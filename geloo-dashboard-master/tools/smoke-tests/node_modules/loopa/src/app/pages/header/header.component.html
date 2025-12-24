@@ -1,0 +1,44 @@
+<ion-header
+  class="ion-no-border"
+>
+  <ion-toolbar
+    [style]="{
+      '--background': backgroundColor ? (backgroundColor + '!important') : '',
+      '--color': textColor ? (textColor + '!important') : ''
+    }"
+  >
+    <ion-buttons class="ion-no-padding ion-no-margin" slot="start">
+      <ion-button shape="round" (click)="goBack()" *ngIf="back">
+        <i class="fas fa-arrow-left"></i>
+      </ion-button>
+      <ion-menu-button *ngIf="menu"></ion-menu-button>
+    </ion-buttons>
+
+    <ion-item
+      [style]="{'--background': 'transparent', '--color': textColor ? (textColor + '!important') : ''}"
+    >
+
+      <ion-avatar (click)="titleClicked.emit()" *ngIf="avatar">
+        <img [src]="avatarSrc" alt="">
+      </ion-avatar>
+
+      <ion-title (click)="titleClicked.emit()" class="ion-no-margin ion-no-padding pl-2">
+        <span>{{ title }}</span>
+      </ion-title>
+    </ion-item>
+
+    <ion-buttons slot="end">
+      <ng-content select="#end-buttons"></ng-content>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<div class="px-2">
+  <ion-searchbar
+    color="light"
+    *ngIf="search"
+    (ionChange)="doSearch($event)"
+  >
+  </ion-searchbar>
+
+</div>

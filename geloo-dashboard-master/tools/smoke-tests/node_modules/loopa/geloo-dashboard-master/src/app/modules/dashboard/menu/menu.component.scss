@@ -1,0 +1,7 @@
+
+.active{
+  @apply border-indigo-300 border-b-2;
+}
+.active>i{
+  @apply text-indigo-300;
+}

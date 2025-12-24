@@ -1,0 +1,84 @@
+/* Make sure the container allows scrolling when necessary */
+.container-fluid {
+    width: 100%;
+    padding: 10px;
+    margin: 0 auto;
+    overflow-x: auto; /* Enable horizontal scrolling */
+    overflow-y: hidden; /* Prevent unnecessary vertical scrolling */
+    max-width: 100%; /* Ensure container does not expand too wide */
+}
+
+/* Table settings */
+table {
+    width: 100%;
+    table-layout: auto; /* Auto width distribution */
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    overflow: auto; /* Ensure table scrolls within its container */
+}
+
+/* Compact column and row settings */
+th, td {
+    padding: 6px 8px; /* Compact padding for cells */
+    border: 1px solid #ddd;
+    text-align: center; /* Align content centrally */
+    vertical-align: middle;
+    white-space: nowrap; /* Prevent text wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Show ellipsis for long text */
+}
+
+/* Set background color for header */
+th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    padding: 6px 8px;
+}
+
+/* Pagination container */
+.pagination-container {
+    display: flex;
+    justify-content: center; /* Center pagination */
+    margin: 10px 0;
+}
+
+/* Pagination controls */
+.pagination-container button,
+.pagination-container a {
+    padding: 4px 6px; /* Compact button padding */
+    margin: 0 2px; /* Small space between buttons */
+    font-size: 12px;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.pagination-container .disabled {
+    pointer-events: none;
+    color: #999;
+    background-color: #f0f0f0;
+}
+
+.pagination-container .active {
+    background-color: #4f46e5;
+    color: white;
+    border-color: #4f46e5;
+}
+
+/* Horizontal and vertical scrolling for smaller screens */
+@media (max-width: 768px) {
+    .container-fluid {
+        overflow-x: scroll; /* Allow horizontal scrolling on small screens */
+    }
+
+    th, td {
+        font-size: 10px; /* Smaller text size for mobile */
+        padding: 4px 6px; /* Reduce padding further on mobile */
+    }
+
+    .pagination-container button,
+    .pagination-container a {
+        padding: 2px 4px; /* Smaller pagination buttons */
+    }
+}

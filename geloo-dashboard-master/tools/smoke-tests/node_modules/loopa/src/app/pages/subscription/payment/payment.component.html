@@ -1,0 +1,87 @@
+<app-header title="Payment" [back]="true"></app-header>
+
+<app-loader *ngIf="pageLoading"></app-loader>
+
+<ion-content>
+
+    <div *ngIf="success" class="text-center row h-100 align-items-center">
+        <div class="w-100">
+            <div class="d-flex justify-content-center">
+                <div class="check-container">
+                <ion-fab-button
+                    class="check-button"
+                >
+                    <i class="fas fa-check text-white"></i>
+                </ion-fab-button>
+                </div>
+            </div>
+            <span class="text-success d-block done-text mt-2">Payment Successful </span>
+            <span class="success-icon d-block desc-text mt-1">Thank you ! Your payment is complete</span>
+        </div>
+    </div>
+
+    <div *ngIf="!success">
+        <div class="w-100 text-center mt-4">
+            <img src="../../../../assets/images/card_payment.png" class="card-pay" alt="">
+            <h1>{{ price }}</h1>
+        </div>
+
+        <ion-list class="mx-4" *ngIf="!pageLoading">
+
+            <div class="mt-3">
+                <ion-label>Full Name</ion-label>
+                <ion-item>
+                    <ion-input type="text" placeholder="Full Name"  [(ngModel)]="cardUserName"></ion-input>
+                </ion-item>
+            </div>
+
+            <div class="mt-3">
+                <ion-label>Card Number</ion-label>
+                <ion-item>
+                    <ion-input type="number" placeholder="Card Number"  [(ngModel)]="cardNumber"></ion-input>
+                </ion-item>
+            </div>
+
+            <div class="mt-3">
+                <ion-label>Expiration Date</ion-label>
+                <ion-row>
+                    <ion-col class="ion-no-padding" size="6">
+                        <ion-item>
+                            <ion-select placeholder="Month" [(ngModel)]="cardMonth" class="w-100">
+                                <ion-select-option *ngFor="let m of months">{{m}}</ion-select-option>
+                            </ion-select>
+                        </ion-item>
+                    </ion-col>
+                    <ion-col class="ion-no-padding" size="6">
+                        <ion-item>
+                            <ion-select placeholder="Year" [(ngModel)]="cardYear" class="w-100">
+                                <ion-select-option *ngFor="let y of years">{{y}}</ion-select-option>
+                            </ion-select>
+                        </ion-item>
+                    </ion-col>
+                </ion-row>
+            </div>
+
+            <div class="mt-3">
+                <ion-label>CVV</ion-label>
+                <ion-item>
+                    <ion-input type="number" placeholder="CVV" [(ngModel)]="cardCVV"></ion-input>
+                </ion-item>
+            </div>
+        </ion-list>
+    </div>
+
+</ion-content>
+
+<ion-footer class="px-3" *ngIf="!success">
+    <ion-button
+      class="mx-1"
+      expand="block"
+      color="primary"
+      size="default"
+      (click)="payAndSubscribe()"
+      [disabled]="pageLoading"
+    >
+        <i class="fas fa-credit-card mr-2"></i> Pay
+    </ion-button>
+</ion-footer>

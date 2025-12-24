@@ -1,0 +1,12 @@
+<app-table
+  [headers]="headers"
+  plurarName="posts"
+  singleName="post"
+  deleteURL="channel/post/:id"
+  retrieveURL="channel/post/all"
+  [displayLink]="getDisplayLinkPost"
+  [showCreateButton]="false"
+  [showUpdateButton]="false"
+  icon="fas fa-clone"
+></app-table>
+

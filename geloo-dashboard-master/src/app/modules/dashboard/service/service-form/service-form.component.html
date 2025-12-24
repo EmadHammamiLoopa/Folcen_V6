@@ -1,0 +1,12 @@
+<app-form
+    [headers]="headers"
+    plurarName="services"
+    singleName="service"
+    icon="fas fa-cog"
+    redirectLink="/dashboard/Services/list"
+    retrieveURL="service/dash/:id"
+    storeURL="service/"
+    updateURL="service/:id"
+    (headersChanged)="changeHeaders($event)"
+    (onChange)="fieldChanged($event)"
+></app-form>

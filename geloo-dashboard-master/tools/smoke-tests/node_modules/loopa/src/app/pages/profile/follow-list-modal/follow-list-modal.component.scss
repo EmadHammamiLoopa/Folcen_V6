@@ -1,0 +1,16 @@
+ion-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+ion-item {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --inner-padding-end: 0;
+}
+
+ion-button {
+  --border-radius: 8px;
+  font-size: 12px;
+  text-transform: none;
+}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loopa Static Logo</title>
+  <style>
+    body, html {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #1a1a1a; /* Dark background for contrast */
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .logo-container {
+      text-align: center;
+    }
+
+    /* Infinity symbol for static logo */
+    .infinity {
+      width: 450px;
+      height: 250px;
+    }
+
+    /* Infinity path with glass effect */
+    .infinity-path {
+      stroke: url(#gradient);
+      stroke-width: 12;
+      fill: transparent;
+      stroke-linecap: round;
+    }
+
+    .infinity-path-inner {
+      stroke: rgba(255, 255, 255, 0.5);
+      stroke-width: 6;
+      fill: transparent;
+    }
+
+    .logo-text {
+      margin-top: 30px;
+      font-size: 55px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 0px 0px 20px rgba(52, 235, 215, 0.8), 0px 0px 30px rgba(52, 144, 242, 1);
+      letter-spacing: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="logo-container">
+    <!-- Infinity Symbol using SVG -->
+    <svg class="infinity" viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">
+      <!-- Gradient for the infinity symbol stroke -->
+      <defs>
+        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#34EBD7" />
+          <stop offset="100%" stop-color="#348FF2" />
+        </linearGradient>
+      </defs>
+      <!-- Outer Path (Glass Effect) -->
+      <path class="infinity-path" d="M10,25 C10,10 40,10 50,25 S90,40 90,25 60,10 50,25 10,40 10,25" />
+      <!-- Inner Path (Highlight for reflection) -->
+      <path class="infinity-path-inner" d="M10,25 C10,10 40,10 50,25 S90,40 90,25 60,10 50,25 10,40 10,25" />
+    </svg>
+
+    <!-- Loopa Text -->
+    <div class="logo-text">Loopa</div>
+  </div>
+
+</body>
+</html>

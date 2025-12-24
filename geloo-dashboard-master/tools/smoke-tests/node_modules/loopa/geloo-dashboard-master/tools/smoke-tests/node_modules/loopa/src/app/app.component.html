@@ -1,0 +1,22 @@
+<ion-app>
+  <!-- Custom Loopa Animation for Splash Screen -->
+  <div *ngIf="showSplash" class="splash-screen">
+    <div class="logo-container">
+      <!-- Infinity Symbol using SVG -->
+      <svg class="infinity" viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#34EBD7" />
+            <stop offset="100%" stop-color="#348FF2" />
+          </linearGradient>
+        </defs>
+        <path class="infinity-path" d="M10,25 C10,10 40,10 50,25 S90,40 90,25 60,10 50,25 10,40 10,25" />
+        <path class="infinity-path-inner" d="M10,25 C10,10 40,10 50,25 S90,40 90,25 60,10 50,25 10,40 10,25" />
+      </svg>
+      <div class="logo-text">Loopa</div>
+    </div>
+  </div>
+
+  <!-- Main App Content -->
+  <ion-router-outlet *ngIf="!showSplash"></ion-router-outlet>
+</ion-app>

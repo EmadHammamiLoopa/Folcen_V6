@@ -1,0 +1,32 @@
+<img
+  [src]="placeholderSrc"
+  width="100%"
+  height="100%"
+  [style]="style"
+  *ngIf="!hidePlaceholder && !avatar"
+>
+<img
+  [src]="src"
+  width="100%"
+  [style]="style"
+  [class.d-none]="!hidePlaceholder"
+  (load)="hidePlaceholder = true"
+  *ngIf="!avatar"
+>
+
+<ion-avatar *ngIf="avatar">
+  <img
+    [src]="placeholderSrc"
+    width="100%"
+    height="100%"
+    [style]="style"
+    *ngIf="!hidePlaceholder"
+  >
+  <img
+    [src]="src"
+    width="100%"
+    [style]="style"
+    [class.d-none]="!hidePlaceholder"
+    (load)="hidePlaceholder = true"
+  >
+</ion-avatar>

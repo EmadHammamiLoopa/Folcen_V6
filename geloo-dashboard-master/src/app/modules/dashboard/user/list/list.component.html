@@ -1,0 +1,88 @@
+<div class="p-6 bg-gray-50 min-h-screen">
+  <!-- Header & Stats -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">User Management</h1>
+      <p class="text-gray-500">Manage and monitor all registered users</p>
+    </div>
+    <div class="flex gap-3">
+      <a routerLink="/dashboard/Users/form/create" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
+        <i class="fas fa-user-plus"></i> Create User
+      </a>
+    </div>
+  </div>
+
+  <!-- Filters Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+    <div class="flex items-center gap-2 mb-4 text-gray-700 font-semibold">
+      <i class="fas fa-filter text-indigo-500"></i>
+      <span>Filter Users</span>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-400 uppercase">Role</label>
+        <select [(ngModel)]="filters.role" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+          <option value="">All Roles</option>
+          <option value="USER">User</option>
+          <option value="ADMIN">Admin</option>
+          <option value="SUPER ADMIN">Super Admin</option>
+        </select>
+      </div>
+
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-400 uppercase">Status</label>
+        <select [(ngModel)]="filters.enabled" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+          <option [ngValue]="null">All Status</option>
+          <option [ngValue]="true">Enabled</option>
+          <option [ngValue]="false">Disabled</option>
+        </select>
+      </div>
+
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-400 uppercase">Min Reports</label>
+        <input type="number" [(ngModel)]="filters.minReports" placeholder="0" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+      </div>
+
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-400 uppercase">From Date</label>
+        <input type="date" [(ngModel)]="filters.fromDate" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+      </div>
+
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-400 uppercase">To Date</label>
+        <input type="date" [(ngModel)]="filters.toDate" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+      </div>
+    </div>
+
+    <div class="flex justify-end mt-6 gap-2">
+      <button (click)="filters = {role:'', enabled:null, minReports:null, fromDate:'', toDate:''}; applyFilters()" 
+              class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        Reset Filters
+      </button>
+      <button (click)="applyFilters()" 
+              class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+        Apply Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Table Section -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <app-table
+      [headers]="headers"
+      [plurarName]="'Users'"
+      [singleName]="'user'"
+      deleteURL="user/:id"
+      retrieveURL="user/all"
+      [extraParams]="filters"
+      [displayLink]="getDisplayLink"
+      editLink="/dashboard/Users/form/edit"
+      createLink="/dashboard/Users/form/create"
+      [showDeleteButton]="true"
+      [showUpdateButton]="true"
+      [showCreateButton]="true"
+      icon="fas fa-users"
+    ></app-table>
+  </div>
+</div>

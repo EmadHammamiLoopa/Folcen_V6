@@ -1,0 +1,34 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Missed Calls</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">Close</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-list *ngIf="calls?.length; else noCalls">
+    <ion-item *ngFor="let c of calls">
+      <ion-avatar slot="start">
+        <img [src]="avatarFor(c)" (error)="onImgError($event)" />
+      </ion-avatar>
+      <ion-label (click)="callBack(c.userId)" class="clickable">
+        <div class="name">{{ c.userName || ('User ' + (c.userId | slice:0:6)) }}</div>
+        <div class="time">{{ c.timestamp | date:'short' }}</div>
+      </ion-label>
+      <ion-button fill="clear" (click)="callBack(c.userId)">Call back</ion-button>
+    </ion-item>
+  </ion-list>
+
+  <ng-template #noCalls>
+    <div class="empty-state" style="padding:20px;text-align:center;color:var(--ion-color-medium);">
+      No missed calls.
+    </div>
+  </ng-template>
+
+  <div class="modal-footer">
+    <ion-button color="danger" expand="full" (click)="clearAll()">Clear All</ion-button>
+  </div>
+</ion-content>
+

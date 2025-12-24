@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!--
+Created using JS Bin
+http://jsbin.com
+
+Copyright (c) 2024 by anonymous (http://jsbin.com/decucupeco/1/edit)
+
+Released under the MIT license: http://jsbin.mit-license.org
+-->
+<meta name="robots" content="noindex">
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loopa Glassy Infinity Logo</title>
+  <style>
+    /* Full-page center alignment */
+    body, html {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #2E2E2E; /* Slightly darker background for better contrast */
+      font-family: 'Poppins', sans-serif;
+    }
+
+    /* Container for the logo */
+    .logo-container {
+      text-align: center;
+      position: relative;
+    }
+
+    /* SVG-based Infinity Symbol */
+    .infinity {
+      width: 400px;
+      height: 200px;
+      position: relative;
+    }
+
+    /* Infinity path styling for glassy effect */
+    .infinity-path {
+      stroke: url(#gradient); /* Gradient colors */
+      stroke-width: 10; /* Thicker stroke for more prominence */
+      fill: transparent;
+      stroke-linecap: round; /* Rounded stroke for a smoother appearance */
+      
+      /* Adding stroke dash properties for the drawing effect */
+      stroke-dasharray: 500;
+      stroke-dashoffset: 500;
+      animation: draw 3s forwards ease-in-out; /* Faster, smoother drawing */
+    }
+
+    /* Inner reflection path for glassy highlight */
+    .infinity-path-inner {
+      stroke: rgba(255, 255, 255, 0.6); /* Slightly brighter reflection */
+      stroke-width: 5; /* Thin highlight for reflection */
+      fill: transparent;
+
+      stroke-dasharray: 500;
+      stroke-dashoffset: 500;
+      animation: draw 3s forwards ease-in-out 0.5s; /* Delayed inner drawing */
+    }
+
+    /* Shine effect with a stronger glow */
+    .infinity {
+      animation: shine 5s infinite ease-in-out; /* Slower shine for smoothness */
+      filter: drop-shadow(0 0 30px rgba(52, 144, 242, 0.8)); /* Added shadow glow */
+    }
+
+    /* Loopa Text Styling */
+    .logo-text {
+      margin-top: 30px;
+      font-size: 50px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 0px 0px 20px rgba(52, 235, 215, 0.8), 0px 0px 30px rgba(52, 144, 242, 1);
+      letter-spacing: 2px; /* Added letter spacing for a modern look */
+      animation: pulse 3s infinite ease-in-out; /* Subtle pulsing effect */
+    }
+
+    /* Shine effect for infinity */
+    @keyframes shine {
+      0% { filter: brightness(1); }
+      50% { filter: brightness(2); }
+      100% { filter: brightness(1); }
+    }
+
+    /* Drawing animation */
+    @keyframes draw {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    /* Pulse effect for the logo text */
+    @keyframes pulse {
+      0%, 100% { text-shadow: 0px 0px 15px rgba(52, 235, 215, 0.8), 0px 0px 25px rgba(52, 144, 242, 1); }
+      50% { text-shadow: 0px 0px 30px rgba(52, 235, 215, 1), 0px 0px 40px rgba(52, 144, 242, 1); }
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="logo-container">
+    <!-- Infinity Symbol using SVG -->
+    <svg class="infinity" viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">
+      <!-- Gradient for the infinity symbol stroke -->
+      <defs>
+        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#34EBD7" />
+          <stop offset="100%" stop-color="#348FF2" />
+        </linearGradient>
+      </defs>
+      <!-- Outer Path (Glass Effect) -->
+      <path class="infinity-path" d="M10,25 C10,10 40,10 50,25 S90,40 90,25 60,10 50,25 10,40 10,25" />
+      <!-- Inner Path (Highlight for reflection) -->
+      <path class="infinity-path-inner" d="M10,25 C10,10 40,10 50,25 S90,40 90,25 60,10 50,25 10,40 10,25" />
+    </svg>
+
+    <!-- Loopa Text -->
+    <div class="logo-text">Loopa</div>
+  </div>
+
+</body>
+</html>

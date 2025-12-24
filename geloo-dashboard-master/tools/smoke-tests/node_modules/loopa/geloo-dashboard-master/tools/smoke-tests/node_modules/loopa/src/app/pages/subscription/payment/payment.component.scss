@@ -1,0 +1,23 @@
+.card-pay{
+    width: 100px;
+}
+.check-button{
+  --background: rgb(55, 158, 103)!important;
+  font-size: 24px;
+  width: 80px;
+  height: 80px;
+}
+.check-container{
+  padding: 25px;
+  background-color: rgb(175, 218, 195)!important;
+  display: block;
+  width: fit-content;
+  border-radius: 50%;
+}
+.done-text{
+    font-size: 30px;
+    font-weight: bold;
+  }
+  .desc-text{
+    font-size: 20px;
+  }

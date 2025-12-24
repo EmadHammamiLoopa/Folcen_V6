@@ -1,0 +1,26 @@
+<div class="relative">
+  <div class="h-full bg-black py-3 w-72 fixed top-0 left-0">
+    <div class="w-full">
+      <div class="flex justify-center">
+        <span class="text-3xl font-semibold text-white">Dashboard</span>
+      </div>
+      <span class="text-left bg-gray-700 text-white my-4 flex items-center px-2 py-3" *ngIf="user">
+        <img class="w-8 h-8" src="./../../../../assets/admin_avatar.png" alt="">
+        <span class="ml-2 uppercase">
+          <span class="font-bold">{{ user.fullName }}</span>
+          <span class="text-xs">{{ user.role }}</span>
+        </span>
+      </span>
+    </div>
+    <nav class="mt-5">
+      <a [routerLink]="item.path" routerLinkActive="active" *ngFor="let item of menuItems" class="text-white my-2 py-2 block hover:bg-gray-700">
+        <i [class]="item.icon + ' mx-3'"></i>
+        <span class="inline-block text-gray-200 capitalize">{{ item.name }}</span>
+      </a>
+      <a (click)="signout()" class="text-white cursor-pointer my-2 py-2 block hover:bg-gray-700">
+        <i class="fas fa-sign-out-alt mx-3"></i>
+        <span class="inline-block text-gray-200 capitalize">Signout</span>
+      </a>
+    </nav>
+  </div>
+</div>

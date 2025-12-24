@@ -1,0 +1,16 @@
+when delete post delete its comments
+nb of comments alwayse 0
+// catch me if you can
+change unfollow service function
+migrate searchbar to header
+replace nb of followers by description channels
+retreive only enabled channels
+add loading while uploading photo product/ job/ service
+add mongodb indexes
+improve success page interfece
+slide back button
+message button in slide
+costum back button size in slide
+online mark
+find new friends (except current Friends)
+slide click on name take to user

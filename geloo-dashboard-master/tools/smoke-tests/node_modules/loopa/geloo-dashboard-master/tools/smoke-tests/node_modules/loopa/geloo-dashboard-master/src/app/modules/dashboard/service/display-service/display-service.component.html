@@ -1,0 +1,197 @@
+<div class="p-6 bg-gray-50 min-h-screen" *ngIf="!loading && service">
+  <!-- Header Section -->
+  <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
+    <div class="flex flex-col md:flex-row items-center gap-6">
+      <div class="relative">
+        <img [src]="service.photo ? (service.photo.startsWith('http') ? service.photo : apiUrl + '/' + service.photo) : 'assets/img/default-service.png'" 
+             class="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-md">
+        <span [class]="service.deletedAt ? 'bg-red-500' : 'bg-green-500'" 
+              class="absolute bottom-2 right-2 w-5 h-5 rounded-full border-2 border-white"></span>
+      </div>
+      
+      <div class="flex-1 text-center md:text-left">
+        <h1 class="text-2xl font-bold text-gray-800 mb-1">{{service.title}}</h1>
+        <p class="text-indigo-600 font-medium mb-2">{{service.company}}</p>
+        <div class="flex flex-wrap justify-center md:justify-start gap-4 text-sm text-gray-500">
+          <span class="flex items-center gap-1"><i class="fas fa-map-marker-alt"></i> {{service.city}}, {{service.country}}</span>
+          <span class="flex items-center gap-1"><i class="fas fa-phone"></i> {{service.phone}}</span>
+          <span class="flex items-center gap-1"><i class="fas fa-calendar-alt"></i> Created {{service.createdAt | date}}</span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <button (click)="toggleStatus()" [class]="service.deletedAt ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-500 hover:bg-orange-600'"
+                class="px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
+          <i [class]="service.deletedAt ? 'fas fa-check-circle' : 'fas fa-ban'"></i>
+          {{service.deletedAt ? 'Enable' : 'Disable'}}
+        </button>
+        <a [routerLink]="['/dashboard/Services/form/edit']" [queryParams]="{id: itemId(service)}"
+           class="px-4 py-2 bg-gray-800 hover:bg-gray-900 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
+          <i class="fas fa-edit"></i> Edit
+        </a>
+        <button (click)="deleteService()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
+          <i class="fas fa-trash"></i> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+    <button (click)="activeTab = 'details'" 
+            [class]="activeTab === 'details' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
+      Service Details
+    </button>
+    <button (click)="activeTab = 'reports'" 
+            [class]="activeTab === 'reports' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
+      Reports ({{service.reports ? service.reports.length : 0}})
+    </button>
+    <button (click)="activeTab = 'creator'" 
+            [class]="activeTab === 'creator' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
+      Creator Info
+    </button>
+  </div>
+
+  <!-- Tab Content -->
+  <div [ngSwitch]="activeTab">
+    <!-- Details Tab -->
+    <div *ngSwitchCase="'details'" class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
+      <div class="md:col-span-2 space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+            <i class="fas fa-align-left text-indigo-500"></i> Description
+          </h3>
+          <p class="text-gray-600 leading-relaxed whitespace-pre-wrap">{{service.description}}</p>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+            <i class="fas fa-info-circle text-indigo-500"></i> Additional Info
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-xs text-gray-400 uppercase font-bold">Category</p>
+              <p class="text-gray-700 font-medium">{{service.serviceCategory}}</p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-xs text-gray-400 uppercase font-bold">Rate</p>
+              <p class="text-gray-700 font-medium">{{service.serviceRate}}</p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-xs text-gray-400 uppercase font-bold">Availability</p>
+              <p class="text-gray-700 font-medium">{{service.availability}}</p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-xs text-gray-400 uppercase font-bold">Experience</p>
+              <p class="text-gray-700 font-medium">{{service.Experience}}</p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-xs text-gray-400 uppercase font-bold">Duration</p>
+              <p class="text-gray-700 font-medium">{{service.serviceDuration}}</p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-xs text-gray-400 uppercase font-bold">Payment Methods</p>
+              <p class="text-gray-700 font-medium">{{service.paymentMethods}}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="text-lg font-semibold mb-4 text-gray-800">Contact & Location</h3>
+          <div class="space-y-3">
+            <p class="flex items-center gap-3 text-gray-600">
+              <i class="fas fa-phone text-indigo-400 w-5"></i> {{service.phone}}
+            </p>
+            <p class="flex items-center gap-3 text-gray-600" *ngIf="service.websitePortfolio">
+              <i class="fas fa-globe text-indigo-400 w-5"></i> 
+              <a [href]="service.websitePortfolio" target="_blank" class="text-indigo-600 hover:underline">{{service.websitePortfolio}}</a>
+            </p>
+            <p class="flex items-center gap-3 text-gray-600">
+              <i class="fas fa-map-pin text-indigo-400 w-5"></i> {{service.address}}
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100" *ngIf="service.licenseCertification">
+          <h3 class="text-lg font-semibold mb-4 text-gray-800">Certifications</h3>
+          <p class="text-gray-600 text-sm">{{service.licenseCertification}}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reports Tab -->
+    <div *ngSwitchCase="'reports'" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">
+      <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="text-lg font-semibold text-gray-800">Reports History</h3>
+        <button *ngIf="service.reports?.length" (click)="clearReports()" class="text-sm text-red-600 hover:text-red-700 font-medium">
+          Clear All Reports
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left">
+          <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
+            <tr>
+              <th class="px-6 py-4">Reporter</th>
+              <th class="px-6 py-4">Reason/Message</th>
+              <th class="px-6 py-4">Date</th>
+              <th class="px-6 py-4">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <tr *ngFor="let report of service.reports" class="hover:bg-gray-50 transition-colors">
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-3" *ngIf="report.userId">
+                  <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                    {{report.userId.firstName ? report.userId.firstName[0] : ''}}{{report.userId.lastName ? report.userId.lastName[0] : ''}}
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-800">{{report.userId.firstName}} {{report.userId.lastName}}</p>
+                    <p class="text-xs text-gray-500">{{report.userId.email}}</p>
+                  </div>
+                </div>
+                <span *ngIf="!report.userId" class="text-gray-400 italic text-sm">Anonymous</span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{{report.message}}</td>
+              <td class="px-6 py-4 text-sm text-gray-500">{{report.createdAt | date:'short'}}</td>
+              <td class="px-6 py-4">
+                <a [routerLink]="['/dashboard/reports/display', itemId(report)]" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">View Details</a>
+              </td>
+            </tr>
+            <tr *ngIf="!service.reports?.length">
+              <td colspan="4" class="px-6 py-12 text-center text-gray-400 italic">No reports found for this service.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Creator Tab -->
+    <div *ngSwitchCase="'creator'" class="animate-fadeIn">
+      <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto text-center">
+        <div class="mb-6">
+          <img [src]="service.user?.mainAvatar ? (service.user.mainAvatar.startsWith('http') ? service.user.mainAvatar : apiUrl + '/' + service.user.mainAvatar) : 'assets/img/default-avatar.png'" 
+               class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg">
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-1">{{service.user?.firstName}} {{service.user?.lastName}}</h3>
+        <p class="text-gray-500 mb-6">{{service.user?.email}}</p>
+        <div class="flex justify-center gap-4">
+          <a [routerLink]="['/dashboard/Users/display', itemId(service.user)]" 
+             class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+            View Full Profile
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="loading" class="flex flex-col items-center justify-center min-h-[400px]">
+  <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+  <p class="text-gray-500 font-medium">Loading service details...</p>
+</div>

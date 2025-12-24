@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../out-tsc/e2e",
+    "module": "commonjs",
+    "target": "ES2020", // Align with main tsconfig
+    "types": ["jasmine", "node"]
+  }
+}

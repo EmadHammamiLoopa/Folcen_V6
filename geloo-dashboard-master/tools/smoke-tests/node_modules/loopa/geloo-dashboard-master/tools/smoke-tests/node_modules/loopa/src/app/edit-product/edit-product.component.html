@@ -1,0 +1,44 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Edit Product</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="saveProduct()">Save</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <form (ngSubmit)="saveProduct()">
+    <ion-item>
+      <ion-label position="stacked">Label</ion-label>
+      <ion-input [(ngModel)]="product.label" name="label" required></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="stacked">Description</ion-label>
+      <ion-textarea [(ngModel)]="product.description" name="description" required></ion-textarea>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="stacked">Price</ion-label>
+      <ion-input [(ngModel)]="product.price" name="price" type="number" required></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="stacked">Currency</ion-label>
+      <ion-select [(ngModel)]="product.currency" name="currency" required>
+        <ion-select-option value="USD">USD</ion-select-option>
+        <ion-select-option value="EUR">EUR</ion-select-option>
+        <!-- Add other currency options here -->
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="stacked">Photos</ion-label>
+      <input type="file" (change)="onFileSelected($event)" multiple>
+    </ion-item>
+    
+
+    <ion-button expand="block" type="submit">Save</ion-button>
+  </form>
+</ion-content>

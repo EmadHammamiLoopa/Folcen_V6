@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "224951885289",
+    "project_id": "loopa-b57f5",
+    "storage_bucket": "loopa-b57f5.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:224951885289:android:0dda825fe0eaab006b3f78",
+        "android_client_info": {
+          "package_name": "com.Loopa.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAq4VMB5lRRNds72FxbjIazVNF7RB0pJAo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

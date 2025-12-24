@@ -1,0 +1,57 @@
+.splash-screen {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #2E2E2E;
+  }
+  
+  .logo-container {
+    text-align: center;
+  }
+  
+  .infinity {
+    width: 400px;
+    height: 200px;
+  }
+  
+  .infinity-path {
+    stroke: url(#gradient);
+    stroke-width: 10;
+    fill: transparent;
+    stroke-linecap: round;
+    stroke-dasharray: 500;
+    stroke-dashoffset: 500;
+    animation: draw 3s forwards ease-in-out;
+  }
+  
+  .infinity-path-inner {
+    stroke: rgba(255, 255, 255, 0.6);
+    stroke-width: 5;
+    fill: transparent;
+    stroke-dasharray: 500;
+    stroke-dashoffset: 500;
+    animation: draw 3s forwards ease-in-out 0.5s;
+  }
+  
+  .logo-text {
+    margin-top: 30px;
+    font-size: 50px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 0px 0px 20px rgba(52, 235, 215, 0.8), 0px 0px 30px rgba(52, 144, 242, 1);
+    letter-spacing: 2px;
+    animation: pulse 3s infinite ease-in-out;
+  }
+  
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% { text-shadow: 0px 0px 15px rgba(52, 235, 215, 0.8), 0px 0px 25px rgba(52, 144, 242, 1); }
+    50% { text-shadow: 0px 0px 30px rgba(52, 235, 215, 1), 0px 0px 40px rgba(52, 144, 242, 1); }
+  }
+  

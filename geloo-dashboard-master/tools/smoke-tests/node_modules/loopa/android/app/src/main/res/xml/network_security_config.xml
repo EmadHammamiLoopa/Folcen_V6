@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Base configuration that applies to all connections -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <!-- Trust system and user certificates -->
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Specific configuration for your server IP (adjust IP as needed) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.5.63</domain>
+        <trust-anchors>
+            <!-- Trust system and user-installed certificates -->
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Optional: Configuration for all IP addresses -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">*.*.*.*</domain> <!-- Matches any IP address -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,8 @@
+{
+  "name": "loopa",
+  "integrations": {
+    "cordova": {},
+    "capacitor": {}
+  },
+  "type": "angular"
+}

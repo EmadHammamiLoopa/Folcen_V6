@@ -1,0 +1,13 @@
+<div class="container-fluid">
+  <app-table
+    [headers]="headers"
+    [plurarName]="'subscriptions'"
+    [singleName]="'subscription'"
+    deleteURL="subscription/:id"
+    retrieveURL="subscription/all"
+    [displayLink]="getDisplayLink"
+    editLink="/dashboard/subscriptions/form/edit"
+    createLink="/dashboard/subscriptions/form/create"
+    icon="fas fa-money-check-alt"
+  ></app-table>
+</div>

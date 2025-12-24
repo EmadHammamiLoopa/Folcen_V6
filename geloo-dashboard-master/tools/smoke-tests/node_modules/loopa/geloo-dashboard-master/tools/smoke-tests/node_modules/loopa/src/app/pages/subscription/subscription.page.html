@@ -1,0 +1,85 @@
+<app-header
+  title="Subscription Plans"
+  [back]="true"
+>
+  <div id="end-buttons">
+    <ion-button
+      *ngIf="subscription && prices.length > 0 && prices[selectedPrice]"
+      [routerLink]="['/tabs/subscription/pay']"
+      [queryParams]="{
+        subscription_id: subscription.id,
+        price: prices[selectedPrice]?.price,
+        duration: prices[selectedPrice]?.duration
+      }"
+      class="d-none d-md-block continue-button"
+      size="large"
+    >
+      Continue
+    </ion-button>
+  </div>
+</app-header>
+
+<app-loader *ngIf="loading"></app-loader>
+
+<ion-content>
+  <div class="h-100 flex flex-column px-4" *ngIf="!loading && subscription && user">
+    <!-- Current Subscription Section -->
+    <div class="text-center px-3 pb-3" *ngIf="user && user.subscription">
+      <span class="d-block">Your current subscription will expire on</span>
+      <span class="d-block expireDate">{{ userExpireDate() }}</span>
+    </div>
+
+    <!-- Offers List -->
+    <div class="row">
+      <div class="col-12 py-2 py-sm-1 col-sm-6 col-md-4" *ngFor="let offer of subscription.offers">
+        <span class="offer-item">
+          <i class="far fa-check-circle"></i> {{ offer }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Pricing Cards -->
+    <div class="flex-grow py-3 w-100">
+      <ion-row class="mt-2 ion-justify-content-center w-100">
+        <ion-col
+          [size]="4"
+          [sizeMd]="2"
+          class="text-center p-2 m-3 price-card"
+          [class.selectedPrice]="ind == selectedPrice"
+          (click)='selectedPrice = ind'
+          *ngFor="let price of prices; let ind = index"
+        >
+          <span *ngIf="ind == selectedPrice" class="selected-label-container">
+            <span class="selected-label">Selected</span>
+          </span>
+          <span class="duration1 d-block"> one {{ price?.duration }}</span>
+          <span class="price d-inline d-block">${{ price?.price }}</span>
+          <ion-text class="save-info" *ngIf="ind > 0">Save {{ savedPrice(ind) }}%</ion-text>
+        </ion-col>
+      </ion-row>
+    </div>
+
+    <!-- Subscription Benefits -->
+    <div class="subscription-benefits mt-4">
+      <h3>Benefits of Your Subscription:</h3>
+      <ul>
+        <li><i class="far fa-check-circle"></i> Full access to premium content</li>
+        <li><i class="far fa-check-circle"></i> Ad-free experience</li>
+        <li><i class="far fa-check-circle"></i> Priority customer support</li>
+        <li><i class="far fa-check-circle"></i> Exclusive early access to new features</li>
+      </ul>
+    </div>
+
+    <!-- Continue Button for Mobile -->
+    <div class="d-flex justify-content-center mt-4">
+      <ion-button
+        *ngIf="subscription && prices.length > 0 && prices[selectedPrice]"
+        (click)="pay()"
+        class="d-md-none continue-button"
+        size="large"
+      >
+        Continue
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

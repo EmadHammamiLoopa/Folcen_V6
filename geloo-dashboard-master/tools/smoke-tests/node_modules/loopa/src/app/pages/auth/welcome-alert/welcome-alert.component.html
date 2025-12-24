@@ -1,0 +1,48 @@
+<app-header
+  [title]="'Welcome ' + (user ? user.fullName : '')"
+>
+</app-header>
+<ion-content>
+  <ion-slides
+    #slides
+    [options]="slideOpts"
+    [pager]="true"
+    (ionSlideWillChange)="slideChanged()"
+    class="h-100"
+  >
+    <ion-slide class="h-100 d-flex flex-column overflow-hidden" *ngFor="let alert of alerts">
+      <div class="h-100 w-100 d-flex flex-column py-2 text-center" >
+        <div class="flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden px-2">
+          <img class="h-100 w-auto image" [src]="'./../../../../assets/' + alert.image" alt="">
+        </div>
+        <div class="flex-grow-auto pb-5 pt-sm-3 pb-sm-3 px-3">
+          <span class="title">{{ alert.title }}</span>
+          <p>{{ alert.text }}</p>
+        </div>
+      </div>
+    </ion-slide>
+  </ion-slides>
+</ion-content>
+
+<ion-footer class="ion-no-padding p-0">
+  <div class="row">
+    <ion-button
+      (click)="previousSlide()"
+      class="skip-btn ion-no-margin col-6"
+      fill="clear"
+      expand="block"
+      [disabled]="currentSlide == 0"
+    >
+      <span> <i class="fas fa-chevron-left"></i></span>
+    </ion-button>
+    <ion-button
+      (click)="nextSlide()"
+      class="skip-btn ion-no-margin col-6"
+      fill="clear"
+      expand="block"
+    >
+      <span *ngIf="currentSlide < alerts.length - 1"><i class="fas fa-chevron-right"></i></span>
+      <span *ngIf="currentSlide == alerts.length - 1">DONE</span>
+    </ion-button>
+  </div>
+</ion-footer>

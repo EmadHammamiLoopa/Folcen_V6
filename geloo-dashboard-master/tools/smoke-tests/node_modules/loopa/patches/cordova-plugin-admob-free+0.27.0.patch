@@ -1,0 +1,13 @@
+diff --git a/node_modules/cordova-plugin-admob-free/src/android/AdMob.java b/node_modules/cordova-plugin-admob-free/src/android/AdMob.java
+index ed87086..aef2c94 100644
+--- a/node_modules/cordova-plugin-admob-free/src/android/AdMob.java
++++ b/node_modules/cordova-plugin-admob-free/src/android/AdMob.java
+@@ -2,7 +2,7 @@ package name.ratson.cordova.admob;
+ 
+ import android.os.Bundle;
+ import android.provider.Settings;
+-import android.support.annotation.NonNull;
++import androidx.annotation.NonNull;
+ import android.util.Log;
+ 
+ import com.google.ads.mediation.admob.AdMobAdapter;

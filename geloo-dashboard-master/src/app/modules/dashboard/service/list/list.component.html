@@ -1,0 +1,15 @@
+<div class="container-fluid">
+  <app-table
+    [headers]="headers"
+    plurarName="services"
+    singleName="service"
+    deleteURL="service/dash/:id"
+    retrieveURL="service/all"
+    [displayLink]="getDisplayLinkservices"
+    editLink="/dashboard/Services/form/edit"
+    createLink="/dashboard/Services/form/create"
+    [showCreateButton]="user.role == 'SUPER ADMIN'"
+    [showUpdateButton]="user.role == 'SUPER ADMIN'"
+    icon="fas fa-cogs"
+  ></app-table>
+</div>
