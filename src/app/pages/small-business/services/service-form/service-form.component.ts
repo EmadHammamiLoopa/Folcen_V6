@@ -1,3 +1,4 @@
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { UploadFileService } from './../../../../services/upload-file.service';
 import { ServiceService } from './../../../../services/service.service';
@@ -5,7 +6,6 @@ import { WebView } from '@ionic-native/ionic-webview/ngx';
 import { FormBuilder, Validators, FormGroup, FormControl } from '@angular/forms';
 import { ToastService } from './../../../../services/toast.service';
 import { Camera } from '@ionic-native/camera/ngx';
-import { Component, OnInit } from '@angular/core';
 import { ListSearchComponent } from 'src/app/pages/list-search/list-search.component';
 import { ModalController, Platform } from '@ionic/angular';
 import { ServiceDisclaimerComponent } from './service-disclaimer.component';
@@ -14,13 +14,16 @@ import { AdMobFeeService } from './../../../../services/admobfree.service';
 import { User } from './../../../../models/User';
 import { JsonService } from './../../../../services/json.service';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
+import { UserService } from 'src/app/services/user.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-service-form',
   templateUrl: './service-form.component.html',
   styleUrls: ['./service-form.component.scss'],
 })
-export class ServiceFormComponent implements OnInit {
+export class ServiceFormComponent implements OnInit, OnDestroy {
 
   countriesObject = {};
   countries: string[] = [];
@@ -28,6 +31,7 @@ export class ServiceFormComponent implements OnInit {
   selectedCountry: string;
   selectedCity: string;
   user: User;
+  private destroy$ = new Subject<void>();
 
   pageLoading = false;
   serviceImages: any[] = [];
@@ -55,11 +59,16 @@ export class ServiceFormComponent implements OnInit {
   constructor(private camera: Camera, private formBuilder: FormBuilder, private uploadFile: UploadFileService, private modalController: ModalController,
               private toastService: ToastService, private webView: WebView, private serviceService: ServiceService, private nativeStorage: NativeStorage,
               private router: Router, private adMobFeeService: AdMobFeeService, private platform: Platform, private jsonService: JsonService,
-              private sanitizer: DomSanitizer) { }
+              private sanitizer: DomSanitizer, private userService: UserService) { }
 
 ngOnInit() {
   this.initializeForm();
-  this.getUserData();
+  this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
+    if (user) {
+      this.user = user;
+      console.log('User updated in ServiceFormComponent:', this.user);
+    }
+  });
   this.loadCountryData();
 
   this.form.valueChanges.subscribe(() => {
@@ -70,6 +79,11 @@ ngOnInit() {
   this.form.get('company').valueChanges.subscribe((value) => {
     this.onCompanySelectionChange(value);
   });
+}
+
+ngOnDestroy() {
+  this.destroy$.next();
+  this.destroy$.complete();
 }
 
 onCompanySelectionChange(value: string) {
@@ -98,50 +112,7 @@ onCompanySelectionChange(value: string) {
       description: ['', [Validators.required, Validators.maxLength(255)]]
     });
     
-    this.getUserData();
     this.loadCountryData(); // Load countries when initializing the form
-  }
-
-  getUserData() {
-    const isCordova = this.platform.is('cordova');
-    console.log('Checking platform for user data. isCordova:', isCordova);
-
-    if (isCordova) {
-      (async () => {
-        try {
-          let u: any = null;
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-          if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
-          
-          if (u) {
-            console.log('Fetched user data from NativeStorage:', u);
-            this.initializeUser(u);
-          } else {
-            console.warn('User not found in NativeStorage, falling back to localStorage');
-            this.fetchUserFromLocalStorage();
-          }
-        } catch (error) {
-          console.warn('Error fetching user data from NativeStorage:', error);
-          this.fetchUserFromLocalStorage();
-        }
-      })();
-    } else {
-      console.log('Not a cordova platform, using localStorage');
-      this.fetchUserFromLocalStorage();
-    }
-  }
-
-  fetchUserFromLocalStorage() {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
-    if (user) {
-      console.log('Fetched user data from localStorage:', user);
-      this.initializeUser(user);
-    } else {
-      console.log('User data not found in localStorage');
-      this.toastService.presentStdToastr('User data not found. Please log in again.');
-      this.router.navigateByUrl('/auth/signin');
-    }
   }
 
   initializeUser(user: any) {
@@ -175,7 +146,7 @@ onCompanySelectionChange(value: string) {
     // Use multiple pictures if in browser, or single if in cordova (for now)
     if (!this.platform.is('cordova')) {
       this.uploadFile.getFileFromBrowser() // I should probably use a multi-file picker
-        .then(file => {
+        .then((file: any) => {
           this.imageLoading = false;
           const img = {
             url: this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file)) as string,
@@ -202,7 +173,7 @@ onCompanySelectionChange(value: string) {
           },
           err => {
             this.imageLoading = false;
-            this.toastService.presentStdToastr(err);
+            this.toastService.presentErrorToastr(err);
           }
         );
     }
@@ -258,13 +229,13 @@ onCompanySelectionChange(value: string) {
   async submit() {
     // Ensure at least one image is selected
     if (this.serviceImages.length === 0) {
-      this.toastService.presentStdToastr('Please select at least one image for the service');
+      this.toastService.presentErrorToastr('Please select at least one image for the service');
       return;
     }
   
     // Ensure the form is valid
     if (this.form.invalid) {
-      this.toastService.presentStdToastr('Please fill in all required fields');
+      this.toastService.presentErrorToastr('Please fill in all required fields');
       return;
     }
 
@@ -298,7 +269,7 @@ onCompanySelectionChange(value: string) {
         resp => {
           this.pageLoading = false;
           console.log(resp);
-          this.toastService.presentStdToastr('Service created successfully');
+          this.toastService.presentSuccessToastr('Service created successfully');
           this.router.navigateByUrl('/tabs/small-business/services');
           this.clearServiceForm();  // Reset the form after success
         },
@@ -308,7 +279,7 @@ onCompanySelectionChange(value: string) {
             this.validatorErrors = err.errors;  // Display validation errors if any
           }
           if (typeof err === 'string') {
-            this.toastService.presentStdToastr(err);
+            this.toastService.presentErrorToastr(err);
           }
           console.log(err);
         }

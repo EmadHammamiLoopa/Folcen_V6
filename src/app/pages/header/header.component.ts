@@ -17,11 +17,12 @@ export class HeaderComponent implements OnInit, OnChanges {
   @Input() search = false;
   @Input() modal = false;
   @Input() reverseColors = false;
-  backgroundColor = "transparent";
-  textColor = "#ffffff";
+  backgroundColor = "";
+  textColor = "";
   @Input() avatar = false;
   @Input() avatarSrc: string;
   @Input() avatarLink: string;
+  @Input() profile: any;
 
   @Output() searchKeyUp = new EventEmitter();
   @Output() titleClicked = new EventEmitter();

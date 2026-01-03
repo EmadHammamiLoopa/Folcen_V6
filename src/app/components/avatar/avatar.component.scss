@@ -1,0 +1,102 @@
+:host {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.avatar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  :host-context(body.light-theme) & {
+    background: #F1F5F9;
+    border-color: rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  &.rounded {
+    border-radius: var(--avatar-border-radius, 16px);
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    border-color: rgba(var(--ion-color-primary-rgb, 56, 128, 255), 0.3);
+  }
+
+  img {
+    object-fit: cover;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.5s ease;
+  }
+
+  &:hover img {
+    transform: scale(1.1);
+  }
+
+  &.premium-ring {
+    &::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #3b82f6 0%, #6366f1 100%);
+      z-index: -1;
+      animation: rotate 3s linear infinite;
+    }
+    padding: 2px;
+    background: transparent;
+  }
+
+  .fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #fff;
+    font-weight: 600;
+    text-transform: uppercase;
+    width: 100%;
+    height: 100%;
+    letter-spacing: 0.02em;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    line-height: 1;
+
+    i {
+      font-size: 1.2em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    &::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+  }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

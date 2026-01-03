@@ -1,5 +1,6 @@
 import { User } from './../../../../models/User';
 import { Component, OnInit } from '@angular/core';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-list',
@@ -47,6 +48,16 @@ export class ListComponent implements OnInit {
       values: ["Disabled", "Enabled"]
     },
     {
+      name: "followers",
+      title: "Followers",
+      type: "number"
+    },
+    {
+      name: "postsCount",
+      title: "Posts",
+      type: "number"
+    },
+    {
       name: "reports",
       title: "Reports",
       type: "number"
@@ -59,6 +70,14 @@ export class ListComponent implements OnInit {
 
   ngOnInit(): void {
     this.getUser();
+  }
+
+  exportChannels(format: 'csv' | 'json') {
+    const token = window.localStorage.getItem('token');
+    const baseUrl = environment.apiUrl;
+    // Corrected URL to match backend route: /api/v1/admin/channels/export
+    const url = `${baseUrl}/admin/channels/export?format=${format}&token=${token}`;
+    window.open(url, '_blank');
   }
 
   getDisplayLinkchannel = (row: any): string => {

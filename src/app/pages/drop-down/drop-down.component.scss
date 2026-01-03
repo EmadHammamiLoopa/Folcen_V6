@@ -1,3 +1,69 @@
-.icon{
-  color: #aaa;
+.dropdown-container {
+  background: rgba(26, 31, 46, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  min-width: 180px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  margin-bottom: 2px;
+  cursor: pointer;
+
+  &:active {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.98);
+  }
+
+  &.last {
+    margin-bottom: 0;
+  }
+
+  .item-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .icon-box {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+    }
+
+    .item-text {
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+  }
+
+  .chevron {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 10px;
+  }
+
+  // Special styling for destructive actions
+  &:has(.fa-trash-alt), &:has(.fa-minus-circle) {
+    .icon-box {
+      color: #ff4d4d;
+      background: rgba(255, 77, 77, 0.1);
+    }
+  }
 }

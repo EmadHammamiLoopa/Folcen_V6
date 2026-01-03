@@ -10,7 +10,7 @@ describe('NewFriendsPage', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ NewFriendsPage ],
-      imports: [IonicModule.forChild()]
+      imports: [IonicModule.forRoot()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(NewFriendsPage);

@@ -10,7 +10,7 @@ describe('ServiceFormComponent', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ ServiceFormComponent ],
-      imports: [IonicModule.forChild()]
+      imports: [IonicModule.forRoot()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(ServiceFormComponent);

@@ -6,24 +6,25 @@
       </ion-button>
     </ion-buttons>
 
-    <div class="user-info" (click)="showUserProfile()">
+    <div class="user-info" (click)="!isAdminChat() && showUserProfile()" [style.cursor]="isAdminChat() ? 'default' : 'pointer'">
       <div class="avatar-wrapper">
-        <img [src]="user?.getMainAvatar()" alt="Profile" *ngIf="user?.getMainAvatar()" />
-        <div *ngIf="user?.online" class="online-dot"></div>
+        <app-avatar [profile]="user" [size]="40"></app-avatar>
+        <div *ngIf="user?.online && !isAdminChat()" class="online-dot"></div>
       </div>
 
       <div class="user-text">
-        <h2 class="user-name">{{ user?.fullName }}</h2>
+        <h2 class="user-name">{{ isAdminChat() ? 'System' : user?.fullName }}</h2>
         <p class="user-status">
-          <span *ngIf="user?.online" class="online">Online</span>
-          <span *ngIf="!user?.online" class="offline">
+          <span *ngIf="user?.online && !isAdminChat()" class="online">Online</span>
+          <span *ngIf="!user?.online && !isAdminChat()" class="offline">
             Last seen {{ user?.lastSeenText }}
           </span>
+          <span *ngIf="isAdminChat()" class="online">Official Account</span>
         </p>
       </div>
     </div>
 
-    <ion-buttons slot="end">
+    <ion-buttons slot="end" *ngIf="!isAdminChat()">
       <ion-button *ngIf="!user?.isFriend && canRequestVideoCall()"
                   (click)="onVideoButtonPressed()"
                   shape="round" fill="clear" class="video-btn">
@@ -78,7 +79,7 @@
              [class.failed]="message?.state === 'failed'">
           
           <!-- Image message -->
-          <img *ngIf="message?.image" [src]="message?.image" class="message-image">
+          <img *ngIf="message?.image" [src]="message?.image" class="message-image" (click)="openImage(message?.image)" style="cursor:pointer">
           
           <!-- Text content -->
           <div class="message-text" *ngIf="message?.text">
@@ -172,15 +173,27 @@
   </div>
 
   <!-- Chat limits messages -->
-  <div class="chat-limits" *ngIf="messages && !conversationStarted()">
-    You can't send more messages until '{{ user?.fullName }}' responds
+  <div class="chat-limits animate__animated animate__fadeInUp" *ngIf="messages && !conversationStarted()">
+    <div class="limit-content">
+      <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+      <p>You can't send more messages until <strong>{{ user?.fullName }}</strong> responds</p>
+    </div>
   </div>
-  <div class="chat-limits" *ngIf="user && messages && !nonFriendsChatEnabled()">
-    You have reached the message limit for non-friends
+  <div class="chat-limits animate__animated animate__fadeInUp" *ngIf="user && messages && !nonFriendsChatEnabled()">
+    <div class="limit-content">
+      <ion-icon name="shield-outline"></ion-icon>
+      <p>You have reached the message limit for non-friends</p>
+    </div>
+  </div>
+
+  <!-- Admin/System Chat Notice -->
+  <div class="admin-chat-notice animate__animated animate__fadeIn" *ngIf="isAdminChat()">
+    <ion-icon name="information-circle-outline"></ion-icon>
+    <p>This is a system channel. You cannot reply to these messages.</p>
   </div>
 </ion-content>
 
-<ion-footer class="message-input-footer">
+<ion-footer class="message-input-footer" *ngIf="!isAdminChat()">
   <ion-toolbar>
     <ion-item lines="none" class="input-container">
       
@@ -204,7 +217,7 @@
       <ion-input
         [(ngModel)]="messageText"
         (keyup.enter)="addMessage()"
-        [disabled]="!conversationStarted() || !nonFriendsChatEnabled()"
+        [readonly]="!conversationStarted() || !nonFriendsChatEnabled()"
         placeholder="Type a message"
         class="message-input">
       </ion-input>
@@ -219,7 +232,7 @@
 
       <!-- Send Button -->
       <ion-button slot="end" fill="clear" (click)="addMessage()"
-        [disabled]="!messageText && !image"
+        [disabled]="(!messageText && !image) || !conversationStarted() || !nonFriendsChatEnabled()"
         class="send-button">
         <ion-icon name="send"></ion-icon>
       </ion-button>

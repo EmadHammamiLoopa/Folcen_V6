@@ -10,12 +10,10 @@
 <ion-content>
   <ion-list *ngIf="calls?.length; else noCalls">
     <ion-item *ngFor="let c of calls">
-      <ion-avatar slot="start">
-        <img [src]="avatarFor(c)" (error)="onImgError($event)" />
-      </ion-avatar>
+      <app-avatar slot="start" [profile]="$any({ _id: c.userId, firstName: c.userName })" [size]="40"></app-avatar>
       <ion-label (click)="callBack(c.userId)" class="clickable">
         <div class="name">{{ c.userName || ('User ' + (c.userId | slice:0:6)) }}</div>
-        <div class="time">{{ c.timestamp | date:'short' }}</div>
+        <div class="time">{{ c.timestamp | extractDiffTime }}</div>
       </ion-label>
       <ion-button fill="clear" (click)="callBack(c.userId)">Call back</ion-button>
     </ion-item>

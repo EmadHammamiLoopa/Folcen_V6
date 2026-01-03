@@ -93,10 +93,11 @@ export class ListComponent implements OnInit {
     this.pageLoading = false;
   }
 
-  handleError(err){
+  handleError(err, event?){
     console.log(err);
+    if (event) event.target.complete();
     this.pageLoading = false;
-    this.toastService.presentStdToastr(err);
+    this.toastService.presentErrorToastr(err);
   }
 
   getServices(event, refresh?){
@@ -105,13 +106,13 @@ export class ListComponent implements OnInit {
       this.serviceService.posted(this.page++, this.searchQuery)
       .then(
         resp => this.handleResponse(event, refresh, resp),
-        err => this.handleError(err)
+        err => this.handleError(err, event)
       );
     }else{
       this.serviceService.available(this.page++, this.searchQuery)
       .then(
         resp => this.handleResponse(event, refresh, resp),
-        err => this.handleError(err)
+        err => this.handleError(err, event)
       );
     }
   }

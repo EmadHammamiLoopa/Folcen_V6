@@ -29,13 +29,14 @@
 .select-container {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  padding: 20px;
+  min-height: 100vh;
+  padding: 24px 16px 96px; /* safe bottom for tabbar */
+  box-sizing: border-box;
 }
 
 .image-section {
   text-align: center;
-  padding: 40px 0;
+  padding: 28px 0 16px;
 
   .business-svg {
     width: 200px;
@@ -49,14 +50,14 @@
   text-align: center;
 
   .welcome-text {
-    font-size: 28px;
+    font-size: clamp(1.4rem, 5.2vw, 28px);
     font-weight: 800;
     color: var(--ion-text-color);
     margin-bottom: 8px;
   }
 
   .subtitle {
-    font-size: 16px;
+    font-size: clamp(0.95rem, 2.6vw, 16px);
     color: var(--loopa-text-muted);
     margin-bottom: 40px;
   }
@@ -68,6 +69,22 @@
   gap: 20px;
   max-width: 600px;
   margin: 0 auto;
+}
+
+@media (min-width: 720px) {
+  .options-grid {
+    grid-template-columns: 1fr 1fr;
+    max-width: 1000px;
+    gap: 24px;
+  }
+
+  .glass-card {
+    padding: 36px 28px;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
 }
 
 .glass-card {

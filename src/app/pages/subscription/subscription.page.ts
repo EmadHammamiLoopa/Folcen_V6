@@ -1,17 +1,20 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Subscription } from 'src/app/models/Subscription';
 import { SubscriptionService } from 'src/app/services/subscription.service';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { User } from './../../models/User';
 import { AlertController } from '@ionic/angular';
 import { Router } from '@angular/router';
+import { UserService } from 'src/app/services/user.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-subscription',
   templateUrl: './subscription.page.html',
   styleUrls: ['./subscription.page.scss'],
 })
-export class SubscriptionPage implements OnInit {
+export class SubscriptionPage implements OnInit, OnDestroy {
 
   subscription: Subscription;
   lastDate: Date;
@@ -22,59 +25,29 @@ export class SubscriptionPage implements OnInit {
   }[] = [];
   selectedPrice = 0;
   user: User;
+  private destroy$ = new Subject<void>();
 
   constructor(private subscriptionService: SubscriptionService, private nativeStorage: NativeStorage, private alertCtrl: AlertController,
-              private router: Router) { }
+              private router: Router, private userService: UserService) { }
 
   ngOnInit() {
-  
     this.prices = [];
+    this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      if (user) {
+        this.user = user;
+        console.log('User updated in SubscriptionPage:', this.user);
+        this.getSubscriptionPrices();
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   ionViewWillEnter(){
     this.prices = []
-    this.getUserData();
-  }
-
-  getUserData() {
-    // Prefer canonical key 'currentUser' in NativeStorage, fallback to legacy 'user', then to localStorage
-    (async () => {
-      try {
-        let u: any = null;
-        try { u = await this.nativeStorage.getItem('currentUser'); } catch (e) { /* ignore */ }
-        if (!u) { try { u = await this.nativeStorage.getItem('user'); } catch (e2) { /* ignore */ } }
-
-        if (u) {
-          console.log('Fetched user data from NativeStorage:', u);
-          this.initializeUser(typeof u === 'string' ? JSON.parse(u) : u);
-          return;
-        }
-      } catch (err) {
-        console.warn('NativeStorage read failed, falling back to localStorage', err);
-      }
-
-      // Fallback to localStorage
-      this.fetchUserFromLocalStorage();
-    })();
-  }
-  
-  fetchUserFromLocalStorage() {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
-    if (user) {
-      console.log('Fetched user data from localStorage:', user);
-      this.initializeUser(user);
-    } else {
-      console.log('User data not found in localStorage');
-      // Handle case when no user data is available in both storages
-      // For example, redirect to login or show an error
-    }
-  }
-  
-  initializeUser(user: any) {
-    this.user = new User().initialize(user);
-    console.log('User initialized successfully:', this.user);
-    this.getSubscriptionPrices();  // Fetch subscription prices after initializing the user
   }
 
   navigateToPayment(){

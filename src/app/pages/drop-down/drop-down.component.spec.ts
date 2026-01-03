@@ -10,7 +10,7 @@ describe('DropDownComponent', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ DropDownComponent ],
-      imports: [IonicModule.forChild()]
+      imports: [IonicModule.forRoot()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(DropDownComponent);

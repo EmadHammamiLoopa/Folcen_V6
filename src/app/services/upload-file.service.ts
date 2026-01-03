@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 import { FilePath } from '@ionic-native/file-path/ngx';
+import { File as IonicFile } from '@ionic-native/file/ngx';
+import { WebView } from '@ionic-native/ionic-webview/ngx';
 import { Platform } from '@ionic/angular';
 import { Camera, CameraOptions, PictureSourceType, MediaType } from '@ionic-native/camera/ngx';
 import { AndroidPermissions } from '@ionic-native/android-permissions/ngx';
@@ -17,6 +19,8 @@ export class UploadFileService {
 
   constructor(
     private filePath: FilePath,
+    private file: IonicFile,
+    private webView: WebView,
     private platform: Platform,
     private camera: Camera,
     private permissionService: PermissionService,
@@ -69,7 +73,7 @@ export class UploadFileService {
   }
 
   // Browser file picker
-  getFileFromBrowser(): Promise<File> {
+  getFileFromBrowser(): Promise<any> {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -84,9 +88,9 @@ export class UploadFileService {
   }
 
   
-  upload(file: File, userId: string): Observable<any> {
+  upload(file: any, userId: string): Observable<any> {
     const maxSizeMB = 20;
-    if (file.size > maxSizeMB * 1024 * 1024) {
+    if (file && file.size > maxSizeMB * 1024 * 1024) {
       throw new Error(`File exceeds ${maxSizeMB} MB limit.`);
     }
     const formData = new FormData();
@@ -110,10 +114,26 @@ export class UploadFileService {
       correctOrientation: true
     };
 
-    return this.camera.getPicture(options).then(imageData => {
+    return this.camera.getPicture(options).then(async imageData => {
+      let fileBlob = null;
+      
+      if (this.platform.is('cordova')) {
+        try {
+          const convertedPath = this.webView.convertFileSrc(imageData);
+          const response = await fetch(convertedPath);
+          fileBlob = await response.blob();
+        } catch (e) {
+          console.error('Error converting URI to blob', e);
+          // Fallback to File plugin if fetch fails
+          const path = imageData.substring(0, imageData.lastIndexOf('/') + 1);
+          const name = imageData.substring(imageData.lastIndexOf('/') + 1);
+          fileBlob = await this.file.readAsArrayBuffer(path, name).then(buffer => new Blob([buffer]));
+        }
+      }
+
       return {
         imageData: imageData,
-        file: null, // you can extend this if needed for file processing
+        file: fileBlob,
         name: imageData.substring(imageData.lastIndexOf('/') + 1)
       };
     });

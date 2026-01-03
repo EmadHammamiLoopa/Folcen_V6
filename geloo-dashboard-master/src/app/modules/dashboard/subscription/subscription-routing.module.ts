@@ -2,6 +2,8 @@ import { SubscriptionFormComponent } from './subscription-form/subscription-form
 import { ListComponent } from './list/list.component';
 import { SubscriptionComponent } from './subscription.component';
 import { SubscriptionDisplayComponent } from './display-subscription/Subscription-DisplayComponent';  // <-- Import Display Component
+import { PlanRuleListComponent } from './plan-rule-list/plan-rule-list.component';
+import { PlanRuleFormComponent } from './plan-rule-form/plan-rule-form.component';
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
@@ -20,6 +22,14 @@ const routes: Routes = [
       {
         path: 'list',
         component: ListComponent
+      },
+      {
+        path: 'rules',
+        component: PlanRuleListComponent
+      },
+      {
+        path: 'rules/form/:type',
+        component: PlanRuleFormComponent
       },
       {
         path: 'form/:type',

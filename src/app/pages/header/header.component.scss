@@ -4,14 +4,23 @@ ion-header {
   ion-toolbar {
     --background: var(--loopa-toolbar-background);
     --color: var(--loopa-toolbar-color);
+    --padding-start: 0;
+    --padding-end: 0;
+    --inner-padding-end: 0;
     backdrop-filter: blur(16px) saturate(180%);
     border-bottom: 1px solid var(--loopa-tabbar-border);
-    padding: 4px 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
 
-    ion-item {
-      --background: transparent;
-      --color: var(--loopa-toolbar-color);
-      width: 100%;
+    ion-buttons[slot="start"] {
+      padding-left: 8px;
+      z-index: 2;
+    }
+
+    ion-buttons[slot="end"] {
+      padding-right: 8px;
+      z-index: 2;
     }
 
     ion-title {
@@ -19,15 +28,38 @@ ion-header {
       font-size: 1.1rem;
       letter-spacing: -0.02em;
       color: var(--loopa-toolbar-color);
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
+      pointer-events: none;
+      margin: 0;
+      padding: 0;
       width: 100%;
-      margin: 0 auto;
-      position: absolute; /* center independent of left/right buttons */
-      left: 50%;
-      transform: translateX(-50%);
+      z-index: 1;
+
+      .title-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        gap: 8px;
+        width: fit-content;
+        margin: 0 auto;
+      }
+
+      .header-avatar {
+        height: 32px;
+        width: 32px;
+        border-radius: 10px;
+        border: 1.5px solid rgba(var(--ion-color-primary-rgb), 0.3);
+        overflow: hidden;
+      }
     }
 
     ion-button {

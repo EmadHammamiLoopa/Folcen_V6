@@ -46,6 +46,13 @@ export class AuthGuard implements CanActivate {
     if (token && user) {
       return true;
     } else {
+      if (token && !user) {
+        console.warn('AuthGuard: Token found but user missing. Clearing inconsistent storage to prevent loop.');
+        try { localStorage.removeItem('token'); } catch (e) {}
+        if (this.platform.is('cordova')) {
+          try { this.nativeStorage.remove('token').catch(() => {}); } catch (e) {}
+        }
+      }
       console.log('Auth token not found, redirecting to /auth/signin');
       this.router.navigate(['/auth/signin']);
       return false;

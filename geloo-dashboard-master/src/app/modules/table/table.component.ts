@@ -1,9 +1,10 @@
 import { NotificationService } from './../../services/notification.service';
 import { DataService } from './../../services/data.service';
 import { environment } from './../../../environments/environment';
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, Output, EventEmitter } from '@angular/core';
 import Swal from 'sweetalert2';
 import { ActivatedRoute } from '@angular/router';
+import { AvatarUrlUtil } from '../../utils/avatar-url.util';
 
 @Component({
   selector: 'app-table',
@@ -23,9 +24,14 @@ export class TableComponent implements OnInit {
   @Input() plurarName: string;
   @Input() singleName: string;
   @Input() icon: string = '';
+  @Input() hideHeader = false;
+  @Input() selectable = false;
+  @Input() promptReason = false;
+
+  @Output() selectionChange = new EventEmitter<any[]>();
 
   // Headers with required properties
-  @Input() headers: { title: string; name: string; type: string; values?: string[], sort?: boolean }[] = [];
+  @Input() headers: { title: string; name: string; type: string; values?: string[], sort?: boolean, align?: string }[] = [];
 
   data: any[] = [];
   pages: number[] = [];
@@ -37,6 +43,8 @@ export class TableComponent implements OnInit {
   searchQuery = '';
   sortBy = '_id';
   sortDir = 1;
+
+  selectedRows: Set<any> = new Set();
 
   constructor(
     private dataService: DataService,
@@ -63,6 +71,8 @@ export class TableComponent implements OnInit {
 
   getData() {
     this.error = undefined;
+    this.selectedRows.clear();
+    this.selectionChange.emit([]);
 
     const requestParams = {
       sortBy: this.sortBy,
@@ -121,139 +131,87 @@ export class TableComponent implements OnInit {
   }
 
   getAvatar(row: any, name: string): string {
-    const v = row[name];
-    // compute backend root by stripping possible `/api/v1` suffix from environment.apiUrl
+    // compute backend root
     const backendRoot = environment.apiUrl ? environment.apiUrl.replace(/\/api\/v1\/?$/i, '') : '';
-    const defaultAvatar = backendRoot + '/public/images/avatars/other.webp';
 
-    if (!v) return defaultAvatar;
-    if (typeof v === 'string') {
-      // If already absolute, return as-is
-      if (v.startsWith('http://') || v.startsWith('https://')) return v;
-      // If it's a server-relative path (starts with /), prefix backend root
-      if (v.startsWith('/')) return backendRoot + v;
-      // Otherwise treat as relative URL on backend
-      return backendRoot + '/' + v;
+    // Use the centralized AvatarUrlUtil for consistent avatar rendering
+    let url = AvatarUrlUtil.getAvatarUrl(row, backendRoot);
+
+    if (!url) {
+      return backendRoot + '/public/images/avatars/other.webp';
     }
-    if (Array.isArray(v) && v.length) return this.getAvatar({ [name]: v[0] }, name);
-    if (v.url) return (v.url.startsWith('http') ? v.url : backendRoot + v.url);
-    if (v.path) return (v.path.startsWith('http') ? v.path : backendRoot + v.path);
-    if (v.mainAvatar) return (v.mainAvatar.startsWith('http') ? v.mainAvatar : backendRoot + v.mainAvatar);
-    if (v.avatar && Array.isArray(v.avatar) && v.avatar.length) return this.getAvatar({ [name]: v.avatar[0] }, name);
-    // fallback
-    return defaultAvatar;
+    
+    // Add cache-busting timestamp if updatedAt exists and it's a local file
+    if (row.updatedAt && !url.includes('dicebear.com')) {
+      const timestamp = new Date(row.updatedAt).getTime();
+      url += (url.includes('?') ? '&' : '?') + 't=' + timestamp;
+    }
+    
+    return url;
   }
 
   getDisplayValue(row: any, name: string): string {
     const v = row[name];
     if (v === null || v === undefined) return 'N/A';
     if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
-    // Mongoose ObjectId may provide toString() or have $oid depending on API
+    
+    // If it's an object, try to extract a meaningful string (especially for IDs)
     try {
-      // If this looks like an id field, prefer to extract a hex string
-      const isIdField = (name === '_id') || /(^|\b)id(\b|$)/i.test(String(name));
+      const isIdField = (name === '_id') || name.toLowerCase().includes('id');
       if (isIdField) {
-        // Common Mongoose ObjectId APIs
-        if (v && typeof v.toHexString === 'function') return v.toHexString();
-        if (v && v.$oid) return String(v.$oid);
-        if (v && v._bsontype === 'ObjectID' && typeof v.toHexString === 'function') return v.toHexString();
-        // Buffer-backed id (v.id or v.buffer.data) -> convert to hex if 12 bytes
-        const bufCandidate = (v && v.id) || (v && v.buffer) || (v && v.data);
-        if (bufCandidate) {
-          // normalize to array of bytes
-          const arr = bufCandidate.data || bufCandidate;
-          if (Array.isArray(arr) && arr.length === 12) {
-            return arr.map((b: any) => (b.toString(16).padStart(2, '0'))).join('');
-          }
-        }
+        const id = this.getId(v);
+        if (id) return id;
       }
 
-      if (v && v._id) return String(v._id);
+      if (v._id) return this.getId(v._id);
+      
       if (typeof v.toString === 'function' && v.toString() !== '[object Object]') {
-        const s = v.toString();
-        // try to extract ObjectId("...") pattern
-        const m = /ObjectId\(["']?([0-9a-fA-F]{24})["']?\)/.exec(s);
-        if (m) return m[1];
-        return s;
+        return v.toString();
+      }
+      
+      // Handle Buffer/Binary data
+      if (v.type === 'Buffer' && Array.isArray(v.data)) {
+        return v.data.map((b: any) => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
       }
     } catch (e) {}
-    if (v.$oid) return String(v.$oid);
-
-    // Detect Node/Buffer-like objects (serialized) and try to extract hex id when possible
-    const tryBufferToHex = (candidate: any): string | null => {
-      if (!candidate) return null;
-      // Array of bytes
-      if (Array.isArray(candidate)) {
-        return candidate.map((b: any) => Number(b).toString(16).padStart(2, '0')).join('');
-      }
-      // Uint8Array / ArrayBuffer
-      if (candidate instanceof Uint8Array) {
-        return Array.from(candidate).map((b: any) => b.toString(16).padStart(2, '0')).join('');
-      }
-      if (candidate instanceof ArrayBuffer) {
-        return Array.from(new Uint8Array(candidate)).map((b: any) => b.toString(16).padStart(2, '0')).join('');
-      }
-      // { type: 'Buffer', data: [...] } or { data: [...] }
-      if (candidate.data && Array.isArray(candidate.data)) {
-        return candidate.data.map((b: any) => Number(b).toString(16).padStart(2, '0')).join('');
-      }
-      if (candidate.buffer && candidate.buffer.data && Array.isArray(candidate.buffer.data)) {
-        return candidate.buffer.data.map((b: any) => Number(b).toString(16).padStart(2, '0')).join('');
-      }
-      // object with numeric keys
-      const numericKeys = Object.keys(candidate || {}).filter(k => String(Number(k)) === k).sort((a, b) => Number(a) - Number(b));
-      if (numericKeys.length) return numericKeys.map(k => Number(candidate[k]).toString(16).padStart(2, '0')).join('');
-      return null;
-    };
-
-    if (v && (v.type === 'Buffer' || v.buffer || v.data || Object.prototype.hasOwnProperty.call(v, '0'))) {
-      // Prefer nested _id if present
-      if (v._id) return String(v._id);
-      // try common nested locations for binary id
-      const candidates = [v.id, v.buffer, v.data, v];
-      for (const c of candidates) {
-        const hex = tryBufferToHex(c);
-        if (hex && hex.length >= 12) return hex.length === 24 ? hex : hex.slice(0, 24);
-      }
-      return '[binary]';
-    }
-    // Fallback: JSON stringify but keep small
-    try {
-      const s = JSON.stringify(v);
-      return s.length > 80 ? s.slice(0, 80) + '...' : s;
-    } catch (e) {
-      return '[object]';
-    }
+    
+    return 'Object';
   }
 
   // Extract a usable id string from various _id shapes
   getId(v: any): string {
     if (!v) return '';
+    
     // If it's a row object, try to get _id or id
     if (typeof v === 'object' && !Array.isArray(v) && (v._id || v.id)) {
       return this.getId(v._id || v.id);
     }
+    
     if (typeof v === 'string') return v;
-    if (v && typeof v === 'object') {
-      if (v.$oid) return String(v.$oid);
+    
+    if (typeof v === 'object') {
+      // Mongoose/BSON ObjectId
       if (v.toHexString && typeof v.toHexString === 'function') return v.toHexString();
+      if (v.$oid) return String(v.$oid);
+      if (v._bsontype === 'ObjectID' && v.id) v = v.id; // Fall through to buffer handling
       
-      // Handle Buffer-like objects from Mongoose/BSON
+      // Handle Buffer/Binary IDs
       const buf = v.buffer || v.data || v;
-      if (buf && (typeof buf === 'object' || Array.isArray(buf))) {
-        const keys = Object.keys(buf).filter(k => !isNaN(Number(k))).sort((a, b) => Number(a) - Number(b));
-        if (keys.length >= 12) {
-          return keys.map(k => Number(buf[k]).toString(16).padStart(2, '0')).join('');
+      if (buf && (Array.isArray(buf) || buf instanceof Uint8Array || buf.data)) {
+        const data = buf.data || buf;
+        if (Array.isArray(data) || data instanceof Uint8Array) {
+          const hex = Array.from(data).map((b: any) => b.toString(16).padStart(2, '0')).join('');
+          if (hex.length >= 12) return hex.slice(0, 24);
         }
       }
       
-      if (v._id) return this.getId(v._id);
-      if (v.id) return this.getId(v.id);
+      if (typeof v.toString === 'function' && v.toString() !== '[object Object]') {
+        return v.toString();
+      }
     }
-    // Fallback to string representation but avoid [object Object]
+    
     const s = String(v);
-    if (s === '[object Object]' || s === 'undefined' || s === 'null') return '';
-    return s;
+    return (s === '[object Object]' || s === 'undefined' || s === 'null') ? '' : s;
   }
 
   getDisplayLink(row: any): string {
@@ -268,20 +226,37 @@ export class TableComponent implements OnInit {
   }
 
   showDeleteConf() {
-    return Swal.fire({
+    const config: any = {
       title: 'Are you sure?',
       text: 'Do you really want to delete this item?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: 'red',
       confirmButtonText: 'Yes, delete it!',
-    });
+    };
+
+    if (this.promptReason) {
+      config.input = 'text';
+      config.inputPlaceholder = 'Enter reason for deletion...';
+      config.inputValidator = (value) => {
+        if (!value) {
+          return 'You need to provide a reason!';
+        }
+        return null;
+      };
+    }
+
+    return Swal.fire(config);
   }
 
   deleteRow(row, ind) {
     this.showDeleteConf().then((resp) => {
       if (resp.isConfirmed) {
-        const deleteUrl = this.deleteURL.replace(':id', this.getId(row));
+        let deleteUrl = this.deleteURL.replace(':id', this.getId(row));
+        if (this.promptReason && resp.value) {
+          const separator = deleteUrl.includes('?') ? '&' : '?';
+          deleteUrl += `${separator}reason=${encodeURIComponent(resp.value)}`;
+        }
         this.dataService.sendDeleteRequest(deleteUrl).subscribe(
           (resp: any) => {
             this.data.splice(ind, 1);
@@ -320,7 +295,32 @@ export class TableComponent implements OnInit {
   sortableHeaders() {
     return this.headers.filter(header => header.sort !== false || header.sort === undefined);
   }
-  
 
-  
+  // Selection Methods
+  toggleSelection(row: any) {
+    if (this.selectedRows.has(row)) {
+      this.selectedRows.delete(row);
+    } else {
+      this.selectedRows.add(row);
+    }
+    this.selectionChange.emit(Array.from(this.selectedRows));
+  }
+
+  toggleAllSelection() {
+    if (this.isAllSelected()) {
+      this.selectedRows.clear();
+    } else {
+      this.data.forEach(row => this.selectedRows.add(row));
+    }
+    this.selectionChange.emit(Array.from(this.selectedRows));
+  }
+
+  isAllSelected() {
+    return this.data.length > 0 && this.selectedRows.size === this.data.length;
+  }
+
+  clearSelection() {
+    this.selectedRows.clear();
+    this.selectionChange.emit([]);
+  }
 }

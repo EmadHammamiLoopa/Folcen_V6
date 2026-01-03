@@ -2,6 +2,7 @@ import { FilePath } from '@ionic-native/file-path/ngx';
 import { UploadFileService } from './../../services/upload-file.service';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { SharingModule } from './../sharing/sharing.module';
+import { SharedComponentsModule } from '../../components/shared.module';
 import { Camera } from '@ionic-native/camera/ngx';
 import { DisplayComponent } from './display/display.component';
 import { FormComponent } from './form/form.component';
@@ -16,6 +17,7 @@ import { IonicModule } from '@ionic/angular';
 import { ProfilePageRoutingModule } from './profile-routing.module';
 
 import { ProfilePage } from './profile.page';
+import { SharingPipeModule } from 'src/app/pipes/sharing/sharing-pipe.module';
 
 @NgModule({
   imports: [
@@ -23,7 +25,9 @@ import { ProfilePage } from './profile.page';
     FormsModule,
     ReactiveFormsModule,
     IonicModule,
+    SharedComponentsModule,
     SharingModule,
+    SharingPipeModule,
     ProfilePageRoutingModule
   ],
   declarations: [

@@ -97,10 +97,11 @@ export class ListComponent implements OnInit {
     this.pageLoading = false;
   }
 
-  handleError(err){
+  handleError(err, event?){
     console.log(err);
+    if (event) event.target.complete();
     this.pageLoading = false;
-    this.toastService.presentStdToastr(err);
+    this.toastService.presentErrorToastr(err);
   }
 
   getJobs(event, refresh?){
@@ -109,13 +110,13 @@ export class ListComponent implements OnInit {
       this.jobService.posted(this.page++, this.searchQuery)
       .then(
         resp => this.handleResponse(event, refresh, resp),
-        err => this.handleError(err)
+        err => this.handleError(err, event)
       );
     }else{
       this.jobService.available(this.page++, this.searchQuery)
       .then(
         resp => this.handleResponse(event, refresh, resp),
-        err => this.handleError(err)
+        err => this.handleError(err, event)
       );
     }
   }

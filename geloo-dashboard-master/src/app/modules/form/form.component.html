@@ -47,8 +47,8 @@
             <div class="relative">
               <select [(ngModel)]="header.value" [id]="header.name" [name]="header.name" [disabled]="header.readonly"
                       class="appearance-none block w-full bg-white border border-gray-200 text-gray-700 rounded-xl py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed">
-                <option [value]="false">{{ header.options[0] }}</option>
-                <option [value]="true">{{ header.options[1] }}</option>
+                <option [value]="false">{{ (header.values || header.options)[0] }}</option>
+                <option [value]="true">{{ (header.values || header.options)[1] }}</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
                 <i class="fas fa-chevron-down text-xs"></i>
@@ -83,7 +83,7 @@
               <select (change)="addTag(header, $event)" [id]="header.name" [name]="header.name"
                       class="appearance-none block w-full bg-white border border-gray-200 text-gray-700 rounded-xl py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all">
                 <option value="" disabled selected>Add {{header.title}}...</option>
-                <option [value]="option" *ngFor="let option of header.options">{{ option }}</option>
+                <option [value]="option" *ngFor="let option of (header.options || header.values)">{{ option }}</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
                 <i class="fas fa-plus text-xs"></i>
@@ -96,7 +96,7 @@
             <div class="relative">
               <select (change)="fieldChanged(header.name, header.value)" [(ngModel)]="header.value" [id]="header.name" [name]="header.name" [disabled]="header.readonly"
                       class="appearance-none block w-full bg-white border border-gray-200 text-gray-700 rounded-xl py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed">
-                <option [value]="option" *ngFor="let option of header.options">{{ option }}</option>
+                <option [value]="option" *ngFor="let option of (header.options || header.values)">{{ option }}</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
                 <i class="fas fa-chevron-down text-xs"></i>

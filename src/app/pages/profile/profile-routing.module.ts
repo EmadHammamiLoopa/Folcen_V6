@@ -27,7 +27,8 @@ const routes: Routes = [
       },
       {
         path: 'chat/:id', // Add this route for chatting with friend
-        loadChildren: () => import('../messages/messages.module').then(m => m.MessagesPageModule),
+        redirectTo: '/messages/chat/:id',
+        pathMatch: 'full',
         canActivate: [AuthGuard]
       }
     ]

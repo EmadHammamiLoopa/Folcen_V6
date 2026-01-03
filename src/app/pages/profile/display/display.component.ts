@@ -1,7 +1,7 @@
-import { Component, Input, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnInit, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Location } from '@angular/common';
-import { AlertController, PopoverController, Platform, ModalController } from '@ionic/angular';
+import { AlertController, PopoverController, Platform, ModalController, LoadingController } from '@ionic/angular';
 import { AuthService } from './../../../services/auth.service';
 import { RequestService } from './../../../services/request.service';
 import { ToastService } from './../../../services/toast.service';
@@ -13,18 +13,23 @@ import constants from 'src/app/helpers/constants';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { DropDownComponent } from '../../drop-down/drop-down.component';
 import { FollowListModalComponent } from '../follow-list-modal/follow-list-modal.component';
+import { ReportModalComponent } from '../../../components/report-modal/report-modal.component';
 import { UploadFileService } from 'src/app/services/upload-file.service';
 import { WebView } from '@ionic-native/ionic-webview/ngx';
 import { Camera } from '@ionic-native/camera/ngx';
 import { environment } from 'src/environments/environment';
 import { IdService } from 'src/app/services/id.service';
+import { Subscription } from 'rxjs';
+
+import { PhotoViewerComponent } from '../../../components/photo-viewer/photo-viewer.component';
+import { SocketService } from 'src/app/services/socket.service';
 
 @Component({
   selector: 'app-display',
   templateUrl: './display.component.html',
   styleUrls: ['./display.component.scss'],
 })
-export class DisplayComponent implements OnInit {
+export class DisplayComponent implements OnInit, OnDestroy {
   pageLoading = true;
   authUser: User;
   @Input() user: User;
@@ -35,12 +40,18 @@ export class DisplayComponent implements OnInit {
   userId: string;
   mainAvatar: string;
   imageLoading = false;
+  isUploading = false;
+  usedCached = false;
+
+  private userSub: Subscription | null = null;
+  private socketSub: Subscription | null = null;
 
   constructor(
     private auth: AuthService, private userService: UserService, private requestService: RequestService,
     private toastService: ToastService, private alertCtrl: AlertController, private router: Router,
     private platform: Platform, private route: ActivatedRoute, private popoverController: PopoverController,
     private modalCtrl: ModalController,
+    private loadingCtrl: LoadingController,
   private nativeStorage: NativeStorage, private sanitizer: DomSanitizer, private changeDetectorRef: ChangeDetectorRef,
     private uploadFile: UploadFileService, private camera: Camera, private webView: WebView,
     private location: Location,
@@ -50,6 +61,127 @@ export class DisplayComponent implements OnInit {
   ngOnInit() {
     console.log("Initializing DisplayComponent...");
     this.getUserId();
+
+    // Subscribe to current user changes to keep friend status in sync
+    this.userSub = this.userService.currentUser.subscribe((updatedUser) => {
+      if (!updatedUser) return;
+
+      // If we are on "display/null" or viewing our own ID, we should update
+      const isMe = this.myProfile || !this.userId || this.userId === 'null' || (this.userId === updatedUser._id);
+
+      if (isMe) {
+        console.log('DisplayComponent: Updating own profile from currentUser stream');
+        this.user = updatedUser;
+        this.mainAvatar = this.user.mainAvatarPath;
+        this.myProfile = true; // Ensure this is set
+        this.changeDetectorRef.detectChanges();
+      } else if (this.user && !this.myProfile) {
+        this.checkIfFriend();
+        this.changeDetectorRef.detectChanges();
+      }
+    });
+
+    // Subscribe to server profile update notifications to refresh follow counts in real-time
+    try {
+      this.socketSub = SocketService.userProfileUpdated$.subscribe((payload: any) => {
+        try {
+          const uid = payload?.userId;
+          if (!uid) return;
+          // If the viewed profile changed, reload it
+          if (this.user && (this.user._id === String(uid) || this.user.id === String(uid))) {
+            console.log('DisplayComponent: Socket update received for viewed user', uid);
+            this.userService.getUserProfile(this.user._id, { forceRefresh: true }).subscribe({
+              next: (u: any) => { if (u) { this.user = new User().initialize(u); this.changeDetectorRef.detectChanges(); } },
+              error: (err) => { this.handleUserDataError(err); }
+            });
+          }
+        } catch (e) { console.warn('Error handling profile update socket payload', e); }
+      });
+    } catch (e) { /* ignore socket subscription errors */ }
+
+    // Subscribe to follow updates
+    try {
+      const followSub = SocketService.followUpdate$.subscribe((payload: any) => {
+        if (this.user && (this.user._id === payload.followedId || this.user._id === payload.followerId)) {
+          console.log('DisplayComponent: Follow update received, refreshing profile');
+          this.userService.getUserProfile(this.user._id, { forceRefresh: true }).subscribe({
+            next: (u: any) => { if (u) { this.user = new User().initialize(u); this.changeDetectorRef.detectChanges(); } },
+            error: (err) => { this.handleUserDataError(err); }
+          });
+        }
+      });
+      if (this.socketSub) {
+        // We can't easily add to socketSub if it's a single Subscription, 
+        // but we can use a composite subscription or just another field.
+        // For simplicity, I'll just add it to the existing socketSub if I can, 
+        // but socketSub is assigned above. I'll use a private subs array.
+      }
+    } catch (e) {}
+
+    // Subscribe to friend updates
+    try {
+      const friendSub = SocketService.friendRequestsUpdated$.subscribe((payload: any) => {
+        if (this.user) {
+          console.log('DisplayComponent: Friend update received, refreshing profile');
+          this.userService.getUserProfile(this.user._id, { forceRefresh: true }).subscribe({
+            next: (u: any) => { if (u) { this.user = new User().initialize(u); this.changeDetectorRef.detectChanges(); } },
+            error: (err) => { this.handleUserDataError(err); }
+          });
+        }
+      });
+    } catch (e) {}
+  }
+
+  ngOnDestroy() {
+    if (this.userSub) {
+      this.userSub.unsubscribe();
+    }
+    try { if (this.socketSub) this.socketSub.unsubscribe(); } catch (e) {}
+  }
+
+  isArray(val: any): boolean {
+    return Array.isArray(val);
+  }
+
+  get isLocked(): boolean {
+    if (!this.user || this.myProfile) return false;
+    // If profile is private, only ACTIVE followers or friends can see content
+    const isFollowingActive = this.user.isFollowing && this.user.followStatus === 'active';
+    return this.user.isPrivate && !isFollowingActive && !this.user.isFriend;
+  }
+
+  get suggestedChannels(): any[] {
+    if (!this.user || !this.user.followedChannels || this.myProfile) return [];
+    
+    const me = this.userService.currentUserValue;
+    if (!me) return [];
+
+    const myChannelIds = (me.followedChannels || []).map(c => {
+      if (typeof c === 'string') return c;
+      return c._id || c.id;
+    });
+    
+    // Filter channels that User B follows but I don't
+    return this.user.followedChannels.filter(c => {
+      if (!c) return false;
+      const channelId = typeof c === 'string' ? c : (c._id || c.id);
+      return !myChannelIds.includes(channelId);
+    }).filter(c => typeof c === 'object'); // Only show if we have the object data
+  }
+
+  getChannelImage(channel: any): string {
+    if (!channel) return 'assets/images/channel-placeholder.png';
+    const img = channel.image || channel.photo;
+    if (!img) return 'assets/images/channel-placeholder.png';
+    if (img.startsWith('http')) return img;
+    return this.domaine + (img.startsWith('/') ? '' : '/') + img;
+  }
+
+  joinChannel(channel: any) {
+    const channelId = channel._id || channel.id;
+    if (!channelId) return;
+    
+    this.router.navigate(['/tabs/channels/channel', channelId]);
   }
 
   ionViewWillEnter() {
@@ -128,7 +260,7 @@ export class DisplayComponent implements OnInit {
         next: (user) => {
           if (user && user._id) {
               this.user = new User().initialize(user);
-              this.filterAvatars();
+              this.mainAvatar = this.user.mainAvatarPath;
               this.pageLoading = false;
             console.log('Loaded user data for own profile:', this.user);
           } else {
@@ -140,7 +272,7 @@ export class DisplayComponent implements OnInit {
         error: (err) => {
           console.error('Error fetching user profile for own profile:', err);
           this.pageLoading = false;
-          this.handleUserDataError();
+          this.handleUserDataError(err);
         }
       });
     } else {
@@ -148,8 +280,18 @@ export class DisplayComponent implements OnInit {
         next: (user) => {
           if (user && user._id) {
             this.user = new User().initialize(user);
-            this.filterAvatars();
-            this.checkIfFriend(); // Check if the user is a friend
+            
+            // 🚫 Guard: Do not allow viewing Admin profiles as regular users
+            const role = (this.user.role || '').toUpperCase();
+            if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN') {
+              console.warn('Attempted to view Admin profile, redirecting...');
+              this.handleUserDataError({ status: 403 });
+              return;
+            }
+
+            this.mainAvatar = this.user.mainAvatarPath;
+            // Trust backend isFriend/friend status initially; 
+            // subscription to currentUser will handle real-time updates.
             this.pageLoading = false;
             console.log('Loaded user data for another profile:', this.user);
           } else {
@@ -161,7 +303,7 @@ export class DisplayComponent implements OnInit {
         error: (err) => {
           console.error('Error fetching user profile for another profile:', err);
           this.pageLoading = false;
-          this.handleUserDataError();
+          this.handleUserDataError(err);
         }
       });
     }
@@ -180,31 +322,34 @@ export class DisplayComponent implements OnInit {
     const formData = new FormData();
     formData.append('avatar', imageFile, imageName);
   
+    this.isUploading = true;
     this.userService.uploadAvatar(this.user._id, formData).subscribe({
       next: (response: any) => {
         if (response && response.user) {
-          this.userService.getUserProfile(response.user._id).subscribe({
-            next: (updatedUser) => {
-              if (updatedUser && updatedUser._id) {
-                this.user = new User().initialize(updatedUser); // Re-initialize with User class
-                this.filterAvatars();
-                this.updateUserInStorage(this.user.toObject());
-                this.changeDetectorRef.detectChanges();
-                this.toastService.presentStdToastr('Avatar uploaded successfully!');
-              } else {
-                this.handleUserDataError();
-              }
-            },
-            error: () => {
-              this.toastService.presentStdToastr('Failed to reload user data.');
-            }
-          });
+          // The backend returns the updated user object
+          const updatedUser = new User().initialize(response.user);
+          
+          // Update local state
+          this.user = updatedUser;
+          this.mainAvatar = updatedUser.mainAvatarPath;
+          
+          // Persist
+          this.updateUserInStorage(this.user.toObject());
+          
+          // Notify other components/services via UserService
+          this.userService.setCurrentUser(this.user, { force: true });
+          
+          this.isUploading = false;
+          this.changeDetectorRef.detectChanges();
+          this.toastService.presentSuccessToastr('Avatar uploaded successfully!');
         } else {
-          this.toastService.presentStdToastr('Invalid response from server.');
+          this.isUploading = false;
+          this.toastService.presentErrorToastr('Invalid response from server.');
         }
       },
       error: () => {
-        this.toastService.presentStdToastr('Error uploading image');
+        this.isUploading = false;
+        this.toastService.presentErrorToastr('Error uploading image');
       }
     });
   }
@@ -217,18 +362,30 @@ export class DisplayComponent implements OnInit {
     const formData = new FormData();
     formData.append('avatar', file, file.name);
   
+    this.isUploading = true;
     this.userService.uploadAvatar(this.user._id, formData).subscribe({
       next: (response: any) => {
-        this.userService.getUserProfile(response.user._id).subscribe((updatedUser) => {
-          this.user = new User().initialize(updatedUser);  // Re-initialize with User class
-          this.filterAvatars();
+        if (response && response.user) {
+          const updatedUser = new User().initialize(response.user);
+          
+          this.user = updatedUser;
+          this.mainAvatar = updatedUser.mainAvatarPath;
+          
           this.updateUserInStorage(this.user.toObject());
+          
+          // Notify other components/services via UserService
+          this.userService.setCurrentUser(this.user, { force: true });
+          
+          this.isUploading = false;
           this.changeDetectorRef.detectChanges();
-          this.toastService.presentStdToastr('Avatar uploaded successfully!');
-        });
+          this.toastService.presentSuccessToastr('Avatar uploaded successfully!');
+        } else {
+          this.isUploading = false;
+        }
       },
       error: (err) => {
-        this.toastService.presentStdToastr('Upload failed: ' + err.message || err);
+        this.isUploading = false;
+        this.toastService.presentErrorToastr('Upload failed: ' + (err.message || err));
       }
     });
   }
@@ -238,7 +395,7 @@ export class DisplayComponent implements OnInit {
       // Native mobile: use existing uploadFile logic
       this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'image')
         .then(resp => this.processSelectedMedia(resp))
-        .catch(err => this.toastService.presentStdToastr('Failed: ' + err));
+        .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
     } else {
       // Browser: trigger file input manually
       const input = document.getElementById('webImageInput') as HTMLInputElement;
@@ -250,24 +407,34 @@ export class DisplayComponent implements OnInit {
   openCameraPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image')
       .then(resp => this.processSelectedMedia(resp))
-      .catch(err => this.toastService.presentStdToastr('Failed: ' + err));
+      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
   }
   
   openVideoPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'video')
       .then(resp => this.processSelectedMedia(resp))
-      .catch(err => this.toastService.presentStdToastr('Failed: ' + err));
+      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
   }
   
 
   checkIfFriend() {
-  const storedRaw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  const storedUser = storedRaw ? JSON.parse(storedRaw) : null;
-    if (storedUser && storedUser.friends) {
-      this.user.isFriend = storedUser.friends.includes(this.userId);
-    } else {
-      this.user.isFriend = false;
+    const me = this.userService.currentUserValue;
+    if (!me || !this.userId || !this.user) {
+      return;
     }
+
+    // Check if the viewed user ID is in my friends list
+    const myFriends = me.friends || [];
+    const isFriendLocally = myFriends.some(f => {
+      const friendId = (typeof f === 'string') ? f : (f._id || f.id);
+      return String(friendId) === String(this.userId);
+    });
+
+    // Update the user object
+    this.user.isFriend = isFriendLocally;
+    this.user.friend = isFriendLocally;
+
+    console.log(`Is friend check for ${this.userId}: local=${isFriendLocally}`);
   }
 
   getAuthUser() {
@@ -277,7 +444,7 @@ export class DisplayComponent implements OnInit {
           this.userId = user._id;
           this.myProfile = true;
           this.user = new User().initialize(user);
-          this.filterAvatars();
+          this.mainAvatar = this.user.mainAvatarPath;
           this.pageLoading = false;
           console.log('Loaded authenticated user data:', this.user);
           this.loadUserData();
@@ -317,13 +484,11 @@ export class DisplayComponent implements OnInit {
   avatarUrl(src?: string): string {
     if (!src) return 'assets/images/avatars/placeholder.png';
     if (/^https?:\/\//i.test(src)) return src;     // already absolute
-    return `${environment.apiUrl}${src.startsWith('/') ? '' : '/'}${src}`;
+    return `${this.domaine}${src.startsWith('/') ? '' : '/'}${src}`;
   }
 
   isDefaultAvatar(avatarUrl: string): boolean {
-    return avatarUrl === constants.defaultMaleAvatarUrl ||
-           avatarUrl === constants.defaultFemaleAvatarUrl ||
-           avatarUrl === constants.defaultOtherAvatarUrl;
+    return this.user?.isDefaultAvatar(avatarUrl) || false;
   }
 
   sanitizeUrl(url: string): SafeUrl {
@@ -351,22 +516,26 @@ export class DisplayComponent implements OnInit {
               this.userService.getUserProfile(response.user._id).subscribe({
                 next: (updatedUser) => {
                   this.user = new User().initialize(updatedUser); // Re-initialize with User class
-                  this.filterAvatars();
-                  this.toastService.presentStdToastr('Avatar uploaded successfully!');
+                  this.mainAvatar = this.user.mainAvatarPath;
+                  
+                  // Notify other components/services via UserService
+                  this.userService.setCurrentUser(this.user, { force: true });
+                  
+                  this.toastService.presentSuccessToastr('Avatar uploaded successfully!');
                 },
                 error: (err) => {
                   console.error('Failed to reload user data after image upload:', err);
-                  this.toastService.presentStdToastr('Failed to reload user data.');
+                  this.toastService.presentErrorToastr('Failed to reload user data.');
                 }
               });
             }
           },
           error: (error) => {
-            this.toastService.presentStdToastr('Error uploading image: ' + error);
+            this.toastService.presentErrorToastr('Error uploading image: ' + error);
           }
         });
       }, err => {
-        this.toastService.presentStdToastr('Image capture failed: ' + err);
+        this.toastService.presentErrorToastr('Image capture failed: ' + err);
       });
   }
 
@@ -430,7 +599,7 @@ export class DisplayComponent implements OnInit {
         if (user && user._id) {
           this.pageLoading = false;
           this.user = new User().initialize(user);
-          this.filterAvatars();
+          this.mainAvatar = this.user.mainAvatarPath;
           // only persist to storage when viewing own profile
           if (this.myProfile) {
             this.updateUserInStorage(this.user.toObject());
@@ -462,12 +631,27 @@ export class DisplayComponent implements OnInit {
     });
   }
   
-  private handleUserDataError() {
-    // Display a toast message
-    this.toastService.presentStdToastr('Failed to load user data. Please try again later.');
-  
-    // Optionally, navigate to a different page
-    // this.router.navigate(['/error']);
+  private handleUserDataError(err?: any) {
+    // If it's a 403 Forbidden, it likely means we are blocked or the profile is private
+    if (err && (err.status === 403 || err.status === 401)) {
+      console.warn('Access denied to profile, showing restricted view');
+      // Create a minimal user object to trigger the "Private Profile" UI
+      this.user = new User().initialize({
+        _id: this.userId,
+        isPrivate: true,
+        isFollowing: false,
+        isFriend: false,
+        fullName: 'Private Profile',
+        firstName: 'Private',
+        lastName: 'Profile'
+      });
+      this.pageLoading = false;
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
+
+    // Display a toast message for other errors
+    this.toastService.presentErrorToastr('Failed to load user data. Please try again later.');
   
     // Reset relevant variables
     this.user = null;
@@ -478,10 +662,10 @@ export class DisplayComponent implements OnInit {
     this.userService.follow(this.user._id).subscribe(
       (resp: any) => {
         this.user.followed = resp.data;
-        this.toastService.presentStdToastr(this.user.followed ? 'follow' : 'unfollow');
+        // Redundant toast removed: this.toastService.presentStdToastr(this.user.followed ? 'follow' : 'unfollow');
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
@@ -494,13 +678,15 @@ export class DisplayComponent implements OnInit {
   }
 
   handleError(err) {
-    this.toastService.presentStdToastr(err);
+    this.toastService.presentErrorToastr(err);
   }
 
   acceptRequest() {
     this.requestService.acceptRequest(this.user.requests[0]._id).then(
       () => {
         this.user.friend = true;
+        this.user.isFriend = true;
+        this.userService.triggerFriendsRefresh();
       },
       err => this.handleError(err)
     );
@@ -509,14 +695,16 @@ export class DisplayComponent implements OnInit {
   removeFriend() {
     this.userService.removeFriendship(this.user._id).subscribe(
       (resp: any) => {
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
         if (resp.data) {
           this.user.friend = false;
+          this.user.isFriend = false;
           this.user.request = null;
+          this.userService.triggerFriendsRefresh();
         }
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
@@ -537,15 +725,15 @@ export class DisplayComponent implements OnInit {
         this.user.request = 'requested';
         this.user.friend = false;
         this.user.requests.push(new Request(resp.data.request));
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
       },
       err => {
         err = JSON.parse(err);
         if (err.code && err.code === constants.ERROR_CODES.SUBSCRIPTION_ERROR) {
           this.router.navigate(['/tabs/subscription']);
-          this.toastService.presentStdToastr(err.message);
+          this.toastService.presentErrorToastr(err.message);
         } else {
-          this.toastService.presentStdToastr(err);
+          this.toastService.presentErrorToastr(err);
         }
       }
     );
@@ -573,14 +761,14 @@ export class DisplayComponent implements OnInit {
   removeFriendship() {
     this.userService.removeFriendship(this.user._id).subscribe(
       (resp: any) => {
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
         if (resp.data) {
           this.user.friend = false;
           this.user.request = null;
         }
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
@@ -621,24 +809,90 @@ export class DisplayComponent implements OnInit {
   changeMainAvatar(avatar: string) {
     this.userService.updateMainAvatar(this.user._id, avatar).subscribe({
       next: (resp: any) => {
-        this.user.mainAvatar = avatar;
-        this.mainAvatar = avatar;
-        this.filterAvatars();
+        // Update both the model and the local state immediately
+        if (resp.user) {
+          this.user = new User().initialize(resp.user);
+        } else {
+          this.user.mainAvatar = avatar;
+          // If we're setting a photo as main, we should clear the customized style locally too
+          if (!avatar.includes('dicebear.com')) {
+            this.user.avatarStyle = '';
+          }
+        }
+        
+        this.mainAvatar = this.user.mainAvatarPath;
+        
+        // Persist and detect changes
         this.updateUserInStorage(this.user.toObject());
-        this.toastService.presentStdToastr('Main avatar updated');
+        
+        // Notify other components/services via UserService
+        this.userService.setCurrentUser(this.user, { force: true });
+        
+        this.toastService.presentSuccessToastr('Main avatar updated');
         this.changeDetectorRef.detectChanges();
       },
-      error: (e) => this.toastService.presentStdToastr(e)
+      error: (e) => {
+        const errorMsg = e.error?.message || e.message || 'Failed to update main avatar';
+        this.toastService.presentErrorToastr(errorMsg);
+      }
     });
   }
 
-  async viewPhoto(url: string) {
-    const alert = await this.alertCtrl.create({
-      cssClass: 'photo-viewer-modal',
-      message: `<img src="${this.avatarUrl(url)}" class="full-photo" />`,
-      buttons: [{ text: 'Close', role: 'cancel' }]
+  async viewPhoto(index: any) {
+    console.log('viewPhoto called with index:', index);
+    
+    let galleryAvatars = this.user.avatars;
+    
+    // If clicking the main avatar (index is a path and matches mainAvatarPath), 
+    // or if gallery is empty, show ONLY the main avatar in the viewer.
+    if (galleryAvatars.length === 0 || index === this.user.mainAvatarPath) {
+      galleryAvatars = [{
+        path: this.user.mainAvatarPath,
+        url: this.user.mainAvatar
+      }];
+    }
+
+    // Map all avatars to full URLs for the viewer
+    const photos = galleryAvatars.map(a => a.url);
+    const rawPaths = galleryAvatars.map(a => a.path);
+
+    console.log('Gallery photos for viewer:', photos);
+
+    let initialIndex = 0;
+    if (typeof index === 'number') {
+      initialIndex = index;
+    } else {
+      // If index is a path, find it in the filtered list
+      initialIndex = rawPaths.indexOf(index);
+      if (initialIndex === -1) initialIndex = 0;
+    }
+    
+    const modal = await this.modalCtrl.create({
+      component: PhotoViewerComponent,
+      componentProps: {
+        photos: photos,
+        rawPaths: rawPaths,
+        initialIndex: initialIndex,
+        myProfile: this.myProfile,
+        currentMainPath: this.user.mainAvatarPath
+      },
+      cssClass: 'photo-viewer-modal'
     });
-    await alert.present();
+    
+    console.log('Presenting photo viewer modal...');
+    await modal.present();
+    console.log('Photo viewer modal presented.');
+
+    const { data } = await modal.onWillDismiss();
+    if (data && data.action) {
+      if (data.action === 'setMain') {
+        this.changeMainAvatar(data.path);
+      } else if (data.action === 'delete') {
+        this.removeAvatar(data.path);
+      } else if (data.action === 'report') {
+        this.reportUser(data.path);
+      }
+    }
   }
   
   
@@ -656,18 +910,34 @@ export class DisplayComponent implements OnInit {
   }
 
   removeAvatar(avatarUrl: string) {
-    this.userService.removeAvatar(this.user._id, avatarUrl).subscribe(
-      (response: any) => {
+    // Optimistic update: remove from local array immediately for real-time feel
+    const originalAvatarPaths = [...this.user.avatar];
+    this.user.avatar = this.user.avatar.filter(path => path !== avatarUrl && this.user.avatarUrl(path) !== avatarUrl);
+    this.changeDetectorRef.detectChanges();
+
+    this.userService.removeAvatar(this.user._id, avatarUrl).subscribe({
+      next: (response: any) => {
+        // Success: update with server data to ensure consistency
         this.user = new User().initialize(response.user);
-        this.filterAvatars();
+        this.mainAvatar = this.user.mainAvatarPath;
 
         this.updateUserInStorage(this.user.toObject());
+        
+        // Notify other components/services via UserService
+        this.userService.setCurrentUser(this.user, { force: true });
+        
         this.changeDetectorRef.detectChanges();
       },
-      err => {
-        this.toastService.presentStdToastr(err);
+      error: (err) => {
+        // Rollback on error
+        this.user.avatar = originalAvatarPaths;
+        this.changeDetectorRef.detectChanges();
+        
+        // Fix [object Object] error by extracting message string
+        const errorMsg = err.error?.message || err.message || 'Failed to delete image';
+        this.toastService.presentErrorToastr(errorMsg);
       }
-    );
+    });
   }
 
   uploadAvatar(files: { url: string, file: any, name: string }[]) {
@@ -684,71 +954,38 @@ export class DisplayComponent implements OnInit {
   
           // Update the avatar list
           this.user.avatar = updatedUser.avatar;
-          this.filterAvatars(); // Filter out default avatars if necessary
   
           // Update the user in local storage or native storage
           this.updateUserInStorage(updatedUser.toObject());
   
+          // Notify other components/services via UserService
+          this.userService.setCurrentUser(updatedUser, { force: true });
+
           // Trigger change detection to update the UI
           this.changeDetectorRef.detectChanges();
   
           // Optionally, display a success toast
-          this.toastService.presentStdToastr('Avatar uploaded successfully!');
+          this.toastService.presentSuccessToastr('Avatar uploaded successfully!');
         } else {
           console.error('Invalid response structure:', response);
-          this.toastService.presentStdToastr('Error: Invalid response from server.');
+          this.toastService.presentErrorToastr('Error: Invalid response from server.');
         }
       },
       (error) => {
         console.error('Error uploading avatar:', error);
-        this.toastService.presentStdToastr('Error uploading avatar. Please try again.');
+        this.toastService.presentErrorToastr('Error uploading avatar. Please try again.');
       }
     );
   }
   
 
-  private defaultSet = new Set([
-    constants.defaultMaleAvatarUrl,
-    constants.defaultFemaleAvatarUrl,
-    constants.defaultOtherAvatarUrl,
-  ]);
-  
-  private genderDefault(g?: string) {
-    if (g === 'male')   return constants.defaultMaleAvatarUrl;
-    if (g === 'female') return constants.defaultFemaleAvatarUrl;
-    if (g === 'other') return constants.defaultOtherAvatarUrl;
-
-    return constants.defaultOtherAvatarUrl;
-  }
-  
-  filterAvatars() {
-    if (!this.user) return;
-
-    // 1) Normalize & dedupe
-    const avatars = Array.isArray(this.user.avatar) ? this.user.avatar : [];
-    const unique = [...new Set(avatars.filter(Boolean))];
-  
-    // 2) Identify custom vs default
-    const customAvatars = unique.filter(u => !this.defaultSet.has(u));
-  
-    // 3) Pick main
-    let main = this.user.mainAvatar;
-    
-    // If main is missing or invalid (not in custom and not a default), pick a new one
-    if (!main || (!customAvatars.includes(main) && !this.defaultSet.has(main))) {
-      main = customAvatars[0] || this.genderDefault(this.user.gender);
-    }
-  
-    // 4) Commit state
-    this.mainAvatar = main;
-    this.user.mainAvatar = main;
-    this.user.avatar = customAvatars; // Keep all custom ones for the gallery
-  
-    this.updateUserInStorage(this.user.toObject());
-    this.changeDetectorRef.detectChanges();
+  private isOldDefaultAvatar(avatar: string): boolean {
+    return this.user?.isDefaultAvatar(avatar) || false;
   }
 
-  trackByAvatar = (_: number, url: string) => url;
+  trackByAvatar(index: number, item: any) {
+    return item?.path || item;
+  }
 
   
   async blockUserConf() {
@@ -773,48 +1010,50 @@ export class DisplayComponent implements OnInit {
   blockUser() {
     this.userService.block(this.user._id).subscribe(
       (resp: any) => {
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
         this.router.navigateByUrl('/tabs/profile/display/null');
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
 
-  async reportUser() {
-    const alert = await this.alertCtrl.create({
-      header: 'Report ' + this.user.fullName,
-      inputs: [
-        {
-          type: 'text',
-          name: 'message',
-          placeholder: 'Message'
-        }
-      ],
-      buttons: [
-        {
-          text: 'CANCEL',
-          role: 'cancel'
-        },
-        {
-          text: 'SEND',
-          cssClass: 'text-danger',
-          handler: (val) => {
-            const message = val.message;
-            this.userService.report(this.userId, message).subscribe(
-              (resp: any) => {
-                this.toastService.presentStdToastr(resp.message);
-              },
-              err => {
-                this.toastService.presentStdToastr(err);
-              }
-            );
-          }
-        }
-      ]
+  async reportUser(photoPath?: string) {
+    const modal = await this.modalCtrl.create({
+      component: ReportModalComponent,
+      componentProps: {
+        targetName: photoPath ? 'this photo' : this.user.fullName
+      },
+      cssClass: 'report-modal-class'
     });
-    await alert.present();
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      const loading = await this.loadingCtrl.create({
+        message: 'Please wait...'
+      });
+      await loading.present();
+
+      const reportPayload = { ...data };
+      if (photoPath) {
+        reportPayload.photoUrl = photoPath;
+        reportPayload.entityType = 'Photo';
+      }
+
+      this.userService.report(this.userId, reportPayload).subscribe(
+        (resp: any) => {
+          loading.dismiss();
+          this.toastService.presentSuccessToastr(resp.message || 'Report submitted successfully');
+        },
+        (err) => {
+          loading.dismiss();
+          this.toastService.presentErrorToastr(err || 'Error reporting user');
+        }
+      );
+    }
   }
 
   videoCall() {
@@ -869,6 +1108,31 @@ export class DisplayComponent implements OnInit {
     await alert.present();
   }
   
+  async openAvatarCustomize() {
+    const modal = await this.modalCtrl.create({
+      component: (await import('../../../components/avatar-customize-modal/avatar-customize-modal.component')).AvatarCustomizeModalComponent,
+      componentProps: { profile: this.user }
+    });
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      console.log('Avatar customization modal dismissed with data:', data);
+      // Force a refresh of the current user to ensure all components stay in sync
+      this.userService.refreshCurrentUser({ forceRefresh: true }).subscribe({
+        next: (updatedUser) => {
+          console.log('User refreshed after avatar customization:', updatedUser);
+          if (this.myProfile) {
+            this.user = updatedUser;
+            this.mainAvatar = this.user.mainAvatarPath;
+            this.changeDetectorRef.detectChanges();
+          }
+        },
+        error: (err) => console.error('Error refreshing user after avatar customization:', err)
+      });
+    }
+  }
+
   goBack() {
     this.location.back();
   }
@@ -886,16 +1150,17 @@ export class DisplayComponent implements OnInit {
   }
 
   toggleFollow() {
-    if (this.user.isFollowing) {
+    if (this.user.isFollowing || this.user.followStatus === 'pending') {
+      const wasPending = this.user.followStatus === 'pending';
       this.userService.unfollow(this.user._id).subscribe({
         next: () => {
           this.user.isFollowing = false;
           this.user.followStatus = null;
-          this.toastService.presentToast('Unfollowed successfully');
+          this.toastService.presentSuccessToastr(wasPending ? 'Follow request cancelled' : 'Unfollowed successfully');
         },
         error: (err) => {
           console.error('Error unfollowing:', err);
-          this.toastService.presentToast('Error unfollowing user');
+          this.toastService.presentErrorToastr('Error unfollowing user');
         }
       });
     } else {
@@ -903,16 +1168,16 @@ export class DisplayComponent implements OnInit {
         next: (res) => {
           if (res.status === 'pending') {
             this.user.followStatus = 'pending';
-            this.toastService.presentToast('Follow request sent');
+            this.toastService.presentSuccessToastr('Follow request sent');
           } else {
             this.user.isFollowing = true;
             this.user.followStatus = 'active';
-            this.toastService.presentToast('Following successfully');
+            this.toastService.presentSuccessToastr('Following successfully');
           }
         },
         error: (err) => {
           console.error('Error following:', err);
-          this.toastService.presentToast('Error following user');
+          this.toastService.presentErrorToastr('Error following user');
         }
       });
     }

@@ -9,6 +9,7 @@ export class Comment{
   private _votes: number;
   private _voted: number;
   private _anonymName: string;  // New property for anonymous name
+  private _isOwner: boolean;    // New property for ownership
   private _media: { url: string; expiryDate: Date | null };
 
   private _post: Post;
@@ -16,13 +17,24 @@ export class Comment{
 
   private _createdAt: Date;
 
+  private safeDate(val: any): Date | null {
+    if (!val) return null;
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   constructor(){
 
     this._media = { url: '', expiryDate: null };
 
   }
 
-  initialize(comment: Comment){
+  initialize(comment: any){
+    if (!comment) return this;
+    if (typeof comment === 'string') {
+      this.id = comment;
+      return this;
+    }
     console.log("Initializing Comment:", comment); // Log the entire comment object
 
     this.id = comment._id;
@@ -31,15 +43,16 @@ export class Comment{
     this.votes = comment.votes;
     this.voted = comment.voted;
     this.anonymName = comment.anonymName; // Initialize anonymName
+    this.isOwner = comment.isOwner;       // Initialize ownership
 
-    this.createdAt = new Date(comment.createdAt);
+    this.createdAt = this.safeDate(comment.createdAt) || new Date();
     this.media = comment.media ? {
       url: comment.media.url || '',
-      expiryDate: comment.media.expiryDate ? new Date(comment.media.expiryDate) : null
+      expiryDate: this.safeDate(comment.media.expiryDate)
     } : { url: '', expiryDate: null };
 
-    this.post = comment.post;
-    this.user = comment.user;
+    this.post = comment.post ? new Post().initialize(comment.post) : null;
+    this.user = comment.user ? new User().initialize(comment.user) : null;
     console.log("Initialized Comment Object:", this); // Log the initialized object
 
     return this;
@@ -59,6 +72,7 @@ export class Comment{
   get post(): Post{ return this._post }
   get user(): User{ return this._user }
   get anonymName(): string{ return this._anonymName } // Getter for anonymName
+  get isOwner(): boolean { return this._isOwner; }
 
   get createdAt(): Date{ return this._createdAt }
 
@@ -73,6 +87,7 @@ export class Comment{
   
   set votes(votes: number){ this._votes = votes }
   set voted(voted: number){ this._voted = voted }
+  set isOwner(isOwner: boolean) { this._isOwner = isOwner; }
   set anonymName(anonymName: string){ this._anonymName = anonymName } // Setter for anonymName
 
   set post(post: Post){

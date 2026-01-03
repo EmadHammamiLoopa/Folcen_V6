@@ -8,6 +8,7 @@ import { SettingsPageRoutingModule } from './settings-routing.module';
 
 import { SettingsPage } from './settings.page';
 import { SharingModule } from '../sharing/sharing.module';
+import { BlockedUsersModalComponent } from './blocked-users-modal/blocked-users-modal.component';
 
 @NgModule({
   imports: [
@@ -19,6 +20,7 @@ import { SharingModule } from '../sharing/sharing.module';
   ],
   declarations: [
     SettingsPage,
+    BlockedUsersModalComponent
   ]
 })
 export class SettingsPageModule {}

@@ -11,6 +11,8 @@ import { Router } from '@angular/router';
 import { AppEventsService } from 'src/app/services/app-events.service';
 import { Message } from 'src/app/models/Message';
 import { SocketService } from 'src/app/services/socket.service';
+import { takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 
 interface ListUser extends User {
   hasUnread?: boolean;
@@ -36,6 +38,7 @@ export class ListComponent implements OnInit, OnDestroy {
   // Latest snapshot for template-friendly access
   public missedMapLatest: { [userId: string]: number } = {};
   private socket: any;                   
+  private destroy$ = new Subject<void>();
   private listenersBound = false;        
   private authId: string | null = null;  
   private static READ_KEY = 'chatLastReadAt';
@@ -54,6 +57,75 @@ export class ListComponent implements OnInit, OnDestroy {
     , private modalCtrl: ModalController
   ) {}
 
+  // Fallback time formatter (short hh:mm) when pipe returns empty
+  public formatShortTime(date: any): string {
+    if (!date) return '—';
+    try {
+      const d = (date instanceof Date) ? date : new Date(date);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return '—'; }
+  }
+
+  isAdmin(user: User): boolean {
+    if (!user) return false;
+    const role = (user.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
+  }
+
+  // Robust parser for various timestamp shapes we sometimes receive from backend
+  public getMessageDate(msg: any): Date | null {
+    if (!msg) return null;
+    let v: any = msg.createdAt ?? msg.created_at ?? msg.ts ?? msg.time ?? null;
+    if (!v) return null;
+    try {
+      // If it's already a Date
+      if (v instanceof Date) return v;
+
+      // If it's a number (ms or seconds)
+      if (typeof v === 'number') {
+        // Heuristic: if > 1e12 assume ms, else seconds
+        return new Date(v > 1e12 ? v : v * 1000);
+      }
+
+      // If it's a numeric string
+      if (typeof v === 'string') {
+        // plain numeric string
+        if (/^\d+$/.test(v)) {
+          const n = Number(v);
+          return new Date(n > 1e12 ? n : n * 1000);
+        }
+        // ISO or RFC date string
+        const parsed = new Date(v);
+        if (!isNaN(parsed.getTime())) return parsed;
+
+        // attempt to JSON parse objects encoded as strings
+        try { v = JSON.parse(v); } catch(e) { v = v; }
+      }
+
+      // If it's an object, try common shapes
+      if (typeof v === 'object') {
+        if (v.$date) return new Date(v.$date);
+        if (v.$numberLong) { const n = Number(v.$numberLong); return new Date(n > 1e12 ? n : n * 1000); }
+        if (v.seconds && v.nanoseconds) return new Date(Number(v.seconds) * 1000 + Math.floor(Number(v.nanoseconds) / 1e6));
+        if (v.seconds) return new Date(Number(v.seconds) * 1000);
+        if (v.ms) return new Date(Number(v.ms));
+        if (v.timestamp) return new Date(Number(v.timestamp));
+      }
+    } catch (e) {
+      // ignore and fall through
+    }
+    return null;
+  }
+
+  // helper returning numeric ms for sorting
+  private getTimeFromMessage(msg: any): number {
+    try {
+      const d = this.getMessageDate(msg);
+      return d ? d.getTime() : 0;
+    } catch (e) { return 0; }
+  }
+
   ngOnInit() {
     // Load authId early so mapping logic can derive the other party correctly
     try {
@@ -61,6 +133,12 @@ export class ListComponent implements OnInit, OnDestroy {
       this.authId = raw ? (JSON.parse(raw)?._id || JSON.parse(raw)?.id) : null;
     } catch {}
     this.loadLastReadMap();
+
+    // Reset budget when viewing messages/missed calls
+    this.userService.resetBudget().subscribe({
+      next: () => console.log('Budget reset on messages view'),
+      error: (err) => console.warn('Failed to reset budget', err)
+    });
 
     // Prefer centralized stream from AppEventsService to avoid duplicate subscriptions
     // Use async pipe for missed calls mapping and OnPush change detection
@@ -78,11 +156,13 @@ export class ListComponent implements OnInit, OnDestroy {
         }
         // local side-effect: present alert only for new missed calls
         try {
-          if ((calls || []).length > this.prevMissedCount) {
+          const count = (calls || []).length;
+          if (count > this.prevMissedCount) {
             const m = calls[0];
             // Present alert inside zone
             this.zone.run(() => this.presentMissedCallAlert(m.userId, m.userName, m.timestamp));
           }
+          this.prevMissedCount = count;
         } catch (e) {}
 
         // Build normalized per-user missed map
@@ -138,6 +218,25 @@ export class ListComponent implements OnInit, OnDestroy {
 
     // ✅ socket live updates for list
     this.initSocket();
+
+    // Refresh cached user profiles when server notifies updates
+    try {
+      SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+        try {
+          const uid = payload?.userId;
+          if (!uid) return;
+          const idx = this.users.findIndex(u => this.keyOf(u) === String(uid));
+          if (idx !== -1) {
+            this.userService.getUserProfile(uid, { forceRefresh: true }).subscribe((p: any) => {
+              if (p && p._id) {
+                this.users[idx] = { ...(this.users[idx] as any), ...p } as ListUser;
+                this.cdr.markForCheck();
+              }
+            }, () => {});
+          }
+        } catch (e) { console.warn('list component profile update handler', e); }
+      });
+    } catch (e) {}
 
     // Proactively refresh missed calls from service in case the stream hasn't emitted yet
     try {
@@ -203,7 +302,7 @@ export class ListComponent implements OnInit, OnDestroy {
             image: msg.image ?? null,
             type: msg.type ?? 'friend',
             productId: msg.productId ?? null,
-            createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+            createdAt: this.getMessageDate(msg),
             state: msg.state ?? 'sent',
           });
   
@@ -477,7 +576,7 @@ private formatTimeAgo(timestamp: string): string {
               const messages = usr.messages.map((message) =>
                 new Message().initialize({
                   ...message,
-                  createdAt: message.createdAt ? new Date(message.createdAt) : new Date(),
+                  createdAt: this.getMessageDate(message),
                   productId: message.type === 'product' ? message.productId : message.productId ?? null,
                 })
               );
@@ -524,11 +623,16 @@ private formatTimeAgo(timestamp: string): string {
           event.target.complete();
           if (!resp?.data?.more && !refresh) event.target.disabled = true;
         }
+        // ensure ordering once asynchronous profile fetches settle
+        try {
+          setTimeout(() => { this.sortUsersByLatestMessage(); try { this.cdr.markForCheck(); } catch(e){} }, 60);
+        } catch (e) { try { this.cdr.markForCheck(); } catch(_) {} }
       },
       (err) => {
         this.pageLoading = false;
         if (event) event.target.complete();
         console.log(err);
+        try { this.cdr.markForCheck(); } catch (e) {}
       }
     );
   }
@@ -572,10 +676,19 @@ openThread(user: User) {
   // Sort users by the latest message timestamp (newest first)
   sortUsersByLatestMessage() {
     this.users.sort((a, b) => {
-      const aTs = a.messages?.length ? new Date(a.messages[0].createdAt).getTime() : 0;
-      const bTs = b.messages?.length ? new Date(b.messages[0].createdAt).getTime() : 0;
+      const aTs = a.messages?.length ? this.getTimeFromMessage(a.messages[0]) : 0;
+      const bTs = b.messages?.length ? this.getTimeFromMessage(b.messages[0]) : 0;
       return bTs - aTs;
     });
+  }
+
+  // Navigate to profile view (used by template CTA)
+  public navigateToProfile() {
+    try {
+      this.router.navigate(['/tabs/profile']);
+    } catch (e) {
+      console.warn('navigateToProfile failed', e);
+    }
   }
 
 

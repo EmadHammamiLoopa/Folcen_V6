@@ -1,5 +1,6 @@
 import { DataService } from './../../services/data.service';
 import { UserService } from './../../services/user.service';
+import { AvatarUrlUtil } from './../../utils/avatar-url-util';
 import { Component, Input, OnInit, Output, EventEmitter, OnChanges, SimpleChange, SimpleChanges } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -27,6 +28,7 @@ export class FormComponent implements OnInit, OnChanges {
     hidden?: boolean,
     readonly?: boolean,
     options?: string[],
+    values?: string[],
     value?: any
   }[] = undefined;
   @Input() icon = "";
@@ -78,15 +80,22 @@ export class FormComponent implements OnInit, OnChanges {
       (resp: any) => {
         this.loading = false;
         // Support different backend shapes: resp.data.user, resp.user, or resp.data
-        this.data = (resp && resp.data && resp.data.user) ? resp.data.user : (resp && resp.user) ? resp.user : (resp && resp.data) ? resp.data : resp;
-        console.log(resp.data);
+        const pName = (this.plurarName || '').toLowerCase();
+        if (pName === 'users') {
+          this.data = (resp && resp.data && resp.data.user) ? resp.data.user : (resp && resp.user) ? resp.user : (resp && resp.data) ? resp.data : resp;
+        } else if (pName === 'comments') {
+          this.data = (resp && resp.data && resp.data.comment) ? resp.data.comment : (resp && resp.comment) ? resp.comment : (resp && resp.data) ? resp.data : resp;
+        } else {
+          this.data = (resp && resp.data) ? resp.data : resp;
+        }
+        console.log('Form data loaded:', this.data);
         this.setHeaderValues();
       },
       err => {
-        err = err.error;
+        const errorMsg = err.error && err.error.message ? err.error.message : (typeof err.error === 'string' ? err.error : 'Failed to load data');
         this.loading = false;
-        this.error = err;
-        console.log(err);
+        this.error = errorMsg;
+        console.log('Error loading form data:', err);
       }
     )
   }
@@ -94,7 +103,13 @@ export class FormComponent implements OnInit, OnChanges {
   setHeaderValues(){
     this.headersChanged.emit(this.headers.map(header => {
       // Prefer direct field, then nested user field
-      const val = (this.data && this.data[header.name]) !== undefined ? this.data[header.name] : (this.data && this.data.user && this.data.user[header.name]) ? this.data.user[header.name] : undefined;
+      let val = (this.data && this.data[header.name]) !== undefined ? this.data[header.name] : (this.data && this.data.user && this.data.user[header.name]) !== undefined ? this.data.user[header.name] : undefined;
+      
+      // Special handling for boolean fields to ensure they are not treated as undefined when false
+      if (header.type === 'boolean' && val === undefined) {
+        val = false;
+      }
+
       this.fieldChanged(header.name, val)
       if(header.type == 'avatar' || header.type == 'image'){
         this.imagesUrl[header.name] = this.getAvatarUrl(val);
@@ -110,18 +125,40 @@ export class FormComponent implements OnInit, OnChanges {
 
   getAvatarUrl(v: any): string {
     const backendRoot = this.dataService ? (this.dataService as any).apiUrl ? (this.dataService as any).apiUrl.replace(/\/api\/v1\/?$/i, '') : '' : '';
+    
+    // If it's a user object or has user-like avatar fields, use AvatarUrlUtil
+    if (v && (v.avatarStyle || v.mainAvatar || v.avatarSeed)) {
+      return AvatarUrlUtil.getAvatarUrl(v, backendRoot);
+    }
+
     const defaultAvatar = './../../../assets/user.jpeg';
     if (!v) return defaultAvatar;
+    
+    let url = '';
     if (typeof v === 'string') {
-      if (v.startsWith('http://') || v.startsWith('https://')) return v;
-      if (v.startsWith('/')) return backendRoot + v;
-      return backendRoot + '/' + v;
+      if (v.startsWith('http://') || v.startsWith('https://')) url = v;
+      else if (v.startsWith('/')) url = backendRoot + v;
+      else url = backendRoot + '/' + v;
+    } else if (Array.isArray(v) && v.length) {
+      return this.getAvatarUrl(v[0]);
+    } else if (v.url) {
+      url = v.url.startsWith('http') ? v.url : backendRoot + v.url;
+    } else if (v.path) {
+      url = v.path.startsWith('http') ? v.path : backendRoot + v.path;
+    } else if (v.mainAvatar) {
+      url = v.mainAvatar.startsWith('http') ? v.mainAvatar : backendRoot + v.mainAvatar;
+    } else if (v.avatar && Array.isArray(v.avatar) && v.avatar.length) {
+      return this.getAvatarUrl(v.avatar[0]);
     }
-    if (Array.isArray(v) && v.length) return this.getAvatarUrl(v[0]);
-    if (v.url) return v.url.startsWith('http') ? v.url : backendRoot + v.url;
-    if (v.path) return v.path.startsWith('http') ? v.path : backendRoot + v.path;
-    if (v.mainAvatar) return v.mainAvatar.startsWith('http') ? v.mainAvatar : backendRoot + v.mainAvatar;
-    if (v.avatar && Array.isArray(v.avatar) && v.avatar.length) return this.getAvatarUrl(v.avatar[0]);
+
+    if (url) {
+      // Add cache-busting timestamp if updatedAt exists
+      if (this.data && this.data.updatedAt) {
+        const timestamp = new Date(this.data.updatedAt).getTime();
+        url += (url.includes('?') ? '&' : '?') + 't=' + timestamp;
+      }
+      return url;
+    }
     return defaultAvatar;
   }
 

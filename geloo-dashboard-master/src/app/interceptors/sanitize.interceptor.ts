@@ -16,6 +16,11 @@ export class SanitizeInterceptor implements HttpInterceptor {
       let changed = false;
       for (const k of Object.keys(newBody)) {
         const v = newBody[k];
+        // SKIP sanitization for userIds array to prevent double-encoding or corruption
+        if (k === 'userIds' && Array.isArray(v)) {
+          console.log('[sanitize] skipping userIds array to preserve raw IDs');
+          continue;
+        }
         if (v && typeof v === 'object') {
           const nid = this.idService.normalizeId(v);
           if (nid) {

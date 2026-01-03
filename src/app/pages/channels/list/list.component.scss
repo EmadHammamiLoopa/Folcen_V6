@@ -27,11 +27,35 @@ ion-content {
 .channels-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
-  padding: 16px;
-  padding-bottom: 100px;
+  gap: 12px;
+  padding: 12px;
+  /* extra bottom padding to avoid overlap with tab bar / fab */
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
   position: relative;
   z-index: 1;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 20px;
+  }
+}
+
+/* Ensure FAB floats above the tabbar and not clipped */
+:host ion-fab, ion-fab {
+  z-index: 1000;
+  right: 18px;
+  /* moved up slightly to clear tab bar and decorative crescent */
+  bottom: calc(28px + 80px + env(safe-area-inset-bottom, 0px));
+}
+
+/* explicit class for channel FABs to ensure they float above tabbar */
+.channel-fab {
+  position: fixed !important;
+  right: 18px !important;
+  /* small upward nudge to avoid overlap with tab / decorative shape */
+  bottom: calc(28px + 80px + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 9999 !important;
 }
 
 .glass-card {
@@ -57,33 +81,34 @@ ion-content {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid var(--loopa-tabbar-border);
 
   &:active {
-    transform: scale(0.98);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transform: scale(0.96);
+    box-shadow: 0 0 25px rgba(var(--ion-color-primary-rgb), 0.2);
+    border-color: rgba(var(--ion-color-primary-rgb), 0.4);
   }
 }
 
 .card-header {
   position: relative;
-  padding: 20px 16px 12px;
+  padding: 16px 12px 8px;
   display: flex;
   justify-content: center;
 
   .avatar-wrapper {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 60px;
+    height: 60px;
     
     .channel-photo {
       width: 100%;
       height: 100%;
-      border-radius: 24px;
+      border-radius: 18px;
       object-fit: cover;
       border: 2px solid var(--loopa-tabbar-border);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
     }
 
     .verified-badge {
@@ -109,30 +134,51 @@ ion-content {
     right: 12px;
     
     .glass-action-btn {
-      background: rgba(var(--ion-text-color-rgb), 0.05);
-      border: none;
+      background: rgba(var(--ion-text-color-rgb), 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 10px;
       color: var(--loopa-text-muted);
       padding: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: all 0.2s ease;
       
       ion-icon {
-        font-size: 18px;
+        font-size: 16px;
+      }
+
+      &:active {
+        background: var(--ion-color-primary);
+        color: white;
+        transform: scale(0.9);
+        box-shadow: 0 0 15px rgba(var(--ion-color-primary-rgb), 0.4);
       }
     }
   }
 }
 
 .card-body {
-  padding: 0 16px 12px;
+  padding: 8px 12px 8px;
   text-align: center;
   flex-grow: 1;
 
+  .category-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(var(--ion-color-primary-rgb), 0.1);
+    color: var(--ion-color-primary);
+    border-radius: 5px;
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
   .channel-title {
-    margin: 0 0 6px;
-    font-size: 1.05rem;
+    margin: 0 0 2px;
+    font-size: 0.9rem;
     font-weight: 700;
     color: var(--ion-text-color);
     white-space: nowrap;
@@ -142,25 +188,27 @@ ion-content {
 
   .channel-desc {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: var(--loopa-text-muted);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    line-height: 1.4;
+    line-height: 1.2;
   }
 }
 
 .card-footer {
-  padding: 12px 16px 16px;
+  padding: 10px 12px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   border-top: 1px solid var(--loopa-tabbar-border);
 
   .stats {
+    flex-shrink: 0;
     .stat-item {
       display: flex;
       align-items: center;
@@ -181,14 +229,21 @@ ion-content {
       background: var(--loopa-gradient-primary);
       color: white;
       border: none;
-      padding: 6px 14px;
-      border-radius: 12px;
-      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-size: 0.7rem;
       font-weight: 700;
-      box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
+      box-shadow: none;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
+
+      &:active {
+        transform: scale(0.95);
+      }
 
       &.followed {
-        background: rgba(var(--ion-text-color-rgb), 0.05);
+        background: rgba(var(--ion-text-color-rgb), 0.08);
         color: var(--loopa-text-muted);
         box-shadow: none;
         border: 1px solid var(--loopa-tabbar-border);
@@ -290,4 +345,79 @@ ion-content {
 
 .fadeIn {
   animation-name: fadeIn;
+}
+
+/* Explore Filters Styling */
+.explore-filters {
+  padding: 16px 16px 8px;
+  position: relative;
+  z-index: 10;
+  background: transparent;
+
+  .search-wrapper {
+    margin-bottom: 12px;
+    
+    .custom-searchbar {
+      --background: var(--loopa-toolbar-background);
+      --color: var(--ion-text-color);
+      --placeholder-color: var(--loopa-text-muted);
+      --icon-color: var(--ion-color-primary);
+      --border-radius: 16px;
+      padding: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--loopa-tabbar-border);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+    }
+  }
+
+  .category-scroll {
+    display: flex;
+    overflow-x: auto;
+    padding: 4px 0 12px;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    
+    &::-webkit-scrollbar {
+      display: none; /* Chrome/Safari */
+    }
+
+    .category-chip {
+      flex: 0 0 auto;
+      padding: 8px 20px;
+      border-radius: 20px;
+      background: var(--loopa-toolbar-background);
+      color: var(--ion-text-color);
+      font-size: 0.9rem;
+      font-weight: 500;
+      border: 1px solid var(--loopa-tabbar-border);
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
+      cursor: pointer;
+
+      &:active {
+        transform: scale(0.95);
+      }
+
+      &.active {
+        background: var(--ion-color-primary);
+        color: #fff;
+        border-color: var(--ion-color-primary);
+        box-shadow: 0 4px 10px rgba(var(--ion-color-primary-rgb), 0.3);
+      }
+    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .explore-filters {
+    padding: 12px 12px 4px;
+  }
+  
+  .category-scroll .category-chip {
+    padding: 6px 16px;
+    font-size: 0.85rem;
+  }
 }

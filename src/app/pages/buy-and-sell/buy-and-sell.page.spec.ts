@@ -10,7 +10,7 @@ describe('BuyAndSellPage', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ BuyAndSellPage ],
-      imports: [IonicModule.forChild()]
+      imports: [IonicModule.forRoot()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(BuyAndSellPage);

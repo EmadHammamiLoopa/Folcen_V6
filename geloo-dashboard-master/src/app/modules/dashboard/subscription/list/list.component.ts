@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-list',
@@ -11,10 +12,10 @@ export class ListComponent implements OnInit {
     { name: "subscriptionId", title: "Subscription ID", type: "text" },
     { name: "userId", title: "User ID", type: "text" },
     { name: "email", title: "Email", type: "text" },
-    { name: "dayPrice", title: "Day Price", type: "number" },
-    { name: "weekPrice", title: "Week Price", type: "number" },
-    { name: "monthPrice", title: "Month Price", type: "number" },
-    { name: "yearPrice", title: "Year Price", type: "number" },
+    { name: "dayPrice", title: "Day Price", type: "text" },
+    { name: "weekPrice", title: "Week Price", type: "text" },
+    { name: "monthPrice", title: "Month Price", type: "text" },
+    { name: "yearPrice", title: "Year Price", type: "text" },
     { name: "currency", title: "Currency", type: "text" },
     { name: "subscribed", title: "Subscribed", type: "boolean", values: ['No', 'Yes'] }
   ];
@@ -23,13 +24,24 @@ export class ListComponent implements OnInit {
 
   ngOnInit(): void {}
 
+  exportSubscriptions(format: 'csv' | 'json') {
+    const token = window.localStorage.getItem('token');
+    const baseUrl = environment.apiUrl;
+    const url = `${baseUrl}/admin/subscriptions/export?format=${format}&token=${token}`;
+    window.open(url, '_blank');
+  }
+
   getDisplayLink = (row: any): string => {
-    const id = this.getId(row.subscriptionId || row._id || row.id);
-    if (!id) {
-      console.error('Row or subscriptionId is missing');
-      return '/dashboard/subscriptions/display'; // Default fallback
+    const subId = this.getId(row.subscriptionId);
+    if (subId && subId !== 'N/A') {
+      return `/dashboard/subscriptions/display/${subId}`;
     }
-    return `/dashboard/subscriptions/display/${id}`;
+    const userId = this.getId(row.userId || row._id || row.id);
+    if (!userId) {
+      console.error('Row or userId is missing');
+      return '/dashboard/subscriptions/list'; // Default fallback
+    }
+    return `/dashboard/Users/display/${userId}`;
   }
 
   getId(v: any): string {

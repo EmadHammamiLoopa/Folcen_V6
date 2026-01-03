@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core';
 import { UserService } from 'src/app/services/user.service';
 import { User } from './../../models/User';
 import { Platform } from '@ionic/angular';
@@ -7,13 +7,15 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import constants from 'src/app/helpers/constants';
 import { IdService } from 'src/app/services/id.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.page.html',
   styleUrls: ['./profile.page.scss'],
 })
-export class ProfilePage implements OnInit {
+export class ProfilePage implements OnInit, OnDestroy {
   user: User;
   authUser: User;
 
@@ -23,6 +25,7 @@ export class ProfilePage implements OnInit {
   myProfile = false;
   mainAvatar: string = '';
   viewedUser: User;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private userService: UserService,
@@ -35,10 +38,13 @@ export class ProfilePage implements OnInit {
   ) {}
 
   ngOnInit() {
-    console.log("sssssssdewwwwwwwwwwwwwww");
-
     this.initializeForm();
     this.loadUserData();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   initializeForm() {
@@ -58,136 +64,44 @@ export class ProfilePage implements OnInit {
   }
 
   loadUserData() {
-    console.log("sssssssdewwwwwwwwwwwwwww");
-
     const userId = this.route.snapshot.paramMap.get('id');
-    this.myProfile = !userId; // Check if it's the user's profile
+    this.myProfile = !userId;
 
-    if (this.platform.is('cordova')) {
-      (async () => {
-        try {
-          let u: any = null;
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-          if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
-          if (u) {
-            this.authUser = new User().initialize(u);
-            this.handleUserData(u, userId);
-          } else {
-            this.loadUserDataFromLocalStorage(userId);
-          }
-        } catch (err) {
-          this.loadUserDataFromLocalStorage(userId);
-        }
-      })();
-    } else {
-      this.loadUserDataFromLocalStorage(userId);
-    }
-  }
-
-  loadUserDataFromLocalStorage(userId: string) {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  let user: any = null;
-  try {
-    user = raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    try {
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : null;
-      user = parsed;
-    } catch (err) { user = null; }
-  }
-  // If storage contains a Buffer-like representation (various shapes), try to recover
-  if (user) {
-    try {
-      // If full object is encoded as bytes under .buffer.data or .buffer or .data
-      const tryExtractBytes = (obj: any): number[] | null => {
-        if (!obj) return null;
-        if (Array.isArray(obj)) return obj.map(n => Number(n));
-        if (obj.data && Array.isArray(obj.data)) return obj.data.map(n => Number(n));
-        if (obj.buffer && Array.isArray(obj.buffer.data)) return obj.buffer.data.map(n => Number(n));
-        // numeric-indexed object { '0': 105, '1': 73, ... }
-        const keys = Object.keys(obj).filter(k => !isNaN(Number(k))).sort((a, b) => Number(a) - Number(b));
-        if (keys.length) return keys.map(k => Number(obj[k]));
-        return null;
-      };
-
-      // Try to decode if the whole user object is a byte container
-      const bytesWhole = tryExtractBytes(user) || tryExtractBytes(user.buffer) || tryExtractBytes(user.data);
-      if (bytesWhole && bytesWhole.length) {
-        try {
-          const arr = new Uint8Array(bytesWhole);
-          const decoded = new TextDecoder().decode(arr);
-          // If decoded text looks like JSON, parse it
-          if (decoded && decoded.trim().startsWith('{')) {
-            const parsed = JSON.parse(decoded);
-            user = parsed;
-            console.warn('Decoded Buffer-like stored user into object');
-          } else {
-            // Otherwise, it might be just an encoded id — leave to idService below
-            // attach a normalized id if missing
-            const hex = bytesWhole.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
-            if (!user._id) user._id = hex;
-          }
-        } catch (e) { console.warn('Failed to decode Buffer-like stored user', e); }
-      }
-
-      // Normalize nested _id or id fields that may themselves be Buffer-like
-      if (user && typeof user === 'object') {
-        if (user._id && typeof user._id !== 'string') {
-          const nid = this.idService.normalizeId(user._id);
-          if (nid) user._id = nid;
-        }
-        if (!user._id && user.id && typeof user.id !== 'string') {
-          const nid2 = this.idService.normalizeId(user.id);
-          if (nid2) user._id = nid2;
+    // Subscribe to the authenticated user from the centralized service
+    this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      this.authUser = user;
+      if (this.myProfile) {
+        if (user) {
+          this.handleUserData(user);
         }
       }
-    } catch (e) {
-      console.warn('Error normalizing stored user', e);
-    }
+    });
 
-    if (user) {
-      this.authUser = new User().initialize(user); // Store the authenticated user's data separately
-      this.handleUserData(user, userId);
-    }
-  }
-  }
-
-  handleUserData(user: any, userId: string) {
-    if (userId && userId !== this.authUser._id) {
+    if (!this.myProfile && userId) {
       this.fetchUserProfileDirectly(userId);
-    } else {
-      this.viewedUser = this.authUser; // Set the viewed user to the authenticated user
-      this.filterAvatars();
-      this.mainAvatar = this.viewedUser.avatar.length > 0 ? this.viewedUser.avatar[0] : '';
-      this.populateForm();
-      this.pageLoading = false;
     }
   }
 
-  filterAvatars() {
-    if (this.user && this.user.avatar) {
-      this.user.avatar = this.user.avatar.filter(url => url.startsWith('http'));
-    }
+  handleUserData(user: User) {
+    this.viewedUser = user;
+    this.mainAvatar = this.viewedUser ? this.viewedUser.mainAvatar : '';
+    this.populateForm();
+    this.pageLoading = false;
+    this.changeDetectorRef.detectChanges();
   }
 
   fetchUserProfileDirectly(userId: string) {
-    if (userId) {
-      this.userService.getUserProfile(userId).subscribe({
-        next: (user) => {
-          this.user = new User().initialize(user);
-          this.filterAvatars(); // Apply the filter after fetching user profile
-          this.mainAvatar = this.user.avatar.length > 0 ? this.user.avatar[0] : '';
-          console.log('Fetched User Main Avatar URL:', this.mainAvatar); // Log the fetched main avatar URL
-          this.populateForm();
-          this.pageLoading = false;
-        },
-        error: () => {
-          this.pageLoading = false;
-        }
-      });
-    } else {
-      this.pageLoading = false;
-    }
+    this.pageLoading = true;
+    this.userService.getUserProfile(userId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (user) => {
+        this.handleUserData(user);
+      },
+      error: (err) => {
+        console.error('Error fetching user profile:', err);
+        this.pageLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    });
   }
 
   populateForm() {
@@ -219,47 +133,34 @@ export class ProfilePage implements OnInit {
 
   saveChanges() {
     if (this.form.valid) {
-      const updatedUser = {
-        firstName: this.form.value.firstName,
-        lastName: this.form.value.lastName,
-        birthDate: this.form.value.birthDate,
-        gender: this.form.value.gender,
-        education: this.form.value.education,
-        school: this.form.value.school,
-        country: this.form.value.country,
-        city: this.form.value.city,
-        profession: this.form.value.profession,
-        interests: this.form.value.interests,
+      this.pageLoading = true;
+      const updatedData = {
+        ...this.form.value,
         avatar: this.viewedUser.avatar // Ensure avatars are included
       };
 
-      const userId = this.viewedUser.getId(); // Use the getter method
+      const userId = this.viewedUser._id;
 
-      this.userService.updateUser(userId, updatedUser).subscribe(
-        () => {
-          this.updateUserInStorage(updatedUser);
-          this.edit = false; // Exit edit mode
+      this.userService.updateUser(userId, updatedData).subscribe({
+        next: (response) => {
+          console.log('User updated successfully:', response);
           if (this.myProfile) {
-            this.authUser = new User().initialize(updatedUser); // Update the authenticated user if it's their profile
+            // Update the centralized user state
+            this.userService.setCurrentUser({ ...this.viewedUser, ...updatedData });
           } else {
-            this.viewedUser = new User().initialize(updatedUser); // Update the viewed user if it's another user's profile
+            // For other users, just update local state
+            Object.assign(this.viewedUser, updatedData);
           }
+          this.edit = false;
+          this.pageLoading = false;
+          this.changeDetectorRef.detectChanges();
         },
-        (error) => {
-          console.error('Error updating user:', error);
+        error: (err) => {
+          console.error('Error updating user:', err);
+          this.pageLoading = false;
+          this.changeDetectorRef.detectChanges();
         }
-      );
+      });
     }
-  }
-
-  updateUserInStorage(updatedUser: any) {
-    // only persist when updating our own profile
-    if (this.myProfile) {
-      try { this.userService.setCurrentUser(updatedUser); } catch (e) {}
-      this.authUser = new User().initialize(updatedUser);
-    } else {
-      this.viewedUser = new User().initialize(updatedUser);
-    }
-    this.changeDetectorRef.detectChanges(); // Ensure the UI updates
   }
 }

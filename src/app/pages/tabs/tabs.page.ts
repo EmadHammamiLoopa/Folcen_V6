@@ -1,20 +1,13 @@
 import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { Socket } from 'socket.io-client';
-
-import { RequestService } from 'src/app/services/request.service';
-import { AppEventsService } from 'src/app/services/app-events.service';
-import { SocketService } from 'src/app/services/socket.service';
+import { BehaviorSubject, of } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
-type TabKey =
-  | 'profile'
-  | 'friends'
-  | 'messages'
-  | 'new-friends'
-  | 'channels'
-  | 'buy-and-sell'
-  | 'small-business';
+import { RequestService } from 'src/app/services/request.service';
+import { AppEventsService, TabKey } from 'src/app/services/app-events.service';
+import { SocketService } from 'src/app/services/socket.service';
+import { UserService } from 'src/app/services/user.service';
 
 @Component({
   selector: 'app-tabs',
@@ -27,6 +20,9 @@ export class TabsPage implements OnInit, OnDestroy {
 
   private currentUrl = '';
   private routerSub: any;
+  private badgeCounts = new Map<TabKey, number>();
+  showTabs = true;
+  budget = 0;
 
   tabs: { url: TabKey; icon: string; notificationEvent?: string }[] = [
     { url: 'profile',        icon: 'fas fa-user' },
@@ -34,6 +30,7 @@ export class TabsPage implements OnInit, OnDestroy {
     { url: 'messages',       icon: 'fas fa-comments',     notificationEvent: 'new-message' },
     { url: 'new-friends',    icon: 'fas fa-search',       notificationEvent: 'friend-suggestion' },
     { url: 'channels',       icon: 'fas fa-object-group', notificationEvent: 'new-channel-activity' },
+    { url: 'feed',           icon: 'fas fa-newspaper' },
     { url: 'buy-and-sell',   icon: 'fas fa-store',        notificationEvent: 'new-buy-sell-update' },
     { url: 'small-business', icon: 'fas fa-briefcase',    notificationEvent: 'new-business-post' },
   ];
@@ -42,10 +39,28 @@ export class TabsPage implements OnInit, OnDestroy {
     private zone: NgZone,
     private router: Router,
     private badges: AppEventsService,
-    private requestService: RequestService
+    private requestService: RequestService,
+    private userService: UserService
   ) {}
 
   async ngOnInit() {
+    // Initialize badge subscriptions
+    this.tabs.forEach(tab => {
+      this.badges.badge$(tab.url).subscribe(count => {
+        this.badgeCounts.set(tab.url, count || 0);
+      });
+    });
+
+    this.badges.budget$.subscribe(b => {
+      this.zone.run(() => {
+        this.budget = b || 0;
+      });
+    });
+
+    this.badges.showTabs$.subscribe(show => {
+      this.showTabs = show;
+    });
+
     // track route changes for smarter message badge behavior
     this.routerSub = this.router.events.subscribe(ev => {
       if (ev instanceof NavigationEnd) this.currentUrl = ev.urlAfterRedirects || ev.url;
@@ -59,14 +74,16 @@ export class TabsPage implements OnInit, OnDestroy {
       await SocketService.ensureConnected();
       this.socket = await SocketService.getSocket();
 
-      // realtime listeners
-      this.attachSocketListenersOnce();
+      // realtime listeners (only if socket created)
+      if (this.socket) {
+        this.attachSocketListenersOnce();
 
-      // seed exact count for friends on first load
-      this.recountFriends();
+        // seed exact count for friends on first load
+        this.recountFriends();
 
-      // seed again on reconnect
-      this.socket.on('connect', () => this.recountFriends());
+        // seed again on reconnect
+        this.socket.on('connect', () => this.recountFriends());
+      }
     } catch (error) {
       console.error('Failed to init Tabs sockets:', error);
     }
@@ -106,8 +123,12 @@ export class TabsPage implements OnInit, OnDestroy {
   }
 
   // ----- template helpers -----
-  badge$(tab: TabKey) {
-    return this.badges.badge$(tab);
+  trackByUrl(index: number, tab: { url: TabKey; icon: string; notificationEvent?: string }) {
+    return tab.url;
+  }
+
+  getBadgeCount(tab: TabKey): number {
+    return this.badgeCounts.get(tab) || 0;
   }
 
   // ----- realtime / API -----
@@ -145,7 +166,10 @@ export class TabsPage implements OnInit, OnDestroy {
 
     // precise recount hooks for friends
     ['friend-requests-updated', 'friend-request-accepted', 'friend-request-declined']
-      .forEach(ev => this.socket!.on(ev, () => this.zone.run(() => this.recountFriends())));
+      .forEach(ev => this.socket!.on(ev, () => this.zone.run(() => {
+        this.recountFriends();
+        this.userService.triggerFriendsRefresh();
+      })));
 
     // optional precise messages recount hook (if server emits totals)
     this.socket.on('messages-updated', (data: any) => {
@@ -182,6 +206,11 @@ export class TabsPage implements OnInit, OnDestroy {
     if (activeTab === 'messages') {
       // visually clear when entering messages root
       if (this.isMessagesRoot()) this.badges.reset('messages');
+    }
+
+    if (activeTab === 'channels') {
+      // Force navigation to the 'followed' list whenever the channels tab is clicked
+      this.router.navigate(['/tabs/channels/list/followed']);
     }
   }
 

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ModalController } from '@ionic/angular';
 import { User } from './../../../models/User';
@@ -8,21 +8,28 @@ import { ListSearchComponent } from './../../list-search/list-search.component';
 import { SchoolService } from './school.service';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
+import { ToastService } from 'src/app/services/toast.service';
 import { UserService } from 'src/app/services/user.service'; // Adjust the import path as needed
 import { Platform } from '@ionic/angular'; // Import Platform
+import { Subject, Subscription } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+import { SocketService } from 'src/app/services/socket.service';
 
 @Component({
   selector: 'app-form',
   templateUrl: './form.component.html',
   styleUrls: ['./form.component.scss'],
 })
-export class FormComponent implements OnInit {
+export class FormComponent implements OnInit, OnDestroy {
   user: User;
   form: FormGroup;
   validationErrors = {};
   pageLoading = true;
+  isUpdating = false;
   id: string;
+  private destroy$ = new Subject<void>();
+  private socketSub: Subscription | null = null;
+  private profileFetched = false;
 
   countries = [];
   selectedCountry = '';
@@ -46,7 +53,11 @@ selectedStudyCountry = '';
 
   languages = [
     'English', 'French', 'Spanish', 'German', 'Arabic', 'Chinese', 'Japanese', 
-    'Russian', 'Portuguese', 'Italian', 'Turkish', 'Hindi', 'Dutch'
+    'Russian', 'Portuguese', 'Italian', 'Turkish', 'Hindi', 'Dutch',
+    'Norwegian', 'Swedish', 'Danish', 'Finnish', 'Icelandic',
+    'Polish', 'Ukrainian', 'Romanian', 'Greek', 'Czech', 'Hungarian',
+    'Bulgarian', 'Slovak', 'Croatian', 'Lithuanian', 'Slovenian', 'Latvian', 'Estonian',
+    'Irish', 'Maltese', 'Korean', 'Vietnamese', 'Thai', 'Indonesian', 'Malay', 'Persian'
   ];
   selectedLanguages = [];
 
@@ -62,9 +73,10 @@ selectedStudyCountry = '';
     private schoolService: SchoolService,
     private http: HttpClient,
     private router: Router,
-    private toastController: ToastController,
+    private toastService: ToastService,
     private userService: UserService, // Add this line
-    private platform: Platform  // Add Platform service
+    private platform: Platform,  // Add Platform service
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -82,112 +94,144 @@ selectedStudyCountry = '';
       interests: [''],
       languages: [''],
       aboutMe: [''],
-      isPrivate: [false]
+      isPrivate: [false],
+      ageVisible: [true],
+      genderVisible: [true]
     });
   
     this.loadUserData();
     this.loadJsonData();
+
+    // Listen for socket updates to refresh form if profile is updated from elsewhere
+    try {
+      this.socketSub = SocketService.userProfileUpdated$.subscribe((payload: any) => {
+        const uid = payload?.userId;
+        if (uid && this.user && (this.user._id === String(uid) || this.user.id === String(uid))) {
+          console.log('FormComponent: Socket update received, refreshing user data');
+          this.userService.refreshCurrentUser({ forceRefresh: true }).subscribe();
+        }
+      });
+    } catch (e) {
+      console.warn('SocketService not available in FormComponent', e);
+    }
+  }
+
+  async openAvatarCustomize() {
+    const modal = await this.modalCtrl.create({
+      component: (await import('../../../components/avatar-customize-modal/avatar-customize-modal.component')).AvatarCustomizeModalComponent,
+      componentProps: { profile: this.user }
+    });
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      console.log('Avatar modal dismissed with data, UI should already be updated via UserService');
+    }
   }
 
   loadUserData() {
-    if (this.platform.is('cordova')) {
-      console.log('Checking platform: cordova');
-      // Prefer canonical key 'currentUser', fallback to legacy 'user'
-      this.nativeStorage.getItem('currentUser')
-        .then(user => {
-          if (user) {
-            console.log('Fetched user data from NativeStorage (currentUser):', user);
-            this.user = new User().initialize(user);
-            this.populateForm();
-            this.fetchUserProfileDirectly();
-          } else {
-            // Prefer canonical 'currentUser', fallback to legacy 'user'
-            return this.nativeStorage.getItem('currentUser').catch(() => {
-              return this.nativeStorage.getItem('user').catch(() => null);
-            });
-          }
-        })
-        .then((legacy: any) => {
-          if (legacy) {
-            this.user = new User().initialize(legacy);
-            this.populateForm();
-            this.fetchUserProfileDirectly();
-          } else {
-            this.loadUserDataFromLocalStorage();
-          }
-        })
-        .catch((error) => {
-          console.warn('NativeStorage not available, using localStorage fallback', error);
-          this.loadUserDataFromLocalStorage();
-        });
-    } else {
-      console.log('Checking platform: not cordova');
-      this.loadUserDataFromLocalStorage();
-    }
-  }
+    this.userService.currentUser$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(user => {
+      if (user) {
+        console.log('FormComponent: Received user update', user.id);
+        const isFirstLoad = !this.user;
+        this.user = user;
 
-  loadUserDataFromLocalStorage() {
-    const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-    const user = raw ? JSON.parse(raw) : null;
-    console.log('Fetched user data from localStorage:', user);
-    if (user) {
-      this.user = new User().initialize(user);
-      this.populateForm();
-      this.fetchUserProfileDirectly();
-    } else {
-      console.log('User data not found in localStorage');
-    }
+        // Populate the form only when it's safe:
+        // - if not currently updating and
+        // - if the form is not dirty (no unsaved edits) OR it's the first load
+        // This prevents overwriting unsaved changes while still allowing settings
+        // updates from other places (e.g., Settings page) to reflect here.
+        const safeToPopulate = !this.isUpdating && (!this.form || !this.form.dirty || isFirstLoad);
+        if (safeToPopulate) {
+          this.populateForm();
+        }
+        
+        this.cdr.detectChanges();
+        
+        if (!this.profileFetched) {
+          this.profileFetched = true;
+          console.log('FormComponent: Initial profile fetch triggered');
+          this.fetchUserProfileDirectly();
+        }
+      }
+    });
   }
 
   populateForm() {
     console.log('Populating form with user data:', this.user);
 
     if (this.user) {
+      const sanitize = (val: any) => (val === 'undefined' || val === undefined || val === null) ? '' : val;
+
       this.form.patchValue({
-        firstName: this.user.firstName,
-        lastName: this.user.lastName,
+        firstName: sanitize(this.user.firstName),
+        lastName: sanitize(this.user.lastName),
         birthDate: this.user.birthDate ? this.user.birthDate.toISOString().substring(0, 10) : '',
-        gender: this.user.gender,
+        gender: sanitize(this.user.gender),
         isPrivate: this.user.isPrivate,
-        studyCountry: (this.user as any).studyCountry || '',   // <-- NEW (if available)
-        country: this.user.country,
-        city: this.user.city,
-        school: this.user.school,
-        education: this.user.education,
-        profession: this.user.profession,
+        ageVisible: this.user.ageVisible,
+        genderVisible: this.user.genderVisible,
+        studyCountry: (() => {
+          const sc = (this.user as any).studyCountry;
+          if (!sc) return '';
+          if (typeof sc === 'string') return sc;
+          if (typeof sc === 'object') return sanitize(sc.name || JSON.stringify(sc));
+          return String(sc);
+        })(),
+        country: sanitize(this.user.country),
+        city: sanitize(this.user.city),
+        school: sanitize(this.user.school),
+        education: sanitize(this.user.education),
+        profession: sanitize(this.user.profession),
         interests: this.user.interests,
         languages: this.user.languages,
-        aboutMe: this.user.aboutMe  // Add this line
+        aboutMe: sanitize(this.user.aboutMe)
       });
 
-      this.selectedCountry = this.user.country;
-      this.selectedCity = this.user.city;
-      this.selectedProfession = this.user.profession;
+      this.selectedCountry = sanitize(this.user.country);
+      this.selectedCity = sanitize(this.user.city);
+      this.selectedProfession = sanitize(this.user.profession);
+      this.selectedSchool = sanitize(this.user.school);
       this.selectedInterests = this.user.interests || [];
       this.selectedLanguages = this.user.languages || [];
-      this.selectedStudyCountry = (this.user as any).studyCountry || '';
+      // Normalize study country to a simple string to avoid [object Object]
+      const rawStudy = (this.user as any).studyCountry;
+      if (!rawStudy) {
+        this.selectedStudyCountry = '';
+      } else if (typeof rawStudy === 'string') {
+        this.selectedStudyCountry = rawStudy;
+      } else if (typeof rawStudy === 'object') {
+        this.selectedStudyCountry = rawStudy.name || JSON.stringify(rawStudy);
+      } else {
+        this.selectedStudyCountry = String(rawStudy);
+      }
       if (this.selectedStudyCountry) {
         this.loadUniversities();
       }
     }
     
     this.pageLoading = false;
-    // Persist authenticated user via centralized service to ensure guards and dual-write
-    try { this.userService.setCurrentUser(this.user); } catch(e) {}
   }
 
   loadJsonData() {
     this.jsonService.getCountries().then(
-      (resp: any) => {
-        if (Array.isArray(resp)) {
-          this.countries = resp;
-        } else {
-          this.countries = Object.keys(resp).map(key => ({ name: key, values: resp[key] }));
+      (data: any) => {
+        let countriesObj = data;
+        // Handle JsonService wrapping object in array
+        if (Array.isArray(data) && data.length === 1 && !Array.isArray(data[0]) && typeof data[0] === 'object') {
+          countriesObj = data[0];
         }
+
+        if (countriesObj && typeof countriesObj === 'object' && !Array.isArray(countriesObj)) {
+          this.countries = Object.keys(countriesObj).map(key => ({ name: key, values: countriesObj[key] }));
+        } else {
+          this.countries = Array.isArray(countriesObj) ? countriesObj : [];
+        }
+
         // reuse the same list for study countries
-        this.studyCountries = Array.isArray(this.countries)
-          ? this.countries.map((c: any) => (c.name ?? c)) // normalize to names
-          : [];
+        this.studyCountries = this.countries.map((c: any) => (typeof c === 'string' ? c : (c.name ?? '')));
       },
       (error) => console.error('Error fetching countries:', error)
     );
@@ -269,6 +313,10 @@ selectedStudyCountry = '';
           this.selectedEducation = result.data;
         } else if (title === 'Schools') {
           this.selectedSchool = result.data;
+        } else if (title === 'Study Countries') {
+          // result.data can be either { name, values } or a simple string
+          this.selectedStudyCountry = result.data.name || result.data;
+          this.loadUniversities();
         }
       }
     });
@@ -304,6 +352,10 @@ selectedStudyCountry = '';
     await this.presentModal(this.countries, 'Countries');
   }
 
+  async presentStudyCountriesModal() {
+    await this.presentModal(this.studyCountries, 'Study Countries');
+  }
+
   async presentCitiesModal() {
     if (this.selectedCountry) {
       await this.presentModal(this.cities, 'Cities');
@@ -325,6 +377,11 @@ selectedStudyCountry = '';
   }
 
   async presentSchoolsModal() {
+    if (!this.selectedStudyCountry) {
+      this.toastService.presentErrorToastr('Please select a Study Country first');
+      return;
+    }
+
     await this.presentModal(this.schools, 'Schools');
   }
 
@@ -333,8 +390,15 @@ selectedStudyCountry = '';
     const maxDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate()); // Exact date 18 years ago
     return maxDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
   }
-  
-  
+
+  onToggleChange(controlName: string, event: any) {
+    if (this.isUpdating) return;
+    const newValue = event.detail.checked;
+    if (this.form.get(controlName).value !== newValue) {
+      this.form.get(controlName).setValue(newValue);
+      this.form.get(controlName).markAsDirty();
+    }
+  }
 
   fetchUserProfileDirectly() {
     const userId = this.user.id;
@@ -342,9 +406,8 @@ selectedStudyCountry = '';
       (response) => {
         console.log('Profile Response:', response);
         if (response) {
-          this.user = new User().initialize(response);
-          this.populateForm();
-          try { this.userService.setCurrentUser(this.user); } catch (e) {}
+          // Centralized update will trigger populateForm via subscription
+          this.userService.setCurrentUser(response);
         } else {
           console.error('User data not available in response');
         }
@@ -368,52 +431,63 @@ selectedStudyCountry = '';
 
   submit() {
     if (this.form.valid) {
+      this.isUpdating = true;
       const formData = this.form.getRawValue();
       console.log('Form Data:', formData);
-  
+
       const userId = this.user.id;
       if (!userId) {
         console.error('User ID is not defined');
         return;
       }
   
-      // Construct updatedUserData with non-empty fields from formData
-      const updatedUserData = {
-        ...this.user.toObject(),
-        ...formData,
-        interests: this.selectedInterests,
-        languages: this.selectedLanguages
-      };
-  
-      console.log('Updating user with ID: ', userId);
+      // Construct updatedUserData by merging only meaningful (non-empty) form fields
+      // into the existing user object to avoid clearing fields unintentionally.
+      const base = (typeof this.user.toObject === 'function') ? this.user.toObject() : { ...this.user };
+      const updatedUserData: any = { ...base };
+
+      Object.keys(formData).forEach((key) => {
+        const val = formData[key];
+        // Booleans and numbers are valid values even if falsy; strings should be persisted only when non-empty
+        if (typeof val === 'string') {
+          if (val !== '' && val !== 'undefined') {
+            updatedUserData[key] = val;
+          }
+        } else if (val !== null && val !== undefined) {
+          updatedUserData[key] = val;
+        }
+      });
+
+      // Always persist selected arrays explicitly
+      updatedUserData.interests = Array.isArray(this.selectedInterests) ? this.selectedInterests : (updatedUserData.interests || []);
+      updatedUserData.languages = Array.isArray(this.selectedLanguages) ? this.selectedLanguages : (updatedUserData.languages || []);
+
+      console.log('Updating user with ID: ', userId, 'payload:', updatedUserData);
+      // Prevent changing country/city from the profile form (preserve values from sign-up)
+      updatedUserData.country = this.user.country || updatedUserData.country;
+      updatedUserData.city = this.user.city || updatedUserData.city;
+
       this.userService.updateUser(userId, updatedUserData).subscribe({
         next: (response) => {
+          this.isUpdating = false;
           console.log('Update Response:', response);
   
           if (response && response.data) {
-            // Initialize user with updated data
-            this.user = new User().initialize(response.data);
+            // Centralized update will trigger UI updates
+            this.userService.setCurrentUser(response.data);
+            this.populateForm(); // Force refresh form fields after successful save
   
-            this.toastController.create({
-              message: 'Profile updated successfully',
-              duration: 2000,
-              color: 'success'
-            }).then(toast => toast.present());
-  
-            try { this.userService.setCurrentUser(this.user); } catch (e) {}
+            this.toastService.presentSuccessToastr('Profile updated successfully');
   
             this.router.navigate(['/tabs/profile/display/null']);
           } else {
             console.error('User data not available in response');
             // Handle the case where user data is not available
-            this.toastController.create({
-              message: 'Error fetching updated profile data',
-              duration: 2000,
-              color: 'danger'
-            }).then(toast => toast.present());
+            this.toastService.presentErrorToastr('Error fetching updated profile data');
           }
         },
         error: (error) => {
+          this.isUpdating = false;
           console.error('Error updating profile:', error);
   
           // Log detailed error information
@@ -427,11 +501,7 @@ selectedStudyCountry = '';
             console.error(`Error Details:`, error.error);
           }
   
-          this.toastController.create({
-            message: 'Error updating profile. Please check the console for details.',
-            duration: 2000,
-            color: 'danger'
-          }).then(toast => toast.present());
+          this.toastService.presentErrorToastr('Error updating profile. Please check the console for details.');
         }
       });
     } else {
@@ -465,5 +535,13 @@ selectedStudyCountry = '';
 
   getMaxDate() {
     return new Date().toISOString().split('T')[0];
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+    if (this.socketSub) {
+      this.socketSub.unsubscribe();
+    }
   }
 }

@@ -56,6 +56,12 @@ export class IdService {
 
   decodeFromTransport(enc: string): string | null {
     if (!enc) return null;
+    // If the value already looks like a 24-character hex ObjectId, return as-is.
+    if (/^[0-9a-f]{24}$/i.test(enc)) return enc;
+    // Only attempt base64url decoding when the value contains URL-safe markers
+    // or typical base64 characters; avoid decoding plain hex strings which
+    // atob would misinterpret and produce binary garbage.
+    if (!/[-_+/=]/.test(enc)) return null;
     try {
       // revert URL-safe base64
       const safe = enc.replace(/-/g, '+').replace(/_/g, '/');

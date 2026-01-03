@@ -2,6 +2,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
 import { AlertController, ModalController, PopoverController } from '@ionic/angular';
+import { PhotoViewerComponent } from 'src/app/components/photo-viewer/photo-viewer.component';
+import { ReportModalComponent } from 'src/app/components/report-modal/report-modal.component';
 import { Post } from './../../../../models/Post';
 import { User } from './../../../../models/User';
 import { ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output, SimpleChanges, OnChanges, ViewChild, ElementRef, Renderer2 } from '@angular/core';
@@ -25,6 +27,7 @@ export class PostComponent implements OnInit, OnChanges {
   @Input() channel: Channel;
 
   isImageEnlarged: boolean = false;
+  isMediaExpired: boolean = false;
   mediaUrl: string = '';
   cachedStrokeOffset: string = '';
   cachedCircleColor: string = '';
@@ -65,13 +68,20 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
         }
       }
     });
-  this.updateMediaUrl();
-  this.checkAndRemoveExpiredMedia(); // Check for expired media
+    // Ensure `post` and `user` exist to avoid template/runtime errors in tests
+    if (!this.post) this.post = {} as any;
+    if (!this.post.user) this.post.user = {} as any;
+    if (!this.post.media) this.post.media = {} as any;
+    if (!this.user) this.user = {} as any;
+    if (!this.channel) this.channel = {} as any;
+    this.updateMediaUrl();
+    this.checkAndRemoveExpiredMedia(); // Check for expired media
 
   }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['post']) {
+      if (this.post && !this.post.user) this.post.user = {} as any;
       this.updateMediaUrl();
       this.checkAndRemoveExpiredMedia(); // Check for expired media
 
@@ -79,7 +89,18 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
   }
 
   postUserName(post: Post) {
-    return post.anonymName || `${post.user.firstName} ${post.user.lastName}`;
+    if (!post) return '';
+    if (post.anonymName) return post.anonymName;
+    if (this.isAdminPost()) return 'System';
+    const u = post.user || {} as any;
+    const first = u.firstName || u.name || '';
+    const last = u.lastName || '';
+    return (first + ' ' + last).trim() || '';
+  }
+
+  isAdminPost(): boolean {
+    const role = (this.post?.user?.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
   }
 
   updateMediaUrl() {
@@ -88,27 +109,29 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
 
   
   getMediaUrl(post: Post): string {
+    if (!post || !post.media) return '';
     if (post.media && post.media.url) {
       const baseUrl = 'http://127.0.0.1:3300/';
       const mediaUrl = baseUrl + post.media.url.replace(/\\/g, '/');
-      console.log("Generated Media URL:", mediaUrl);  // Debugging output
-      return mediaUrl;  // Ensure URL uses forward slashes
+      console.log("Generated Media URL:", mediaUrl);
+      return mediaUrl;
     }
     return '';
   }
 
-  toggleImageSize() {
-    this.isImageEnlarged = !this.isImageEnlarged;
-  }
-
-  getExpirationProgress(expiryDate: string): string {
+  getExpirationProgress(expiryDate: any): string {
+    if (!expiryDate) return '';
     if (this.previousExpiryDate === expiryDate && this.cachedStrokeOffset) {
       return this.cachedStrokeOffset;
     }
 
-    const expiryTime = new Date(expiryDate).getTime();
+    const dateObj = new Date(expiryDate);
+    if (isNaN(dateObj.getTime())) return '';
+
+    const expiryTime = dateObj.getTime();
     const currentTime = Date.now();
-    const totalTime = expiryTime - new Date(this.post.createdAt).getTime();
+    const createdAtTime = this.post && this.post.createdAt ? new Date(this.post.createdAt).getTime() : Date.now();
+    const totalTime = expiryTime - createdAtTime;
     const remainingTime = expiryTime - currentTime;
 
     const progressPercentage = Math.max((remainingTime / totalTime) * 100, 0);
@@ -120,12 +143,16 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     return this.cachedStrokeOffset;
   }
 
-  getCircleColor(expiryDate: string): string {
+  getCircleColor(expiryDate: any): string {
+    if (!expiryDate) return 'blue';
     if (this.previousExpiryDate === expiryDate && this.cachedCircleColor) {
       return this.cachedCircleColor;
     }
 
-    const expiryTime = new Date(expiryDate).getTime();
+    const dateObj = new Date(expiryDate);
+    if (isNaN(dateObj.getTime())) return 'blue';
+
+    const expiryTime = dateObj.getTime();
     const currentTime = Date.now();
     const remainingTime = expiryTime - currentTime;
 
@@ -145,8 +172,12 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     return color;
   }
 
-  getTimeRemaining(expiryDate: string): string {
-    const expiryTime = new Date(expiryDate).getTime();
+  getTimeRemaining(expiryDate: any): string {
+    if (!expiryDate) return '';
+    const dateObj = new Date(expiryDate);
+    if (isNaN(dateObj.getTime())) return '';
+
+    const expiryTime = dateObj.getTime();
     const currentTime = Date.now();
     const remainingTime = Math.max(expiryTime - currentTime, 0); // Ensure remainingTime is never negative
   
@@ -158,11 +189,19 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
   
 
   checkAndRemoveExpiredMedia() {
-    const expiryTime = new Date(this.post.media?.expiryDate).getTime();
+    const expiryDate = this.post && this.post.media ? this.post.media.expiryDate : null;
+    if (!expiryDate) {
+      this.isMediaExpired = false;
+      return;
+    }
+    const expiryTime = new Date(expiryDate).getTime();
     const currentTime = Date.now();
-  
-    if (expiryTime && expiryTime <= currentTime) {
-      this.post.media.url = '';  // Remove the media URL if it has expired
+
+    if (Number.isFinite(expiryTime) && expiryTime <= currentTime) {
+      this.isMediaExpired = true;
+      this.mediaUrl = ''; // Clear the URL so it doesn't load
+    } else {
+      this.isMediaExpired = false;
     }
   }
 
@@ -175,7 +214,7 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
         this.post.votes = resp.data.votes;
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
@@ -212,29 +251,53 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
   }
 
   changeVisibility(option: string) {
-    // Handle visibility change logic here
-    console.log(`Changed visibility to: ${option}`);
-    this.visibilityOptionsOpen = false;
-    this.removeClickListener();
+    if (!this.post || !this.post.id) return;
+    
+    this.channelService.updatePostVisibility(this.post.id, option).then(
+      (res: any) => {
+        this.post.visibility = option;
+        this.toastService.presentSuccessToastr('Visibility updated successfully');
+        this.visibilityOptionsOpen = false;
+        this.removeClickListener();
+        this.cdr.detectChanges();
+      },
+      err => {
+        console.error('Error updating visibility:', err);
+        this.toastService.presentErrorToastr('Could not update visibility');
+        this.visibilityOptionsOpen = false;
+        this.removeClickListener();
+      }
+    );
   }
 
   async showComments() {
+    if (!this.showCommentsBtn) return;
     this.router.navigate(['/tabs/channels/post/' + this.post.id], {
       queryParams: {
         channel: JSON.stringify(this.channel.toObject())
       }
     });
   }
+
+  handleMediaClick() {
+    if (this.showCommentsBtn) {
+      this.showComments();
+    } else {
+      this.toggleImageSize();
+    }
+  }
   
 
   showUserProfile(id: string) {
-    if (!this.post.anonyme && this.user.id !== id) {
+    if (id && !this.post.anonyme && !this.isAdminPost()) {
       this.router.navigate(['/tabs/profile/display/' + id]);
     }
   }
 
   async presentPopover(ev: any) {
-    const popoverItems = this.post.user.id === this.user.id
+    // Use the backend-provided isOwner flag for definitive ownership check
+    const isOwner = this.post.isOwner;
+    const popoverItems = isOwner
       ? [{ text: 'Delete', icon: 'fas fa-trash-alt', event: 'delete' }]
       : [{ text: 'Report', icon: 'fas fa-exclamation-triangle', event: 'report' }];
 
@@ -273,36 +336,58 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     this.channelService.deletePost(this.post.id).then(
       (resp: any) => {
         this.removePost.emit();
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
 
-  async reportPost() {
-    const alert = await this.alertCtrl.create({
-      header: 'Report Post',
-      inputs: [{ type: 'text', name: 'message', placeholder: 'Message' }],
-      buttons: [
-        { text: 'CANCEL', role: 'cancel' },
-        {
-          text: 'SEND',
-          cssClass: 'text-danger',
-          handler: (val) => {
-            this.channelService.reportPost(this.post.id, val.message).then(
-              (resp: any) => {
-                this.toastService.presentStdToastr(resp.message);
-              },
-              err => {
-                this.toastService.presentStdToastr(err);
-              }
-            );
-          }
-        }
-      ]
+  async reportPost(evidence?: string) {
+    const modal = await this.modalCtrl.create({
+      component: ReportModalComponent,
+      componentProps: {
+        targetName: evidence ? 'this image' : 'this post'
+      },
+      cssClass: 'report-modal-class'
     });
-    await alert.present();
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      if (evidence) {
+        data.evidence = [evidence];
+        data.photoUrl = evidence;
+      }
+      this.channelService.reportPost(this.post.id, data).then(
+        (resp: any) => {
+          this.toastService.presentSuccessToastr(resp.message || 'Report submitted successfully');
+        },
+        err => {
+          this.toastService.presentErrorToastr(err || 'Error reporting post');
+        }
+      );
+    }
+  }
+
+  async toggleImageSize() {
+    if (this.mediaUrl) {
+      const modal = await this.modalCtrl.create({
+        component: PhotoViewerComponent,
+        componentProps: {
+          photos: [this.mediaUrl],
+          initialIndex: 0,
+          myProfile: false
+        }
+      });
+      await modal.present();
+
+      const { data } = await modal.onDidDismiss();
+      if (data && data.action === 'report') {
+        this.reportPost(this.mediaUrl);
+      }
+    }
   }
 }

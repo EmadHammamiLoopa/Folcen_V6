@@ -4,8 +4,8 @@
 }
 
 ion-toolbar {
-  --background: #fff;
-  --color: #000;
+  --background: var(--loopa-toolbar-background);
+  --color: var(--loopa-toolbar-color);
 }
 
 ion-title {

@@ -178,15 +178,10 @@
     align-items: center;
     gap: 12px;
 
-    .avatar-placeholder {
+    .poster-avatar {
       width: 40px;
       height: 40px;
-      background: var(--loopa-gradient-primary);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
+      --border-radius: 12px;
     }
 
     .poster-details {

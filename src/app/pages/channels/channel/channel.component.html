@@ -14,7 +14,7 @@
       </div>
 
       <div class="channel-info">
-        <div class="category-badge" *ngIf="channel.category">{{ channel.category }}</div>
+        <div class="category-badge" *ngIf="channel.category && channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">{{ channel.category }}</div>
         <h1 class="channel-name">{{ channel.name }}</h1>
         <p class="channel-desc" *ngIf="channel.description">{{ channel.description }}</p>
         
@@ -34,21 +34,20 @@
         </div>
 
         <div class="channel-actions">
-          <ion-button 
-            class="follow-btn" 
-            [color]="channel.followedBy(user.id) ? 'light' : 'primary'"
-            (click)="handlePopoverEvent('follow')"
-          >
-            <ion-icon [name]="channel.followedBy(user.id) ? 'checkmark-circle' : 'add-circle'" slot="start"></ion-icon>
-            {{ channel.followedBy(user.id) ? 'Following' : 'Follow' }}
-          </ion-button>
+            <ion-button 
+              class="follow-btn" 
+              *ngIf="!isOwner(channel)"
+              [class.followed]="channel.followedBy(user.id || user._id)"
+              (click)="handlePopoverEvent('follow')"
+            >
+              <ion-icon [name]="channel.followedBy(user.id || user._id) ? 'checkmark-circle' : 'add-circle'" slot="start"></ion-icon>
+              {{ channel.followedBy(user.id || user._id) ? 'Following' : 'Follow' }}
+            </ion-button>
           
           <ion-button 
             class="post-btn" 
-            fill="outline" 
-            color="light"
             (click)="showPostForm()"
-            *ngIf="channel && user && (channel.followedBy(user.id) || channel.user.id == user.id)"
+            *ngIf="channel && user && (channel.followedBy(user.id || user._id) || isOwner(channel))"
           >
             <ion-icon name="create-outline" slot="start"></ion-icon>
             Post
@@ -69,7 +68,7 @@
     <div class="alert-card">
       <i class="fas fa-shield-alt"></i>
       <h3>Under Verification</h3>
-      <p>This channel is not public yet. It is currently being reviewed by the Loopa team to ensure community safety.</p>
+      <p>This channel is not public yet. It is currently being reviewed by the Folcen team to ensure community safety.</p>
       <ion-button fill="clear" routerLink="/tabs/channels">Go Back</ion-button>
     </div>
   </div>
@@ -83,10 +82,9 @@
       <h2>No posts yet</h2>
       <p>Be the first one to start the conversation in <strong>{{ channel.name }}</strong>!</p>
       <ion-button 
-        shape="round" 
-        color="primary" 
+        class="create-first-btn"
         (click)="showPostForm()"
-        *ngIf="channel.followedBy(user.id) || channel.user.id == user.id"
+        *ngIf="channel.followedBy(user.id || user._id) || isOwner(channel)"
       >
         Create First Post
       </ion-button>

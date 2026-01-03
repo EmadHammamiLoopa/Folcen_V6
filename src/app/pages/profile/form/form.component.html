@@ -9,6 +9,16 @@
 <app-loader *ngIf="pageLoading"></app-loader>
 
 <ion-content>
+  <div class="avatar-edit-section text-center p-3">
+    <app-avatar [profile]="user" [size]="140"></app-avatar>
+    <div class="mt-2">
+      <ion-button fill="outline" size="small" (click)="openAvatarCustomize()">
+        <ion-icon name="color-palette-outline" slot="start"></ion-icon>
+        Customize Avatar
+      </ion-button>
+    </div>
+  </div>
+
   <form class="p-2 ml-2" *ngIf="form" [formGroup]="form">
     <ion-text class="font-weight-bold" color="primary">
       <i class="fas fa-info-circle mr-2"></i> Basic Information
@@ -78,6 +88,7 @@
           <ion-select-option value="female">Female</ion-select-option>
           <ion-select-option value="male">Male</ion-select-option>
           <ion-select-option value="other">Other</ion-select-option>
+          <ion-select-option value="prefer not to say">Prefer not to say</ion-select-option>
         </ion-select>
       </ion-item>
       <div class="mt-1" *ngIf="!gender.valid && validationErrors['gender']">
@@ -87,18 +98,18 @@
         </span>
       </div>
 
-      <ion-item class="styled-item mt-3" (click)="presentCountriesModal()">
+      <ion-item class="styled-item mt-3">
         <ion-label position="floating">
           <i class="fas fa-globe mr-2"></i>Country
         </ion-label>
-        <ion-input placeholder="Select your country" type="text" formControlName="country" [value]="selectedCountry" readonly></ion-input>
+        <ion-input placeholder="Select your country" type="text" formControlName="country" [value]="selectedCountry || ''" [disabled]="true"></ion-input>
       </ion-item>
 
-      <ion-item class="styled-item mt-3" (click)="presentCitiesModal()">
+      <ion-item class="styled-item mt-3">
         <ion-label position="floating">
           <i class="fas fa-city mr-2"></i>City
         </ion-label>
-        <ion-input placeholder="Select your city" type="text" formControlName="city" [value]="selectedCity" readonly></ion-input>
+        <ion-input placeholder="Select your city" type="text" formControlName="city" [value]="selectedCity || ''" [disabled]="true"></ion-input>
       </ion-item>
 
       <ion-item class="styled-item mt-3" (click)="presentProfessionsModal()">
@@ -108,17 +119,27 @@
         <ion-input placeholder="Select your profession" type="text" formControlName="profession" [value]="selectedProfession" readonly></ion-input>
       </ion-item>
 
-      <ion-item class="styled-item mt-3" (click)="presentSchoolsModal()">
+      <ion-item class="styled-item mt-3" (click)="presentStudyCountriesModal()">
+        <ion-label position="floating">
+          <i class="fas fa-globe mr-2"></i>Study Country
+        </ion-label>
+        <ion-input placeholder="Select study country" type="text" formControlName="studyCountry" [value]="selectedStudyCountry" readonly></ion-input>
+      </ion-item>
+
+      <ion-item class="styled-item mt-3" (click)="selectedStudyCountry ? presentSchoolsModal() : null">
         <ion-label position="floating">
           <i class="fas fa-school mr-2"></i>School
         </ion-label>
-        <ion-input placeholder="Select your school" type="text" formControlName="school" [value]="selectedSchool" readonly></ion-input>
+        <ion-input placeholder="Select your school" type="text" formControlName="school" [value]="selectedSchool || ''" readonly [disabled]="!selectedStudyCountry"></ion-input>
       </ion-item>
       <div class="mt-1" *ngIf="!school.valid && school.touched && validationErrors['school']">
         <span class="text-danger pl-1">
           <span *ngIf="school.hasError('maxlength')">The school field must not contain more than 50 characters</span>
           <span *ngIf="validationErrors['school']">{{ validationErrors['school'] }}</span>
         </span>
+      </div>
+      <div class="mt-1" *ngIf="!selectedStudyCountry" style="padding-left: 16px; color: #888; font-size: 0.9em;">
+        Select a Study Country to choose a School
       </div>
 
       <ion-item class="styled-item mt-3">
@@ -168,9 +189,23 @@
 
       <ion-item class="styled-item mt-3">
         <ion-label>
+          <i class="fas fa-birthday-cake mr-2"></i>Show Age
+        </ion-label>
+        <ion-toggle [checked]="form.get('ageVisible').value" (ionChange)="onToggleChange('ageVisible', $event)"></ion-toggle>
+      </ion-item>
+
+      <ion-item class="styled-item mt-3">
+        <ion-label>
+          <i class="fas fa-venus-mars mr-2"></i>Show Gender
+        </ion-label>
+        <ion-toggle [checked]="form.get('genderVisible').value" (ionChange)="onToggleChange('genderVisible', $event)"></ion-toggle>
+      </ion-item>
+
+      <ion-item class="styled-item mt-3">
+        <ion-label>
           <i class="fas fa-lock mr-2"></i>Private Profile
         </ion-label>
-        <ion-toggle formControlName="isPrivate"></ion-toggle>
+        <ion-toggle [checked]="form.get('isPrivate').value" (ionChange)="onToggleChange('isPrivate', $event)"></ion-toggle>
       </ion-item>
     </ion-list>
 

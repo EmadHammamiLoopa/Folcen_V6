@@ -4,6 +4,7 @@ import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { SanitizeInterceptor } from './interceptors/sanitize.interceptor';
+import { LegalInterceptor } from './interceptors/legal.interceptor';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -28,7 +29,8 @@ import { AppComponent } from './app.component';
     })
   ],
   providers: [
-    { provide: HTTP_INTERCEPTORS, useClass: SanitizeInterceptor, multi: true }
+    { provide: HTTP_INTERCEPTORS, useClass: SanitizeInterceptor, multi: true },
+    { provide: HTTP_INTERCEPTORS, useClass: LegalInterceptor, multi: true }
   ],
   bootstrap: [
     AppComponent,

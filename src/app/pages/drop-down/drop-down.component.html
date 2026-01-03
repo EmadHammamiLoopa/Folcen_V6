@@ -1,8 +1,13 @@
-<ion-list class="p-0">
-  <ion-item class="pr-5" (click)="dismiss(item.event)" [button]="true" *ngFor="let item of items">
-    <ion-label class="pl-2 my-0">
-      <i [class]="item.icon" class="mr-1 icon"></i>
-      {{ item.text }}
-    </ion-label>
-  </ion-item>
-</ion-list>
+<div class="dropdown-container">
+  <div class="dropdown-item" *ngFor="let item of items; let last = last" (click)="dismiss(item.event)" [class.last]="last">
+    <div class="item-content">
+      <div class="icon-box">
+        <i [class]="item.icon"></i>
+      </div>
+      <span class="item-text">{{ item.text }}</span>
+    </div>
+    <div class="chevron">
+      <i class="fas fa-chevron-right"></i>
+    </div>
+  </div>
+</div>

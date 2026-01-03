@@ -93,6 +93,22 @@ export class DisplayPostComponent implements OnInit {
     return val;
   }
 
+  getMediaUrl() {
+    if (!this.post || !this.post.media) return null;
+    const backendRoot = (this.dataService as any).apiUrl ? (this.dataService as any).apiUrl.replace(/\/api\/v1\/?$/i, '') : '';
+    const path = this.post.media.url;
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    return `${backendRoot}/${path.replace(/\\/g, '/')}`;
+  }
+
+  isMediaVideo() {
+    const url = this.getMediaUrl();
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm'];
+    return videoExtensions.some(ext => url.toLowerCase().endsWith(ext));
+  }
+
   deletePost() {
     if (confirm('Are you sure you want to delete this post?')) {
       this.dataService.sendDeleteRequest(`channel/post/${this.itemId(this.post)}`).subscribe(() => {

@@ -10,7 +10,7 @@ describe('ChannelsHeaderComponent', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ ChannelsHeaderComponent ],
-      imports: [IonicModule.forChild()]
+      imports: [IonicModule.forRoot()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(ChannelsHeaderComponent);

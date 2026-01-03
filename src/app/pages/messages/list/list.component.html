@@ -22,12 +22,12 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <div class="h-100 w-100 d-flex flex-column py-2 text-center" *ngIf="(!users || !users.length) && !pageLoading">
-    <div class="flex-grow-1 d-flex align-items-end justify-content-center overflow-hidden">
-      <img class="h-100 w-auto image" src="./../../../../assets/images/svgs/chat.svg" alt="">
-    </div>
-    <div class="flex-grow-1 py-2">
-      <span class="empty-alert">You have no chat yet</span>
+  <div class="h-100 w-100 d-flex flex-column py-2 text-center empty-state" *ngIf="(!users || !users.length) && !pageLoading">
+    <div class="flex-grow-1 d-flex align-items-center justify-content-center">
+      <div class="empty-text">
+        <h3 class="empty-alert">No messages yet</h3>
+        <p class="empty-sub">You haven't started any conversations. Open a profile or find friends to begin.</p>
+      </div>
     </div>
   </div>
 
@@ -42,18 +42,18 @@
           'new-thread': user.hasUnread
         }"
       >
-        <ion-avatar class="avatar ml-2 position-relative">
-          <img [src]="user.mainAvatar || user.avatar" alt="{{ user.fullName }}" />
-          <span *ngIf="user.online" class="online-status"></span>
+        <div class="avatar-wrapper ml-2 position-relative">
+          <app-avatar [profile]="user" [size]="48"></app-avatar>
+          <span *ngIf="user.online && !isAdmin(user)" class="online-status"></span>
           <!-- compact per-thread missed badge -->
           <span class="friends-missed-pill" *ngIf="getMissedCountFor(user) as mc; mc">
             {{ mc > 99 ? '99+' : mc }}
           </span>
-        </ion-avatar>
+        </div>
   
         <ion-label class="ml-3">
           <span class="mb-0 title d-block font-weight-bold">
-            {{ user.fullName }}
+            {{ isAdmin(user) ? 'System' : user.fullName }}
             <ion-badge *ngIf="user.hasUnread" color="primary" class="ml-1">New</ion-badge>
             <!-- optional inline missed indicator next to name -->
             <ion-badge *ngIf="getMissedCountFor(user) as mc; mc" color="medium" class="ml-1">Missed {{ mc }}</ion-badge>
@@ -73,7 +73,7 @@
         </ion-label>
   
         <span class="text-center" *ngIf="user.messages?.length">
-          <small class="mr-2">{{ user.messages[0]?.createdAt | extractDiffTime }}</small>
+          <small class="mr-2">{{ (getMessageDate(user.messages[0]) | extractDiffTime) || formatShortTime(getMessageDate(user.messages[0])) }}</small>
         </span>
       </ion-item>
   

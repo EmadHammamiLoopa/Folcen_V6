@@ -268,7 +268,7 @@ export class JobFormComponent implements OnInit {
       });
     } catch (err) {
       console.error('Failed to load countries from JsonService:', err);
-      this.toastService.presentStdToastr('Error fetching countries and cities.');
+      this.toastService.presentErrorToastr('Error fetching countries and cities.');
     }
   }
 
@@ -300,7 +300,7 @@ export class JobFormComponent implements OnInit {
     if (!this.platform.is('cordova')) {
       // Browser fallback
       this.uploadFile.getFileFromBrowser()
-        .then(file => {
+        .then((file: any) => {
           this.imageLoading = false;
           const img = {
             url: this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file)) as string,
@@ -331,7 +331,7 @@ export class JobFormComponent implements OnInit {
           },
           err => {
             this.imageLoading = false;
-            this.toastService.presentStdToastr(err);
+            this.toastService.presentErrorToastr(err);
           }
         );
     }
@@ -396,12 +396,12 @@ export class JobFormComponent implements OnInit {
 
   submit() {
     if (this.form.invalid) {
-      this.toastService.presentStdToastr('Please fill all required fields correctly.');
+      this.toastService.presentErrorToastr('Please fill all required fields correctly.');
       return;
     }
 
     if (this.jobImages.length === 0) {
-      this.toastService.presentStdToastr('Please select at least one image for the job');
+      this.toastService.presentErrorToastr('Please select at least one image for the job');
       return;
     }
 
@@ -427,7 +427,7 @@ export class JobFormComponent implements OnInit {
     const maxSalary = parseFloat(this.maxSalary.value);
   
     if (isNaN(minSalary) || isNaN(maxSalary)) {
-      this.toastService.presentStdToastr('Please enter valid salary values.');
+      this.toastService.presentErrorToastr('Please enter valid salary values.');
       return;
     }
   
@@ -438,7 +438,7 @@ export class JobFormComponent implements OnInit {
     this.jobService.store(this.getJobForm())
       .then(resp => {
         this.pageLoading = false;
-        this.toastService.presentStdToastr('Job created successfully');
+        this.toastService.presentSuccessToastr('Job created successfully');
         this.router.navigateByUrl('/tabs/small-business/jobs');
         this.clearJobForm();
       })
@@ -449,7 +449,7 @@ export class JobFormComponent implements OnInit {
           this.validatorErrors = err.errors;
         }
         if (typeof err === 'string') {
-          this.toastService.presentStdToastr(err);
+          this.toastService.presentErrorToastr(err);
         }
       });
   }

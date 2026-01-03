@@ -20,10 +20,66 @@ export class ListComponent implements OnInit {
 
 
   user: User | undefined;
+  authUserId: string = '';
   pageLoading = false;
   page: number = 0;
   channels: Channel[] = [];
   searchWord = "";
+  selectedCategory: string = '';
+  categories = [
+    'News', 'Events', 'Dating', 'Arts', 'Watch', 'Found', 
+    'Sports', 'Food', 'Technology', 'Music', 'Gaming', 
+    'Health', 'Education', 'Business', 'Lifestyle',
+    'Travel', 'Fashion', 'Science', 'Politics', 'Religion', 'Community',
+    'Movies', 'Photography', 'Automotive', 'Finance', 'Environment', 
+    'Pets', 'DIY', 'History', 'Literature', 'Philosophy', 'Space', 
+    'Fitness', 'Parenting', 'Real Estate', 'Legal', 'Marketing', 
+    'Design', 'Architecture', 'Comedy', 'Spirituality', 'Crypto', 
+    'Startups', 'Mental Health', 'Gardening', 'Crafts', 'Volunteering', 
+    'Networking', 'Jobs', 'Outdoors', 'Self Improvement', 'Social Media', 
+    'Writing', 'Languages', 'Culture', 'Sci-Fi', 'Fantasy', 'Anime', 
+    'Collectibles', 'Cooking', 'Investing', 'Career', 'Mindfulness', 
+    'Yoga', 'Psychology', 'Astronomy', 'Sustainability', 'Aviation', 
+    'Military', 'Poetry', 'True Crime', 'Mystery', 'Horror', 'Romance', 
+    'Teaching', 'Family', 'Weddings', 'Backpacking', 'Camping', 'Hiking', 
+    'Digital Nomad', 'UI/UX', 'Interior Design', 'Veganism', 'Baking', 
+    'Wine', 'Beer', 'Coffee', 'Esports', 'Retro Gaming', 'Tabletop', 
+    'Chess', 'Poker', 'Memes', 'Astrology', 'Tarot', 'Human Rights', 
+    'Charity', 'Local News', 'SEO', 'Sales', 'Leadership', 'Agile', 
+    'AI', 'Robotics', 'IoT', 'Cybersecurity', 'Blockchain', 'NFTs', 
+    'Metaverse', 'VR/AR', 'Quantum', 'Biotech', 'Clean Tech', 'FinTech', 
+    'AgTech', 'Logistics', 'Manufacturing', 'Construction', 'Energy', 
+    'Insurance', 'Genealogy', 'Museums', 'Theater', 'Dance', 'Opera', 
+    'Classical', 'Jazz', 'Rock', 'Pop', 'Hip Hop', 'Electronic', 
+    'DJing', 'Animation', 'VFX', 'Screenwriting', 'Acting', 'Reality TV', 
+    'Podcasts', 'Audiobooks', 'Blogging', 'Vlogging', 'Public Speaking', 
+    'Conferences', 'Festivals', 'Exhibitions', 'Workshops', 'Webinars', 
+    'Meetups', 'Parties', 'Holidays', 'Seasons', 'Weather', 'Wildlife', 
+    'Conservation', 'Recycling', 'Zero Waste', 'Animal Rights', 'Dogs', 
+    'Cats', 'Birds', 'Fish', 'Reptiles', 'Horses', 'Livestock', 
+    'Veterinary', 'Plants', 'Flowers', 'Trees', 'Landscaping', 
+    'Permaculture', 'Agriculture', 'Nutrition', 'Dieting', 'Healthy Eating', 
+    'Gourmet', 'Street Food', 'Fast Food', 'Beverages', 'Spirits', 
+    'Cocktails', 'Tea', 'Juice', 'Water', 'Restaurants', 'Cafes', 
+    'Bars', 'Pubs', 'Clubs', 'Tourism', 'Destinations', 'Adventure', 
+    'Luxury', 'Budget', 'Solo', 'Family', 'Business Travel', 'Flights', 
+    'Trains', 'Road Trips', 'Hotels', 'Resorts', 'Vacation Rentals', 
+    'Expat', 'Heritage', 'Customs', 'Etiquette', 'Morality', 'Values', 
+    'Beliefs', 'Faith', 'Self-Help', 'Motivation', 'Inspiration', 
+    'Success', 'Happiness', 'Well-being', 'Mathematics', 'Engineering', 
+    'Medicine', 'Universe', 'Future', 'Confessions', 'Rants', 
+    'Compliments', 'Recommendations', 'Requests', 'Offers', 'Trading', 
+    'Free Stuff', 'Giveaways', 'Contests', 'Challenges', 'Projects', 
+    'Collaborations', 'Support', 'Help', 'Feedback', 'Ideas', 
+    'Creativity', 'Discovery', 'Transformation', 'Impact', 'Purpose', 
+    'Meaning', 'Connection', 'Belonging', 'Identity', 'Diversity', 
+    'Inclusion', 'Equality', 'Justice', 'Freedom', 'Peace', 'Love', 
+    'Kindness', 'Compassion', 'Empathy', 'Gratitude', 'Hope', 'Resilience', 
+    'Courage', 'Strength', 'Wisdom', 'Truth', 'Beauty', 'Wonder', 
+    'Awe', 'Joy', 'Laughter', 'Fun', 'Play', 'Exploration', 'Curiosity', 
+    'Imagination', 'Dreams', 'Vision', 'Legacy', 'Life', 'Death', 
+    'Existence', 'Reality', 'Consciousness', 'Spirit', 'Soul', 'God'
+  ];
   type: string = '';
   followLoading: string[] = [];
   searchTimeout: any; // Add this line to declare the searchTimeout variable
@@ -54,29 +110,61 @@ ionViewWillEnter() {
 
 
 getChannelUserId(channel: Channel): string {
-  console.log('Channel:', channel);
+    console.log('Channel:', channel);
 
-  // If channel.user is a string (i.e., the user ID), return it directly
-  if (typeof channel.user === 'string') {
-    console.log('User is a string, returning user ID:', channel.user);
-    return channel.user;
-  }
+    try {
+      const u = channel && (channel as any).user;
+      if (!u) return '';
 
-  // If channel.user is an object (i.e., a User object), return the user's _id
-  console.log('User is an object, returning user._id:', channel.user._id);
-  return channel.user._id;
+      // If channel.user is a string (i.e., the user ID), return it directly
+      if (typeof u === 'string') {
+        console.log('User is a string, returning user ID:', u);
+        return u;
+      }
+
+      // If it's an instance of our User class, it may expose `id` getter
+      if (typeof u.getId === 'function') {
+        const got = u.getId();
+        if (got) return got;
+      }
+
+      // Check common id fields safely
+      const maybeId = (u && (u._id || u.id)) || (u && typeof u.toObject === 'function' && (u.toObject()._id || u.toObject().id));
+      if (maybeId) {
+        console.log('User object id extracted:', maybeId);
+        return String(maybeId);
+      }
+
+      // Also check common alternate fields on the channel itself (owner variants)
+      const alt = (channel as any)._userId || (channel as any).userId || (channel as any).owner || (channel as any).ownerId || (channel as any).createdBy;
+      if (alt) return String(alt);
+
+      // No id found — only log during local development to avoid noisy console in prod
+      return '';
+    } catch (e) {
+      console.warn('Error extracting channel user id', e, channel && (channel as any).user);
+      return '';
+    }
 }
+
+  isOwner(channel: Channel): boolean {
+    if (!channel) return false;
+    return channel.isOwner(this.authUserId);
+  }
 
 
   getType() {
     this.route.paramMap.subscribe(params => {
       this.type = params.get('type') || '';
-      if (this.type === 'explore' || this.type === 'mines') {
-        this.loadUserData();
-      } else {
-        this.getChannels(null, true);
-      }
+      this.loadUserData();
     });
+  }
+
+  onCategoryChange(val: any) {
+    this.selectedCategory = String(val || '');
+    // refresh list using new category filter
+    this.page = 0;
+    this.getChannels(null, true);
   }
 
   loadUserData() {
@@ -91,6 +179,7 @@ getChannelUserId(channel: Channel): string {
           if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
           if (u) {
             this.user = new User().initialize(u);
+            try { this.authUserId = this.user.id || this.user._id || ''; } catch(e) { this.authUserId = ''; }
             this.getChannels(null, true);
           } else {
             this.loadUserDataFromLocalStorage();
@@ -109,6 +198,8 @@ getChannelUserId(channel: Channel): string {
   const user = raw ? JSON.parse(raw) : null;
     if (user) {
       this.user = new User().initialize(user);
+      // normalize auth user id to a simple string for templates
+      try { this.authUserId = this.user.id || this.user._id || ''; } catch (e) { this.authUserId = '';} 
       this.getChannels(null, true);
     }
   }
@@ -120,7 +211,9 @@ getChannelUserId(channel: Channel): string {
   
     this.searchTimeout = setTimeout(() => {
       this.searchWord = searchWord;
-      this.getChannels();
+      // Reset paging so explore API will be called with the new search term
+      this.page = 0;
+      this.getChannels(null, true);
     }, 300); // Wait for 300ms after the last keystroke before making the API call
   }
   
@@ -130,27 +223,30 @@ getChannelUserId(channel: Channel): string {
     // Add your logic for deleting the channel here
     this.channelService.deleteChannel(channel.id).then(
       (resp: any) => {
-        this.toastService.presentStdToastr('Channel deleted successfully');
+        this.toastService.presentSuccessToastr('Channel deleted successfully');
         this.channels = this.channels.filter(ch => ch.id !== channel.id);
       },
       err => {
-        this.toastService.presentStdToastr('Failed to delete the channel');
+        this.toastService.presentErrorToastr('Failed to delete the channel');
       }
     );
   }
   
   async presentPopover(ev: any, channel: any) {
     const popover = await this.popoverController.create({
-      component: ChannelPopoverComponent,  // This will be the popover component
-      componentProps: { channel },  // Pass the channel data to the popover
+      component: ChannelPopoverComponent,
+      componentProps: { channel },
       event: ev,
-      translucent: true
+      translucent: true,
+      cssClass: 'channel-info-popover',
+      mode: 'ios'
     });
     return await popover.present();
   }
 
-  handleResponse(resp: any, level: 'city' | 'country' | 'global') {
+  handleResponse(resp: any, level: 'city' | 'country' | 'global', event?: any) {
     this.pageLoading = false; // Ensure loading state is reset
+    if (event) event.target.complete();
   
     if (resp && resp.data) {
       console.log("response:", resp);
@@ -196,7 +292,7 @@ getChannelUserId(channel: Channel): string {
         }
       }
     } else {
-      this.toastService.presentStdToastr('Failed to load channels');
+      this.toastService.presentErrorToastr('Failed to load channels');
     }
   }
   
@@ -213,7 +309,10 @@ getChannelUserId(channel: Channel): string {
       buttons: [
         {
           text: 'Cancel',
-          role: 'cancel'
+          role: 'cancel',
+          handler: () => {
+            this.router.navigate(['/tabs/channels/list/followed']);
+          }
         },
         {
           text: 'Create Channel',
@@ -245,7 +344,10 @@ getChannelUserId(channel: Channel): string {
       buttons: [
         {
           text: 'Cancel',
-          role: 'cancel'
+          role: 'cancel',
+          handler: () => {
+            this.router.navigate(['/tabs/channels/list/followed']);
+          }
         },
         {
           text: level === 'country' ? 'Explore Country' : 'Explore Global',
@@ -269,9 +371,10 @@ getChannelUserId(channel: Channel): string {
   }
 
   
-  handleError(err) {
+  handleError(err, event?: any) {
     this.pageLoading = false;
-    this.toastService.presentStdToastr(err);
+    if (event) event.target.complete();
+    this.toastService.presentErrorToastr(err);
   }
 
 
@@ -305,27 +408,72 @@ getChannelUserId(channel: Channel): string {
     if (this.type === 'mines') {
         this.channelService.myChannels(this.page++, this.searchWord)
             .then(
-                (resp: any) => this.handleResponse(resp, 'city'),
-                err => this.handleError(err)
+                (resp: any) => this.handleResponse(resp, 'city', event),
+                err => this.handleError(err, event)
             );
 
     } else if (this.type === 'followed') {
-        this.channelService.followedChannels(this.page++, this.searchWord)
+      this.channelService.followedChannels(this.page++, this.searchWord, this.selectedCategory)
             .then(
                 (resp: any) => {
-                    this.handleResponse(resp, 'city');
-                    this.sortStaticChannels();  // Ensure static channels are sorted
+                    this.handleResponse(resp, 'city', event);
+            this.sortStaticChannels();  // Ensure static channels are sorted
+            // merge static city channels so user sees default-followed statics
+            this.getAndMergeCityStatics();
                 },
-                err => this.handleError(err)
+                err => this.handleError(err, event)
             );
 
     } else if (this.type === 'explore') {
         // Avoid making redundant calls to exploreChannels if the page isn't 0
         if (this.page === 0) {
-            this.exploreChannels(this.explorationLevel);
+            this.exploreChannels(this.explorationLevel, event);
+        } else {
+          this.pageLoading = false;
+          if (event) event.target.complete();
         }
+    } else {
+      this.pageLoading = false;
+      if (event) event.target.complete();
     }
 }
+
+  async getAndMergeCityStatics() {
+    // Fetch static city channels for the user's city and country and merge into followed list as default-followed
+    try {
+      if (!this.user) return;
+      const resp: any = await this.channelService.getCityChannels(this.user.city || '', this.user.country || '', 0, '');
+      if (resp && resp.data && Array.isArray(resp.data.channels)) {
+        const statics = resp.data.channels.map(ch => Channel.createFromData(ch)).filter(c => ['static','static_events','static_dating'].includes(c.type));
+        statics.forEach(s => {
+          // if not already present, add and mark as followed locally
+          if (!this.channels.find(c => c.id === s.id)) {
+            try {
+              if (!s.followers) s.followers = [];
+              if (this.user && !s.followers.includes(this.user.id)) s.followers.push(this.user.id);
+            } catch (e) { /* ignore */ }
+            this.channels.push(s);
+          }
+        });
+        // dedupe
+        this.channels = _.uniqBy(this.channels.reverse(), 'id').reverse();
+        // Optionally persist default follows server-side if configured (localStorage key 'persist_default_channel_follows' === '1')
+        try {
+          const persist = localStorage.getItem('persist_default_channel_follows') === '1';
+          if (persist && this.user) {
+            statics.forEach(async s => {
+              try {
+                // only follow on server when not already followed
+                if (!s.followers || !s.followers.includes(this.user.id)) {
+                  await this.channelService.follow(s.id);
+                }
+              } catch (e) { /* ignore follow errors */ }
+            });
+          }
+        } catch (e) {}
+      }
+    } catch (e) { console.warn('Failed to fetch/merge city statics', e); }
+  }
 
 
 sortStaticChannels() {
@@ -350,7 +498,10 @@ sortStaticChannels() {
       buttons: [
         {
           text: 'Cancel',
-          role: 'cancel'
+          role: 'cancel',
+          handler: () => {
+            this.router.navigate(['/tabs/channels/list/followed']);
+          }
         },
         {
           text: 'Explore Country',
@@ -375,7 +526,10 @@ sortStaticChannels() {
       buttons: [
         {
           text: 'Cancel',
-          role: 'cancel'
+          role: 'cancel',
+          handler: () => {
+            this.router.navigate(['/tabs/channels/list/followed']);
+          }
         },
         {
           text: 'Explore Global',
@@ -392,7 +546,7 @@ sortStaticChannels() {
     await alert.present();
   }
 
-  exploreChannels(level: 'city' | 'country' | 'global' = 'city') {
+  exploreChannels(level: 'city' | 'country' | 'global' = 'city', event?: any) {
     console.log(`exploreChannels API called ${level} level`);
 
     // Reset channels array when switching exploration levels
@@ -403,7 +557,7 @@ sortStaticChannels() {
     // Ensure API call is only made when the page is 0
     if (this.page === 0) {
         this.explorationLevel = level;
-        this.channelService.exploreChannels(this.page++, this.searchWord, level)
+        this.channelService.exploreChannels(this.page++, this.searchWord, level, this.selectedCategory)
             .then(
                 (resp: any) => {
                     console.log('Response from exploreChannels API:', resp);
@@ -415,11 +569,21 @@ sortStaticChannels() {
                         });
 
                         // Handle response and deduplication as usual
-                        this.handleResponse({ data: { channels: initializedChannels } }, level);
+                        this.handleResponse({ data: { channels: initializedChannels } }, level, event);
+                      // if exploring followed view, also merge city static channels so user sees default-followed statics
+                      if (this.type === 'followed') {
+                        this.getAndMergeCityStatics();
+                      }
+                    } else {
+                      this.pageLoading = false;
+                      if (event) event.target.complete();
                     }
                 },
-                err => this.handleError(err)
+                err => this.handleError(err, event)
             );
+    } else {
+      this.pageLoading = false;
+      if (event) event.target.complete();
     }
 }
 
@@ -433,23 +597,58 @@ sortStaticChannels() {
       .then(
         (resp: any) => {
           this.followLoading.splice(this.followLoading.indexOf(channel.id), 1);
-          this.toastService.presentStdToastr(resp.message);
-          if (resp.data)
-            channel.followers.push(this.user.id);
-          else
-            channel.followers.splice(channel.followers.indexOf(this.user.id), 1);
+          this.toastService.presentSuccessToastr(resp.message);
+          const uid = this.user.id || this.user._id || '';
+          if (resp.data) {
+            // followed: ensure uid is present as a string
+            try {
+              if (!channel.followers) channel.followers = [];
+              const exists = channel.followers.find((f: any) => {
+                if (!f) return false;
+                if (typeof f === 'string') return f === uid;
+                if (typeof f === 'object') return f._id === uid || f.id === uid;
+                return false;
+              });
+              if (!exists) channel.followers.push(uid);
+            } catch (e) { console.warn('Error updating followers after follow', e); }
+          } else {
+            // unfollow: remove any entries that match uid
+            try {
+              if (!channel.followers) channel.followers = [];
+              channel.followers = channel.followers.filter((f: any) => {
+                if (!f) return false;
+                if (typeof f === 'string') return f !== uid;
+                if (typeof f === 'object') return String(f._id || f.id) !== uid;
+                return true;
+              });
+
+              // If we are in the followed list, remove it from the channels array directly
+              if (this.type === 'followed') {
+                this.channels = this.channels.filter(c => c.id !== channel.id);
+              }
+            } catch (e) { console.warn('Error updating followers after unfollow', e); }
+          }
         },
         err => {
           this.followLoading.splice(this.followLoading.indexOf(channel.id), 1);
-          this.toastService.presentStdToastr(err);
+          this.toastService.presentErrorToastr(err);
         }
       );
   }
 
   showChannel(channel: Channel) {
+    // Ensure owner info is present when navigating from 'mines' (user's own channels)
+    const chObj: any = channel.toObject();
+    try {
+      const hasUser = chObj.user && Object.keys(chObj.user).length > 0;
+      if (!hasUser && this.type === 'mines' && this.authUserId) {
+        chObj.user = { _id: this.authUserId, id: this.authUserId };
+      }
+    } catch (e) {}
+
     this.router.navigate(['/tabs/channels/channel'], {
       queryParams: {
-        channel: JSON.stringify(channel.toObject())
+        channel: JSON.stringify(chObj)
       }
     });
   }

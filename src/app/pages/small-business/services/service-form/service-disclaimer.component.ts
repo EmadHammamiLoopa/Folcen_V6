@@ -215,21 +215,21 @@ import { ModalController } from '@ionic/angular';
     }
     section {
       margin-bottom: 24px;
-      h3 {
-        color: #818cf8;
-        font-size: 1.1rem;
-        font-weight: 700;
-        margin-bottom: 8px;
-      }
-      p, li {
-        color: #cbd5e1;
-        font-size: 0.95rem;
-        line-height: 1.5;
-      }
-      ul {
-        padding-left: 20px;
-        margin-top: 8px;
-      }
+    }
+    section h3 {
+      color: #818cf8;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    section p, section li {
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    section ul {
+      padding-left: 20px;
+      margin-top: 8px;
     }
     .acceptance-box {
       background: rgba(129, 140, 248, 0.1);
@@ -237,16 +237,15 @@ import { ModalController } from '@ionic/angular';
       border-radius: 16px;
       padding: 10px;
       margin-top: 30px;
-      
-      ion-item {
-        --background: transparent;
-        --color: #f8fafc;
-        font-size: 0.9rem;
-      }
-      ion-checkbox {
-        --border-color: #818cf8;
-        --checkbox-background-checked: #818cf8;
-      }
+    }
+    .acceptance-box ion-item {
+      --background: transparent;
+      --color: #f8fafc;
+      font-size: 0.9rem;
+    }
+    .acceptance-box ion-checkbox {
+      --border-color: #818cf8;
+      --checkbox-background-checked: #818cf8;
     }
     .accept-btn {
       --background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);

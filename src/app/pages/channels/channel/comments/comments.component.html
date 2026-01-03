@@ -16,7 +16,21 @@
 
   <div class="comments-page-container">
 
-    <div *ngIf="!pageLoading && comments" class="post-header-section">
+    <div *ngIf="postError" class="restricted-content-state animate__animated animate__fadeIn">
+      <div class="restricted-card">
+        <div class="lock-icon-box">
+          <ion-icon name="lock-closed-outline"></ion-icon>
+        </div>
+        <h3>Content is Hidden</h3>
+        <p>You no longer have permission to view this post or it has been removed.</p>
+        <ion-button fill="outline" color="light" (click)="getPost()">
+          <ion-icon name="refresh-outline" slot="start"></ion-icon>
+          Try Again
+        </ion-button>
+      </div>
+    </div>
+
+    <div *ngIf="!pageLoading && comments && !postError" class="post-header-section">
       <app-post
         [post]="post"
         [user]="user"
@@ -36,6 +50,7 @@
 
     <div class="comments-list" *ngIf="comments && comments.length">
       <app-comment
+        [id]="'comment-' + comment.id"
         (removeComment)="onRemoveComment(ind)"
         [backgroundColor]="post.backgroundColor"
         [color]="post.color"
@@ -56,7 +71,7 @@
 
 </ion-content>
 
-<ion-footer class="comment-footer">
+<ion-footer class="comment-footer" *ngIf="!postError">
   <!-- Media Preview -->
   <div *ngIf="mediaPreview" class="media-preview-container">
     <div class="preview-card">

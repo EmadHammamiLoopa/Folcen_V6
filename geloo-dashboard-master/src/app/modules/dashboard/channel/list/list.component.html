@@ -1,13 +1,35 @@
-<app-table
-  [headers]="headers"
-  [plurarName]="'Channels'"
-  [singleName]="'channel'"
-  deleteURL="channel/dash/:id"
-  retrieveURL="channel/all"
-  [displayLink]="getDisplayLinkchannel"
-  editLink="/dashboard/Channels/form/edit"
-  createLink="/dashboard/Channels/form/create"
-  [showCreateButton]="user?.role === 'SUPER ADMIN'"
-  [showUpdateButton]="user?.role === 'SUPER ADMIN'"
-  icon="fas fa-project-diagram"
-></app-table>
+<div class="p-6 bg-gray-50 min-h-screen">
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Channel Management</h1>
+      <p class="text-gray-600">Monitor and moderate community channels</p>
+    </div>
+    <div class="flex gap-3">
+      <div class="flex bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <button (click)="exportChannels('csv')" class="px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2 border-r border-gray-100">
+          <i class="fas fa-file-csv text-green-600"></i> <span class="text-xs font-bold">CSV</span>
+        </button>
+        <button (click)="exportChannels('json')" class="px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2">
+          <i class="fas fa-file-code text-amber-600"></i> <span class="text-xs font-bold">JSON</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-2">
+    <app-table
+      [headers]="headers"
+      [plurarName]="'Channels'"
+      [singleName]="'channel'"
+      deleteURL="channel/dash/:id"
+      retrieveURL="channel/all"
+      [displayLink]="getDisplayLinkchannel"
+      editLink="/dashboard/Channels/form/edit"
+      createLink="/dashboard/Channels/form/create"
+      [showCreateButton]="user?.role === 'SUPER ADMIN'"
+      [showUpdateButton]="user?.role === 'SUPER ADMIN'"
+      [hideHeader]="true"
+      icon="fas fa-project-diagram"
+    ></app-table>
+  </div>
+</div>

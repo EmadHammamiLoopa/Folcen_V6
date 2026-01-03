@@ -1,6 +1,6 @@
 <app-header title="Payment" [back]="true"></app-header>
 
-<app-loader *ngIf="pageLoading"></app-loader>
+<app-sandglass-loader [visible]="pageLoading" message="Please wait"></app-sandglass-loader>
 
 <ion-content>
 

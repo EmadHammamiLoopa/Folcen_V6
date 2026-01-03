@@ -30,7 +30,7 @@
           <i [class]="channel.approved ? 'fas fa-certificate' : 'fas fa-check-double'"></i>
           {{channel.approved ? 'Unverify' : 'Verify'}}
         </button>
-        <button (click)="toggleStatus()" [class]="channel.enabled ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-600 hover:bg-green-700'"
+        <button (click)="toggleStatus()" [class]="channel.enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
                 class="px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i [class]="channel.enabled ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
           {{channel.enabled ? 'Disable' : 'Enable'}}
@@ -63,6 +63,11 @@
             [class]="tab === 'creator' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Owner Info
+    </button>
+    <button (click)="tab = 'analytics'" 
+            [class]="tab === 'analytics' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
+      Analytics
     </button>
   </div>
 
@@ -101,9 +106,13 @@
               <p class="text-xs text-blue-600 uppercase font-bold mb-1">Followers</p>
               <p class="text-2xl font-bold text-blue-800">{{counts.followers || 0}}</p>
             </div>
-            <div class="p-4 bg-green-50 rounded-xl border border-green-100">
-              <p class="text-xs text-green-600 uppercase font-bold mb-1">Total Posts</p>
-              <p class="text-2xl font-bold text-green-800">{{counts.posts || 0}}</p>
+            <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+              <p class="text-xs text-indigo-600 uppercase font-bold mb-1">Total Posts</p>
+              <p class="text-2xl font-bold text-indigo-800">{{counts.posts || 0}}</p>
+            </div>
+            <div class="p-4 bg-purple-50 rounded-xl border border-purple-100">
+              <p class="text-xs text-purple-600 uppercase font-bold mb-1">Total Comments</p>
+              <p class="text-2xl font-bold text-purple-800">{{counts.totalComments || 0}}</p>
             </div>
             <div class="p-4 bg-red-50 rounded-xl border border-red-100">
               <p class="text-xs text-red-600 uppercase font-bold mb-1">Reports</p>
@@ -198,6 +207,59 @@
              class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
             View Owner Profile
           </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Tab -->
+    <div *ngSwitchCase="'analytics'" class="animate-fadeIn space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Engagement Overview</h3>
+          <div class="space-y-4">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Total Followers</span>
+              <span class="font-bold text-indigo-600">{{counts.followers || 0}}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Total Posts</span>
+              <span class="font-bold text-indigo-600">{{counts.posts || 0}}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Total Comments</span>
+              <span class="font-bold text-indigo-600">{{counts.totalComments || 0}}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Moderation Metrics</h3>
+          <div class="space-y-4">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Total Reports</span>
+              <span class="font-bold text-red-600">{{counts.reports || 0}}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Verification Status</span>
+              <span [class]="channel.approved ? 'text-green-600' : 'text-yellow-600'" class="font-bold">
+                {{channel.approved ? 'Verified' : 'Pending'}}
+              </span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Channel Status</span>
+              <span [class]="channel.enabled ? 'text-green-600' : 'text-red-600'" class="font-bold">
+                {{channel.enabled ? 'Active' : 'Disabled'}}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Post Activity Chart Placeholder or List -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Recent Activity Summary</h3>
+        <div class="text-center py-8 text-gray-400 italic">
+          Detailed activity trends and growth charts will be available in the next update.
         </div>
       </div>
     </div>

@@ -20,19 +20,49 @@
 <ion-content
   [style]="{'--background': postBackColor, '--color': postTextColor}"
 >
+  <app-sandglass-loader [visible]="postLoading" message="Posting"></app-sandglass-loader>
   <ion-card class="post-card">
     <ion-card-content>
-      <ion-item class="ion-item-clear visibility-options">
-        <ion-icon name="eye-outline" slot="start" class="mr-2"></ion-icon>
-        <ion-label>Visibility</ion-label>
-        <ion-select [(ngModel)]="visibility" interface="popover" class="visibility-select" placeholder="Select">
-          <ion-select-option value="public">Public</ion-select-option>
-          <ion-select-option value="friends-only">Only Friends</ion-select-option>
-          <ion-select-option value="private">Only Me</ion-select-option>
-        </ion-select>
-      </ion-item>
+      <div class="visibility-header" [style]="{'color': postTextColor}">
+        <ion-icon name="eye-outline"></ion-icon>
+        <ion-label>Who can see this?</ion-label>
+      </div>
+      
+      <div class="visibility-grid">
+        <div class="visibility-item" 
+             [class.active]="visibility === 'public'" 
+             (click)="visibility = 'public'"
+             [style]="{'--active-color': postTextColor}">
+          <div class="icon-wrapper">
+            <ion-icon name="earth"></ion-icon>
+          </div>
+          <span>Public</span>
+        </div>
 
-      <ion-item class="ion-item-clear">
+        <div class="visibility-item" 
+             [class.active]="visibility === 'friends-only'" 
+             (click)="visibility = 'friends-only'"
+             [style]="{'--active-color': postTextColor}">
+          <div class="icon-wrapper">
+            <ion-icon name="people"></ion-icon>
+          </div>
+          <span>Friends</span>
+        </div>
+
+        <div class="visibility-item" 
+             [class.active]="visibility === 'private'" 
+             (click)="visibility = 'private'"
+             [style]="{'--active-color': postTextColor}">
+          <div class="icon-wrapper">
+            <ion-icon name="lock-closed"></ion-icon>
+          </div>
+          <span>Private</span>
+        </div>
+      </div>
+
+      <div class="divider" [style]="{'background': postTextColor, 'opacity': 0.1}"></div>
+
+      <ion-item class="ion-item-clear anonymous-toggle" [style]="{'--color': postTextColor}">
         <ion-icon name="person-circle-outline" slot="start" class="mr-2"></ion-icon>
         <ion-label>Post Anonymously</ion-label>
         <ion-toggle [(ngModel)]="anonyme" slot="end"></ion-toggle>
@@ -44,34 +74,41 @@
   <div *ngIf="showEventFields">
     <ion-card class="post-card">
       <ion-card-content>
-        <ion-item class="ion-item-clear">
-          <ion-label>Date</ion-label>
+        <div class="field-container">
+          <ion-label class="field-label">Date</ion-label>
           <ion-datetime
             [(ngModel)]="eventDate"
             presentation="date"
+            [min]="minDate"
+            [max]="maxDate"
             display-format="DD MMM YYYY"
             placeholder="Select date"
+            class="custom-input"
           ></ion-datetime>
-        </ion-item>
+        </div>
 
-        <ion-item class="ion-item-clear">
-          <ion-label>Location</ion-label>
+        <div class="field-container">
+          <ion-label class="field-label">Location</ion-label>
           <ion-input
             [(ngModel)]="eventLocation"
             placeholder="Enter location"
+            class="custom-input"
           ></ion-input>
-        </ion-item>
+        </div>
 
-        <ion-item class="ion-item-clear">
-          <ion-label>Time</ion-label>
+        <div class="field-container">
+          <ion-label class="field-label">Time</ion-label>
           <ion-datetime
             [(ngModel)]="eventTime"
             presentation="time"
+            [min]="minDate"
+            [max]="maxDate"
             display-format="HH:mm"
             picker-format="HH:mm"
             placeholder="Select time"
+            class="custom-input"
           ></ion-datetime>
-        </ion-item>
+        </div>
       </ion-card-content>
     </ion-card>
   </div>
@@ -80,42 +117,68 @@
   <div *ngIf="showDatingFields">
     <ion-card class="post-card">
       <ion-card-content>
-        <ion-item class="ion-item-clear">
-          <ion-label>Relationship Goals</ion-label>
-          <ion-select [(ngModel)]="relationshipGoals" placeholder="Select goal" interface="popover">
+        <div class="field-container">
+          <ion-label class="field-label">Relationship Goals</ion-label>
+          <ion-select [(ngModel)]="relationshipGoals" placeholder="Select goal" interface="popover" class="custom-select">
             <ion-select-option value="casual">Casual</ion-select-option>
             <ion-select-option value="long-term">Long-term</ion-select-option>
             <ion-select-option value="friendship">Friendship</ion-select-option>
           </ion-select>
-        </ion-item>
+        </div>
 
-        <ion-item class="ion-item-clear">
-          <ion-label>Age Range</ion-label>
-          <ion-range dualKnobs="true" min="18" max="99" step="1" snaps="true" [(ngModel)]="ageRange">
-            <ion-label slot="start">{{ ageRange.lower }}</ion-label>
-            <ion-label slot="end">{{ ageRange.upper }}</ion-label>
-          </ion-range>
-        </ion-item>
+        <div class="field-container">
+          <ion-label class="field-label">Age Range</ion-label>
+          <div class="range-wrapper">
+            <div class="range-values">
+              <span>{{ ageRange.lower }} yrs</span>
+              <span>{{ ageRange.upper }} yrs</span>
+            </div>
+            <ion-range dualKnobs="true" min="18" max="99" step="1" [(ngModel)]="ageRange" class="custom-range">
+            </ion-range>
+          </div>
+        </div>
 
-        <ion-item class="ion-item-clear">
-          <ion-label>Interests or Hobbies</ion-label>
+        <div class="field-container">
+          <ion-label class="field-label">Interests or Hobbies</ion-label>
           <ion-input
             [(ngModel)]="interests"
             placeholder="Enter interests or hobbies"
+            class="custom-input"
           ></ion-input>
-        </ion-item>
+        </div>
 
-        <ion-item class="ion-item-clear">
-          <ion-label>Hint about me</ion-label>
+        <div class="field-container">
+          <ion-label class="field-label">Hint about me</ion-label>
           <ion-textarea
             [(ngModel)]="hintAboutMe"
             placeholder="Write a hint about yourself"
             autoGrow="true"
+            class="custom-textarea"
           ></ion-textarea>
-        </ion-item>
+        </div>
       </ion-card-content>
     </ion-card>
   </div>
+
+  <!-- Post Textarea Section -->
+  <ion-card class="post-card post-textarea-card" [style]="{'--background': postBackColor, '--color': postTextColor}">
+    <ion-card-content>
+      <ion-textarea
+        #postTextarea
+        [(ngModel)]="postText"
+        placeholder="What's on your mind?"
+        class="creative-textarea"
+        [maxlength]="255"
+        autoGrow="true"
+        (ionFocus)="forceTextareaResize()"
+        [style]="{'--color': postTextColor}"
+      ></ion-textarea>
+      
+      <div class="char-counter" [class.limit]="postText?.length >= 255" [style]="{'color': postTextColor}">
+        {{ postText?.length || 0 }}/255
+      </div>
+    </ion-card-content>
+  </ion-card>
 
   <!-- Media Section -->
   <div class="media-section">
@@ -154,25 +217,6 @@
     </div>
   </div>
 
-  <!-- Post Textarea Section -->
-  <ion-card class="post-card post-textarea-card" [style]="{'--background': postBackColor, '--color': postTextColor}">
-    <ion-card-content>
-      <ion-textarea
-        #postTextarea
-        [(ngModel)]="postText"
-        placeholder="What's on your mind?"
-        class="creative-textarea"
-        [maxlength]="255"
-        (ionFocus)="forceTextareaResize()"
-        [style]="{'--color': postTextColor}"
-      ></ion-textarea>
-      
-      <div class="char-counter" [class.limit]="postText?.length >= 255" [style]="{'color': postTextColor}">
-        {{ postText?.length || 0 }}/255
-      </div>
-    </ion-card-content>
-  </ion-card>
-
   <!-- FAB for Palette -->
   <ion-fab
     slot="fixed"
@@ -198,18 +242,5 @@
 
   <!-- Hidden input for media selection -->
   <input type="file" #fileInput (change)="onMediaSelected($event)" hidden accept="image/*,video/*">
-
-  <!-- FAB for Camera Icon (Positioned Bottom Left) -->
-  <ion-fab
-    slot="fixed"
-    vertical="bottom"
-    horizontal="start"
-    class="fab-camera"
-  >
-    <ion-fab-button (click)="triggerFileInput()" class="camera-fab">
-      <ion-icon name="camera-outline"></ion-icon>
-      <span class="add-label" *ngIf="!mediaPreview">Add Media</span>
-    </ion-fab-button>
-  </ion-fab>
 </ion-content>
 

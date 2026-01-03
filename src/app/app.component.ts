@@ -1,4 +1,5 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { Platform, ModalController } from '@ionic/angular';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { JsonService } from './services/json.service';
@@ -19,15 +20,21 @@ import { RequestService } from './services/request.service';
 import { Socket } from 'socket.io-client';
 import { UserService } from './services/user.service';
 import { ThemeService } from './services/theme.service';
+import { AppEventsService } from './services/app-events.service';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
+import { SessionStoreService } from './services/session-store.service';
+import { DataService } from './services/data.service';
+import { PerformanceMonitorService } from './services/performance-monitor.service';
+
+import { AnnouncementModalComponent } from './components/announcement-modal/announcement-modal.component';
 
 @Component({
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
 })
-export class AppComponent {
+export class AppComponent implements OnDestroy {
   socket: Socket | null = null; // Use the Socket type from socket.io-client
   user: User;
   audio: HTMLAudioElement;
@@ -57,6 +64,10 @@ export class AppComponent {
   private connectionMonitorInterval: any;
   private wasOnline = true;
 
+  private userSub: Subscription | null = null;
+  private forceLogoutHandler: any = null;
+  private forceLogoutMessageHandler: any = null;
+
   constructor(
     private platform: Platform,
     private nativeStorage: NativeStorage,
@@ -77,21 +88,108 @@ export class AppComponent {
     private socketService: SocketService,
     private userService: UserService,
     private themeService: ThemeService,
+    private appEvents: AppEventsService,
+    private sessionStore: SessionStoreService,
+    private dataService: DataService,
     public webRTC: WebrtcService,
+    private perfMonitor: PerformanceMonitorService
   ) {
+    // Expose performance monitor globally for debugging
+    (window as any).__perfMonitor = this.perfMonitor;
+    console.log('📊 Performance monitor initialized. Use window.__perfMonitor.logSummary() to see stats');
+    
     this.initializeApp();
     this.setupSocketListeners(); // Call this in constructor
+    // Listen for global forced-logout events dispatched by SocketService
+    try {
+      this.forceLogoutHandler = async (ev: any) => {
+        try {
+          console.warn('AppComponent: handling global force-logout event', ev?.detail || ev);
+          try { await this.dataService.logout(); } catch (e) { console.warn('Error during forced DataService.logout', e); }
+        } catch (e) { console.warn('Error handling force-logout event', e); }
+      };
+      window.addEventListener('force-logout', this.forceLogoutHandler as any);
+
+      // also support postMessage fallback
+      this.forceLogoutMessageHandler = async (m: any) => {
+        try {
+          if (m?.data && m.data.type === 'force-logout') {
+            console.warn('AppComponent: handling force-logout via postMessage', m.data.payload);
+            try { await this.dataService.logout(); } catch (e) { console.warn('Error during forced DataService.logout', e); }
+          }
+        } catch (e) {}
+      };
+      window.addEventListener('message', this.forceLogoutMessageHandler as any);
+    } catch (e) {}
+    // Subscribe to central user store so this.user stays in sync across pages
+    try {
+      this.userSub = this.userService.currentUser.subscribe((u) => {
+        if (u) {
+          this.user = u;
+          this.checkAnnouncements();
+          this.changeDetectorRef.detectChanges();
+        } else {
+          this.user = null;
+          this.shownAnnouncements.clear();
+        }
+      });
+    } catch (e) {}
   }
+
+  
 
   ngOnInit() {
     this.loadRequests();
   }
 
-  ngOnDestroy() {
-    // Cleanup event listeners
-    this.activityHandlers.forEach(({ type, handler }) => {
-      document.removeEventListener(type, handler);
+  private shownAnnouncements = new Set<string>();
+
+  checkAnnouncements() {
+    if (!this.user) return;
+    
+    this.userService.getAnnouncements().subscribe((resp: any) => {
+      if (resp && resp.data && resp.data.length > 0) {
+        const announcement = resp.data[0];
+        if (!this.shownAnnouncements.has(announcement._id)) {
+          this.showAnnouncement(announcement);
+        }
+      }
     });
+  }
+
+  async showAnnouncement(announcement: any) {
+    this.shownAnnouncements.add(announcement._id);
+    const modal = await this.modalCtrl.create({
+      component: AnnouncementModalComponent,
+      componentProps: { announcement },
+      cssClass: 'announcement-modal',
+      backdropDismiss: false // Force user to click "Understood"
+    });
+    
+    modal.onDidDismiss().then(() => {
+      // Mark as seen in backend
+      this.userService.markAnnouncementSeen(announcement._id).subscribe({
+        next: () => console.log('Announcement marked as seen'),
+        error: (err) => {
+          console.error('Failed to mark announcement as seen', err);
+          this.shownAnnouncements.delete(announcement._id); // Allow retry if failed
+        }
+      });
+    });
+    
+    return await modal.present();
+  }
+
+  ngOnDestroy(): void {
+    try { if (this.userSub) this.userSub.unsubscribe(); } catch (e) {}
+    try {
+      this.activityHandlers.forEach(({ type, handler }) => {
+        document.removeEventListener(type, handler);
+      });
+    } catch (e) {}
+    try { if (this.forceLogoutHandler) window.removeEventListener('force-logout', this.forceLogoutHandler); } catch (e) {}
+    try { if (this.forceLogoutMessageHandler) window.removeEventListener('message', this.forceLogoutMessageHandler); } catch (e) {}
+    try { if (this.connectionMonitorInterval) { clearInterval(this.connectionMonitorInterval); this.connectionMonitorInterval = null; } } catch (e) {}
   }
 
   private async setupSocketListeners() {
@@ -143,12 +241,29 @@ export class AppComponent {
   }
 
   initializeApp() {
+    console.log('🚀 AppComponent: initializeApp starting...');
     this.platform.ready().then(async () => {
+      console.log('📱 Platform ready');
       // Initialize Theme
       this.themeService.initializeTheme();
 
+      // Initialize session/user once per app boot (deduped)
+      console.log('⏳ Initializing session store...');
+      try {
+        await this.sessionStore.init();
+        console.log('✅ Session store initialized');
+      } catch (e) {
+        console.warn('⚠️ Session store init failed', e);
+      }
+
       // ✅ Ask notification permission
-      await LocalNotifications.requestPermissions();
+      console.log('⏳ Requesting notification permissions...');
+      try {
+        await LocalNotifications.requestPermissions();
+        console.log('✅ Notification permissions handled');
+      } catch (e) {
+        console.warn('⚠️ Notification permissions failed', e);
+      }
 
       SocketService.initializeSocket();
 
@@ -198,12 +313,24 @@ export class AppComponent {
       }
 
       // ✅ Initialize user & data
+      // Auto-enable persistence of default static channel follows so
+      // client will persist follows to the server when merging statics.
+      try {
+        if (!localStorage.getItem('persist_default_channel_follows')) {
+          localStorage.setItem('persist_default_channel_follows', '1');
+          console.log('📌 Enabled persist_default_channel_follows by default');
+        }
+      } catch (err) {
+        console.warn('Could not set persist_default_channel_follows in localStorage', err);
+      }
+
       this.getUserData();
       this.getJsonData();
 
       setTimeout(() => {
+        console.log('✨ Hiding splash screen');
         this.showSplash = false;
-      }, 8000);
+      }, 3000);
     });
 
 
@@ -386,10 +513,67 @@ export class AppComponent {
         });
       });
 
-      socket.off('video-canceled').on('video-canceled', () => {
-        console.log('🚫 Call canceled.');
+      socket.off('video-canceled').on('video-canceled', (data) => {
+        console.log('🚫 Call canceled.', data);
         this.audio?.pause();
         localStorage.removeItem('partnerId');
+        // If I'm the callee and this is a cancel/timeout, register missed call
+        if (data && data.notify && this.user?.id) {
+          this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'video-canceled');
+        }
+      });
+
+      socket.off('video-call-timeout').on('video-call-timeout', (data) => {
+        console.log('⏰ Call timed out.', data);
+        this.audio?.pause();
+        localStorage.removeItem('partnerId');
+        if (this.user?.id) {
+          this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'video-call-timeout');
+        }
+      });
+
+      socket.off('missed-call').on('missed-call', (data) => {
+        console.log('📞 Missed call received.', data);
+        if (this.user?.id) {
+          this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'missed-call');
+        }
+      });
+
+      socket.off('follow-update').on('follow-update', (data) => {
+        console.log('👥 Follow update received:', data);
+        if (this.user?.id && (data.followerId === this.user.id || data.followedId === this.user.id)) {
+          console.log('🔄 Refreshing user data due to follow update...');
+          this.userService.refreshCurrentUser().subscribe({
+            next: (refreshedUser) => {
+              this.user = refreshedUser;
+              this.changeDetectorRef.detectChanges();
+            }
+          });
+        }
+      });
+
+      socket.off('user-profile-updated').on('user-profile-updated', (data) => {
+        console.log('👤 Profile update received:', data);
+        if (this.user?.id && data.userId === this.user.id) {
+          console.log('🔄 Refreshing user data due to profile update...');
+          this.userService.refreshCurrentUser().subscribe({
+            next: (refreshedUser) => {
+              this.user = refreshedUser;
+              this.changeDetectorRef.detectChanges();
+            }
+          });
+        }
+      });
+
+      socket.off('budget-update').on('budget-update', (data) => {
+        console.log('💰 Budget update received:', data);
+        if (this.user) {
+          this.user.missedCallBudget = data.missedCallBudget;
+          this.userService.setCurrentUser(this.user);
+          // broadcast budget to other UI pieces (feed, tabs)
+          try { this.appEvents.setBudget(data.missedCallBudget); } catch(e) {}
+          this.changeDetectorRef.detectChanges();
+        }
       });
     } catch (e) {
       console.error('connectUser failed:', e);
@@ -445,7 +629,7 @@ export class AppComponent {
 
   private async initializeUser(user: any) {
     this.user = new User().initialize(user);
-    this.filterAvatars();
+    this.userService.setCurrentUser(this.user); // Ensure UserService is updated
 
     try {
       await SocketService.initializeSocket();
@@ -457,15 +641,16 @@ export class AppComponent {
     setTimeout(() => this.initWebrtc(), 500);
     this.connectUser();
     this.changeDetectorRef.detectChanges();
-  }
 
-  private filterAvatars() {
-    if (this.user.avatar) {
-      this.user.avatar = this.user.avatar.filter(
-        (url) => url.startsWith('http') && url !== '',
-      );
-    }
-    this.changeDetectorRef.detectChanges();
+    // Refresh user data from server to ensure latest followers/channels/budget
+    this.userService.refreshCurrentUser().subscribe({
+      next: (refreshedUser) => {
+        this.user = refreshedUser;
+        this.changeDetectorRef.detectChanges();
+        console.log('✅ User data synchronized with server');
+      },
+      error: (err) => console.warn('Could not refresh user data from server', err)
+    });
   }
 
   private async initWebrtc() {
@@ -532,7 +717,7 @@ export class AppComponent {
           },
           error: (err) => {
             console.error('❌ Partner peer lookup failed:', err);
-            this.toastService.presentStdToastr(
+            this.toastService.presentErrorToastr(
               'Could not connect to partner',
             );
           },
@@ -564,6 +749,8 @@ export class AppComponent {
 
   getJsonData() {
     this.jsonService.getCountries().then((resp: any) => {
+      if (!resp) return;
+      
       this.countries = Array.isArray(resp)
         ? resp
         : Object.keys(resp).map((key) => ({ name: key, values: resp[key] }));

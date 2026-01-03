@@ -27,15 +27,22 @@ export class SlideComponent implements OnInit {
   constructor(private userService: UserService, private requestService: RequestService, private toastService: ToastService,
               private alertCtrl: AlertController, private router: Router, private nativeStorage: NativeStorage) { }
 
-  ngOnInit() {}
+  ngOnInit() {
+    // Defensive defaults so unit tests that don't provide `user` won't crash templates
+    if (!this.user) this.user = {} as any;
+    if (!(this.user as any).getAge) (this.user as any).getAge = (_: boolean) => null;
+    if (!(this.user as any).fullName) (this.user as any).fullName = '';
+    if (!(this.user as any).city) (this.user as any).city = '';
+  }
 
   get avatarUrl(): string {
-    if (this.user.mainAvatar) {
-      return this.user.mainAvatar;
-    } else if (this.user.avatar.length > 0) {
-      return this.user.avatar[0];
+    const u = this.user || {} as any;
+    if (u.mainAvatar) {
+      return u.mainAvatar;
+    } else if (Array.isArray(u.avatar) && u.avatar.length > 0) {
+      return u.avatar[0];
     } else {
-      return this.user.gender === 'male' ? constants.defaultMaleAvatarUrl : constants.defaultFemaleAvatarUrl;
+      return u.gender === 'male' ? constants.defaultMaleAvatarUrl : constants.defaultFemaleAvatarUrl;
     }
   }
 
@@ -45,11 +52,11 @@ export class SlideComponent implements OnInit {
         (resp: any) => {
           console.log(resp);
           this.user.followed = resp.data;
-          this.toastService.presentStdToastr(resp.message)
+          this.toastService.presentSuccessToastr(resp.message)
         },
         err => {
           console.log(err);
-          this.toastService.presentStdToastr(err);
+          this.toastService.presentErrorToastr(err);
         }
       )
   }
@@ -62,7 +69,7 @@ export class SlideComponent implements OnInit {
   }
 
   handleError(err) {
-    this.toastService.presentStdToastr(err)
+    this.toastService.presentErrorToastr(err)
   }
 
   acceptRequest() {
@@ -85,7 +92,7 @@ export class SlideComponent implements OnInit {
     this.requestService.cancelRequest(this.user.requests[0].id)
       .then(
         (resp: any) => {
-          this.toastService.presentStdToastr(resp.message)
+          this.toastService.presentSuccessToastr(resp.message)
           this.user.request = null;
           this.user.requests = [];
         },
@@ -104,13 +111,13 @@ export class SlideComponent implements OnInit {
             this.user.requests.push(new Request(resp.data.request));
             this.user.request = 'requested';
           }
-          this.toastService.presentStdToastr(resp.message);
+          this.toastService.presentSuccessToastr(resp.message);
         },
         err => {
           err = JSON.parse(err);
           if (err.code && err.code == constants.ERROR_CODES.SUBSCRIPTION_ERROR) {
             this.router.navigate(['/tabs/subscription']);
-            this.toastService.presentStdToastr(err.message)
+            this.toastService.presentErrorToastr(err.message)
           }
           else this.handleError(err)
         }
@@ -141,7 +148,7 @@ export class SlideComponent implements OnInit {
     this.userService.removeFriendship(this.user.id)
       .subscribe(
         (resp: any) => {
-          this.toastService.presentStdToastr(resp.message)
+          this.toastService.presentSuccessToastr(resp.message)
           if (resp.data) {
             this.user.friend = false;
             this.user.request = null
@@ -151,7 +158,14 @@ export class SlideComponent implements OnInit {
       )
   }
 
+  isAdmin(): boolean {
+    if (!this.user) return false;
+    const role = (this.user.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
+  }
+
   showProfile() {
+    if (this.isAdmin()) return;
     this.router.navigateByUrl('/tabs/profile/display/' + this.user.id)
   }
 

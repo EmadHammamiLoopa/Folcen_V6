@@ -16,7 +16,7 @@ export class Subscription {
   private _userFirstName: string;
   private _userLastName: string;
 
-  constructor(subscription: Partial<Subscription>, user?: { id: string; firstName: string; lastName: string }) {
+  constructor(subscription: any, user?: { id: string; firstName: string; lastName: string }) {
     // Initialize subscription fields
     this._id = subscription._id || '';
     this._offers = subscription._offers || [];

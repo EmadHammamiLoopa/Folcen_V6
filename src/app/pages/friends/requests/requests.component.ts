@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Router } from '@angular/router';
 import { RequestService } from 'src/app/services/request.service';
 import { UserService } from 'src/app/services/user.service';
 import { ToastService } from 'src/app/services/toast.service';
@@ -19,12 +20,14 @@ import { Subscription } from 'rxjs';
 export class RequestsComponent implements OnInit, OnDestroy {
   requests: Request[] = [];
   pageLoading = false;
+  showSandglass = false;
   page: number = 0;
   private socket: Socket | null = null;
   private badgeSubscription!: Subscription;
   private friendRequestCount = 0;
 
   constructor(
+    private router: Router,
     private requestService: RequestService,
     private userService: UserService,
     private toastService: ToastService,
@@ -32,6 +35,11 @@ export class RequestsComponent implements OnInit, OnDestroy {
     private appEvents: AppEventsService,
     private zone: NgZone
   ) {}
+
+  goToProfile(userId: string) {
+    if (!userId) return;
+    this.router.navigate(['/tabs/profile/display', userId]);
+  }
 
   async ngOnInit() {
     // Subscribe to friend request count changes
@@ -92,6 +100,8 @@ export class RequestsComponent implements OnInit, OnDestroy {
     this.socket.on('new-friend-request', (data: any) => {
       this.zone.run(() => {
         console.log('New friend request received in RequestsComponent');
+        this.page = 0;
+        this.loadRequests();
         this.updatePageTitle();
       });
     });
@@ -100,6 +110,8 @@ export class RequestsComponent implements OnInit, OnDestroy {
     this.socket.on('friend-requests-updated', (data: any) => {
       this.zone.run(() => {
         console.log('Friend requests updated in RequestsComponent');
+        this.page = 0;
+        this.loadRequests();
         this.updatePageTitle();
       });
     });
@@ -108,6 +120,8 @@ export class RequestsComponent implements OnInit, OnDestroy {
     this.socket.on('friend-request-accepted', (data: any) => {
       this.zone.run(() => {
         console.log('Friend request accepted in RequestsComponent');
+        this.page = 0;
+        this.loadRequests();
         this.updatePageTitle();
       });
     });
@@ -116,6 +130,8 @@ export class RequestsComponent implements OnInit, OnDestroy {
     this.socket.on('friend-request-declined', (data: any) => {
       this.zone.run(() => {
         console.log('Friend request declined in RequestsComponent');
+        this.page = 0;
+        this.loadRequests();
         this.updatePageTitle();
       });
     });
@@ -142,37 +158,38 @@ export class RequestsComponent implements OnInit, OnDestroy {
   getRequests(page: number = this.page, event?: any) {
     this.requestService.requests(page).then(
       (resp: any) => {
-        if (!event) {
-          this.requests = [];
-        }
+          const dataArray = Array.isArray(resp?.data) ? resp.data : [];
+          if (!event) {
+            this.requests = [];
+          }
 
-        this.requests = [
-          ...this.requests,
-          ...resp.data.map((requestData: any) => {
-            const request = new Request().initialize(requestData);
-            request.from = new User().initialize({
-              ...requestData.from,
-              mainAvatar: requestData.from.mainAvatar || requestData.from.avatar?.[0],
-            });
-            return request;
-          }),
-        ];
+          this.requests = [
+            ...this.requests,
+            ...dataArray.map((requestData: any) => {
+              const request = new Request().initialize(requestData);
+              request.from = new User().initialize({
+                ...requestData.from,
+                mainAvatar: requestData.from?.mainAvatar || requestData.from?.avatar?.[0],
+              });
+              return request;
+            }),
+          ];
 
-        // Update the badge when we load page 0
-        if (page === 0) {
-          const count = Array.isArray(resp?.data) ? resp.data.length : 0;
-          this.appEvents.set('friends', count);
-          this.friendRequestCount = count; // Update local count
-          this.updatePageTitle(); // Update page title
-        }
+          // Update the badge when we load page 0
+          if (page === 0) {
+            const count = dataArray.length;
+            this.appEvents.set('friends', count);
+            this.friendRequestCount = count;
+            this.updatePageTitle();
+          }
 
-        if (event?.target) event.target.complete();
-        this.pageLoading = false;
-      },
+          if (event?.target) event.target.complete();
+          this.pageLoading = false;
+        },
       (err) => {
         this.pageLoading = false;
         console.error('Error loading requests:', err);
-        this.toastService.presentStdToastr('Failed to load requests.');
+        this.toastService.presentErrorToastr('Failed to load requests.');
         if (event?.target) event.target.complete();
       }
     );
@@ -180,27 +197,30 @@ export class RequestsComponent implements OnInit, OnDestroy {
 
   async acceptRequest(request: Request) {
     const requestId = request._id;
+    this.showSandglass = true;
     try {
       const resp: any = await this.requestService.acceptRequest(requestId);
 
       // Remove from list immediately
       this.requests = this.requests.filter((r) => r._id !== requestId);
-      this.toastService.presentStdToastr(resp.message);
+      this.toastService.presentSuccessToastr(resp.message);
 
       // Instant badge change (optimistic)
       this.appEvents.inc('friends', -1);
       this.friendRequestCount = Math.max(0, this.friendRequestCount - 1); // Update local count
       this.updatePageTitle(); // Update page title
 
-      // Refresh friends list
-      await this.userService.refreshFriendsList();
+      // Refresh friends list and current user
+      this.userService.triggerFriendsRefresh();
       
       // Emit socket event to notify other clients
       SocketService.emit('friend-request-accepted', { requestId });
       
     } catch (err) {
       console.error('Error accepting request:', err);
-      this.toastService.presentStdToastr('Failed to accept request.');
+      this.toastService.presentErrorToastr('Failed to accept request.');
+    } finally {
+      this.showSandglass = false;
     }
   }
 
@@ -218,12 +238,13 @@ export class RequestsComponent implements OnInit, OnDestroy {
 
   async rejectRequest(request: Request) {
     const requestId = request._id;
+    this.showSandglass = true;
     try {
-      const resp: any = await this.requestService.cancelRequest(requestId);
+      const resp: any = await this.requestService.rejectRequest(requestId);
 
       // Remove from list immediately
       this.requests = this.requests.filter((r) => r._id !== requestId);
-      this.toastService.presentStdToastr(resp.message);
+      this.toastService.presentSuccessToastr(resp.message);
 
       // Instant badge change (optimistic)
       this.appEvents.inc('friends', -1);
@@ -235,7 +256,9 @@ export class RequestsComponent implements OnInit, OnDestroy {
       
     } catch (err) {
       console.error('Error rejecting request:', err);
-      this.toastService.presentStdToastr('Failed to reject request.');
+      this.toastService.presentErrorToastr('Failed to reject request.');
+    } finally {
+      this.showSandglass = false;
     }
   }
 }

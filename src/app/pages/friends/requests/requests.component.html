@@ -3,7 +3,8 @@
 <ion-content class="vibrant-dark-theme">
   <div class="mesh-gradient"></div>
 
-  <app-loader *ngIf="pageLoading"></app-loader>
+  <app-sandglass-loader [visible]="pageLoading" message="Loading requests..."></app-sandglass-loader>
+  <app-sandglass-loader [visible]="showSandglass" message="Please wait..."></app-sandglass-loader>
 
   <ion-refresher slot="fixed" pullFactor="0.5" pullMin="100" pullMax="200" (ionRefresh)="getRequests(page, $event)">
     <ion-refresher-content></ion-refresher-content>
@@ -25,13 +26,19 @@
            *ngFor="let request of requests; let i = index"
            [style.animation-delay]="(i * 0.1) + 's'">
         
-        <div class="request-info">
+        <div class="request-info" (click)="goToProfile(request.from?._id || request.from?.id)">
           <div class="avatar-wrapper">
-            <img [src]="request.from.getMainAvatar()" alt="User Avatar">
+            <app-avatar [profile]="request.from" [size]="50"></app-avatar>
           </div>
           <div class="request-details">
             <span class="user-name">{{ request.from.fullName }}</span>
-            <span class="request-time">{{ request.createdAt | extractDate }}</span>
+            <div class="meta-info">
+              <span class="request-time">{{ request.createdAt | extractDiffTime }}</span>
+              <span class="location" *ngIf="(request.from.city && request.from.city !== '-') || (request.from.country && request.from.country !== '-')">
+                <i class="fas fa-map-marker-alt"></i>
+                {{ (request.from.city && request.from.city !== '-') ? request.from.city : '' }}{{ (request.from.city && request.from.city !== '-' && request.from.country && request.from.country !== '-') ? ', ' : '' }}{{ (request.from.country && request.from.country !== '-') ? request.from.country : '' }}
+              </span>
+            </div>
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 
-import { ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
+import { IdService } from 'src/app/services/id.service';
 import { Router } from '@angular/router';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { IonInfiniteScroll, IonSlides, ModalController } from '@ionic/angular';
@@ -7,13 +8,15 @@ import { UserService } from 'src/app/services/user.service';
 import { SearchOptionsComponent } from './search-options/search-options.component';
 import { User } from './../../models/User';
 import { AdMobFeeService } from './../../services/admobfree.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-new-friends',
   templateUrl: './new-friends.page.html',
   styleUrls: ['./new-friends.page.scss'],
 })
-export class NewFriendsPage implements OnInit {
+export class NewFriendsPage implements OnInit, OnDestroy {
   @ViewChild('infinitScroll') infinitScroll: IonInfiniteScroll;
   @ViewChild('slides') slides: IonSlides;
 
@@ -42,26 +45,24 @@ export class NewFriendsPage implements OnInit {
     speed: 400,
     onlyExternal: false
   };
+  private destroy$ = new Subject<void>();
+  showSandglass: boolean = false;
 
 
   constructor(private userService: UserService, private modalController: ModalController, private router: Router,
-              private changeDetectorRef: ChangeDetectorRef, private nativeStorage: NativeStorage, private adMobFeeService: AdMobFeeService) { }
+              private changeDetectorRef: ChangeDetectorRef, private nativeStorage: NativeStorage, private adMobFeeService: AdMobFeeService,
+              private idService: IdService) { }
 
-              ngOnInit() {
-                this.getAuthUser();
-              }
-
-  ionViewWillEnter(){
-    this.page = 0;
-    this.slideOpts = {
-      initialSlide: 0,
-      speed: 400,
-      onlyExternal: false
-    }
-    this.getNearUsers(null, true);
+  async ngOnInit() {
+    // Load saved filters first so initial fetch uses persisted filters
+    try { await this.loadLastFilters(); } catch (e) { /* ignore */ }
     this.getAuthUser();
-    // load last-applied filters so the modal shows the previous selection
-    this.loadLastFilters();
+    this.getNearUsers(null, true);
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   toggleRandom(){
@@ -71,25 +72,13 @@ export class NewFriendsPage implements OnInit {
   }
 
   getAuthUser() {
-    this.pageLoading = true;
-    (async () => {
-      try {
-        let u: any = null;
-        try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-        if (!u) {
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) { /* ignore */ }
-        }
-        if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
-        if (u) {
-          this.authUser = new User().initialize(u);
-          console.log('Authenticated user data fetched and stored:', this.authUser);
-        } else {
-          this.fallbackToLocalStorage();
-        }
-      } catch (err) {
-        this.fallbackToLocalStorage();
+    this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      if (user) {
+        this.authUser = user;
+        console.log('Authenticated user data fetched via service:', this.authUser);
+        this.changeDetectorRef.detectChanges();
       }
-    })();
+    });
   }
   
 
@@ -219,6 +208,14 @@ export class NewFriendsPage implements OnInit {
     await modal.present();
     const { data } = await modal.onDidDismiss();
     console.log('Modal dismissed with data:', data);
+    // If modal signalled a reset, clear stored snapshot and reset options
+    if (data && data.reset) {
+      this.options = { gender: 'both', profession: '0', education: '0', minAge: null as any, maxAge: null as any, interestsList: '', languages: '', online: false };
+      try { await this.nativeStorage.remove('friend_search_last_filters'); } catch (e) { localStorage.removeItem('friend_search_last_filters'); }
+      this.page = 0;
+      this.getNearUsers(null, true);
+      return;
+    }
 
     if(data && Object.keys(data).length){
       // Normalize returned data into our options structure
@@ -233,29 +230,38 @@ export class NewFriendsPage implements OnInit {
       
       console.log('Updated options:', this.options);
       this.page = 0;
-      this.getNearUsers(null, true)
-      // Auto-save last-applied filters so next time the modal opens they stay selected
+      this.getNearUsers(null, true);
+
+      // Persist last-applied filters synchronously to localStorage to avoid race/reversion
       try {
-        const defaults = {
-          gender: 'both', profession: '0', education: '0', minAge: null, maxAge: null, interestsList: '', languages: '', online: false
-        };
-        const snapshot = { ...this.options };
-        // treat empty lists consistently
+        const defaults = { gender: 'both', profession: '0', education: '0', minAge: null, maxAge: null, interestsList: '', languages: '', online: false };
+        const snapshot: any = { ...this.options };
         if (!snapshot.interestsList) snapshot.interestsList = '';
+        // If snapshot equals defaults, remove stored snapshot
         if (JSON.stringify(snapshot) === JSON.stringify(defaults)) {
-          localStorage.removeItem('friend_search_last_filters');
+          try { this.nativeStorage.remove('friend_search_last_filters'); } catch (_) { localStorage.removeItem('friend_search_last_filters'); }
         } else {
-          localStorage.setItem('friend_search_last_filters', JSON.stringify(snapshot));
+          try { this.nativeStorage.setItem('friend_search_last_filters', snapshot); } catch (e) { localStorage.setItem('friend_search_last_filters', JSON.stringify(snapshot)); }
         }
-      } catch (e) { /* ignore storage errors */ }
+      } catch (e) {
+        // ignore storage errors but ensure localStorage fallback
+        try { localStorage.setItem('friend_search_last_filters', JSON.stringify(this.options)); } catch (_) { /* ignore */ }
+      }
     }
   }
-  
-  loadLastFilters() {
+  async loadLastFilters() {
     try {
-      const raw = localStorage.getItem('friend_search_last_filters');
-      if (!raw) return;
-      const saved = JSON.parse(raw);
+      let saved: any = null;
+      try {
+        saved = await this.nativeStorage.getItem('friend_search_last_filters');
+      } catch (e) {
+        // nativeStorage may not be available in browser; fallback to localStorage
+        try {
+          const raw = localStorage.getItem('friend_search_last_filters');
+          if (raw) saved = JSON.parse(raw);
+        } catch (err) { saved = null; }
+      }
+      if (!saved) return;
       this.options.gender = saved.gender || this.options.gender;
       this.options.profession = saved.profession || this.options.profession;
       this.options.education = saved.education || this.options.education;
@@ -273,8 +279,48 @@ export class NewFriendsPage implements OnInit {
     this.showSlides = true
   }
 
-  showProfile(id: string){
-    this.router.navigateByUrl('/tabs/profile/display/' + id)
+  isAdmin(user: any): boolean {
+    if (!user) return false;
+    const role = (user.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
+  }
+
+  showProfile(id: any){
+    // Normalize incoming id (handle Buffer-like objects, legacy id fields, or transport encodings)
+    let targetId: any = id;
+    try {
+      if (!targetId) return;
+      // prefer string coercion
+      if (typeof targetId !== 'string') {
+        targetId = (targetId && (targetId._id || targetId.id)) ? (targetId._id || targetId.id) : String(targetId);
+      }
+      // try IdService normalization if available
+      try {
+        const norm = this.idService && this.idService.normalizeId ? this.idService.normalizeId(targetId) : null;
+        if (norm) targetId = norm;
+      } catch (e) { /* ignore normalization errors */ }
+
+        const cached = this.userService.getCachedProfile(targetId);
+        console.log('showProfile -> targetId:', targetId, 'cached?', !!cached);
+        
+        // 🚫 Guard: Do not allow viewing Admin profiles
+        if (cached && this.isAdmin(cached)) {
+          return;
+        }
+
+        if (cached) {
+          this.router.navigate(['/tabs/profile/display', String(targetId)]);
+          return;
+        }
+    } catch (e) { /* ignore */ }
+
+    this.showSandglass = true;
+    this.changeDetectorRef.markForCheck();
+    console.log('Navigating to profile display for id:', targetId);
+    this.router.navigate(['/tabs/profile/display', String(targetId)]).finally(() => {
+      this.showSandglass = false;
+      try { this.changeDetectorRef.markForCheck(); } catch (e) {}
+    });
   }
 
   skipSlide(){

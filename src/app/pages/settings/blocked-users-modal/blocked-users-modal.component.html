@@ -1,0 +1,40 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">
+        <ion-icon name="close-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="blocked-container">
+    <div class="grid" *ngIf="!loading && users.length">
+      <div class="user-card" *ngFor="let u of users">
+        <div class="avatar-wrapper" (click)="goToProfile(u)">
+          <app-avatar [profile]="u" [size]="56"></app-avatar>
+        </div>
+        <div class="info" (click)="goToProfile(u)">
+          <div class="name">{{ u.fullName || (u.firstName + ' ' + u.lastName) }}</div>
+          <div class="handle" *ngIf="u.email">@{{ u.email.split('@')[0] }}</div>
+        </div>
+        <div class="actions">
+          <ion-button size="small" color="danger" fill="clear" (click)="unblock(u)">
+            Unblock
+          </ion-button>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="loading" class="status-msg">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Loading...</p>
+    </div>
+    
+    <div *ngIf="!loading && users.length === 0" class="status-msg">
+      <ion-icon name="people-outline"></ion-icon>
+      <p>No blocked users</p>
+    </div>
+  </div>
+</ion-content>

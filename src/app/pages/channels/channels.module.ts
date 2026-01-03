@@ -1,6 +1,4 @@
-import { CommentComponent } from './channel/comment/comment.component';
-import { CommentsComponent } from './channel/comments/comments.component';
-import { PostComponent } from './channel/post/post.component';
+import { PostModule } from './channel/post/post.module';
 import { SharingPipeModule } from './../../pipes/sharing/sharing-pipe.module';
 import { PostFormComponent } from './channel/post-form/post-form.component';
 import { ChannelComponent } from './channel/channel.component';
@@ -13,6 +11,7 @@ import { ChannelFormComponent } from './channel-form/channel-form.component';
 import { ChannelsHeaderComponent } from './channels-header/channels-header.component';
 import { ListComponent } from './list/list.component';
 import { SharingModule } from './../sharing/sharing.module';
+import { SharedComponentsModule } from '../../components/shared.module';
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -30,7 +29,9 @@ import { ChannelPopoverComponent } from './list/ChannelPopoverComponent';
     IonicModule,
     ChannelsPageRoutingModule,
     SharingModule,
-    SharingPipeModule
+    SharingPipeModule,
+    PostModule,
+    SharedComponentsModule
   ],
   declarations: [
     ChannelsPage,
@@ -39,9 +40,6 @@ import { ChannelPopoverComponent } from './list/ChannelPopoverComponent';
     ChannelFormComponent,
     ChannelComponent,
     PostFormComponent,
-    PostComponent,
-    CommentsComponent,
-    CommentComponent,
     TermsModalComponent,
     ChannelPopoverComponent
   ],

@@ -5,7 +5,8 @@
   <div class="mesh-gradient"></div>
 
   <div class="friends-container animate__animated animate__fadeIn">
-    <app-loader *ngIf="pageLoading"></app-loader>
+    <app-sandglass-loader [visible]="pageLoading" message="Loading friends..."></app-sandglass-loader>
+    <app-sandglass-loader [visible]="showSandglass" message="Please wait"></app-sandglass-loader>
 
     <ion-refresher slot="fixed" pullFactor="0.5" pullMin="100" pullMax="200" (ionRefresh)="getFriends($event, true)">
       <ion-refresher-content></ion-refresher-content>
@@ -18,25 +19,31 @@
       </div>
       <h3>No Friends Yet</h3>
       <p>Start connecting with people to see them here.</p>
-      <button class="find-btn" routerLink="/tabs/search">Find People</button>
+      <button class="find-btn" routerLink="/tabs/new-friends">Find People</button>
     </div>
 
     <!-- Friends List -->
     <div class="friends-list" *ngIf="!pageLoading && friends.length > 0">
       <div class="friend-card glass-card" *ngFor="let friend of friends">
-        <div class="friend-info" [routerLink]="['/tabs/profile/display/' + friend._id]">
+        <div class="friend-info" (click)="navigateToProfile(friend)" [style.cursor]="isAdmin(friend) ? 'default' : 'pointer'">
           <div class="avatar-wrapper">
-            <img [src]="friend.getMainAvatar()" alt="Avatar">
-            <div class="status-dot" *ngIf="friend.online" class="online"></div>
+            <app-avatar [profile]="friend" [size]="50"></app-avatar>
+            <div class="status-dot online" *ngIf="friend.online && !isAdmin(friend)"></div>
           </div>
           <div class="friend-details">
             <span class="friend-name">
-              {{ friend.fullName }}
-              <ng-container *ngIf="friend.getAge(friend === myProfile); let age">
+              {{ isAdmin(friend) ? 'System' : friend.fullName }}
+              <ng-container *ngIf="!isAdmin(friend) && friend.getAge(friend === myProfile); let age">
                 {{ age !== null ? ', ' + age : '' }}
               </ng-container>
             </span>
-            <span class="friend-location">{{ friend.city || 'Unknown Location' }}</span>
+            <span class="friend-location" *ngIf="!isAdmin(friend) && ((friend.city && friend.city !== '-') || (friend.country && friend.country !== '-')) else noLocation">
+              <ion-icon name="location-outline" size="small"></ion-icon>
+              {{ (friend.city && friend.city !== '-') ? friend.city : '' }}{{ (friend.city && friend.city !== '-' && friend.country && friend.country !== '-') ? ', ' : '' }}{{ (friend.country && friend.country !== '-') ? friend.country : '' }}
+            </span>
+            <ng-template #noLocation>
+              <span class="friend-location muted">{{ isAdmin(friend) ? 'Official Account' : '—' }}</span>
+            </ng-template>
           </div>
         </div>
         

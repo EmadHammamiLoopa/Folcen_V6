@@ -1,0 +1,174 @@
+.preview-section {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  background: var(--ion-background-color, #0f172a);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin: -16px -16px 24px -16px; // Offset ion-padding
+  border-radius: 0 0 24px 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+
+  .avatar-preview {
+    width: 160px;
+    height: 160px;
+    background: #fff;
+    border-radius: 50%;
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    margin-bottom: 16px;
+    
+    img {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .preview-actions {
+    display: flex;
+    gap: 12px;
+  }
+}
+
+.section-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ion-color-medium);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.swatch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+
+  .swatch {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+
+    &.auto {
+      background: #eee;
+      font-size: 0.7rem;
+      font-weight: bold;
+      color: #666;
+    }
+
+    &.active {
+      border-color: var(--ion-color-primary);
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .label {
+      font-size: 0.6rem;
+      color: rgba(0,0,0,0.3);
+      font-weight: bold;
+    }
+
+    &[data-color="auburn"] { background: #A55728; }
+    &[data-color="black"] { background: #2C1B18; }
+    &[data-color="blonde"] { background: #B58143; }
+    &[data-color="blondeGolden"] { background: #D6B370; }
+    &[data-color="brown"] { background: #724133; }
+    &[data-color="brownDark"] { background: #4A312C; }
+    &[data-color="pastelPink"] { background: #F59797; }
+    &[data-color="platinum"] { background: #ECDCBF; }
+    &[data-color="red"] { background: #C93305; }
+    &[data-color="silverGray"] { background: #E6E6E6; }
+
+    // Clothing & Hat Colors
+    &[data-color="blue01"] { background: #65C9FF; }
+    &[data-color="blue02"] { background: #5199E4; }
+    &[data-color="blue03"] { background: #25557C; }
+    &[data-color="gray01"] { background: #E6E6E6; }
+    &[data-color="gray02"] { background: #929598; }
+    &[data-color="heather"] { background: #383838; }
+    &[data-color="pastelBlue"] { background: #B1E2FF; }
+    &[data-color="pastelGreen"] { background: #A7FFC4; }
+    &[data-color="pastelOrange"] { background: #FFDEB5; }
+    &[data-color="pastelRed"] { background: #FFAFB9; }
+    &[data-color="pastelYellow"] { background: #FFFFB1; }
+    &[data-color="pink"] { background: #FF488E; }
+    &[data-color="white"] { background: #FFFFFF; border: 1px solid #ddd; }
+    &[data-color="red"] { background: #FF5C5C; }
+  }
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 24px;
+
+  ion-chip {
+    margin: 0;
+    font-size: 0.75rem;
+    height: 32px;
+    
+    ion-label {
+      margin: 0 8px;
+    }
+  }
+}
+
+.background-type-toggle {
+  margin-bottom: 24px;
+  ion-segment {
+    background: var(--ion-color-light);
+    border-radius: 12px;
+  }
+}
+
+.hair-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+
+  .hair-item {
+    padding: 10px;
+    background: var(--ion-color-light);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid transparent;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: var(--ion-color-light-shade);
+    }
+
+    &.active {
+      background: var(--ion-color-primary-light, #e0eaff);
+      border-color: var(--ion-color-primary);
+      color: var(--ion-color-primary);
+      font-weight: bold;
+    }
+  }
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 24px;
+}

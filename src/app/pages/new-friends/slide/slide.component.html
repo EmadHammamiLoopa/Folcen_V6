@@ -1,16 +1,16 @@
 <div class="slide-container animate__animated animate__fadeIn">
   <div class="image-wrapper">
-    <img (click)="!random ? showProfile() : null" [src]="avatarUrl" class="user-image" alt="">
+    <app-avatar (click)="!random && !isAdmin() ? showProfile() : null" [profile]="user" [size]="400" shape="rounded" class="user-image" [style.cursor]="isAdmin() ? 'default' : 'pointer'"></app-avatar>
     
-    <div class="glass-overlay p-3" (click)="!random ? showProfile() : null">
+    <div class="glass-overlay p-3" (click)="!random && !isAdmin() ? showProfile() : null" [style.cursor]="isAdmin() ? 'default' : 'pointer'">
       <div class="user-info">
         <h2 class="user-name">
-          {{ user.fullName }}<span class="age" *ngIf="user.getAge(true)">, {{ user.getAge(true) }}</span>
-          <span class="online-status" *ngIf="user.online"></span>
+          {{ isAdmin() ? 'System' : user.fullName }}<span class="age" *ngIf="!isAdmin() && user.getAge(false)">, {{ user.getAge(false) }}</span>
+          <span class="online-status" *ngIf="user.online && !isAdmin()"></span>
         </h2>
         <p class="user-location">
-          <i class="fas fa-map-marker-alt"></i>
-          {{ user.gender }}, {{ user.city }}
+          <i class="fas fa-map-marker-alt" *ngIf="!isAdmin()"></i>
+          <span *ngIf="!isAdmin() && user.genderVisible && user.gender !== 'prefer not to say'">{{ user.gender }}, </span>{{ isAdmin() ? 'Official Account' : user.city }}
         </p>
       </div>
     </div>
@@ -18,7 +18,7 @@
 
   <div class="actions-container">
     <div class="action-buttons">
-      <button *ngIf="random" class="glass-btn video" (click)="videoCall()">
+      <button *ngIf="random && !isAdmin()" class="glass-btn video" (click)="videoCall()">
         <i class="fas fa-video"></i>
       </button>
 

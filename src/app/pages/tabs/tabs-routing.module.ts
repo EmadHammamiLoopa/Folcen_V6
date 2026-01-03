@@ -33,6 +33,11 @@ const routes: Routes = [
         loadChildren: () => import('./../channels/channels.module').then( m => m.ChannelsPageModule),
       },
       {
+        path: 'feed',
+        loadChildren: () => import('./../feed/feed.module').then( m => m.FeedPageModule),
+        canActivate: [AuthGuard]
+      },
+      {
         path: 'new-friends',
         loadChildren: () => import('./../new-friends/new-friends.module').then( m => m.NewFriendsPageModule),
       },

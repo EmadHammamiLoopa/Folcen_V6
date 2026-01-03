@@ -16,7 +16,7 @@
 <ion-content class="vibrant-dark-theme">
   <div class="mesh-gradient"></div>
 
-  <app-loader *ngIf="pageLoading"></app-loader>
+  <app-sandglass-loader [visible]="pageLoading" message="Please wait"></app-sandglass-loader>
 
   <div *ngIf="service" class="detail-container">
     <!-- Hero Section -->

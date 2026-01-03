@@ -3,6 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { CommentComponent } from './comment.component';
 import { DisplayCommentComponent } from './display-comment/display-comment.component';
 import { ListComponent } from './list/list.component';
+import { CommentFormComponent } from './comment-form/comment-form.component';
 
 const routes: Routes = [
   {
@@ -21,6 +22,10 @@ const routes: Routes = [
       {
         path: 'display/:id',
         component: DisplayCommentComponent
+      },
+      {
+        path: 'form/:type',
+        component: CommentFormComponent
       }
     ]
   }

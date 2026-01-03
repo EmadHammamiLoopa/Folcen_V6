@@ -1,24 +1,56 @@
 import { Injectable, Inject, forwardRef } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, throwError, BehaviorSubject } from 'rxjs';
+import { Observable, throwError, BehaviorSubject, of, firstValueFrom, Subject } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, finalize, map, shareReplay, tap, distinctUntilChanged } from 'rxjs/operators';
 import { User } from '../models/User';
 import constants from '../helpers/constants';
 import { StorageService } from './storage.service';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { IdService } from './id.service';
+import { SocketService } from './socket.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class UserService {
 
+  private static instance: UserService | null = null;
   private apiUrl = `${environment.apiUrl}/user`;
   private currentUserSubject: BehaviorSubject<User>;
   public currentUser: Observable<User>;
+  public currentUser$: Observable<User>;
   private viewedUserSubject: BehaviorSubject<User>;
   public viewedUser: Observable<User>;
+  private inflightCurrentUser$: Observable<User> | null = null;
+
+  // Subject to notify components when friends list changes
+  private friendsUpdatedSubject = new Subject<void>();
+  public friendsUpdated$ = this.friendsUpdatedSubject.asObservable();
+  private friendsRefreshTimeout: any;
+
+  // Cache + instrumentation for profile fetches
+  private profileCache = new Map<string, { user: User; expires: number }>();
+  private inflightProfiles = new Map<string, Observable<User>>();
+  private cacheTTLms = 2 * 60 * 1000; // 2 minutes
+  private callCounters = {
+    profileRequests: 0,
+    profileHits: 0,
+    profileMisses: 0,
+    initCalls: 0,
+  };
+
+  getAnnouncements(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/announcements`);
+  }
+
+  markAnnouncementSeen(id: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/announcements/${id}/seen`, {});
+  }
+
+  resetBudget(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/reset-budget`, {});
+  }
 
   constructor(
     private http: HttpClient,
@@ -26,17 +58,55 @@ export class UserService {
     private nativeStorage: NativeStorage // ✅ Add clearly
     , @Inject(forwardRef(() => IdService)) private idService: IdService
   ) {
+    UserService.instance = this;
     this.currentUserSubject = new BehaviorSubject<User>(null);
     this.currentUser = this.currentUserSubject.asObservable();
+    this.currentUser$ = this.currentUser.pipe(
+      shareReplay(1)
+    );
   
     this.viewedUserSubject = new BehaviorSubject<User>(null);
     this.viewedUser = this.viewedUserSubject.asObservable();
   
     this.initCurrentUser(); // ✅ initialize clearly
+    // Subscribe to profile update notifications from socket service
+    try {
+      SocketService.userProfileUpdated$.subscribe(payload => {
+        try {
+          if (payload && payload.userId) {
+            this.invalidateProfile(payload.userId);
+          }
+        } catch (e) { console.warn('Error handling userProfileUpdated payload', e); }
+      });
+    } catch (e) {
+      // graceful if socket service not initialized in some environments
+    }
+    // Subscribe to follow-update events to refresh friends/follow lists
+    try {
+      SocketService.followUpdate$.subscribe(payload => {
+        try {
+          if (!payload) return;
+          const followerId = payload.followerId || payload.follower;
+          const followedId = payload.followedId || payload.followed;
+          // Invalidate caches for both involved users
+          if (followerId) this.invalidateProfile(String(followerId));
+          if (followedId) this.invalidateProfile(String(followedId));
+          // Trigger a debounced refresh so UI updates counts/lists
+          this.triggerFriendsRefresh();
+        } catch (e) { console.warn('Error handling follow-update payload', e); }
+      });
+    } catch (e) {}
+    // Also refresh when friend-requests-updated arrives (covers block/unblock flows)
+    try {
+      SocketService.friendRequestsUpdated$.subscribe(() => {
+        try { this.triggerFriendsRefresh(); } catch (e) {}
+      });
+    } catch (e) {}
   }
   
 
   private async initCurrentUser() {
+    this.callCounters.initCalls += 1;
     try {
       // Prefer the new key 'currentUser' in storage, fall back to legacy 'user' for compatibility
       let user: User = null;
@@ -50,7 +120,7 @@ export class UserService {
         const localStorageUser = localStorage.getItem('currentUser') || localStorage.getItem('user');
         user = localStorageUser ? JSON.parse(localStorageUser) : null;
       }
-  
+
       if (user) {
         try {
           // Normalize buffer-like id fields if present
@@ -64,12 +134,37 @@ export class UserService {
           }
         } catch (e) { console.warn('Failed to normalize stored user id', e); }
 
-        this.currentUserSubject.next(new User().initialize(user));
-        console.log('✅ Current user initialized:', user);
+        // Validate the persisted user by fetching fresh server data. If validation
+        // fails (token revoked/deleted), clear stored user data and force sign-in.
+        try {
+          // Ensure the stored user id is accessible via getCurrentUserId()
+          // (this relies on localStorage being populated with the stored user)
+          const fresh = await firstValueFrom(this.refreshCurrentUser({ forceRefresh: true }));
+          // Apply server-fresh user and force overwrite of any in-memory user
+          this.setCurrentUser(fresh, { force: true });
+          console.log('✅ Current user validated and refreshed from server:', fresh._id);
+        } catch (e) {
+          console.warn('Stored user validation failed; clearing persisted user and token', e);
+          // clear persisted user and token from both storages to prevent auth loops
+          try { 
+            localStorage.removeItem('currentUser'); 
+            localStorage.removeItem('user'); 
+            localStorage.removeItem('token');
+          } catch (er) {}
+          try { 
+            if (this.nativeStorage && typeof this.nativeStorage.remove === 'function') { 
+              await this.nativeStorage.remove('currentUser').catch(()=>{}); 
+              await this.nativeStorage.remove('user').catch(()=>{}); 
+              await this.nativeStorage.remove('token').catch(()=>{});
+            } 
+          } catch (er) {}
+          // ensure in-memory is cleared
+          this.setCurrentUser(null);
+        }
       } else {
         console.warn('⚠️ No user found in any storage');
       }
-  
+
     } catch (error) {
       console.error('❌ Initialization error:', error);
     }
@@ -82,13 +177,29 @@ export class UserService {
     return this.viewedUserSubject.value;
   }
 
-  setCurrentUser(user: User) {
+  /** Static helper to clear user state from anywhere without injection */
+  public static clearUserState() {
+    if (UserService.instance) {
+      UserService.instance.setCurrentUser(null);
+    }
+  }
+
+  setCurrentUser(user: any, options: { force?: boolean } = {}) {
+    if (!user) {
+      this.resetUserCache('setCurrentUser(null)');
+      this.currentUserSubject.next(null);
+      return;
+    }
+
+    // Ensure we have a User instance
+    const userObj = user instanceof User ? user : new User().initialize(user);
+
     // Safety guard: if we already have an authenticated user in memory,
     // don't overwrite it with a different user's profile unless explicitly forced.
     try {
       const existing = this.currentUserSubject && this.currentUserSubject.value;
-      if (existing && existing._id && user && user._id && existing._id !== user._id) {
-        console.warn('setCurrentUser: refusing to overwrite existing authenticated user with different id', existing._id, user._id);
+      if (!options.force && existing && existing._id && userObj._id && existing._id !== userObj._id) {
+        console.warn('setCurrentUser: refusing to overwrite existing authenticated user with different id', existing._id, userObj._id);
         return;
       }
     } catch (e) {
@@ -96,17 +207,27 @@ export class UserService {
     }
 
     // Write canonical key and legacy key for compatibility in both storages (native + local)
+    const rawData = userObj.toObject ? userObj.toObject() : userObj;
     try {
       if (this.nativeStorage && typeof this.nativeStorage.setItem === 'function') {
-        try { this.nativeStorage.setItem('currentUser', user).catch(() => {}); } catch (_) {}
-        try { this.nativeStorage.setItem('user', user).catch(() => {}); } catch (_) {}
+        try { this.nativeStorage.setItem('currentUser', rawData).catch(() => {}); } catch (_) {}
+        try { this.nativeStorage.setItem('user', rawData).catch(() => {}); } catch (_) {}
       }
     } catch (e) {}
 
-    try { localStorage.setItem('currentUser', JSON.stringify(user)); } catch (e) {}
-    try { localStorage.setItem('user', JSON.stringify(user)); } catch (e) {}
+    try { localStorage.setItem('currentUser', JSON.stringify(rawData)); } catch (e) {}
+    try { localStorage.setItem('user', JSON.stringify(rawData)); } catch (e) {}
 
-    this.currentUserSubject.next(user);
+    // Invalidate profile cache for this user to ensure real-time updates across the app
+    if (userObj._id) {
+      this.profileCache.delete(userObj._id);
+      this.profileCache.delete('me');
+      this.inflightProfiles.delete(userObj._id);
+      this.inflightProfiles.delete('me');
+      this.inflightCurrentUser$ = null;
+    }
+
+    this.currentUserSubject.next(userObj);
   }
 
   setViewedUser(user: User) {
@@ -119,7 +240,19 @@ export class UserService {
 
   updateUser(id: string, data: any): Observable<any> {
     console.log('Updating user with ID: ', id);
-    return this.http.put(`${this.apiUrl}/${id}`, data);
+    return this.http.put(`${this.apiUrl}/${id}`, data).pipe(
+      tap((res: any) => {
+        if (res && (res.user || res.data)) {
+          this.setCurrentUser(res.user || res.data);
+        }
+      })
+    );
+  }
+
+  updateProfile(data: any): Observable<any> {
+    const userId = this.getCurrentUserId();
+    if (!userId) return throwError('No user logged in');
+    return this.updateUser(userId, data);
   }
 
   removeAvatar(userId: string, avatarUrl: string): Observable<any> {
@@ -210,7 +343,87 @@ getCurrentUserId(): string | null {
 }
 
 
-  getUserProfile(userId: any): Observable<User> {
+  refreshCurrentUser(options: { forceRefresh?: boolean } = {}): Observable<User> {
+    const userId = this.getCurrentUserId();
+    if (!userId) return throwError(() => new Error('No user logged in'));
+
+    const forceRefresh = !!options.forceRefresh;
+
+    if (!forceRefresh && this.inflightCurrentUser$) {
+      return this.inflightCurrentUser$;
+    }
+
+    // Performance monitoring
+    if (typeof (window as any).__perfMonitor !== 'undefined') {
+      (window as any).__perfMonitor.incrementUserFetch();
+    }
+
+    const request$ = this.http.get<any>(`${this.apiUrl}/profile/${encodeURIComponent(userId)}`).pipe(
+      map((response: any) => {
+        if (response && response.data) {
+          const userData = response.data;
+          const fresh = new User().initialize(userData);
+          // Merge with existing in-memory user to avoid overwriting transient fields
+          const existing = this.currentUserSubject?.value;
+          if (existing && existing._id && existing._id === fresh._id) {
+            // Merge arrays and scalar values when fresh response lacks them
+            try {
+              // CRITICAL: Ensure we don't overwrite fresh avatar metadata with old existing metadata
+              const mergedData = { 
+                ...existing.toObject(), 
+                ...userData,
+                // Explicitly prefer fresh avatar fields
+                avatarStyle: userData.avatarStyle || fresh.avatarStyle,
+                avatarSeed: userData.avatarSeed || fresh.avatarSeed,
+                avatarVariant: userData.avatarVariant || fresh.avatarVariant,
+                avatarOverrides: userData.avatarOverrides || fresh.avatarOverrides
+              };
+              const merged = new User().initialize(mergedData);
+              // prefer server-provided values but fall back to existing where empty
+              if ((!merged.followers || merged.followers.length === 0) && existing.followers) merged.followers = existing.followers;
+              if ((!merged.following || merged.following.length === 0) && existing.following) merged.following = existing.following;
+              if ((!merged.friends || merged.friends.length === 0) && existing.friends) merged.friends = existing.friends;
+              if ((!merged.followedChannels || merged.followedChannels.length === 0) && existing.followedChannels && existing.followedChannels.length) merged.followedChannels = existing.followedChannels;
+              if ((!merged.avatar || merged.avatar.length === 0) && existing.avatar) merged.avatar = existing.avatar || [];
+              
+              // Only fall back to existing mainAvatar if the fresh one is truly empty
+              if (!merged.mainAvatar && existing.mainAvatar) merged.mainAvatar = existing.mainAvatar;
+              
+              // preserve missedCallBudget and peerId if not returned
+              if ((merged as any).missedCallBudget === undefined && (existing as any).missedCallBudget !== undefined) (merged as any).missedCallBudget = (existing as any).missedCallBudget;
+              if (!(merged as any).peerId && (existing as any).peerId) (merged as any).peerId = (existing as any).peerId;
+              this.setCurrentUser(merged, { force: true });
+              console.log('✅ Current user refreshed and merged from server:', merged);
+              return merged;
+            } catch (e) {
+              console.warn('Failed to merge refreshed user with existing user, using fresh:', e);
+            }
+          }
+
+          this.setCurrentUser(fresh, { force: true });
+          console.log('✅ Current user refreshed from server:', fresh);
+          return fresh;
+        } else {
+          throw new Error('Invalid response data');
+        }
+      }),
+      catchError((error) => {
+        console.error('Error refreshing current user:', error);
+        return throwError(() => error);
+      }),
+      finalize(() => {
+        this.inflightCurrentUser$ = null;
+      }),
+      shareReplay(1)
+    );
+
+    this.inflightCurrentUser$ = request$;
+    return request$;
+  }
+
+  getUserProfile(userId: any, options: { forceRefresh?: boolean; ttlMs?: number } = {}): Observable<User> {
+    const ttl = options.ttlMs ?? this.cacheTTLms;
+    const forceRefresh = !!options.forceRefresh;
     // Use IdService to normalize any incoming id-like value
     let id: string | null = null;
     try {
@@ -254,14 +467,15 @@ getCurrentUserId(): string | null {
       }
 
       // final sanity: if id looks like an object coercion, reject early
-      if (id === '[object Object]' || !id || (id !== 'me' && !/^[a-fA-F0-9]{24}$/.test(id))) {
+      if (id === '[object Object]' || !id) {
         console.warn('getUserProfile: refusing to request backend with invalid id:', id, 'original:', userId);
         return new Observable((observer) => { observer.error(new Error('Invalid user id')); });
       }
     }
 
     // If asking for the authenticated user's profile, return current user subject if initialized
-    if (id === 'me' || (this.currentUserSubject && this.currentUserSubject.value && this.currentUserSubject.value._id === id)) {
+    // BUT only if we are not forcing a refresh
+    if (!forceRefresh && (id === 'me' || (this.currentUserSubject && this.currentUserSubject.value && this.currentUserSubject.value._id === id))) {
       return new Observable((observer) => {
         observer.next(this.currentUserSubject.value);
         observer.complete();
@@ -273,7 +487,23 @@ getCurrentUserId(): string | null {
       return new Observable((observer) => { observer.error(new Error('Invalid user id')); });
     }
 
-    return this.http.get<any>(`${this.apiUrl}/profile/${encodeURIComponent(id)}`).pipe(
+    // Cache + in-flight dedupe
+    const now = Date.now();
+    const cached = this.profileCache.get(id);
+    if (!forceRefresh && cached && cached.expires > now) {
+      this.callCounters.profileHits += 1;
+      return of(cached.user);
+    }
+
+    if (!forceRefresh && this.inflightProfiles.has(id)) {
+      this.callCounters.profileHits += 1; // treat reuse as a hit
+      return this.inflightProfiles.get(id);
+    }
+
+    this.callCounters.profileRequests += 1;
+    console.log(`📡 getUserProfile -> ${id} (force:${forceRefresh})`);
+
+    const request$ = this.http.get<any>(`${this.apiUrl}/profile/${encodeURIComponent(id)}`).pipe(
       map((response: any) => {
         if (response && response.data) {
           const userData = response.data;
@@ -287,16 +517,85 @@ getCurrentUserId(): string | null {
           const user = new User().initialize(userData);
           this.storageService.setItem(`user-profile-${userId}`, userData);
           console.log('User data fetched and stored:', userData);
+          this.callCounters.profileMisses += 1;
+          this.profileCache.set(id, { user, expires: Date.now() + ttl });
           return user;
         } else {
           throw new Error('Invalid response data');
         }
       }),
-      catchError((error) => {
+      finalize(() => {
+        this.inflightProfiles.delete(id);
+        (window as any).__userProfileCounters = this.getDiagnostics();
+      }),
+      shareReplay(1),
+      catchError((error: any) => {
+        // If the profile is missing (404), return a lightweight placeholder user
+        try {
+          if (error && error.status === 404) {
+            console.warn('User profile not found (404), returning placeholder for', id);
+            const placeholder = new User().initialize({ _id: id, firstName: 'User', lastName: '' });
+            // Cache placeholder to avoid repeated 404 network calls
+            try { this.profileCache.set(id, { user: placeholder, expires: Date.now() + ttl }); } catch (e) {}
+            return of(placeholder);
+          }
+        } catch (e) {}
         console.error('Error fetching user profile:', error);
         return throwError(() => new Error('Error fetching user profile'));
       })
     );
+
+    this.inflightProfiles.set(id, request$);
+    return request$;
+  }
+
+  /** Clears caches and inflight maps; call on logout or user switch. */
+  resetUserCache(reason = 'manual') {
+    console.log(`🧹 Clearing user cache (${reason})`);
+    this.profileCache.clear();
+    this.inflightProfiles.clear();
+  }
+
+  /** Invalidate a single user's cached profile and optionally refresh current user */
+  invalidateProfile(id: string) {
+    if (!id) return;
+    try {
+      this.profileCache.delete(id);
+      this.inflightProfiles.delete(id);
+      // If this is the authenticated user, re-fetch and update currentUser
+      const cu = this.currentUserSubject && this.currentUserSubject.value;
+      if (cu && (cu._id === id || cu.id === id)) {
+        this.getUserProfile(id, { forceRefresh: true }).subscribe({
+          next: (u) => { if (u) this.setCurrentUser(u); },
+          error: () => { /* ignore */ }
+        });
+      }
+    } catch (e) { console.warn('invalidateProfile error', e); }
+  }
+
+  /** Return a cached profile synchronously if available and not expired. */
+  getCachedProfile(id: string): User | null {
+    if (!id) return null;
+    try {
+      const entry = this.profileCache.get(id);
+      if (!entry) return null;
+      if (entry.expires && Date.now() > entry.expires) {
+        this.profileCache.delete(id);
+        return null;
+      }
+      return entry.user instanceof User ? entry.user : new User().initialize(entry.user as any);
+    } catch (e) {
+      console.warn('getCachedProfile error', e);
+      return null;
+    }
+  }
+
+  getDiagnostics() {
+    return {
+      ...this.callCounters,
+      cacheSize: this.profileCache.size,
+      inflight: this.inflightProfiles.size,
+    };
   }
 
   uploadAvatar(userId: string, formData: FormData): Observable<any> {
@@ -312,7 +611,32 @@ getCurrentUserId(): string | null {
   }
 
   refreshFriendsList(): Promise<any> { // Add this method to refresh friends list
+    this.friendsUpdatedSubject.next();
     return this.http.get(`${this.apiUrl}/friends`).toPromise();
+  }
+
+  /**
+   * Trigger a full refresh of the current user and notify friends list listeners
+   */
+  triggerFriendsRefresh() {
+    if (this.friendsRefreshTimeout) {
+      clearTimeout(this.friendsRefreshTimeout);
+    }
+
+    this.friendsRefreshTimeout = setTimeout(() => {
+      console.log('🔄 Triggering friends refresh (debounced)...');
+      
+      // Emit immediately so the UI can start fetching the new friends list
+      this.friendsUpdatedSubject.next();
+
+      // Also refresh the current user profile in the background to keep the local state in sync
+      this.refreshCurrentUser({ forceRefresh: true }).subscribe({
+        next: () => {
+          console.log('✅ Current user refreshed after friend update');
+        },
+        error: (err) => console.error('Failed to refresh user after friend update:', err)
+      });
+    }, 500);
   }
 
   getPartnerPeerId(userId: string): Observable<string | null> {
@@ -379,16 +703,16 @@ getCurrentUserId(): string | null {
     return this.http.post(`${this.apiUrl}/friends/remove/${id}`, {});
   }
 
-  report(id: string, message: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/${id}/report`, { message });
+  report(id: string, reportData: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${id}/report`, reportData);
   }
 
-  updateEmail(id: string, email: string): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${id}/email`, { email });
+  updateEmail(id: string, email: string, current_password?: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/email`, { email, current_password });
   }
 
   updatePassword(id: string, data: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${id}/password`, data);
+    return this.http.put(`${this.apiUrl}/password`, data);
   }
 
 
@@ -430,6 +754,11 @@ getCurrentUserId(): string | null {
 
   block(userId: string): Observable<any> {
     return this.http.post(`${environment.apiUrl}/follow/block/${userId}`, {});
+  }
+
+  unblock(userId: string): Observable<any> {
+    // Backend exposes unblock as POST /api/v1/user/:userId/unblock
+    return this.http.post(`${this.apiUrl}/${userId}/unblock`, {});
   }
 
   getFollowers(userId: string): Observable<any> {

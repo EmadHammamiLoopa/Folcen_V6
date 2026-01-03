@@ -150,12 +150,12 @@ import { environment } from '../../../../environments/environment';
   `,
   styles: [`
     ion-content {
-      --background: var(--ion-background-color);
-      color: var(--ion-text-color);
+      --background: #0f172a;
+      color: #f8fafc;
     }
     ion-toolbar {
-      --background: var(--loopa-toolbar-background);
-      --color: var(--ion-text-color);
+      --background: #1e293b;
+      --color: #f8fafc;
     }
     .disclaimer-container {
       padding: 10px;

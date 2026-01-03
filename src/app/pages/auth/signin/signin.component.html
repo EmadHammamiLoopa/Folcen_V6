@@ -1,94 +1,63 @@
 <app-header title="Login" backLink="/auth/home" [back]="true"></app-header>
 <app-loader *ngIf="pageLoading"></app-loader>
 
-<ion-content>
-    <form [formGroup]="form" (ngSubmit)="submit()">
-      <ion-list class="mx-3">
-        <ion-item class="my-3">
+<ion-content class="login-content">
+    <div class="logo-section">
+      <div class="logo-container">
+        <img src="assets/images/logo.png" class="infinity-logo" alt="Folcen Logo">
+        <div class="logo-text">Folcen</div>
+      </div>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="login-form">
+      <ion-list lines="none" class="bg-transparent">
+        <ion-item class="input-item">
+          <ion-icon name="mail-outline" slot="start"></ion-icon>
           <ion-input formControlName="email" placeholder="E-mail"></ion-input>
         </ion-item>
-        <div class="w-100 text-danger mt-1" *ngIf="validationErrors['email']">
+        <div class="error-message" *ngIf="(form.get('email')?.invalid && (form.get('email')?.dirty || form.get('email')?.touched)) || validationErrors['email']">
+          <span class="d-block text-danger" *ngIf="form.get('email')?.hasError('required')">Email is required.</span>
+          <span class="d-block text-danger" *ngIf="form.get('email')?.hasError('email')">Please enter a valid email.</span>
           <span *ngFor="let error of validationErrors['email']">{{ error }}</span>
         </div>
-        <ion-item class="my-3">
+
+        <ion-item class="input-item">
+          <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
           <ion-input type="password" formControlName="password" placeholder="Password"></ion-input>
         </ion-item>
-        <div class="w-100 text-danger mt-1" *ngIf="validationErrors['password']">
+        <div class="error-message" *ngIf="(form.get('password')?.invalid && (form.get('password')?.dirty || form.get('password')?.touched)) || validationErrors['password']">
+          <span class="d-block text-danger" *ngIf="form.get('password')?.hasError('required')">Password is required.</span>
           <span *ngFor="let error of validationErrors['password']">{{ error }}</span>
         </div>
+
         <ion-button
           type="submit"
           expand="block"
-          color="primary"
-          class="w-100"
+          class="login-btn"
         >
           Login
         </ion-button>
-        <ion-button
-          expand="block"
-          color="secondary"
-          class="w-100"
-          (click)="googleSignin()"
-        >
-          <ion-icon name="logo-google" slot="start"></ion-icon>
-          Login with Google
-        </ion-button>
+
+        <div class="register-link-container">
+          <span>Don't have an account?</span>
+          <ion-button fill="clear" routerLink="/auth/signup" class="register-link">
+            Register
+          </ion-button>
+        </div>
       </ion-list>
     </form>
-    <div class="px-4 mt-5 pt-5">
-      <img src="./../../../../assets/images/svgs/login.svg" alt="Login Image" class="login-image">
-    </div>
 </ion-content>
 
-<ion-footer class="px-3">
-  <ion-button
-    expand="block"
-    color="primary"
-    fill="outline"
-    size="small"
-    class="mt-4"
-    routerLink="/auth/signup"
-  >
-    Register
-  </ion-button>
+<ion-footer class="ion-no-border bg-transparent">
   <ion-button
     expand="block"
     fill="clear"
-    color="primary"
-    class="w-100"
+    color="light"
+    class="back-link"
     routerLink="/auth"
   >
-    <ion-icon name="chevron-back-outline" class="mr-3"></ion-icon>
+    <ion-icon name="chevron-back-outline" slot="start"></ion-icon>
     Back
   </ion-button>
 </ion-footer>
 
-<!-- Styles -->
-<style>
-  ion-button {
-    --border-radius: 8px;
-    --padding-start: 16px;
-    --padding-end: 16px;
-  }
-
-  .login-image {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 0 auto;
-  }
-
-  ion-icon[name="logo-google"] {
-    font-size: 24px;
-    color: white; /* Ensure the icon stands out against the button color */
-  }
-
-  .text-danger {
-    color: #dc3545; /* Bootstrap red */
-  }
-
-  ion-footer ion-button {
-    --padding-start: 16px;
-    --padding-end: 16px;
-  }
-</style>

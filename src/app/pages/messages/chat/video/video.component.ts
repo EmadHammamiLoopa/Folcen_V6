@@ -164,7 +164,7 @@ async ngOnInit() {
 
       window.addEventListener('partner-answered', this.partnerAnsweredListener, { once:false });
       window.addEventListener('peer-call-error', () => {
-        this.toastService.presentStdToastr('Call could not be established');
+        this.toastService.presentErrorToastr('Call could not be established');
         this.cancel(true);
       });
 
@@ -324,7 +324,7 @@ async ionViewWillEnter() {
     }
   } catch (e) {
     console.error(e);
-    this.toastService.presentStdToastr('Failed to start video call.');
+    this.toastService.presentErrorToastr('Failed to start video call.');
     this.router.navigate(['/']);
   } finally {
     this.pageLoading = false;
@@ -385,7 +385,7 @@ private async waitForVideoElements(): Promise<void> {
 
 handleVideoError(type: 'local' | 'partner') {
   console.error(`${type} video error`);
-  this.toastService.presentStdToastr(`${type} video failed to load`);
+  this.toastService.presentErrorToastr(`${type} video failed to load`);
 }
 getUserId() {
   this.route.paramMap.subscribe((params) => {
@@ -429,7 +429,7 @@ getUser() {
       console.error('Error fetching partner profile:', err);
       this.pageLoading = false;
       this.location.back();
-      this.toastService.presentStdToastr('Cannot make this call, try again later');
+      this.toastService.presentErrorToastr('Cannot make this call, try again later');
     }
   );
 }
@@ -503,7 +503,7 @@ getUser() {
 
   handleUserInitError() {
     this.pageLoading = false;
-    this.toastService.presentStdToastr('User not found, please log in again');
+    this.toastService.presentErrorToastr('User not found, please log in again');
     this.router.navigate(['/auth/signin']);
   }
 
@@ -633,7 +633,7 @@ listenForVideoCallEvents() {
     if (this.myEl)      { this.myEl.srcObject = null; this.myEl.pause(); }
     if (this.partnerEl) { this.partnerEl.srcObject = null; this.partnerEl.pause(); }
     this.messengerService.sendMessage({ event: 'stop-audio' });
-    await this.toastService.presentStdToastr('Call was canceled.');
+    await this.toastService.presentSuccessToastr('Call was canceled.');
     this.leaveCallRoom();
     this.calling = false;
     this.answered = false;
@@ -700,7 +700,7 @@ listenForVideoCallEvents() {
 
   this.socket.on(VideoEvents.MISSED, (ev) => {
     // Dedicated missed events: service will account from MISSED_*; show toast only
-    this.toastService.presentStdToastr('Missed call.');
+    this.toastService.presentErrorToastr('Missed call.');
   });
 
   // (moved above) already wired legacy cancel names
@@ -929,7 +929,7 @@ async placeCall() {
   try {
     const now = Date.now();
     if (now - this.lastPlaceCallAt < 2000) {
-      this.toastService.presentStdToastr('Please wait a moment before retrying the call');
+      this.toastService.presentErrorToastr('Please wait a moment before retrying the call');
       return;
     }
     this.lastPlaceCallAt = now;
@@ -950,7 +950,7 @@ async placeCall() {
     if (!this.localStream) {
       this.localStream = await this.webRTC.getUserMedia();
       if (!this.localStream) {
-        this.toastService.presentStdToastr('Cannot access camera / mic');
+        this.toastService.presentErrorToastr('Cannot access camera / mic');
         return;
       }
       this.showSelfPreview(this.localStream);
@@ -971,7 +971,7 @@ async placeCall() {
 
     this.calling = true;
   } catch (err: any) {
-    this.toastService.presentStdToastr(err.message ?? String(err));
+    this.toastService.presentErrorToastr(err.message ?? String(err));
   } finally {
     this.placingCall = false;
     // ensure no dangling timeout remains if placeCall failed

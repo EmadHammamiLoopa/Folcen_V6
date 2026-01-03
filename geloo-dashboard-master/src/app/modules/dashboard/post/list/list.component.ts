@@ -15,6 +15,11 @@ export class ListComponent implements OnInit {
       type: "text"
     },
     {
+      name: "text",
+      title: "Content",
+      type: "text"
+    },
+    {
       name: "channel",
       title: "Channel",
       type: "text"
@@ -22,6 +27,11 @@ export class ListComponent implements OnInit {
     {
       name: "user",
       title: "User",
+      type: "text"
+    },
+    {
+      name: "userStatus",
+      title: "User Status",
       type: "text"
     },
     {
@@ -48,9 +58,9 @@ export class ListComponent implements OnInit {
     const id = this.getId(row);
     if (!id) {
       console.error('Row or id is missing');
-      return '/dashboard/posts/display'; // Default fallback
+      return '/dashboard/Posts/display'; // Default fallback
     }
-    return `/dashboard/posts/display/${id}`;
+    return `/dashboard/Posts/display/${id}`;
   }
 
   getId(v: any): string {

@@ -6,13 +6,17 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { User } from './../../../../models/User';
 import constants from 'src/app/helpers/constants';
 import { Service } from './../../../../models/Service';
-import { Component, OnInit, ChangeDetectorRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { CallNumber } from '@ionic-native/call-number/ngx';
 import { DropDownComponent } from 'src/app/pages/drop-down/drop-down.component';
+import { ReportModalComponent } from 'src/app/components/report-modal/report-modal.component';
 import { OneSignalService } from 'src/app/services/one-signal.service';
 import { ShareFriendsModalComponent } from './share-friends-modal.component';
 import { ApplierDisclaimerComponent } from './applier-disclaimer.component';
 import { GalleryModalComponent } from './gallery-modal.component';
+import { UserService } from 'src/app/services/user.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 
 @Component({
@@ -20,7 +24,7 @@ import { GalleryModalComponent } from './gallery-modal.component';
   templateUrl: './service.component.html',
   styleUrls: ['./service.component.scss'],
 })
-export class ServiceComponent implements OnInit {
+export class ServiceComponent implements OnInit, OnDestroy {
 
   @ViewChild('serviceSlides') slides: IonSlides;
 
@@ -32,71 +36,33 @@ export class ServiceComponent implements OnInit {
   user: User;
   showNumber: boolean = false;
   currentPhotoIndex: number = 1;
+  private destroy$ = new Subject<void>();
 
   constructor(private serviceService: ServiceService, private route: ActivatedRoute, private popoverController: PopoverController,
               private toastService: ToastService, private alertCtrl: AlertController,
               private router: Router, private nativeStorage: NativeStorage, private callNumber: CallNumber,
               private platform: Platform, private changeDetectorRef: ChangeDetectorRef, private oneSignalService: OneSignalService,
-              private modalController: ModalController) { }
+              private modalCtrl: ModalController, private userService: UserService) { }
 
   ngOnInit() {
-    this.getUserData();
+    this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      if (user) {
+        this.user = user;
+        this.changeDetectorRef.detectChanges();
+        console.log('User updated in ServiceComponent:', this.user);
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   ionViewWillEnter(){
     this.getServiceId();
   }
 
-  private getUserData() {
-    const isCordova = this.platform.is('cordova');
-    if (isCordova) {
-      (async () => {
-        try {
-          let u: any = null;
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-          if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
-          
-          if (u) {
-            console.log('Fetched user data from NativeStorage:', u);
-            this.initializeUser(u);
-          } else {
-            this.fetchUserFromLocalStorage();
-          }
-        } catch (error) {
-          console.warn('Error fetching user data from NativeStorage:', error);
-          this.fetchUserFromLocalStorage();
-        }
-      })();
-    } else {
-      this.fetchUserFromLocalStorage();
-    }
-  }
-
-  private fetchUserFromLocalStorage() {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
-    if (user) {
-      console.log('Fetched user data from localStorage:', user);
-      this.initializeUser(user);
-    } else {
-      console.log('User data not found in localStorage');
-      this.toastService.presentStdToastr('User data not found. Please log in again.');
-      this.router.navigateByUrl('/auth/signin');
-    }
-  }
-
-  private initializeUser(user: any) {
-    if (user) {
-      this.user = new User().initialize(user);
-     // this.oneSignalService.open(this.user._id);
-      this.changeDetectorRef.detectChanges();
-      console.log('User initialized successfully:', this.user);
-    } else {
-      console.error('Invalid user data:', user);
-    }
-  }
-
-  
   getServiceId(){
     this.route.paramMap
     .subscribe(
@@ -123,7 +89,7 @@ export class ServiceComponent implements OnInit {
       err => {
         this.pageLoading = false;
         console.log(err);
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     )
   }
@@ -133,12 +99,12 @@ export class ServiceComponent implements OnInit {
     .then(
       (resp: any) => {
         console.log(resp);
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
         this.router.navigateByUrl('/tabs/small-business/services/list/posted')
       },
       err => {
         console.log(err);
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     )
   }
@@ -166,7 +132,7 @@ export class ServiceComponent implements OnInit {
   }
 
   async call(){
-    const modal = await this.modalController.create({
+    const modal = await this.modalCtrl.create({
       component: ApplierDisclaimerComponent,
       cssClass: 'disclaimer-modal'
     });
@@ -178,7 +144,7 @@ export class ServiceComponent implements OnInit {
       this.showNumber = true;
       this.callNumber.callNumber(this.service.phone, true)
         .then(res => console.log('Launched dialer!', res))
-        .catch(err => this.toastService.presentStdToastr('Cannot make this call'));
+        .catch(err => this.toastService.presentErrorToastr('Cannot make this call'));
     }
   }
 
@@ -208,7 +174,7 @@ export class ServiceComponent implements OnInit {
   }
 
   async shareToFriends() {
-    const modal = await this.modalController.create({
+    const modal = await this.modalCtrl.create({
       component: ShareFriendsModalComponent,
       componentProps: {
         service: this.service,
@@ -224,7 +190,7 @@ export class ServiceComponent implements OnInit {
       ? this.service.photos 
       : [this.service.photo];
 
-    const modal = await this.modalController.create({
+    const modal = await this.modalCtrl.create({
       component: GalleryModalComponent,
       componentProps: {
         photos: photos,
@@ -241,39 +207,28 @@ export class ServiceComponent implements OnInit {
   }
 
   async reportService(){
-    const alert = await this.alertCtrl.create({
-      header: 'Report Service',
-      inputs: [
-        {
-          type: 'text',
-          name: 'message',
-          placeholder: 'Message'
-        }
-      ],
-      buttons: [
-        {
-          text: 'CANCEL',
-          role: 'cancel'
-        },
-        {
-          text: 'SEND',
-          cssClass: 'text-danger',
-          handler: (val) => {
-            const message = val.message;
-            this.serviceService.report(this.service.id, message)
-            .then(
-              (resp: any) => {
-                this.toastService.presentStdToastr(resp.message);
-              },
-              err => {
-                this.toastService.presentStdToastr(err);
-              }
-            )
-          }
-        }
-      ]
+    const modal = await this.modalCtrl.create({
+      component: ReportModalComponent,
+      componentProps: {
+        targetName: this.service.title
+      },
+      cssClass: 'report-modal-class'
     });
-    await alert.present();
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      this.serviceService.report(this.service.id, data)
+      .then(
+        (resp: any) => {
+          this.toastService.presentSuccessToastr(resp.message || 'Report submitted successfully');
+        },
+        err => {
+          this.toastService.presentErrorToastr(err || 'Error reporting service');
+        }
+      )
+    }
   }
 
 }

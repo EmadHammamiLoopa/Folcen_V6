@@ -1,13 +1,23 @@
-<div class="container-fluid">
-  <app-table
-    [headers]="headers"
-    plurarName="reports"
-    singleName="report"
-    retrieveURL="report/all"
-    [displayLink]="getDisplayLinkreport"
-    [showCreateButton]="false"
-    [showDeleteButton]="false"
-    [showUpdateButton]="false"
-    icon="fas fa-exclamation-triangle"
-  ></app-table>
+<div class="p-6 bg-gray-50 min-h-screen">
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Moderation Queue</h1>
+      <p class="text-gray-600">Review and act on user reports</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-2">
+    <app-table
+      [headers]="headers"
+      plurarName="reports"
+      singleName="report"
+      retrieveURL="report/all"
+      [displayLink]="getDisplayLinkreport"
+      [showCreateButton]="false"
+      [showDeleteButton]="false"
+      [showUpdateButton]="false"
+      [hideHeader]="true"
+      icon="fas fa-exclamation-triangle"
+    ></app-table>
+  </div>
 </div>

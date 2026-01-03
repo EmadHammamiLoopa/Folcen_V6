@@ -21,7 +21,50 @@ export class Message {
   constructor() {}
 
   initialize(message: any) {
-    console.log('Initializing message:', message);
+    // Defensive initialization: accept ISO string, numeric timestamp, Date object, or Buffer-like objects
+    const parseDate = (v: any): Date => {
+      try {
+        if (!v) {
+          // Attempt to derive timestamp from Mongo ObjectId if present
+          try {
+            if (this._id && /^[a-fA-F0-9]{24}$/.test(this._id)) {
+              const secs = parseInt(this._id.slice(0, 8), 16);
+              if (!isNaN(secs)) return new Date(secs * 1000);
+            }
+          } catch (e) {}
+          // unknown -> return epoch start (so UI won't show 'now')
+          return new Date(0);
+        }
+        if (v instanceof Date) return v;
+        if (typeof v === 'number' && !isNaN(v)) return new Date(v);
+        if (typeof v === 'string' && v.trim() !== '' && !isNaN(Date.parse(v))) return new Date(v);
+        // handle numeric strings
+        if (typeof v === 'string' && !isNaN(Number(v))) return new Date(Number(v));
+        // handle Buffer-like objects { data: [...] } or numeric-indexed objects
+        const tryExtractBytes = (obj: any): number[] | null => {
+          if (!obj) return null;
+          if (Array.isArray(obj)) return obj.map(n => Number(n));
+          if (obj.data && Array.isArray(obj.data)) return obj.data.map(n => Number(n));
+          if (obj.buffer && obj.buffer.data && Array.isArray(obj.buffer.data)) return obj.buffer.data.map(n => Number(n));
+          const keys = Object.keys(obj).filter(k => !isNaN(Number(k))).sort((a, b) => Number(a) - Number(b));
+          if (keys.length) return keys.map(k => Number(obj[k]));
+          return null;
+        };
+        const bytes = tryExtractBytes(v);
+        if (bytes && bytes.length) {
+          try {
+            const dec = new TextDecoder().decode(new Uint8Array(bytes));
+            if (dec && !isNaN(Date.parse(dec))) return new Date(dec);
+          } catch (e) {}
+          // fallback: try to interpret as unix/epoch bytes
+          try {
+            const asNum = bytes.reduce((acc, b) => (acc << 8) + (b & 0xff), 0);
+            if (!isNaN(asNum)) return new Date(asNum);
+          } catch (e) {}
+        }
+      } catch (e) {}
+      return new Date();
+    };
 
     this._id = message._id || message.id;
     this.tempId = message.tempId; // ✅ keep tempId if provided
@@ -31,7 +74,7 @@ export class Message {
     this.from = message.from;
     this.to = message.to;
     this.text = message.text;
-    this.createdAt = new Date(message.createdAt);
+    this.createdAt = parseDate(message.createdAt);
     this.image = message.image;
     this.state = message.state;
     this.type = message.type;

@@ -13,10 +13,24 @@ export class Request {
   }
 
   initialize(request: any): Request {
-    this.id = request._id; // Ensure to map _id correctly
+    if (!request) return this;
+    
+    // Normalize ID if it's a Buffer-like object
+    let id = request._id || request.id;
+    if (id && typeof id !== 'string') {
+      if (id.data && Array.isArray(id.data)) {
+        id = id.data.map((b: any) => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+      } else if (id.buffer && Array.isArray(id.buffer.data)) {
+        id = id.buffer.data.map((b: any) => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+      } else {
+        id = String(id);
+      }
+    }
+    this.id = id;
+    
     this.from = request.from;
     this.to = request.to;
-    this.createdAt = new Date(request.createdAt);
+    this.createdAt = request.createdAt ? new Date(request.createdAt) : new Date();
     return this; // Return the current instance after initialization
   }
 

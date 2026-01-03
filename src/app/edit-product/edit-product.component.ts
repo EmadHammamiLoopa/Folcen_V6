@@ -27,7 +27,7 @@ export class EditProductComponent implements OnInit {
       if (this.productId) {
         this.getProductDetails(this.productId);
       } else {
-        this.toastService.presentStdToastr('Invalid product ID.');
+        this.toastService.presentErrorToastr('Invalid product ID.');
       }
     });
   }
@@ -39,7 +39,7 @@ export class EditProductComponent implements OnInit {
       },
       err => {
         console.error('Error fetching product details:', err);
-        this.toastService.presentStdToastr('Error fetching product details.');
+        this.toastService.presentErrorToastr('Error fetching product details.');
       }
     );
   }
@@ -66,12 +66,12 @@ export class EditProductComponent implements OnInit {
 
     this.productService.update(this.productId, formData).then(
       (resp: any) => {
-        this.toastService.presentStdToastr('Product updated successfully.');
+        this.toastService.presentSuccessToastr('Product updated successfully.');
         this.router.navigate(['/product', this.productId]); // Navigate back to the product page
       },
       err => {
         console.error('Error updating product:', err);
-        this.toastService.presentStdToastr('Error updating product.');
+        this.toastService.presentErrorToastr('Error updating product.');
       }
     );
   }

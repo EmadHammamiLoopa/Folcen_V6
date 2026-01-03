@@ -12,7 +12,9 @@ export class Post{
   private _backgroundColor: string;
   private _color: string;
   private _anonymName: string;  // New property for anonymous name
+  private _isOwner: boolean;    // New property for ownership
   private _media: { url: string; expiryDate: Date | null };
+  private _visibility: string;
 
   private _channel: Channel;
   private _user: User;
@@ -28,6 +30,11 @@ export class Post{
   private _interests: string[];  // List of interests or hobbies
   private _hintAboutMe: string;  // Short hint about the user
 
+  private safeDate(val: any): Date | null {
+    if (!val) return null;
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
 
   constructor(){
     this._media = { url: '', expiryDate: null };
@@ -40,36 +47,48 @@ export class Post{
     this._hintAboutMe = '';
   }
 
-  initialize(post: Post){
+  initialize(post: any){
+    if (!post) return this;
+    if (typeof post === 'string') {
+      this.id = post;
+      return this;
+    }
     console.log("Initializing Post:", post); // Log the entire comment object
 
     this.id = post._id;
     this.text = post.text;
     this.votes = post.votes
     this.voted = post.voted
-    this.comments = post.comments.map(comment => new Comment().initialize(comment));
+    // Defensive: ensure comments is an array before mapping
+    if (post.comments && Array.isArray(post.comments)) {
+      this.comments = post.comments.map(comment => new Comment().initialize(comment));
+    } else {
+      this.comments = [];
+    }
     this.anonyme = post.anonyme;
     this.backgroundColor = post.backgroundColor;
     this.color = post.color;
     this.anonymName = post.anonymName; // Initialize anonymName
+    this.isOwner = post.isOwner;       // Initialize ownership
+    this.visibility = post.visibility || 'public';
     this.media = post.media ? {
       url: post.media.url || '',
-      expiryDate: post.media.expiryDate ? new Date(post.media.expiryDate) : null
+      expiryDate: this.safeDate(post.media.expiryDate)
     } : { url: '', expiryDate: null };
 
-    this.deletedAt = new Date(post.deletedAt);
-    this.createdAt = new Date(post.createdAt);
-    this.eventDate = post.eventDate ? new Date(post.eventDate) : null;
+    this.deletedAt = this.safeDate(post.deletedAt);
+    this.createdAt = this.safeDate(post.createdAt) || new Date();
+    this.eventDate = this.safeDate(post.eventDate);
     this.eventLocation = post.eventLocation || '';
     this.eventTime = post.eventTime || '';
 
-    this.relationshipGoals = post.relationshipGoals || [];
+    this.relationshipGoals = Array.isArray(post.relationshipGoals) ? post.relationshipGoals : (typeof post.relationshipGoals === 'string' ? [post.relationshipGoals] : []);
     this.ageRange = post.ageRange || { min: 18, max: 99 };
-    this.interests = post.interests || [];
+    this.interests = Array.isArray(post.interests) ? post.interests : (typeof post.interests === 'string' ? post.interests.split(',').map(i => i.trim()) : []);
     this.hintAboutMe = post.hintAboutMe || '';
 
-    this.channel = post.channel;
-    this.user = post.user;
+    this.channel = post.channel ? new Channel().initialize(post.channel) : null;
+    this.user = post.user ? new User().initialize(post.user) : null;
     console.log("Initialized post Object:", this); // Log the initialized object
 
     return this;
@@ -84,6 +103,8 @@ export class Post{
   get backgroundColor(): string{ return this._backgroundColor }
   get color(): string{ return this._color }
   get anonymName(): string{ return this._anonymName } // Getter for anonymName
+  get isOwner(): boolean { return this._isOwner; }
+  get visibility(): string{ return this._visibility }
   get media(): { url: string; expiryDate: Date | null } {
     return this._media;
   }
@@ -114,6 +135,8 @@ export class Post{
   set backgroundColor(backgroundColor: string){ this._backgroundColor = backgroundColor }
   set color(color: string){ this._color = color }
   set anonymName(anonymName: string){ this._anonymName = anonymName } // Setter for anonymName
+  set isOwner(isOwner: boolean) { this._isOwner = isOwner; }
+  set visibility(visibility: string){ this._visibility = visibility }
 
 
   set relationshipGoals(relationshipGoals: string[]) { this._relationshipGoals = relationshipGoals; }

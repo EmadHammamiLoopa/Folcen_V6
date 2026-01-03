@@ -2,10 +2,8 @@
   class="ion-no-border"
 >
   <ion-toolbar
-    [style]="{
-      '--background': backgroundColor ? (backgroundColor + '!important') : '',
-      '--color': textColor ? (textColor + '!important') : ''
-    }"
+    [style.--background]="backgroundColor ? (backgroundColor + '!important') : null"
+    [style.--color]="textColor ? (textColor + '!important') : null"
   >
     <ion-buttons class="ion-no-padding ion-no-margin" slot="start">
       <ion-button shape="round" (click)="goBack()" *ngIf="back">
@@ -14,18 +12,12 @@
       <ion-menu-button *ngIf="menu"></ion-menu-button>
     </ion-buttons>
 
-    <ion-item
-      [style]="{'--background': 'transparent', '--color': textColor ? (textColor + '!important') : ''}"
-    >
-
-      <ion-avatar (click)="titleClicked.emit()" *ngIf="avatar">
-        <img [src]="avatarSrc" alt="">
-      </ion-avatar>
-
-      <ion-title (click)="titleClicked.emit()" class="ion-no-margin ion-no-padding pl-2">
+    <ion-title (click)="titleClicked.emit()" class="ion-no-margin ion-no-padding">
+      <div class="title-content">
+        <app-avatar *ngIf="avatar" [profile]="profile" [size]="32" class="header-avatar"></app-avatar>
         <span>{{ title }}</span>
-      </ion-title>
-    </ion-item>
+      </div>
+    </ion-title>
 
     <ion-buttons slot="end">
       <ng-content select="#end-buttons"></ng-content>

@@ -29,7 +29,6 @@ export class SearchOptionsComponent implements OnInit {
   interestsChips: string[] = [];
   languagesChips: string[] = [];
   checkItemsNames: string[] = [];
-  showAssistant = false;
 
   constructor(
     public modalCtrl: ModalController,
@@ -38,7 +37,9 @@ export class SearchOptionsComponent implements OnInit {
 
   ngOnInit() {
     this.loadInterests();
-    this.checkItemsNames = Object.keys(this.checkItems);
+    // ensure checkItems is an object so toggles bind safely
+    if (!this.checkItems || typeof this.checkItems !== 'object') this.checkItems = {};
+    this.checkItemsNames = Object.keys(this.checkItems || {});
     
     if (this.interests) {
       this.interestsChips = this.interests.split(',').map(s => s.trim()).filter(Boolean);
@@ -46,6 +47,20 @@ export class SearchOptionsComponent implements OnInit {
     if (this.languages) {
       this.languagesChips = this.languages.split(',').map(s => s.trim()).filter(Boolean);
     }
+    // Normalize incoming checkItems values to booleans so ion-toggle binds correctly
+    if (this.checkItems && this.checkItemsNames && this.checkItemsNames.length) {
+      this.checkItemsNames.forEach(k => {
+        try {
+          const v = this.checkItems[k];
+          this.checkItems[k] = (v === true || v === 1 || v === '1');
+        } catch (e) {
+          console.warn('Failed to normalize checkItem', k, e);
+          this.checkItems[k] = false;
+        }
+      });
+    }
+
+    // no selects for profession/education here — toggles only
   }
 
   async loadInterests() {
@@ -106,11 +121,6 @@ export class SearchOptionsComponent implements OnInit {
     this.languagesChips.splice(i, 1);
   }
 
-  // Toggle assistant help panel (placeholder for Gemini integration)
-  toggleAssistant() {
-    this.showAssistant = !this.showAssistant;
-  }
-
   // Reset form fields to defaults and apply
   reset() {
     this.gender = 'both';
@@ -118,22 +128,36 @@ export class SearchOptionsComponent implements OnInit {
     this.maxAge = null;
     this.interestsChips = [];
     this.languagesChips = [];
+    // Clear raw inputs too so submit() won't fall back to stale input props
+    this.interests = '';
+    this.languages = '';
     this.online = false;
     if (this.checkItemsNames && this.checkItemsNames.length) {
-      this.checkItemsNames.forEach(k => this.checkItems[k] = 0);
+      this.checkItemsNames.forEach(k => {
+        try { this.checkItems[k] = false; } catch (e) { /* ignore */ }
+      });
     }
-    this.submit();
+    // Clear persisted filters so next open uses defaults
+    try { localStorage.removeItem('friend_search_last_filters'); } catch (e) { /* ignore */ }
+    try { (window as any).nativeStorage && (window as any).nativeStorage.remove('friend_search_last_filters'); } catch (e) { /* ignore */ }
+    console.log('SearchOptionsComponent.reset(): clearing persisted filters and dismissing');
+    // Signal parent that filters were reset so it can refresh and clear any persisted snapshot
+    this.modalCtrl.dismiss({ reset: true });
   }
 
   // No preset saving — just submit the selected filters
   submit(){
+    // Ensure checkItems are converted to '1'/'0' strings reliably
+    if (!this.checkItemsNames || !this.checkItemsNames.length) this.checkItemsNames = Object.keys(this.checkItems || {});
     this.checkItemsNames.forEach(item => {
-      this.checkItems[item] = this.checkItems[item] ? '1' : '0';
-    })
-    const data: any = {
-      gender: this.gender,
-      ...this.checkItems
-    }
+      const v = this.checkItems[item];
+      this.checkItems[item] = (v === true || v === 1 || v === '1') ? '1' : '0';
+    });
+
+    const data: any = { gender: this.gender, ...(this.checkItems || {}) };
+    console.log('SearchOptionsComponent.submit(): dismissing modal with data', data);
+
+    // profession/education are provided via checkItems toggles (already spread into data)
 
     if (this.minAge) data.minAge = String(this.minAge);
     if (this.maxAge) data.maxAge = String(this.maxAge);
@@ -146,7 +170,18 @@ export class SearchOptionsComponent implements OnInit {
 
     if (this.online || this.isRandomMode) data.online = '1';
 
-    this.modalCtrl.dismiss(data)
+    // Persist empty/cleared filters as explicit empty values so parent can store exact snapshot
+    data.minAge = (this.minAge !== null && this.minAge !== undefined) ? String(this.minAge) : '';
+    data.maxAge = (this.maxAge !== null && this.maxAge !== undefined) ? String(this.maxAge) : '';
+
+    // Ensure explicit keys exist so parent can persist exact snapshot for toggles and lists
+    if (data.profession === undefined) data.profession = this.checkItems && this.checkItems.profession ? this.checkItems.profession : '0';
+    if (data.education === undefined) data.education = this.checkItems && this.checkItems.education ? this.checkItems.education : '0';
+    if (data.interests === undefined) data.interests = '';
+    if (data.languages === undefined) data.languages = '';
+    if (data.online === undefined) data.online = this.online ? '1' : '0';
+
+    this.modalCtrl.dismiss(data);
   }
 
 }

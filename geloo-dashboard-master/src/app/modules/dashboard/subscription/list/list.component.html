@@ -1,13 +1,36 @@
-<div class="container-fluid">
-  <app-table
-    [headers]="headers"
-    [plurarName]="'subscriptions'"
-    [singleName]="'subscription'"
-    deleteURL="subscription/:id"
-    retrieveURL="subscription/all"
-    [displayLink]="getDisplayLink"
-    editLink="/dashboard/subscriptions/form/edit"
-    createLink="/dashboard/subscriptions/form/create"
-    icon="fas fa-money-check-alt"
-  ></app-table>
+<div class="p-6 bg-gray-50 min-h-screen">
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Subscription Management</h1>
+      <p class="text-gray-600">Manage plans and view subscriber data</p>
+    </div>
+    <div class="flex gap-3">
+      <a routerLink="/dashboard/subscriptions/rules" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 transition-colors flex items-center gap-2">
+        <i class="fas fa-gavel"></i> <span class="text-sm font-bold">Plan Rules</span>
+      </a>
+      <div class="flex bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <button (click)="exportSubscriptions('csv')" class="px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2 border-r border-gray-100">
+          <i class="fas fa-file-csv text-green-600"></i> <span class="text-xs font-bold">CSV</span>
+        </button>
+        <button (click)="exportSubscriptions('json')" class="px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2">
+          <i class="fas fa-file-code text-amber-600"></i> <span class="text-xs font-bold">JSON</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-2">
+    <app-table
+      [headers]="headers"
+      [plurarName]="'subscriptions'"
+      [singleName]="'subscription'"
+      deleteURL="subscription/:id"
+      retrieveURL="subscription/all"
+      [displayLink]="getDisplayLink"
+      editLink="/dashboard/subscriptions/form/edit"
+      createLink="/dashboard/subscriptions/form/create"
+      [hideHeader]="true"
+      icon="fas fa-money-check-alt"
+    ></app-table>
+  </div>
 </div>

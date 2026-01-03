@@ -2,6 +2,8 @@ import { Router } from '@angular/router';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
 import { AlertController, ModalController, PopoverController } from '@ionic/angular';
+import { PhotoViewerComponent } from 'src/app/components/photo-viewer/photo-viewer.component';
+import { ReportModalComponent } from 'src/app/components/report-modal/report-modal.component';
 import { User } from './../../../../models/User';
 import { Comment } from '../../../../models/Comment';
 import { Component, Input, OnInit, Output, EventEmitter, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
@@ -33,6 +35,9 @@ export class CommentComponent implements OnInit, OnChanges {
              ToastService, private router: Router, private popoverController: PopoverController, private modalCtrl: ModalController) { }
 
   ngOnInit() {
+    // Ensure comment exists to avoid template errors in tests
+    if (!this.comment) this.comment = {} as any;
+    if (!this.comment.user) this.comment.user = {} as any;
     this.updateMediaUrl();
   }
 
@@ -48,36 +53,48 @@ export class CommentComponent implements OnInit, OnChanges {
   }
 
   commentUserName(comment: Comment) {
+    if (this.isAdminComment()) return 'System';
     return comment.anonymName || `${comment.user.firstName} ${comment.user.lastName}`;
-}
+  }
+
+  isAdminComment(): boolean {
+    const role = (this.comment?.user?.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
+  }
   
 
   getMediaUrl(comment: Comment): string {
+    if (!comment || !comment.media) return '';
     if (comment.media && comment.media.url) {
       const baseUrl = 'http://127.0.0.1:3300/';
       const mediaUrl = baseUrl + comment.media.url.replace(/\\/g, '/');
-      console.log("Generated Media URL:", mediaUrl);  // Debugging output
-      return mediaUrl;  // Ensure URL uses forward slashes
+      console.log("Generated Media URL:", mediaUrl);
+      return mediaUrl;
     }
     return '';
-  }
-
-  toggleImageSize() {
-    this.isImageEnlarged = !this.isImageEnlarged;
   }
 
   // Function to calculate expiration progress
  // Function to calculate expiration progress
 // Function to calculate expiration progress
-getExpirationProgress(expiryDate: string): string {
+getExpirationProgress(expiryDate: any): string {
+  if (!expiryDate) return '';
   if (this.previousExpiryDate === expiryDate && this.cachedStrokeOffset) {
     return this.cachedStrokeOffset;
   }
 
-  const expiryTime = new Date(expiryDate).getTime();
+  const createdAt = this.comment?.createdAt;
+  if (!createdAt) return '';
+
+  const dateObj = new Date(expiryDate);
+  if (isNaN(dateObj.getTime())) return '';
+
+  const expiryTime = dateObj.getTime();
   const currentTime = Date.now();
-  const totalTime = expiryTime - new Date(this.comment.createdAt).getTime();
+  const totalTime = expiryTime - new Date(createdAt).getTime();
   const remainingTime = expiryTime - currentTime;
+
+  if (totalTime === 0) return '';
 
   const progressPercentage = Math.max((remainingTime / totalTime) * 100, 0);
   const circumference = 282;
@@ -90,8 +107,12 @@ getExpirationProgress(expiryDate: string): string {
 
 
 // Function to determine the color of the circle based on remaining time
-getCircleColor(expiryDate: string): string {
-  const expiryTime = new Date(expiryDate).getTime();
+getCircleColor(expiryDate: any): string {
+  if (!expiryDate) return 'blue';
+  const dateObj = new Date(expiryDate);
+  if (isNaN(dateObj.getTime())) return 'blue';
+
+  const expiryTime = dateObj.getTime();
   const currentTime = Date.now();
   const remainingTime = expiryTime - currentTime;
 
@@ -110,8 +131,12 @@ getCircleColor(expiryDate: string): string {
 }
 
 // Function to calculate the remaining time and format it as a string
-getTimeRemaining(expiryDate: string): string {
-  const expiryTime = new Date(expiryDate).getTime();
+getTimeRemaining(expiryDate: any): string {
+  if (!expiryDate) return '';
+  const dateObj = new Date(expiryDate);
+  if (isNaN(dateObj.getTime())) return '';
+
+  const expiryTime = dateObj.getTime();
   const currentTime = Date.now();
   const remainingTime = expiryTime - currentTime;
 
@@ -134,11 +159,11 @@ getTimeRemaining(expiryDate: string): string {
       (resp: any) => {
         this.deleteLoading = false;
         this.removeComment.emit();
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
       },
       err => {
         this.deleteLoading = false;
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     )
   }
@@ -172,13 +197,13 @@ getTimeRemaining(expiryDate: string): string {
         this.comment.votes = resp.data.votes;
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     )
   }
 
   showUserProfile(id: string){
-    if (!this.comment.anonyme && this.user.id !== id) {
+    if (id && !this.comment.anonyme && !this.isAdminComment()) {
       this.router.navigate(['/tabs/profile/display/' + id]);
       this.modalCtrl.dismiss();
     }
@@ -186,7 +211,9 @@ getTimeRemaining(expiryDate: string): string {
 
   async presentPopover(ev: any) {
     const popoverItems = [];
-    if (this.comment.user.id === this.user.id) {
+    // Use the backend-provided isOwner flag for definitive ownership check
+    const isOwner = this.comment.isOwner;
+    if (isOwner) {
       popoverItems.push(
         {
           text: 'Delete',
@@ -224,39 +251,51 @@ getTimeRemaining(expiryDate: string): string {
     }
   }
 
-  async reportComment(){
-    const alert = await this.alertCtrl.create({
-      header: 'Report Comment',
-      inputs: [
-        {
-          type: 'text',
-          name: 'message',
-          placeholder: 'Message'
-        }
-      ],
-      buttons: [
-        {
-          text: 'CANCEL',
-          role: 'cancel'
-        },
-        {
-          text: 'SEND',
-          cssClass: 'text-danger',
-          handler: (val) => {
-            const message = val.message;
-            this.channelService.reportComment(this.comment.id, message)
-            .then(
-              (resp: any) => {
-                this.toastService.presentStdToastr(resp.message);
-              },
-              err => {
-                this.toastService.presentStdToastr(err);
-              }
-            );
-          }
-        }
-      ]
+  async reportComment(evidence?: string){
+    const modal = await this.modalCtrl.create({
+      component: ReportModalComponent,
+      componentProps: {
+        targetName: evidence ? 'this image' : 'this comment'
+      },
+      cssClass: 'report-modal-class'
     });
-    await alert.present();
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      if (evidence) {
+        data.evidence = [evidence];
+        data.photoUrl = evidence;
+      }
+      this.channelService.reportComment(this.comment.id, data)
+      .then(
+        (resp: any) => {
+          this.toastService.presentSuccessToastr(resp.message || 'Report submitted successfully');
+        },
+        err => {
+          this.toastService.presentErrorToastr(err || 'Error reporting comment');
+        }
+      );
+    }
+  }
+
+  async toggleImageSize() {
+    if (this.mediaUrl) {
+      const modal = await this.modalCtrl.create({
+        component: PhotoViewerComponent,
+        componentProps: {
+          photos: [this.mediaUrl],
+          initialIndex: 0,
+          myProfile: false
+        }
+      });
+      await modal.present();
+
+      const { data } = await modal.onDidDismiss();
+      if (data && data.action === 'report') {
+        this.reportComment(this.mediaUrl);
+      }
+    }
   }
 }

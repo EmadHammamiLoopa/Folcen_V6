@@ -5,18 +5,21 @@ import { ToastService } from './../../../services/toast.service';
 import { ProductService } from './../../../services/product.service';
 import { UserService } from './../../../services/user.service'; // Import UserService
 import { Product } from './../../../models/Product';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AlertController, PopoverController, ModalController } from '@ionic/angular';
 import { DropDownComponent } from '../../drop-down/drop-down.component';
+import { ReportModalComponent } from 'src/app/components/report-modal/report-modal.component';
 import { BuyerDisclaimerComponent } from './buyer-disclaimer.component';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-product',
   templateUrl: './product.component.html',
   styleUrls: ['./product.component.scss'],
 })
-export class ProductComponent implements OnInit {
+export class ProductComponent implements OnInit, OnDestroy {
 
   pageLoading = false;
   product: Product;
@@ -27,6 +30,7 @@ export class ProductComponent implements OnInit {
   isSeller: boolean = false;
   isBuyer: boolean = false;
   poster: User; // Add poster variable
+  private destroy$ = new Subject<void>();
 
   constructor(
     private productService: ProductService, 
@@ -40,7 +44,22 @@ export class ProductComponent implements OnInit {
     private modalController: ModalController
   ) { }
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      if (user) {
+        this.user = user;
+        console.log('User updated in ProductComponent:', this.user);
+        if (this.productId) {
+          this.getProduct();
+        }
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   ionViewWillEnter() {
     this.getProductId();
@@ -49,46 +68,7 @@ export class ProductComponent implements OnInit {
   getProductId() {
     this.route.paramMap.subscribe(params => {
       this.productId = params.get('id');
-      this.getUserData();
     });
-  }
-
-  getUserData() {
-    (async () => {
-      try {
-        let u: any = null;
-        try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-        if (!u) {
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) { /* ignore */ }
-        }
-        if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
-        if (u) {
-          console.log('Fetched user data from NativeStorage:', u);
-          this.user = new User().initialize(u);
-          this.getProduct();
-        } else {
-          console.error('User data not found in NativeStorage');
-          this.fetchUserFromLocalStorage();
-        }
-      } catch (error) {
-        console.warn('Error fetching user data from NativeStorage:', error);
-        this.fetchUserFromLocalStorage();
-      }
-    })();
-  }
-
-  fetchUserFromLocalStorage() {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
-    if (user) {
-      console.log('Fetched user data from localStorage:', user);
-      this.user = new User().initialize(user);
-      this.getProduct();
-    } else {
-      console.error('User data not found in localStorage');
-      this.toastService.presentStdToastr('User data not found. Please log in again.');
-      this.router.navigateByUrl('/auth/signin'); // Redirect to login or handle appropriately
-    }
   }
 
   getProduct(event?) {
@@ -112,7 +92,7 @@ export class ProductComponent implements OnInit {
         this.pageLoading = false;
         console.log(err);
         if (event) event.target.complete();
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
@@ -148,12 +128,12 @@ export class ProductComponent implements OnInit {
     this.productService.remove(this.product.id).then(
       (resp: any) => {
         console.log(resp);
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
         this.router.navigateByUrl('/tabs/buy-and-sell/products/sell');
       },
       err => {
         console.log(err);
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
@@ -184,12 +164,12 @@ export class ProductComponent implements OnInit {
     this.pageLoading = true;
     this.productService.sold(this.product.id).then(
       (resp: any) => {
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
         this.product.sold = true;
         this.pageLoading = false;
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
         this.pageLoading = false;
       }
     );
@@ -221,38 +201,27 @@ export class ProductComponent implements OnInit {
   }
 
   async reportProduct() {
-    const alert = await this.alertCtrl.create({
-      header: 'Report ' + this.product.label,
-      inputs: [
-        {
-          type: 'text',
-          name: 'message',
-          placeholder: 'Message'
-        }
-      ],
-      buttons: [
-        {
-          text: 'CANCEL',
-          role: 'cancel'
-        },
-        {
-          text: 'SEND',
-          cssClass: 'text-danger',
-          handler: (val) => {
-            const message = val.message;
-            this.productService.report(this.product.id, message).then(
-              (resp: any) => {
-                this.toastService.presentStdToastr(resp.message);
-              },
-              err => {
-                this.toastService.presentStdToastr(err);
-              }
-            );
-          }
-        }
-      ]
+    const modal = await this.modalController.create({
+      component: ReportModalComponent,
+      componentProps: {
+        targetName: this.product.label
+      },
+      cssClass: 'report-modal-class'
     });
-    await alert.present();
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      this.productService.report(this.product.id, data).then(
+        (resp: any) => {
+          this.toastService.presentSuccessToastr(resp.message || 'Report submitted successfully');
+        },
+        err => {
+          this.toastService.presentErrorToastr(err || 'Error reporting product');
+        }
+      );
+    }
   }
 
   goToPosterProfile() {

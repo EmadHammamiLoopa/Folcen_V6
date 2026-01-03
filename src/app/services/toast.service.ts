@@ -9,9 +9,9 @@ export class ToastService {
 
   constructor(private toastCtrl: ToastController, private toast: Toast, private platform: Platform) { }
 
-  async presentErrorToastr(err: string, position: any = 'bottom') {
+  async presentErrorToastr(err: string, position: any = 'top') {
     if (this.platform.is('cordova')) {
-      this.toast.show(err, '2000', position).subscribe(
+      this.toast.show(err, '3000', position).subscribe(
         toast => {
           console.log(toast);
         },
@@ -21,10 +21,16 @@ export class ToastService {
       );
     } else {
       const toastr = await this.toastCtrl.create({
-        message: err,
+        message: '❌ ' + err,
         position,
         color: 'danger',
-        duration: 2000,
+        duration: 3000,
+        buttons: [
+          {
+            text: 'OK',
+            role: 'cancel'
+          }
+        ]
       });
 
       toastr.present();
@@ -35,9 +41,14 @@ export class ToastService {
     return this.presentStdToastr(msg);
   }
 
-  async presentStdToastr(msg: string) {
+  async presentStdToastr(msg: any, position: any = 'top') {
+    let displayMsg = msg;
+    if (msg && typeof msg !== 'string') {
+      displayMsg = msg.error?.message || msg.message || JSON.stringify(msg);
+    }
+
     if (this.platform.is('cordova')) {
-      this.toast.show(msg, '1500', 'bottom').subscribe(
+      this.toast.show(displayMsg, '2000', position).subscribe(
         toast => {
           console.log(toast);
         },
@@ -47,18 +58,19 @@ export class ToastService {
       );
     } else {
       const toastr = await this.toastCtrl.create({
-        message: msg,
-        position: 'bottom',
-        duration: 1500,
+        message: 'ℹ️ ' + displayMsg,
+        position: position,
+        duration: 2000,
+        color: 'dark',
       });
 
       toastr.present();
     }
   }
 
-  async presentSuccessToastr(success: string) {
+  async presentSuccessToastr(success: string, position: any = 'top') {
     if (this.platform.is('cordova')) {
-      this.toast.show(success, '2000', 'bottom').subscribe(
+      this.toast.show(success, '2500', position).subscribe(
         toast => {
           console.log(toast);
         },
@@ -68,10 +80,10 @@ export class ToastService {
       );
     } else {
       const toastr = await this.toastCtrl.create({
-        message: success,
-        position: 'bottom',
+        message: '✅ ' + success,
+        position: position,
         color: 'success',
-        duration: 2000,
+        duration: 2500,
       });
 
       toastr.present();

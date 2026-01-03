@@ -18,47 +18,79 @@ export class DataService {
 
   private header(): HttpHeaders {
     const token = window.localStorage.getItem('token');
-    return token ? new HttpHeaders({
-      Authorization: 'Bearer ' + token
-    }) : new HttpHeaders();
+    let headers = new HttpHeaders();
+    if (token) {
+      headers = headers.set('Authorization', 'Bearer ' + token);
+    }
+    return headers;
+  }
+
+  private getFullUrl(url: string, useApiPrefix: boolean): string {
+    if (!useApiPrefix) return url;
+    // Ensure no double slashes
+    const base = this.apiUrl.endsWith('/') ? this.apiUrl.slice(0, -1) : this.apiUrl;
+    const path = url.startsWith('/') ? url.slice(1) : url;
+    return `${base}/${path}`;
   }
 
   public sendGetRequest(url: string, params?: any, useApiPrefix: boolean = true): Observable<object> {
-    const fullUrl = useApiPrefix ? `${this.apiUrl}/${url}` : url;
+    const fullUrl = this.getFullUrl(url, useApiPrefix);
     console.log('[DataService] GET', fullUrl, 'params:', params);
     return this.http.get(fullUrl, { params, headers: this.header() }).pipe(
-      catchError(err => {
-        // Normalize network / ProgressEvent errors into a readable object
-        if (err instanceof ProgressEvent) {
-          console.error('[DataService] Network/ProgressEvent error', err);
-          return throwError({ message: 'Network error or CORS issue', detail: err });
-        }
-        // HttpErrorResponse or other
-        const msg = (err && err.error && err.error.message) || err.message || JSON.stringify(err);
-        console.error('[DataService] HTTP error', { url: fullUrl, status: err.status, message: msg, body: err.error || err });
-        return throwError({ message: msg, status: err.status, detail: err, url: fullUrl });
-      })
+      catchError(err => this.handleError(err, fullUrl))
     );
-}
-
-
+  }
 
   public sendPostRequest(url: string, data: any): Observable<object> {
-    return this.http.post(`${this.apiUrl}/${url}`, data, { headers: this.header() })
+    const fullUrl = this.getFullUrl(url, true);
+    return this.http.post(fullUrl, data, { headers: this.header() })
       .pipe(
-        catchError(error => {
-          console.error('Error occurred during POST request:', error);
-          return throwError(error);
-        })
+        catchError(err => this.handleError(err, fullUrl))
       );
   }
 
   public sendPutRequest(url: string, data: any): Observable<object> {
-    return this.http.put(`${this.apiUrl}/${url}`, data, { headers: this.header() });
+    const fullUrl = this.getFullUrl(url, true);
+    return this.http.put(fullUrl, data, { headers: this.header() })
+      .pipe(
+        catchError(err => this.handleError(err, fullUrl))
+      );
   }
 
   public sendDeleteRequest(url: string): Observable<object> {
-    return this.http.delete(`${this.apiUrl}/${url}`, { headers: this.header() });
+    const fullUrl = this.getFullUrl(url, true);
+    return this.http.delete(fullUrl, { headers: this.header() })
+      .pipe(
+        catchError(err => this.handleError(err, fullUrl))
+      );
+  }
+
+  private handleError(err: any, url: string): Observable<never> {
+    // Normalize network / ProgressEvent errors into a readable object
+    if (err instanceof ProgressEvent) {
+      console.error('[DataService] Network/ProgressEvent error', err);
+      return throwError({ message: 'Network error or CORS issue', detail: err, url });
+    }
+    
+    // HttpErrorResponse
+    const msg = (err && err.error && (err.error.message || err.error.errors)) || err.message || JSON.stringify(err);
+    const errorCode = err && err.error && err.error.errorCode;
+    
+    console.error('[DataService] HTTP error', { 
+      url, 
+      status: err.status, 
+      message: msg, 
+      errorCode,
+      body: err.error || err 
+    });
+
+    return throwError({ 
+      message: msg, 
+      status: err.status, 
+      errorCode,
+      detail: err, 
+      url 
+    });
   }
 
   public sendRequest(method: RequestMethod, url: string, data?: any): Observable<object> {

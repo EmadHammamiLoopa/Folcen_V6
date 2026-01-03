@@ -9,6 +9,7 @@ import { TermsOfServiceComponent } from '../../terms-of-service/terms-of-service
 import { PrivacyPolicyComponent } from '../../privacy-policy/privacy-policy.component';
 import { JsonService } from '../../../services/json.service';
 import { SchoolService } from '../../profile/form/school.service';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-signup',
@@ -17,7 +18,7 @@ import { SchoolService } from '../../profile/form/school.service';
 })
 export class SignupComponent implements OnInit {
 
-  gender = "male";
+  gender = "prefer not to say";
   step = 0;
   steps = ['email', 'name', 'password', 'birthDate', 'gender', 'location', 'school', 'education', 'profession', 'interests', 'languages', 'aboutMe', 'randomRequests', 'ageVisibility', 'success'];
   validationErrors: any = {};
@@ -43,7 +44,11 @@ export class SignupComponent implements OnInit {
   interests: string[] = [];
   languages: string[] = [
     'English', 'French', 'Spanish', 'German', 'Arabic', 'Chinese', 'Japanese', 
-    'Russian', 'Portuguese', 'Italian', 'Turkish', 'Hindi', 'Dutch'
+    'Russian', 'Portuguese', 'Italian', 'Turkish', 'Hindi', 'Dutch',
+    'Norwegian', 'Swedish', 'Danish', 'Finnish', 'Icelandic',
+    'Polish', 'Ukrainian', 'Romanian', 'Greek', 'Czech', 'Hungarian',
+    'Bulgarian', 'Slovak', 'Croatian', 'Lithuanian', 'Slovenian', 'Latvian', 'Estonian',
+    'Irish', 'Maltese', 'Korean', 'Vietnamese', 'Thai', 'Indonesian', 'Malay', 'Persian'
   ];
 
   constructor(
@@ -56,6 +61,7 @@ export class SignupComponent implements OnInit {
     private nativeStorage: NativeStorage,
     private jsonService: JsonService,
     private schoolService: SchoolService,
+    private toastService: ToastService,
   ) { }
 
   ionViewWillEnter() {
@@ -73,21 +79,27 @@ export class SignupComponent implements OnInit {
   initializeForm() {
     this.form = this.formBuilder.group({
       email: ['', [Validators.required, Validators.email, Validators.maxLength(50)]],
-      password: ['', [Validators.required, Validators.minLength(8)]],
+      password: ['', [
+        Validators.required, 
+        Validators.minLength(8),
+        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])/)
+      ]],
       password_confirmation: ['', [Validators.required, Validators.minLength(8)]],
       firstName: ['', [Validators.required, Validators.pattern('[a-zA-Z-_]+'), Validators.maxLength(40)]], // Correct initialization
       lastName: ['', [Validators.required, Validators.pattern('[a-zA-Z-_]+'), Validators.maxLength(40)]], // Correct initialization
       birthDate: ['', [Validators.required]],
       receiveRandomRequests: [false],
-      showAge: [false],
-      gender: ['', [Validators.required]],
+      showAge: [true],
+      genderVisible: [true],
+      gender: ['prefer not to say', [Validators.required]],
       studyCountry: [''],       
       school: [''],
       education: [''],
       profession: [''],
       interests: [''],
       languages: [''],
-      aboutMe: ['']
+      aboutMe: [''],
+      acceptedTerms: [false, [Validators.requiredTrue]]
     });
   }
   
@@ -138,11 +150,16 @@ export class SignupComponent implements OnInit {
   }
 
   async loadCountries() {
-    const countries = await this.jsonService.getCountries();
-    this.countriesObject = countries;
-    this.countries = Object.keys(this.countriesObject);
+    const data = await this.jsonService.getCountries();
+    // countries.json is an object { "Country": ["City1", "City2"] }
+    // JsonService.getJsonOnce wraps it in an array if it's not an array.
+    if (Array.isArray(data) && data.length === 1 && !Array.isArray(data[0]) && typeof data[0] === 'object') {
+      this.countriesObject = data[0];
+    } else {
+      this.countriesObject = data;
+    }
+    this.countries = Object.keys(this.countriesObject || {});
     this.studyCountries = this.countries;
-
   }
 
   async loadEducations() {
@@ -182,13 +199,15 @@ export class SignupComponent implements OnInit {
       gender: this.gender,
       birthDate: this.form.get('birthDate')?.value,
       receiveRandomRequests: this.form.get('receiveRandomRequests')?.value,
-      showAge: this.form.get('showAge')?.value,
+      ageVisible: this.form.get('showAge')?.value,
+      genderVisible: this.form.get('genderVisible')?.value,
       school: String(this.form.get('school')?.value || ''), // Ensure it's a string
       education: String(this.form.get('education')?.value || ''), // Ensure it's a string
       profession: String(this.form.get('profession')?.value || ''), // Ensure it's a string
       interests: this.selectedInterests.map(s => s.trim()).filter(Boolean),
       languages: this.selectedLanguages.map(s => s.trim()).filter(Boolean),
-      aboutMe: this.form.get('aboutMe')?.value
+      aboutMe: this.form.get('aboutMe')?.value,
+      acceptedTerms: this.form.get('acceptedTerms')?.value
     };
   }
   
@@ -254,7 +273,20 @@ export class SignupComponent implements OnInit {
         else this.validationErrors['email'] = ['this email is already exists'];
       }, err => {
         this.btnLoading = false;
-        if (err.errors) this.validationErrors = err.errors;
+        if (err && err.error && err.error.errors) {
+          this.validationErrors = err.error.errors;
+        } else if (err && err.errors) {
+          this.validationErrors = err.errors;
+        } else {
+          let message = 'An unexpected error occurred.';
+          if (err && err.error) {
+            if (typeof err.error === 'string') message = err.error;
+            else if (err.error.message) message = err.error.message;
+          } else if (err && err.message) {
+            message = err.message;
+          }
+          this.toastService.presentErrorToastr(message);
+        }
       });
   }
 
@@ -267,9 +299,21 @@ export class SignupComponent implements OnInit {
         this.step++;
       }, err => {
         this.pageLoading = false;
-        if (err.errors) {
+        if (err && err.error && err.error.errors) {
+          this.validationErrors = err.error.errors;
+          this.backToError();
+        } else if (err && err.errors) {
           this.validationErrors = err.errors;
           this.backToError();
+        } else {
+          let message = 'An unexpected error occurred.';
+          if (err && err.error) {
+            if (typeof err.error === 'string') message = err.error;
+            else if (err.error.message) message = err.error.message;
+          } else if (err && err.message) {
+            message = err.message;
+          }
+          this.toastService.presentErrorToastr(message);
         }
       });
   }
@@ -281,8 +325,11 @@ export class SignupComponent implements OnInit {
       return this.form.get('password')?.valid && this.form.get('password')?.value === this.form.get('password_confirmation')?.value;
     } else if (this.steps[this.step] == 'location') {
       return this.selectedCountry && this.selectedCity;
-    } else if (this.steps[this.step] == 'randomRequests' || this.steps[this.step] == 'ageVisibility') {
+    } else if (this.steps[this.step] == 'randomRequests') {
       return true;
+    } else if (this.steps[this.step] == 'ageVisibility') {
+      // Last step before success: require terms acceptance
+      return this.form.get('acceptedTerms')?.value === true;
     } else if (this.steps[this.step] != 'gender') {
       return this.form.get(this.steps[this.step])?.valid;
     }

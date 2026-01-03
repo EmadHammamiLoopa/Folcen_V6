@@ -1,26 +1,24 @@
 .avatar{
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
 }
 td{
   vertical-align: middle;
 }
 .disabled{
-  cursor: none;
-  @apply text-gray-300 border-gray-300 hover:bg-transparent;
-}
-.active{
-  @apply bg-indigo-50 border-indigo-500 text-indigo-600
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 /* Adjust the pagination container to enable scrolling if necessary */
 nav[aria-label="Pagination"] {
   display: flex;
-  flex-wrap: wrap; /* Allows wrapping of pagination buttons */
-  justify-content: center; /* Centers the pagination */
-  overflow-x: auto; /* Enable horizontal scrolling if too many pages */
-  max-width: 100%; /* Prevent the pagination from extending beyond the container */
-  white-space: nowrap; /* Prevent the pagination from wrapping unnecessarily */
+  flex-wrap: wrap;
+  justify-content: center;
+  overflow-x: auto;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 /* Styling for the pagination buttons */

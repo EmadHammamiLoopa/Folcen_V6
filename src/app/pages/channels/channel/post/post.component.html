@@ -1,10 +1,10 @@
 <ion-card class="jodel-card" [style]="{'--post-bg': post.backgroundColor, '--post-fg': post.color}">
   <!-- header -->
   <div class="jdl-h">
-    <div class="jdl-user" [style]="{'color':'var(--post-fg)'}" (click)="showUserProfile(post.user.id)">
-      <div class="avatar-mini">
+    <div class="jdl-user" [style]="{'color':'var(--post-fg)'}" (click)="showUserProfile(post.user.id)" [style.cursor]="(post.anonyme || isAdminPost()) ? 'default' : 'pointer'">
+      <div class="avatar-mini" [class.anonyme]="post.anonyme">
         <i *ngIf="post.anonyme" class="fas fa-user-secret"></i>
-        <i *ngIf="!post.anonyme" class="fas fa-user"></i>
+        <app-avatar *ngIf="!post.anonyme" [profile]="post.user" [size]="40" shape="rounded"></app-avatar>
       </div>
       <div class="user-info">
         <span class="name">{{ postUserName(post) }}</span>
@@ -15,7 +15,7 @@
     </div>
 
     <div class="jdl-h-actions">
-      <ng-container *ngIf="post.user.id === user.id">
+      <ng-container *ngIf="post.isOwner">
         <div class="rel">
           <ion-button class="icon-btn" fill="clear" size="small" (click)="toggleVisibilityOptions($event)">
             <ion-icon name="eye-outline"></ion-icon>
@@ -26,10 +26,10 @@
                 <ion-icon name="earth" slot="start"></ion-icon><ion-label>Public</ion-label>
               </ion-item>
               <ion-item button (click)="changeVisibility('friends-only')">
-                <ion-icon name="people" slot="start"></ion-icon><ion-label>Friends</ion-label>
+                <ion-icon name="people" slot="start"></ion-icon><ion-label>Friends Only</ion-label>
               </ion-item>
               <ion-item button (click)="changeVisibility('private')">
-                <ion-icon name="lock-closed" slot="start"></ion-icon><ion-label>Only me</ion-label>
+                <ion-icon name="lock-closed" slot="start"></ion-icon><ion-label>Private</ion-label>
               </ion-item>
             </ion-list>
           </div>
@@ -43,51 +43,120 @@
   </div>
 
   <!-- text -->
-  <div class="jdl-text" [style]="{'color':'var(--post-fg)'}">{{ post.text }}</div>
+  <div class="jdl-text" [style]="{'color':'var(--post-fg)'}" (click)="showComments()">
+    <ng-container *ngIf="showCommentsBtn">
+      {{ post.text | slice:0:150 }}{{ post.text.length > 150 ? '...' : '' }}
+      <span *ngIf="post.text.length > 150" class="see-more">See More</span>
+    </ng-container>
+    <ng-container *ngIf="!showCommentsBtn">
+      {{ post.text }}
+    </ng-container>
+  </div>
 
   <!-- meta (events / dating) -->
-  <div *ngIf="channel.type === 'static_events'" class="jdl-meta">
-    <div>
-      <strong><i class="far fa-calendar-alt"></i> Date</strong>
-      {{ post.eventDate | date:'dd MMM yyyy' }}
-    </div>
-    <div>
-      <strong><i class="fas fa-map-marker-alt"></i> Location</strong>
-      {{ post.eventLocation }}
-    </div>
-    <div>
-      <strong><i class="far fa-clock"></i> Time</strong>
-      {{ post.eventTime | date:'shortTime' }}
-    </div>
+  <div *ngIf="channel.type === 'static_events'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
+    <ng-container *ngIf="showCommentsBtn">
+      <div class="meta-chip">
+        <i class="far fa-calendar-alt"></i>
+        {{ post.eventDate | date:'dd MMM' }}
+      </div>
+      <div class="meta-chip">
+        <i class="fas fa-map-marker-alt"></i>
+        {{ post.eventLocation | slice:0:15 }}
+      </div>
+      <div class="meta-chip">
+        <i class="far fa-clock"></i>
+        {{ post.eventTime | date:'HH:mm' }}
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="!showCommentsBtn">
+      <div>
+        <strong><i class="far fa-calendar-alt"></i> Date</strong>
+        {{ post.eventDate | date:'dd MMM yyyy' }}
+      </div>
+      <div>
+        <strong><i class="fas fa-map-marker-alt"></i> Location</strong>
+        {{ post.eventLocation }}
+      </div>
+      <div>
+        <strong><i class="far fa-clock"></i> Time</strong>
+        {{ post.eventTime | date:'shortTime' }}
+      </div>
+    </ng-container>
   </div>
 
-  <div *ngIf="channel.type === 'static_dating'" class="jdl-meta">
-    <div><strong><i class="fas fa-heart"></i> Goals</strong> {{ post.relationshipGoals }}</div>
-    <div><strong><i class="fas fa-birthday-cake"></i> Age</strong> {{ post.ageRange.min }}–{{ post.ageRange.max }}</div>
-    <div class="full-width"><strong><i class="fas fa-star"></i> Interests</strong> {{ post.interests.join(', ') }}</div>
+  <div *ngIf="channel.type === 'static_dating'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
+    <ng-container *ngIf="showCommentsBtn">
+      <div class="meta-chip" *ngIf="post.relationshipGoals?.length">
+        <i class="fas fa-heart"></i>
+        {{ post.relationshipGoals[0] }}
+      </div>
+      <div class="meta-chip">
+        <i class="fas fa-birthday-cake"></i>
+        {{ post.ageRange.min }}–{{ post.ageRange.max }}
+      </div>
+      <div class="meta-chip" *ngIf="post.interests?.length">
+        <i class="fas fa-star"></i>
+        {{ post.interests[0] }}
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="!showCommentsBtn">
+      <div><strong><i class="fas fa-heart"></i> Goals</strong> {{ post.relationshipGoals.join(', ') }}</div>
+      <div><strong><i class="fas fa-birthday-cake"></i> Age</strong> {{ post.ageRange.min }}–{{ post.ageRange.max }}</div>
+      <div class="full-width"><strong><i class="fas fa-star"></i> Interests</strong> {{ post.interests.join(', ') }}</div>
+    </ng-container>
   </div>
+
+  <!-- hint (dating only) -->
+  <ng-container *ngIf="channel.type === 'static_dating' && post.hintAboutMe">
+    <div *ngIf="showCommentsBtn" class="jdl-hint-teaser" (click)="showComments()">
+      <i class="fas fa-quote-left"></i>
+      <span>{{ post.hintAboutMe | slice:0:60 }}{{ post.hintAboutMe.length > 60 ? '...' : '' }}</span>
+    </div>
+    <div *ngIf="!showCommentsBtn" class="hint-box full-width-hint">
+      <strong><i class="fas fa-quote-left"></i> Hint about me</strong>
+      <p>{{ post.hintAboutMe }}</p>
+    </div>
+  </ng-container>
 
   <!-- media -->
-  <div *ngIf="mediaUrl" class="jdl-media" (click)="toggleImageSize()">
-    <div class="media-container">
-      <img *ngIf="post.media?.url?.endsWith('.jpg') || post.media?.url?.endsWith('.webp') || post.media?.url?.endsWith('.png')"
-           [src]="mediaUrl" alt="media" />
-      
-      <video *ngIf="post.media?.url?.endsWith('.mp4') || post.media?.url?.endsWith('.webm')"
-             [src]="mediaUrl" controls playsinline (click)="$event.stopPropagation()"></video>
-      
-      <div class="media-overlay"></div>
+  <div *ngIf="mediaUrl || (isMediaExpired && !showCommentsBtn)" class="jdl-media" (click)="handleMediaClick()">
+    <div class="media-container" [class.enlarged-container]="isImageEnlarged && !showCommentsBtn">
+      <ng-container *ngIf="!isMediaExpired">
+        <img *ngIf="post.media?.url?.endsWith('.jpg') || post.media?.url?.endsWith('.webp') || post.media?.url?.endsWith('.png')"
+             [src]="mediaUrl" alt="media" [class.enlarged]="isImageEnlarged && !showCommentsBtn" />
+        
+        <video *ngIf="post.media?.url?.endsWith('.mp4') || post.media?.url?.endsWith('.webm')"
+               [src]="mediaUrl" controls playsinline (click)="$event.stopPropagation()"></video>
+        
+        <div class="media-overlay" *ngIf="showCommentsBtn">
+          <div class="expand-hint">
+            <ion-icon name="expand-outline"></ion-icon>
+            <span>Tap to view full</span>
+          </div>
+        </div>
+      </ng-container>
+
+      <div *ngIf="isMediaExpired" class="expired-placeholder">
+        <div class="expired-content">
+          <i class="fas fa-history"></i>
+          <span>Media Expired</span>
+          <p>This temporary media is no longer available</p>
+        </div>
+      </div>
     </div>
 
-    <div *ngIf="post.media?.expiryDate && getTimeRemaining(post.media.expiryDate.toISOString()) !== ''"
-         class="expiry-badge" [ngClass]="{'pulse-warning': getCircleColor(post.media.expiryDate.toISOString()) === 'red'}">
+    <div *ngIf="post.media?.expiryDate && !isMediaExpired && getTimeRemaining(post.media.expiryDate) !== ''"
+         class="expiry-badge" [ngClass]="{'pulse-warning': getCircleColor(post.media.expiryDate) === 'red'}">
       <div class="progress-ring">
         <svg width="20" height="20">
           <circle class="bg" cx="10" cy="10" r="8"></circle>
-          <circle class="fg" cx="10" cy="10" r="8" [style]="getExpirationProgress(post.media.expiryDate.toISOString())" [attr.stroke]="getCircleColor(post.media.expiryDate.toISOString())"></circle>
+          <circle class="fg" cx="10" cy="10" r="8" [style]="getExpirationProgress(post.media.expiryDate)" [attr.stroke]="getCircleColor(post.media.expiryDate)"></circle>
         </svg>
       </div>
-      <span class="time-text">{{ getTimeRemaining(post.media.expiryDate.toISOString()) }}</span>
+      <span class="time-text">{{ getTimeRemaining(post.media.expiryDate) }}</span>
     </div>
   </div>
 

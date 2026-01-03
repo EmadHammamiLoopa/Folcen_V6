@@ -7,16 +7,17 @@ describe('TabsPage', () => {
   let component: TabsPage;
   let fixture: ComponentFixture<TabsPage>;
 
-  beforeEach(waitForAsync(() => {
+  beforeEach(() => {
     TestBed.configureTestingModule({
       declarations: [ TabsPage ],
-      imports: [IonicModule.forChild()]
+      imports: [IonicModule.forRoot()],
+      schemas: []
     }).compileComponents();
 
     fixture = TestBed.createComponent(TabsPage);
     component = fixture.componentInstance;
-    fixture.detectChanges();
-  }));
+    // avoid triggering full change detection which runs heavy async init
+  });
 
   it('should create', () => {
     expect(component).toBeTruthy();

@@ -10,14 +10,15 @@
   <div class="mesh-gradient"></div>
 
   <div class="discovery-container">
+    <app-sandglass-loader [visible]="showSandglass" message="Please wait"></app-sandglass-loader>
+    <app-sandglass-loader [visible]="pageLoading" message="Finding new friends..."></app-sandglass-loader>
+    
     <div class="mode-toggle-card glass-card animate__animated animate__fadeInDown">
       <ion-item lines="none" class="mode-toggle">
         <ion-label class="toggle-label">Random Discovery</ion-label>
         <ion-toggle [(ngModel)]="random" (ionChange)="toggleRandom()"></ion-toggle>
       </ion-item>
     </div>
-
-    <app-loader *ngIf="pageLoading" class="animated-loader"></app-loader>
 
     <ion-refresher *ngIf="!random" slot="fixed" pullFactor="0.5" pullMin="100" pullMax="200" (ionRefresh)="getNearUsers($event, true)">
       <ion-refresher-content pullingIcon="lines" refreshingSpinner="crescent"></ion-refresher-content>
@@ -47,14 +48,15 @@
             <div class="user-card-wrapper animate__animated animate__fadeInUp" 
                  [style.animation-delay]="(i * 0.05) + 's'"
                  *ngIf="isUser(user)">
-              <div class="user-card glass-card" (click)="showProfile(user.id)">
+              <div class="user-card glass-card" (click)="!isAdmin(user) && showProfile(user._id || user.id)" [style.cursor]="isAdmin(user) ? 'default' : 'pointer'">
                 <div class="photo-container">
-                  <img [src]="user.mainAvatar || user.avatar[0]" alt="Avatar">
-                  <div class="status-dot" [class.online]="user.online"></div>
+                  <app-avatar [profile]="user" [size]="140" shape="rounded" class="grid-avatar"></app-avatar>
+                  <div class="status-dot" [class.online]="user.online && !isAdmin(user)"></div>
                 </div>
                 <div class="user-info">
-                  <h3 class="user-name">{{ user.firstName | resumeText: 12 }}</h3>
-                  <p class="user-age" *ngIf="user.getAge(true)">{{ user.getAge(true) }} yrs</p>
+                  <h3 class="user-name">{{ isAdmin(user) ? 'System' : (user.firstName | resumeText: 12) }}</h3>
+                  <p class="user-age" *ngIf="!isAdmin(user) && user.getAge(false)">{{ user.getAge(false) }} yrs</p>
+                  <p class="user-age" *ngIf="isAdmin(user)">Official Account</p>
                 </div>
               </div>
             </div>

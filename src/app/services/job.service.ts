@@ -66,11 +66,11 @@ export class JobService extends DataService {
     });
   }
 
-  report(id: string, message: string) {
+  report(id: string, reportData: any) {
     return this.sendRequest({
       method: 'post',
       url: '/' + id + '/report', // Assuming 'job/:id/report' is the endpoint
-      data: { message }
+      data: reportData
     });
   }
 }

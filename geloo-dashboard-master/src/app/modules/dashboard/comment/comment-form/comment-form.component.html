@@ -1,1 +1,12 @@
-<p>comment-form works!</p>
+<div class="container-fluid">
+  <app-form
+    [headers]="headers"
+    plurarName="comments"
+    singleName="comment"
+    storeURL="comment"
+    updateURL="comment/:id"
+    retrieveURL="comment/dash/edit/:id"
+    redirectLink="/dashboard/Comments/list"
+    icon="fas fa-comments"
+  ></app-form>
+</div>

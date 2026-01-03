@@ -58,14 +58,14 @@ ion-chip.selected{
   }
 
   &.shrunk {
-    margin-top: -20px; /* Move it up */
-    margin-bottom: 10px;
-    transform: scale(0.5); /* Shrink the whole container */
-    opacity: 0.8;
+    margin-top: -10px;
+    margin-bottom: 15px;
+    transform: scale(0.8); /* Increased from 0.5 to keep it visible */
+    opacity: 1;
 
     @media (max-height: 667px) {
-      margin-top: -30px;
-      margin-bottom: 0;
+      margin-top: -20px;
+      margin-bottom: 5px;
     }
 
     .logo-text {
@@ -86,11 +86,11 @@ ion-chip.selected{
   }
 }
 
-/* Infinity symbol dimensions with subtle scaling animation */
-.infinity {
-  width: 180px;
+/* Infinity logo dimensions with subtle scaling animation */
+.infinity-logo {
+  width: 140px;
   max-width: 50vw;
-  height: 90px;
+  height: auto;
   animation: pulse 4s infinite ease-in-out;
 }
 
@@ -103,7 +103,28 @@ ion-chip.selected{
     letter-spacing: -0.5px;
   }
 }
-.placeholder { opacity: .6; }
+.text-danger {
+  color: #ff4d4d !important;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+
+  &::before {
+    content: '⚠️';
+    margin-right: 6px;
+    font-size: 12px;
+  }
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
 
 /* Outer infinity path with gradient effect */
 .infinity-path {
@@ -216,22 +237,62 @@ ion-progress-bar {
 
 .gender-container {
   display: flex;
-  justify-content: space-around;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
   margin-top: 1rem;
   
   ion-chip {
-    flex: 1;
-    margin: 0 8px;
+    margin: 0;
     height: 60px;
+    min-width: 100px;
+    padding: 0 20px;
     border-radius: 16px;
     border: 2px solid var(--loopa-tabbar-border);
     background: var(--ion-item-background);
     transition: all 0.3s ease;
     
+    ion-label {
+      font-size: 16px;
+      font-weight: 600;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.2;
+    }
+    
     &.selected {
       border-color: var(--ion-color-primary);
       background: rgba(var(--ion-color-primary-rgb), 0.1);
       color: var(--ion-color-primary);
+    }
+  }
+}
+
+.terms-acceptance-container {
+  margin-bottom: 16px;
+  
+  .checkbox-item {
+    --background: transparent;
+    --padding-start: 0;
+    --inner-padding-end: 0;
+    
+    ion-checkbox {
+      --size: 20px;
+      --border-radius: 6px;
+      --border-width: 2px;
+      margin-right: 12px;
+    }
+    
+    ion-label {
+      font-size: 13px;
+      color: var(--loopa-text-muted);
+      margin: 0;
+      
+      .link {
+        color: var(--ion-color-primary);
+        font-weight: 600;
+        text-decoration: none;
+      }
     }
   }
 }

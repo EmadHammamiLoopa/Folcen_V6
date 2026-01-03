@@ -75,7 +75,7 @@ export class PaymentComponent implements OnInit {
         this.pageLoading = false;
       },
       err => {
-        this.toastService.presentStdToastr(err)
+        this.toastService.presentErrorToastr(err)
         this.pageLoading = false;
       }
     )
@@ -109,14 +109,14 @@ export class PaymentComponent implements OnInit {
     .then(
       (resp: any) => {
         this.pageLoading = false;
-    this.toastService.presentStdToastr(resp.message);
-    const user = new User().initialize(resp.data)
-    try { this.userService.setCurrentUser(user.toObject ? user.toObject() : user); } catch(e) {}
+        this.toastService.presentSuccessToastr(resp.message);
+        // Centralized update
+        this.userService.setCurrentUser(resp.data);
         this.success = true;
       },
       err => {
         this.pageLoading = false;
-        this.toastService.presentStdToastr(err)
+        this.toastService.presentErrorToastr(err)
       }
     )
   }
@@ -131,12 +131,12 @@ export class PaymentComponent implements OnInit {
           },
           err => {
             this.pageLoading = false;
-            this.toastService.presentStdToastr(err)
+            this.toastService.presentErrorToastr(err)
           }
         )
       }, err => {
         this.pageLoading = false;
-        this.toastService.presentStdToastr(err)
+        this.toastService.presentErrorToastr(err)
       }
     )
   }

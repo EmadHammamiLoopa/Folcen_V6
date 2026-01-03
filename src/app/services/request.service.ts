@@ -10,6 +10,8 @@ import { HttpClient } from '@angular/common/http';
 })
 export class RequestService extends DataService {
 
+  private inflightRequests = new Map<string, Promise<any>>();
+
   constructor(nativeStorage: NativeStorage, http: HTTP, httpClient: HttpClient, router: Router, platform: Platform) {
     super('request', nativeStorage, http, httpClient, router, platform);
   }
@@ -22,17 +24,36 @@ export class RequestService extends DataService {
   }
 
   async requests(page: number) {
-    const token = await this.getToken();
-    if (!token) {
-      console.warn("No token found, skipping request."); // ✅ Prevents request if user isn't logged in
-      return Promise.resolve(null);
+    const key = String(page ?? 0);
+    if (this.inflightRequests.has(key)) {
+      return this.inflightRequests.get(key);
     }
-  
-    return this.sendRequest({
-      method: 'get',
-      url: '/requests',
-      params: { page: page.toString() },
-    });
+
+    const promise = (async () => {
+      const token = await this.getToken();
+      if (!token) {
+        console.warn("No token found, skipping request."); // ✅ Prevents request if user isn't logged in
+        return null;
+      }
+
+      return this.sendRequest({
+        method: 'get',
+        url: '/requests',
+        params: { page: page.toString() },
+      });
+    })();
+
+    this.inflightRequests.set(key, promise);
+
+    try {
+      return await promise;
+    } finally {
+      this.inflightRequests.delete(key);
+    }
+  }
+
+  invalidateRequestsCache() {
+    this.inflightRequests.clear();
   }
 
   acceptRequest(id: string) {

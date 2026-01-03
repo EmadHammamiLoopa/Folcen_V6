@@ -1,9 +1,12 @@
-<app-header title="New Channel" [back]="true"></app-header>
+<app-header title="Launch Your Channel" [back]="true"></app-header>
 
 <ion-content class="pro-form-content">
   <app-loader *ngIf="pageLoading"></app-loader>
   
   <div *ngIf="!pageLoading" class="pro-container">
+    <div class="form-header-creative">
+    </div>
+
     <!-- Professional Image Header -->
     <div (click)="pickImage()" class="image-header" [class.has-img]="channelImage.url">
       <div *ngIf="!channelImage.url" class="upload-state">
@@ -29,12 +32,21 @@
           </div>
         </div>
 
-        <div class="field-box">
-          <span class="field-label">Category</span>
-          <ion-input formControlName="category" placeholder="e.g. Technology"></ion-input>
+        <div class="field-box select-field">
+          <div class="field-header">
+            <span class="field-label">Category</span>
+          </div>
+          <ion-select formControlName="category" (ionChange)="onCategoryChange($event)" interface="action-sheet" placeholder="Choose a category" class="custom-select">
+            <ion-select-option *ngFor="let cat of categories" [value]="cat">{{cat}}</ion-select-option>
+          </ion-select>
           <div class="error-msg" *ngIf="validatorErrors['category'] || (category.dirty && category.errors)">
             <span *ngIf="category.hasError('required')">Required</span>
           </div>
+        </div>
+
+        <div class="field-box animate__animated animate__fadeIn" *ngIf="showOtherCategory">
+          <span class="field-label">Specify Category</span>
+          <ion-input formControlName="otherCategory" placeholder="Enter your category"></ion-input>
         </div>
 
         <div class="field-box">

@@ -285,6 +285,20 @@
     font-size: 0.9rem;
     box-shadow: 0 8px 16px rgba(99, 102, 241, 0.2);
   }
+
+  /* Reuse vibrant button style used across other lists (services/jobs) */
+  .vibrant-btn {
+    margin-top: 24px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    border: none;
+    padding: 14px 32px;
+    border-radius: 14px;
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+    cursor: pointer;
+  }
 }
 
 // FAB Button

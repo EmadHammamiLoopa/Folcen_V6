@@ -1,0 +1,10 @@
+[
+  { "name": "Kabul University", "country": "Afghanistan", "alpha_two_code": "AF" },
+  { "name": "Herat University", "country": "Afghanistan", "alpha_two_code": "AF" },
+  { "name": "University of Tirana", "country": "Albania", "alpha_two_code": "AL" },
+  { "name": "University of Elbasan", "country": "Albania", "alpha_two_code": "AL" },
+  { "name": "University of Algiers", "country": "Algeria", "alpha_two_code": "DZ" },
+  { "name": "University of Oran", "country": "Algeria", "alpha_two_code": "DZ" },
+  { "name": "University of Buenos Aires", "country": "Argentina", "alpha_two_code": "AR" },
+  { "name": "University of Cordoba", "country": "Argentina", "alpha_two_code": "AR" }
+]

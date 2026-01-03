@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Resolve, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { Observable } from 'rxjs';
-import { SubscriptionService } from './subscription.service';  // Import your subscription service
+import { SubscriptionService } from '../modules/dashboard/subscription/subscription.service';  // Import your subscription service
 
 @Injectable({
   providedIn: 'root'

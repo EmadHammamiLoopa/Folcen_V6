@@ -7,6 +7,8 @@ import { SubscriptionComponent } from './subscription.component';
 import { ListComponent } from './list/list.component';
 import { SubscriptionFormComponent } from './subscription-form/subscription-form.component';
 import { SubscriptionDisplayComponent } from './display-subscription/Subscription-DisplayComponent';
+import { PlanRuleListComponent } from './plan-rule-list/plan-rule-list.component';
+import { PlanRuleFormComponent } from './plan-rule-form/plan-rule-form.component';
 
 
 @NgModule({
@@ -14,7 +16,9 @@ import { SubscriptionDisplayComponent } from './display-subscription/Subscriptio
     SubscriptionComponent,
     ListComponent,
     SubscriptionFormComponent,
-    SubscriptionDisplayComponent
+    SubscriptionDisplayComponent,
+    PlanRuleListComponent,
+    PlanRuleFormComponent
   ],
   imports: [
     CommonModule,

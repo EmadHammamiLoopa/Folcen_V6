@@ -5,6 +5,7 @@ import { SocketService } from 'src/app/services/socket.service';
 import { ToastService } from 'src/app/services/toast.service';
 import { Service } from 'src/app/models/Service';
 import { User } from 'src/app/models/User';
+import { MessageService } from 'src/app/services/message.service';
 
 @Component({
   selector: 'app-share-friends-modal',
@@ -86,16 +87,16 @@ import { User } from 'src/app/models/User';
       display: flex;
       align-items: center;
       gap: 12px;
+    }
 
-      i { color: #818cf8; }
-      input {
-        background: transparent;
-        border: none;
-        color: var(--ion-text-color);
-        width: 100%;
-        outline: none;
-        font-size: 0.9rem;
-      }
+    .search-bar i { color: #818cf8; }
+    .search-bar input {
+      background: transparent;
+      border: none;
+      color: var(--ion-text-color);
+      width: 100%;
+      outline: none;
+      font-size: 0.9rem;
     }
 
     .friends-list {
@@ -113,49 +114,49 @@ import { User } from 'src/app/models/User';
       align-items: center;
       gap: 15px;
       transition: all 0.2s ease;
+    }
 
-      &:active {
-        background: rgba(255, 255, 255, 0.08);
-        transform: scale(0.98);
-      }
+    .friend-item:active {
+      background: rgba(255, 255, 255, 0.08);
+      transform: scale(0.98);
+    }
 
-      .avatar {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
-        overflow: hidden;
-        img { width: 100%; height: 100%; object-fit: cover; }
-      }
+    .friend-item .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .friend-item .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-      .info {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        .name { color: #f8fafc; font-weight: 600; font-size: 0.95rem; }
-        .status { 
-          font-size: 0.75rem; color: #94a3b8; 
-          &.online { color: #10b981; }
-        }
-      }
+    .friend-item .info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .friend-item .info .name { color: #f8fafc; font-weight: 600; font-size: 0.95rem; }
+    .friend-item .info .status { 
+      font-size: 0.75rem; color: #94a3b8; 
+    }
+    .friend-item .info .status.online { color: #10b981; }
 
-      .share-icon {
-        width: 36px;
-        height: 36px;
-        background: rgba(99, 102, 241, 0.1);
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #818cf8;
-      }
+    .friend-item .share-icon {
+      width: 36px;
+      height: 36px;
+      background: rgba(99, 102, 241, 0.1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #818cf8;
     }
 
     .empty-state {
       text-align: center;
       padding: 40px 20px;
       color: #64748b;
-      i { font-size: 3rem; margin-bottom: 15px; opacity: 0.3; }
     }
+    .empty-state i { font-size: 3rem; margin-bottom: 15px; opacity: 0.3; }
   `]
 })
 export class ShareFriendsModalComponent implements OnInit {
@@ -169,7 +170,8 @@ export class ShareFriendsModalComponent implements OnInit {
   constructor(
     private modalCtrl: ModalController,
     private userService: UserService,
-    private toastService: ToastService
+    private toastService: ToastService,
+    private messageService: MessageService
   ) {}
 
   ngOnInit() {
@@ -184,7 +186,7 @@ export class ShareFriendsModalComponent implements OnInit {
       },
       err => {
         this.loading = false;
-        this.toastService.presentStdToastr('Failed to load friends');
+        this.toastService.presentErrorToastr('Failed to load friends');
       }
     );
   }
@@ -211,10 +213,14 @@ export class ShareFriendsModalComponent implements OnInit {
     try {
       await SocketService.initializeSocket();
       SocketService.emit('send-message', payload);
-      this.toastService.presentStdToastr(`Shared with ${friend.fullName}`);
+      
+      // ✅ Clear REST cache for this thread so the recipient sees the shared message immediately
+      this.messageService.clearCacheForThread(friend._id);
+
+      this.toastService.presentSuccessToastr(`Shared with ${friend.fullName}`);
       this.dismiss();
     } catch (error) {
-      this.toastService.presentStdToastr('Failed to share message');
+      this.toastService.presentErrorToastr('Failed to share message');
     }
   }
 

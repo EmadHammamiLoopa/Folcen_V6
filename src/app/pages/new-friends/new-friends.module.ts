@@ -2,6 +2,7 @@ import { UserService } from './../../services/user.service';
 import { HTTP } from '@ionic-native/http/ngx';import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { SlideComponent } from './slide/slide.component';
 import { SharingModule } from './../sharing/sharing.module';
+import { SharedComponentsModule } from '../../components/shared.module';
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -21,7 +22,8 @@ import { SharingPipeModule } from 'src/app/pipes/sharing/sharing-pipe.module';
     IonicModule,
     NewFriendsPageRoutingModule,
     SharingModule,
-    SharingPipeModule
+    SharingPipeModule,
+    SharedComponentsModule
   ],
   declarations: [
     NewFriendsPage,

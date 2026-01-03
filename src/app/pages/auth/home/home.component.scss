@@ -1,12 +1,6 @@
 .background {
-  --background: linear-gradient(
-    rgba(52, 235, 215, 1), /* Turquoise */
-    rgba(52, 144, 242, 1) 50%, /* Blue */
-    #000
-  ) !important;
+  --background: radial-gradient(circle at top, #1e293b 0%, #020617 100%) !important;
 }
-
-
 
 .desc{
   font-size: 22px;
@@ -16,14 +10,53 @@
   padding: 0px;
   margin-top: 50%;
 }
-ion-footer{
-  background-color: #000;
+ion-footer {
+  background-color: transparent;
   color: #fff;
+  padding-bottom: 30px;
+  text-align: center;
+
+  h4 {
+    font-weight: 800;
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  span {
+    color: #94a3b8;
+    font-size: 14px;
+  }
+
+  ion-button {
+    --border-radius: 12px;
+    height: 56px;
+    font-weight: 700;
+    font-size: 18px;
+    margin-top: 24px;
+    text-transform: none;
+    
+    &[color="primary"] {
+      --background: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+      --box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+
+    &.signup-btn {
+      --background: rgba(255, 255, 255, 0.15);
+      --color: #ffffff;
+      --border-color: #ffffff;
+      --border-width: 2px;
+      --border-style: solid;
+      margin-top: 12px;
+      font-weight: 700;
+      --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+    }
+  }
 }
 
 .logo-img {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
 }
 
@@ -31,20 +64,13 @@ ion-footer{
   text-align: center;
 }
 
-/* Infinity symbol dimensions with subtle scaling animation */
-.infinity {
-  width: 370px;
-  height: 170px;
-  margin-top: 20%;
+/* Infinity logo dimensions with subtle scaling animation */
+.infinity-logo {
+  width: 220px;
+  height: auto;
+  margin-top: 15%;
   animation: pulse 5s infinite ease-in-out;
-}
-
-/* Outer infinity path with gradient effect */
-.infinity-path {
-  stroke: url(#gradient);
-  stroke-width: 12;
-  fill: transparent;
-  stroke-linecap: round;
+  filter: drop-shadow(0 0 20px rgba(52, 144, 242, 0.3));
 }
 
 /* Ensure the border is always visible */
@@ -62,12 +88,12 @@ ion-footer{
 
 /* Text below the infinity symbol with fade-in animation */
 .logo-text {
-  margin-top: 30px;
-  font-size: 50px;
-  font-weight: bold;
+  margin-top: 20px;
+  font-size: 64px;
+  font-weight: 900;
   color: #ffffff;
-  text-shadow: 0px 0px 20px rgba(52, 235, 215, 0.8), 0px 0px 30px rgba(52, 144, 242, 1);
-  letter-spacing: 2px;
+  text-shadow: 0px 0px 25px rgba(52, 235, 215, 0.5), 0px 0px 40px rgba(52, 144, 242, 0.7);
+  letter-spacing: 4px;
   animation: pulse 5s infinite ease-in-out;
 }
 

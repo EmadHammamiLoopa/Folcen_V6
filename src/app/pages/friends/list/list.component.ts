@@ -3,13 +3,14 @@ import { User } from './../../../models/User';
 import { Platform, IonInfiniteScroll } from '@ionic/angular';
 import { ToastService } from './../../../services/toast.service';
 import { Component, OnInit, ViewChild, OnDestroy, NgZone, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, forkJoin, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { AppEventsService } from 'src/app/services/app-events.service';
 import { WebrtcService } from './../../../services/webrtc.service';
 import { Subscription } from 'rxjs';
 import { RequestService } from './../../../services/request.service';
 import { AlertController } from '@ionic/angular';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-list',
@@ -22,11 +23,13 @@ export class ListComponent implements OnInit {
 
   pageLoading = false;
   friends: User[] = [];
+  showSandglass: boolean = false;
   page: number = 0;
   myProfile: User; // Ensure myProfile is defined
   private missedSub: Subscription;
   public missedMap: { [userId: string]: number } = {};
   public missedMap$: Observable<{ [userId: string]: number }>;
+  private friendsSub: Subscription;
 
   constructor(
     private requestService: RequestService,
@@ -37,7 +40,7 @@ export class ListComponent implements OnInit {
     , private webRTC: WebrtcService
     , private zone: NgZone
     , private cdr: ChangeDetectorRef
-    , private appEvents: AppEventsService
+    , private appEvents: AppEventsService, private router: Router
   ) {}
 
   ngOnInit() {
@@ -61,6 +64,16 @@ export class ListComponent implements OnInit {
 
     // immediate refresh in case stream hasn't emitted
     try { this.refreshMissedFromService(); } catch(e) {}
+
+    // Listen for real-time friends list updates
+    this.friendsSub = this.userService.friendsUpdated$.subscribe(() => {
+      this.zone.run(() => {
+        console.log('👥 Friends list update received, refreshing...');
+        this.page = 0;
+        this.friends = [];
+        this.getFriends();
+      });
+    });
   }
 
   private refreshMissedFromService() {
@@ -79,6 +92,7 @@ export class ListComponent implements OnInit {
 
   ngOnDestroy() {
     try { this.missedSub?.unsubscribe(); } catch (e) {}
+    try { this.friendsSub?.unsubscribe(); } catch (e) {}
   }
 
   ionViewWillEnter() {
@@ -89,12 +103,39 @@ export class ListComponent implements OnInit {
     });
   }
 
+  isAdmin(user: User): boolean {
+    if (!user) return false;
+    const role = (user.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
+  }
+
+  navigateToProfile(friend: User) {
+    if (this.isAdmin(friend)) {
+      this.toastService.presentErrorToastr('This profile is not available');
+      return;
+    }
+    try {
+      const cached = this.userService.getCachedProfile(friend._id);
+      if (cached) {
+        this.router.navigate(['/tabs/profile/display', friend._id]);
+        return;
+      }
+    } catch (e) { /* ignore cache check failure */ }
+
+    this.showSandglass = true;
+    this.cdr.markForCheck();
+    this.router.navigate(['/tabs/profile/display', friend._id]).finally(() => {
+      this.showSandglass = false;
+      try { this.cdr.markForCheck(); } catch (e) {}
+    });
+  }
+
   
   loadUserProfile() {
     const currentUserId = this.userService.getCurrentUserId(); // Dynamically get the current user ID
     if (!currentUserId) {
       console.error('Current user ID not found');
-      this.toastService.presentStdToastr('Failed to load profile.');
+      this.toastService.presentErrorToastr('Failed to load profile.');
       return;
     }
   
@@ -104,7 +145,7 @@ export class ListComponent implements OnInit {
       },
       (error) => {
         console.error('Error loading user profile:', error);
-        this.toastService.presentStdToastr('Failed to load profile.');
+        this.toastService.presentErrorToastr('Failed to load profile.');
       }
     );
   }
@@ -116,50 +157,78 @@ export class ListComponent implements OnInit {
 
     this.userService.getFriends(this.page).subscribe(
       (resp: any) => {
-        if (!event || refresh) this.friends = [];
-        if (refresh && this.infinitScroll) this.infinitScroll.disabled = false;
+        const newFriendsRaw = resp.friends || [];
+        
+        if (newFriendsRaw.length === 0) {
+          if (!event || refresh) this.friends = [];
+          this.pageLoading = false;
+          if (event) event.target.complete();
+          this.cdr.markForCheck();
+          return;
+        }
 
-        resp.friends.forEach((usr: any) => {
-          // Defensive: fetch a fresh profile for display but never mutate or persist it into auth storage.
-          this.userService.getUserProfile(usr._id).subscribe((userProfile) => {
-            try {
+        // Fetch all profiles in parallel for better performance and consistent UI update
+        const profileRequests = newFriendsRaw.map((usr: any) => 
+          this.userService.getUserProfile(usr._id).pipe(
+            map(userProfile => {
               const safeProfile = {
                 _id: usr._id,
                 firstName: userProfile.firstName || usr.firstName,
                 lastName: userProfile.lastName || usr.lastName,
                 mainAvatar: userProfile.mainAvatar || usr.mainAvatar,
                 avatar: Array.isArray(userProfile.avatar) ? userProfile.avatar.slice() : (Array.isArray(usr.avatar) ? usr.avatar.slice() : []),
-                fullName: (userProfile.firstName || usr.firstName) + ' ' + (userProfile.lastName || usr.lastName)
+                fullName: (userProfile.firstName || usr.firstName) + ' ' + (userProfile.lastName || usr.lastName),
+                country: userProfile.country || usr.country || '-',
+                city: userProfile.city || usr.city || '-',
+                online: userProfile.online // preserve online status if available
               };
-
               const friend = new User().initialize(safeProfile);
               friend.friend = true;
-              // push a local friend object only; do not call updateUserInStorage or touch auth storages here
-              this.friends.push(friend);
-            } catch (e) {
-              console.warn('Failed to materialize friend profile for', usr._id, e);
-            }
-          }, err => {
-            // If profile fetch fails, fall back to the minimal server-provided friend data
-            const friend = new User().initialize({ _id: usr._id, firstName: usr.firstName, lastName: usr.lastName, mainAvatar: usr.mainAvatar, avatar: Array.isArray(usr.avatar)?usr.avatar:[] });
-            friend.friend = true;
-            this.friends.push(friend);
-          });
+              return friend;
+            }),
+            catchError(() => {
+              const friend = new User().initialize({ 
+                _id: usr._id, 
+                firstName: usr.firstName, 
+                lastName: usr.lastName, 
+                mainAvatar: usr.mainAvatar, 
+                avatar: Array.isArray(usr.avatar) ? usr.avatar : [], 
+                country: usr.country || '-', 
+                city: usr.city || '-' 
+              });
+              friend.friend = true;
+              return of(friend);
+            })
+          )
+        );
+
+        forkJoin(profileRequests).subscribe((fetchedFriends: User[]) => {
+          if (!event || refresh) {
+            this.friends = fetchedFriends;
+          } else {
+            this.friends = [...this.friends, ...fetchedFriends];
+          }
+
+          if (refresh && this.infinitScroll) {
+            this.infinitScroll.disabled = false;
+          }
+
+          this.pageLoading = false;
+          this.page++;
+
+          if (event) {
+            event.target.complete();
+            if (!resp.more && !refresh) event.target.disabled = true;
+          }
+          this.cdr.markForCheck();
         });
-
-        this.pageLoading = false;
-        this.page++;
-
-        if (event) {
-          event.target.complete();
-          if (!resp.more && !refresh) event.target.disabled = true;
-        }
       },
       (err) => {
         console.error('Error fetching friends:', err);
-        this.toastService.presentStdToastr('Failed to load friends.');
+        this.toastService.presentErrorToastr('Failed to load friends.');
         this.pageLoading = false;
         if (event) event.target.complete();
+        this.cdr.markForCheck();
       }
     );
   }
@@ -183,12 +252,14 @@ export class ListComponent implements OnInit {
           handler: () => {
             this.userService.removeFriendship(friend._id).subscribe(
               (resp: any) => {
-                this.toastService.presentStdToastr(resp.message);
+                this.toastService.presentSuccessToastr(resp.message);
                 this.friends = this.friends.filter((f) => f._id !== friend._id);
+                this.userService.triggerFriendsRefresh();
+                this.cdr.markForCheck();
               },
               (err) => {
                 console.error('Error removing friend:', err);
-                this.toastService.presentStdToastr('Failed to remove friend.');
+                this.toastService.presentErrorToastr('Failed to remove friend.');
               }
             );
           },
@@ -213,12 +284,14 @@ export class ListComponent implements OnInit {
           handler: () => {
             this.userService.block(friend._id).subscribe(
               (resp: any) => {
-                this.toastService.presentStdToastr(resp.message);
+                this.toastService.presentSuccessToastr(resp.message);
                 this.friends = this.friends.filter((f) => f._id !== friend._id);
+                this.userService.triggerFriendsRefresh();
+                this.cdr.markForCheck();
               },
               (err) => {
                 console.error('Error blocking user:', err);
-                this.toastService.presentStdToastr('Failed to block user.');
+                this.toastService.presentErrorToastr('Failed to block user.');
               }
             );
           },

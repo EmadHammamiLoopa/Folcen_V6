@@ -35,58 +35,93 @@
     </div>
   </div>
 </div> -->
-<div class="grid grid-cols-12 h-full">
-  <div class="col-span-5 bg-black text-white text-center grid grid-cols-12 items-center">
-    <div class="border-b-2 pb-4 border-grey-200 col-span-6 col-start-4">
-      <span class="font-bold">
-        <span class="text-6xl"><i class="fas fa-th"></i></span>
-        <span class="text-5xl mt-2">Geloo Dashboard</span>
-      </span>
-      <span class="text-2xl mt-2">Break the ice</span>
-    </div>
-  </div>
-  
-  <div class="col-span-7 text-center grid grid-cols-12 items-center">
-    <div class="border-b-2 pb-4 border-grey-200 col-span-6 col-start-4 text-center justify-center">
-      <img class="w-16 mx-auto" src="./../../../../assets/logo.png" alt="">
-      <span class="text-2xl font-bold">Login</span>
-      <form #form="ngForm" (ngSubmit)="submit(form.value)">
-        <div class="mt-4">
-          <app-alert [title]="error" *ngIf="error" type="danger" ></app-alert>
+<div class="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-700 to-pink-500 flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all hover:scale-[1.01]">
+    <div class="p-8">
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center justify-center w-32 h-32 bg-indigo-50 rounded-2xl mb-4 shadow-inner">
+          <img class="w-28 h-28 object-contain" src="./../../../../assets/logo.png" alt="Folcen Logo">
         </div>
-        <input 
-          ngModel 
-          name="email" 
-          type="email" 
-          class="appearance-none mt-5 block w-full bg-gray-100 text-gray-600 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white"
-          id="email" 
-          placeholder="name@example.com"
-        >
-        <span class="text-red-400 my-2 text-left" *ngIf="errors && errors['email']">
-          <span *ngFor="let error of errors['email']">
-            <i class="fas fa-info-circle mx-1"></i>{{ error }}
-          </span>
-        </span>
+        <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight">Folcen Dashboard</h1>
+        <p class="text-gray-500 mt-2 font-medium">Welcome back! Please sign in to your account.</p>
+      </div>
 
-        <input 
-          ngModel 
-          name="password" 
-          type="password" 
-          class="appearance-none mt-5 block w-full bg-gray-100 text-gray-600 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white"
-          id="password" 
-          placeholder="Password"
-        >
-        <span class="text-red-400 my-2 text-left" *ngIf="errors && errors['password']">
-          <span *ngFor="let error of errors['password']">
-            <i class="fas fa-info-circle mx-1"></i>{{ error }}
-          </span>
-        </span>
+      <form #form="ngForm" (ngSubmit)="submit(form.value)" class="space-y-6">
+        <div *ngIf="error" class="animate-shake">
+          <app-alert [title]="error" type="danger"></app-alert>
+        </div>
 
-        <button type="submit" class="bg-indigo-400 p-2 w-full mt-5 text-white">
-          <span *ngIf="loading"><i class="fas fa-circle-notch fa-spin"></i></span>
-          <span *ngIf="!loading">Log in</span>
+        <div>
+          <label for="email" class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-envelope text-gray-400"></i>
+            </div>
+            <input 
+              ngModel 
+              name="email" 
+              type="email" 
+              id="email"
+              required
+              class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:border-transparent transition-all sm:text-sm"
+              placeholder="admin@folcen.com"
+            >
+          </div>
+          <p class="mt-2 text-xs text-red-500" *ngIf="errors && errors['email']">
+            <span *ngFor="let error of errors['email']" class="flex items-center gap-1">
+              <i class="fas fa-exclamation-circle"></i> {{ error }}
+            </span>
+          </p>
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-lock text-gray-400"></i>
+            </div>
+            <input 
+              ngModel 
+              name="password" 
+              type="password" 
+              id="password"
+              required
+              class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:border-transparent transition-all sm:text-sm"
+              placeholder="••••••••"
+            >
+          </div>
+          <p class="mt-2 text-xs text-red-500" *ngIf="errors && errors['password']">
+            <span *ngFor="let error of errors['password']" class="flex items-center gap-1">
+              <i class="fas fa-exclamation-circle"></i> {{ error }}
+            </span>
+          </p>
+        </div>
+
+        <div class="flex items-center">
+          <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+          <label for="remember-me" class="ml-2 block text-sm text-gray-600">Remember me</label>
+        </div>
+
+        <button 
+          type="submit" 
+          [disabled]="loading"
+          class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+        >
+          <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+            <i class="fas fa-sign-in-alt text-indigo-500 group-hover:text-indigo-400 transition-colors" *ngIf="!loading"></i>
+          </span>
+          <span *ngIf="loading" class="flex items-center gap-2">
+            <i class="fas fa-circle-notch fa-spin"></i> Signing in...
+          </span>
+          <span *ngIf="!loading">Sign In</span>
         </button>
       </form>
+    </div>
+    
+    <div class="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
+      <p class="text-xs text-gray-500 uppercase tracking-widest font-bold">
+        &copy; 2026 Folcen Inc. All rights reserved.
+      </p>
     </div>
   </div>
 </div>

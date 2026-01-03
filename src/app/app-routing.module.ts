@@ -10,6 +10,7 @@ import { ProductComponent } from './pages/buy-and-sell/product/product.component
 import { ProductFormComponent } from './pages/buy-and-sell/product-form/product-form.component';
 import { EventsComponent } from './pages/admin/events/events.component';
 import { AcceptancesComponent } from './pages/admin/acceptances/acceptances.component';
+import { SessionInitResolver } from './guards/session-init.resolver';
 
 const routes: Routes = [
   {
@@ -27,6 +28,12 @@ const routes: Routes = [
   },
 
   {
+    path: 'activity',
+    loadChildren: () => import('./pages/activity/activity.module').then(m => m.ActivityPageModule),
+    canActivate: [AuthGuard]
+  },
+
+  {
     path: 'auth',
     loadChildren: () => import('./pages/auth/auth.module').then(m => m.AuthPageModule),
     canActivate: [GuestGuard]
@@ -39,20 +46,26 @@ const routes: Routes = [
   {
     path: 'messages/chat/:id',
     component: ChatComponent,
-    canActivate: [AuthGuard]
+    canActivate: [AuthGuard],
+    resolve: { session: SessionInitResolver }
   },
   {
     path: 'chat/:productId',
     component: ChatComponent,
-    canActivate: [AuthGuard]
+    canActivate: [AuthGuard],
+    resolve: { session: SessionInitResolver }
   },
   {
     path: 'messages/video/:id',
     component: VideoComponent,
-    canActivate: [AuthGuard]
-  },  {
+    canActivate: [AuthGuard],
+    resolve: { session: SessionInitResolver }
+  },
+  // Legacy/duplicate chat path kept as alias, redirect to guarded product chat
+  {
     path: 'messages/chat/:productId',
-    component: ChatComponent
+    redirectTo: 'chat/:productId',
+    pathMatch: 'full'
   },
   { path: 'edit-product/:id', component: ProductFormComponent, canActivate: [AuthGuard]},
   { path: 'product/:id', component: ProductComponent, canActivate: [AuthGuard] },

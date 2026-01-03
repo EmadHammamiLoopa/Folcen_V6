@@ -39,15 +39,32 @@ export class Channel {
         ? photoData
         : `${baseUrl}${photoData.startsWith('/') ? '' : '/'}${photoData}`;
     } else if (typeof photoData === 'object' && photoData !== null && (photoData['path'] || photoData['url'])) {
-      const path = photoData['path'] || photoData['url'];
-      this._photo = path.startsWith('http')
-        ? path
-        : `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+      const p = photoData['path'] || photoData['url'];
+      this._photo = p.startsWith('http') ? p : `${baseUrl}${p.startsWith('/') ? '' : '/'}${p}`;
     } else {
       this._photo = 'assets/images/default-channel.png';
     }
 
-    this._user = channel.user ?? new User();
+    // Normalize user: accept string id, populated object, or empty -> try fallbacks
+    const uInit = (channel as any).user;
+    if (!uInit || (typeof uInit === 'object' && Object.keys(uInit).length === 0)) {
+      const uidInit = (channel as any).userId || (channel as any).user_id || (channel as any).createdBy || (channel as any).ownerId;
+      if (uidInit) {
+        this._user = new User();
+        this._user.id = String(uidInit);
+      } else {
+        this._user = new User();
+      }
+    } else if (typeof uInit === 'string') {
+      this._user = new User();
+      this._user.id = uInit;
+    } else if (typeof uInit === 'object') {
+      const uidInit = uInit._id || uInit.id || uInit.userId;
+      if (uidInit) this._user = new User().initialize({ _id: uidInit, firstName: uInit.firstName || '', lastName: uInit.lastName || '' });
+      else this._user = new User();
+    } else {
+      this._user = new User();
+    }
     this._createdAt = channel.createdAt ? new Date(channel.createdAt) : new Date();
     this._category = channel.category ?? '';
     this._followers = channel.followers ?? [];
@@ -82,7 +99,32 @@ export class Channel {
     }
 
     channel._createdAt = data.createdAt ? new Date(data.createdAt) : new Date();
-    channel._user = data.user || new User();
+    // Normalize user: can be string (id), populated object, or empty
+    const u = data.user;
+    if (!u) {
+      // try common fallback fields
+      const uid = (data as any).userId || (data as any).user_id || (data as any).createdBy || (data as any).ownerId;
+      if (uid) {
+        channel._user = new User();
+        channel._user.id = String(uid);
+      } else {
+        channel._user = new User();
+      }
+    } else if (typeof u === 'string') {
+      channel._user = new User();
+      channel._user.id = u;
+    } else if (typeof u === 'object') {
+      // if object has id fields, initialize user wrapper
+      const uid = (u as any)._id || (u as any).id || (u as any).userId;
+      if (uid) {
+        channel._user = new User().initialize({ _id: uid, firstName: (u as any).firstName || (u as any).name || '', lastName: (u as any).lastName || '' });
+      } else {
+        // empty object -> create empty User
+        channel._user = new User();
+      }
+    } else {
+      channel._user = new User();
+    }
     channel._followers = data.followers || [];
     channel._category = data.category || '';
     channel._icon = data.icon;
@@ -93,9 +135,38 @@ export class Channel {
     return channel;
   }
 
+  isOwner(userId: string): boolean {
+    if (!userId) return false;
+    try {
+      const ownerId = this._user?.id || (this as any).user?._id || (this as any).userId || (this as any).createdBy || (this as any).ownerId;
+      return !!ownerId && String(ownerId) === String(userId);
+    } catch (e) {
+      return false;
+    }
+  }
+
   followedBy(userId: string): boolean {
-  //  console.log(`Checking if user ${userId} follows the channel:`, this._followers);
-    return this._followers.includes(userId);
+    if (!userId) return false;
+    // Owners are always considered followers
+    if (this.isOwner(userId)) return true;
+
+    try {
+      if (!this._followers) return false;
+      return this._followers.some((f: any) => {
+        if (!f) return false;
+        if (typeof f === 'string') return f === userId;
+        if (typeof f === 'object') {
+          if (typeof f.getId === 'function') return f.getId() === userId;
+          if (f._id && String(f._id) === userId) return true;
+          if (f.id && String(f.id) === userId) return true;
+          // sometimes followers may be ObjectId-like; try string conversion
+          try { if (String(f) === userId) return true; } catch(e) {}
+        }
+        return false;
+      });
+    } catch (e) {
+      return false;
+    }
   }
   
 

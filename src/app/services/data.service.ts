@@ -1,8 +1,11 @@
-import { Injectable, Inject } from '@angular/core';
+import { Injectable, Inject, Optional } from '@angular/core';
 import { Router } from '@angular/router';
 import { HTTP } from '@ionic-native/http/ngx';import { HttpClient } from '@angular/common/http';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { Platform } from '@ionic/angular';
+import { SessionStoreService } from './session-store.service';
+import { SocketService } from './socket.service';
+import { UserService } from './user.service';
 import constants from './../helpers/constants';
 
 type HttpMethod = 'get' | 'post' | 'put' | 'delete';
@@ -23,12 +26,13 @@ type RequestOptions = {
 })
 export class DataService {
   constructor(
-    @Inject('string') private url: string,
+    @Optional() @Inject('string') private url: string,
     private nativeStorage: NativeStorage,
     private http: HTTP,
     private httpClient: HttpClient,
     private router: Router,
-    public platform: Platform
+    public platform: Platform,
+    @Optional() private sessionStore?: SessionStoreService
   ) {}
 
   getToken() {
@@ -39,7 +43,8 @@ export class DataService {
 
   sendRequest(requestOptions: RequestOptions) {
     return this.getToken().then((token: string) => {
-      const url = constants.DOMAIN_URL + (requestOptions.noApi ? '' : constants.API_V1) + this.url + requestOptions.url;
+      const base = this.url || '';
+      const url = constants.DOMAIN_URL + (requestOptions.noApi ? '' : constants.API_V1) + base + requestOptions.url;
       console.log('ssssssssssssssssssssssssssssss request to URL:', url); // Print the URL to the console
 
       const headers = {
@@ -48,7 +53,8 @@ export class DataService {
         'Authorization': 'Bearer ' + token
       };
 
-      return this.platform.is('cordova')
+      // Use browser (HttpClient) for multipart even on cordova, as native HTTP doesn't handle FormData well
+      return (this.platform.is('cordova') && requestOptions.serializer !== 'multipart')
         ? this.cordovaHttpRequest(url, requestOptions, headers)
         : this.browserHttpRequest(url, requestOptions, headers);
     });
@@ -84,18 +90,48 @@ export class DataService {
   private handleError(err: any) {
     console.error('HTTP error', err);
     if (err.status === 401) {
-      this.logout();
-    } else {
-      return Promise.reject(err);
+      // If we are already on the auth page, don't trigger a logout redirect loop,
+      // but we still want to reject so the signin component can show "Invalid credentials".
+      const isAuthPage = this.router.url.includes('/auth');
+      if (!isAuthPage) {
+        this.logout();
+      }
     }
+    return Promise.reject(err);
   }
 
-  logout() {
-    this.nativeStorage.remove('token');
-    this.nativeStorage.remove('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    this.router.navigateByUrl('/auth');
+  async logout() {
+    try {
+      console.log('Performing full logout and state reset...');
+      
+      // 1. Clear all persistence
+      try { await this.nativeStorage.clear(); } catch (e) { console.warn('NativeStorage clear failed', e); }
+      try { localStorage.clear(); } catch (e) { console.warn('localStorage clear failed', e); }
+      try { sessionStorage.clear(); } catch (e) { console.warn('sessionStorage clear failed', e); }
+      
+      // 2. Clear cookies
+      document.cookie = 'token=; Max-Age=0; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+
+      // 3. Clear session store caches & observable state
+      try { this.sessionStore?.clear('logout'); } catch (e) { console.warn('SessionStore clear failed', e); }
+
+      // 4. Disconnect socket and reset socket static state
+      try { await SocketService.logout(); } catch (e) { console.warn('SocketService logout failed', e); }
+
+      // 5. Clear user service state
+      try { UserService.clearUserState(); } catch (e) { console.warn('UserService clear failed', e); }
+
+      // 6. Clear any other known caches (e.g. PeerJS)
+      if ((window as any).peer) {
+        try { (window as any).peer.destroy(); } catch (e) {}
+      }
+
+    } catch (err) {
+      console.error('Error during logout process:', err);
+    } finally {
+      // Always navigate to auth screen
+      this.router.navigateByUrl('/auth', { replaceUrl: true });
+    }
   }
 
   getItem(key: string) {

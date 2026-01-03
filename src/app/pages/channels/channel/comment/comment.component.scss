@@ -3,8 +3,8 @@
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
   border-radius: 24px;
-  margin: 12px 16px;
-  padding: 16px;
+  margin: 8px 16px;
+  padding: 12px 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -30,7 +30,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 
     .user-info {
       display: flex;
@@ -54,13 +54,31 @@
         .avatar-inner {
           width: 100%;
           height: 100%;
-          background: var(--loopa-tabbar-background);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--ion-text-color);
           font-size: 16px;
+          overflow: hidden;
+
+          i {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            line-height: 1;
+          }
+
+          &.is-anonyme {
+            background: var(--loopa-tabbar-background);
+          }
+
+          app-avatar {
+            width: 100%;
+            height: 100%;
+          }
         }
       }
 
@@ -93,9 +111,9 @@
 
   .card-body {
     .comment-text {
-      margin: 0 0 12px;
-      font-size: 1rem;
-      line-height: 1.5;
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.4;
       color: var(--text);
       font-weight: 500;
     }
@@ -239,7 +257,7 @@
   }
 
   .card-footer {
-    margin-top: 16px;
+    margin-top: 10px;
     display: flex;
     justify-content: flex-start;
 

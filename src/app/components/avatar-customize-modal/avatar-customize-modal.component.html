@@ -1,0 +1,299 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <ion-title>Customize Avatar</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">
+        <ion-icon name="close-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="preview-section">
+    <div class="section-label" style="margin-bottom: 8px;">Live Preview</div>
+    <div class="avatar-preview">
+      <app-avatar [profile]="tempProfile" [size]="140"></app-avatar>
+    </div>
+    <div class="preview-actions">
+      <ion-button fill="solid" size="small" color="secondary" (click)="randomize()">
+        <ion-icon name="shuffle-outline" slot="start"></ion-icon>
+        Randomize
+      </ion-button>
+      <ion-button fill="outline" size="small" color="danger" (click)="reset()">
+        <ion-icon name="trash-outline" slot="start"></ion-icon>
+        Reset
+      </ion-button>
+    </div>
+  </div>
+
+  <div class="customize-section">
+    <!-- Skin Tone -->
+    <div class="section-label">Skin Tone</div>
+    <div class="swatch-grid">
+      <div 
+        class="swatch auto" 
+        [class.active]="tempProfile.avatarOverrides?.skinTone === 'auto'"
+        (click)="setOverride('skinTone', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let tone of options.skinTone; let i = index" 
+        class="swatch" 
+        [style.background-color]="'#' + tone"
+        [class.active]="tempProfile.avatarOverrides?.skinTone === tone"
+        (click)="setOverride('skinTone', tone)"
+      >
+        <span class="label">t{{i+1}}</span>
+      </div>
+    </div>
+
+    <!-- Hair Style -->
+    <div class="section-label">Hair Style</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.top === 'auto'"
+        (click)="setOverride('top', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let top of options.top" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.top === top"
+        (click)="setOverride('top', top)"
+      >{{ top }}</div>
+    </div>
+
+    <!-- Hair Color -->
+    <div class="section-label">Hair Color</div>
+    <div class="swatch-grid">
+      <div 
+        class="swatch auto" 
+        [class.active]="tempProfile.avatarOverrides?.hairColor === 'auto'"
+        (click)="setOverride('hairColor', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let color of options.hairColor" 
+        class="swatch" 
+        [style.background-color]="'#' + color"
+        [class.active]="tempProfile.avatarOverrides?.hairColor === color"
+        (click)="setOverride('hairColor', color)"
+      ></div>
+    </div>
+
+    <!-- Hat Color -->
+    <div class="section-label">Hat Color</div>
+    <div class="swatch-grid">
+      <div 
+        class="swatch auto" 
+        [class.active]="tempProfile.avatarOverrides?.hatColor === 'auto'"
+        (click)="setOverride('hatColor', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let color of options.hatColor" 
+        class="swatch" 
+        [style.background-color]="'#' + color"
+        [class.active]="tempProfile.avatarOverrides?.hatColor === color"
+        (click)="setOverride('hatColor', color)"
+      ></div>
+    </div>
+
+    <!-- Accessories -->
+    <div class="section-label">Accessories</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.accessories === 'auto'"
+        (click)="setOverride('accessories', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let acc of options.accessories" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.accessories === acc"
+        (click)="setOverride('accessories', acc)"
+      >{{ acc }}</div>
+    </div>
+
+    <!-- Accessories Color -->
+    <div class="section-label">Accessories Color</div>
+    <div class="swatch-grid">
+      <div 
+        class="swatch auto" 
+        [class.active]="tempProfile.avatarOverrides?.accessoriesColor === 'auto'"
+        (click)="setOverride('accessoriesColor', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let color of options.accessoriesColor" 
+        class="swatch" 
+        [style.background-color]="'#' + color"
+        [class.active]="tempProfile.avatarOverrides?.accessoriesColor === color"
+        (click)="setOverride('accessoriesColor', color)"
+      ></div>
+    </div>
+
+    <!-- Facial Hair -->
+    <div class="section-label">Facial Hair</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.facialHair === 'auto'"
+        (click)="setOverride('facialHair', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let fh of options.facialHair" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.facialHair === fh"
+        (click)="setOverride('facialHair', fh)"
+      >{{ fh }}</div>
+    </div>
+
+    <!-- Facial Hair Color -->
+    <div class="section-label">Facial Hair Color</div>
+    <div class="swatch-grid">
+      <div 
+        class="swatch auto" 
+        [class.active]="tempProfile.avatarOverrides?.facialHairColor === 'auto'"
+        (click)="setOverride('facialHairColor', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let color of options.facialHairColor" 
+        class="swatch" 
+        [style.background-color]="'#' + color"
+        [class.active]="tempProfile.avatarOverrides?.facialHairColor === color"
+        (click)="setOverride('facialHairColor', color)"
+      ></div>
+    </div>
+
+    <!-- Clothing -->
+    <div class="section-label">Clothing</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.clothing === 'auto'"
+        (click)="setOverride('clothing', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let cl of options.clothing" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.clothing === cl"
+        (click)="setOverride('clothing', cl)"
+      >{{ cl }}</div>
+    </div>
+
+    <!-- Clothing Color -->
+    <div class="section-label">Clothing Color</div>
+    <div class="swatch-grid">
+      <div 
+        class="swatch auto" 
+        [class.active]="tempProfile.avatarOverrides?.clothingColor === 'auto'"
+        (click)="setOverride('clothingColor', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let color of options.clothingColor" 
+        class="swatch" 
+        [style.background-color]="'#' + color"
+        [class.active]="tempProfile.avatarOverrides?.clothingColor === color"
+        (click)="setOverride('clothingColor', color)"
+      ></div>
+    </div>
+
+    <!-- Clothing Graphic -->
+    <div class="section-label">Clothing Graphic</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.clothingGraphic === 'auto'"
+        (click)="setOverride('clothingGraphic', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let graphic of options.clothingGraphic" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.clothingGraphic === graphic"
+        (click)="setOverride('clothingGraphic', graphic)"
+      >{{ graphic }}</div>
+    </div>
+
+    <!-- Background -->
+    <div class="section-label">Background</div>
+    <div class="swatch-grid">
+      <div 
+        class="swatch auto" 
+        [class.active]="tempProfile.avatarOverrides?.backgroundColor === 'auto'"
+        (click)="setOverride('backgroundColor', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let bg of options.backgroundColor" 
+        class="swatch" 
+        [style.background-color]="'#' + bg"
+        [class.active]="tempProfile.avatarOverrides?.backgroundColor === bg"
+        (click)="setOverride('backgroundColor', bg)"
+      ></div>
+    </div>
+
+    <div class="background-type-toggle">
+      <ion-segment [value]="tempProfile.avatarOverrides?.backgroundType || 'solid'" (ionChange)="setOverride('backgroundType', $any($event).detail.value)">
+        <ion-segment-button value="solid">
+          <ion-label>Solid</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="gradientLinear">
+          <ion-label>Gradient</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
+
+    <!-- Eyes -->
+    <div class="section-label">Eyes</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.eyes === 'auto'"
+        (click)="setOverride('eyes', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let eye of options.eyes" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.eyes === eye"
+        (click)="setOverride('eyes', eye)"
+      >{{ eye }}</div>
+    </div>
+
+    <!-- Eyebrows -->
+    <div class="section-label">Eyebrows</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.eyebrows === 'auto'"
+        (click)="setOverride('eyebrows', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let eb of options.eyebrows" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.eyebrows === eb"
+        (click)="setOverride('eyebrows', eb)"
+      >{{ eb }}</div>
+    </div>
+
+    <!-- Mouth -->
+    <div class="section-label">Mouth</div>
+    <div class="hair-grid">
+      <div 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.mouth === 'auto'"
+        (click)="setOverride('mouth', 'auto')"
+      >Auto</div>
+      <div 
+        *ngFor="let m of options.mouth" 
+        class="hair-item" 
+        [class.active]="tempProfile.avatarOverrides?.mouth === m"
+        (click)="setOverride('mouth', m)"
+      >{{ m }}</div>
+    </div>
+  </div>
+</ion-content>
+
+<ion-footer class="ion-no-border">
+  <ion-toolbar>
+    <ion-button expand="block" (click)="save()" class="ion-margin">
+      Save Avatar
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

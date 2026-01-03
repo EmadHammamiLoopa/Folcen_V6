@@ -16,6 +16,12 @@ export class Subscription {
   private _userFirstName: string;
   private _userLastName: string;
 
+  private safeDate(val: any): Date | null {
+    if (!val) return null;
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   constructor(subscription: Partial<Subscription>, user?: { id: string; firstName: string; lastName: string }) {
     // Initialize subscription fields
     this._id = subscription.id || '';
@@ -25,8 +31,8 @@ export class Subscription {
     this._monthPrice = subscription.monthPrice || 0;
     this._yearPrice = subscription.yearPrice || 0;
     this._currency = subscription.currency || 'USD';
-    this._createdAt = subscription.createdAt ? new Date(subscription.createdAt) : new Date();
-    this._updatedAt = subscription.updatedAt ? new Date(subscription.updatedAt) : new Date();
+    this._createdAt = this.safeDate(subscription.createdAt) || new Date();
+    this._updatedAt = this.safeDate(subscription.updatedAt) || new Date();
 
     // Initialize user-related fields if a user object is provided
     if (user) {

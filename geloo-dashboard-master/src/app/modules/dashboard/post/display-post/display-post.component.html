@@ -62,8 +62,21 @@
           <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
             <i class="fas fa-align-left text-indigo-500"></i> Post Text
           </h3>
-          <div class="p-4 bg-gray-50 rounded-lg text-gray-700 leading-relaxed whitespace-pre-wrap border border-gray-100">
+          <div class="p-4 bg-gray-50 rounded-lg text-gray-700 leading-relaxed whitespace-pre-wrap border border-gray-100 mb-4">
             {{post.text || 'No text content.'}}
+          </div>
+
+          <!-- Media Section -->
+          <div *ngIf="getMediaUrl()" class="rounded-lg overflow-hidden border bg-black flex items-center justify-center min-h-[200px]">
+            <video *ngIf="isMediaVideo()" [src]="getMediaUrl()" controls class="max-h-[500px] w-full"></video>
+            <img *ngIf="!isMediaVideo()" [src]="getMediaUrl()" class="max-h-[500px] object-contain" alt="Post Media">
+          </div>
+
+          <!-- GDPR Expired Media Placeholder -->
+          <div *ngIf="!getMediaUrl() && post.media?.expiryDate" class="p-8 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-500">
+            <i class="fas fa-eye-slash text-3xl mb-2"></i>
+            <p class="font-medium">Media Expired (GDPR)</p>
+            <p class="text-xs">This content was automatically removed per data retention policy.</p>
           </div>
         </div>
         

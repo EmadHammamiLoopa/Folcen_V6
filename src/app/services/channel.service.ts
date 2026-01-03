@@ -49,23 +49,28 @@ export class ChannelService extends DataService {
   
   
   
-  followedChannels(page: number, search: string) {
-    console.log('Requesting followed channels with:', { page, search });
-  
+  followedChannels(page: number, search: string, category?: string) {
+    console.log('Requesting followed channels with:', { page, search, category });
+
+    const data: any = { page: page.toString(), search };
+    if (category) data.category = category;
+
     return this.sendRequest({
       method: 'get',
       url: '/followed',
-      data: { page: page.toString(), search },
+      data,
     });
   }
   
   
 
-  exploreChannels(page: number, search: string, level: 'city' | 'country' | 'global') {
+  exploreChannels(page: number, search: string, level: 'city' | 'country' | 'global', category?: string) {
+    const data: any = { page: page.toString(), search, level };
+    if (category) data.category = category;
     return this.sendRequest({
       method: 'get',
       url: '/explore',
-      data: { page: page.toString(), search, level }  // Pass the exploration level as a query parameter
+      data
     });
   }
   
@@ -95,10 +100,25 @@ export class ChannelService extends DataService {
     });
   }
 
+  show(id: string){
+    return this.sendRequest({
+      method: 'get',
+      url: '/' + id
+    });
+  }
+
   getPosts(id: string, page: number){
     return this.sendRequest({
       method: 'get',
       url: '/' + id + '/getposts/',
+      data: {page: page.toString()}
+    })
+  }
+
+  getFeed(page: number){
+    return this.sendRequest({
+      method: 'get',
+      url: '/feed',
       data: {page: page.toString()}
     })
   }
@@ -186,31 +206,28 @@ export class ChannelService extends DataService {
     })
   }
 
-  reportChannel(id: string, reportType: string, message: string) {
+  reportChannel(id: string, reportData: any) {
     return this.sendRequest({
       method: 'post',
       url: '/' + id + '/report',
-      data: {
-        reportType,  // ✅ Now sending `reportType`
-        message      // ✅ Sending the user-provided message
-      }
+      data: reportData
     });
   }
   
 
-  reportPost(id: string, message: string){
+  reportPost(id: string, reportData: any){
     return this.sendRequest({
       method: 'post',
       url: '/post/' + id + '/report',
-      data: {message}
+      data: reportData
     })
   }
 
-  reportComment(id: string, message: string){
+  reportComment(id: string, reportData: any){
     return this.sendRequest({
       method: 'post',
       url: '/comment/' + id + '/report',
-      data: {message}
+      data: reportData
     })
   }
 

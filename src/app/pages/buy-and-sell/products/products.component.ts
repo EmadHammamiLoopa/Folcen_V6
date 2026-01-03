@@ -169,7 +169,7 @@ export class ProductsComponent implements OnInit {
   handleError(err) {
     console.log(err);
     this.pageLoading = false;
-    this.toastService.presentStdToastr(err);
+    this.toastService.presentErrorToastr(err);
   }
 
   getProducts(event, refresh?) {
@@ -202,7 +202,7 @@ export class ProductsComponent implements OnInit {
       },
       err => {
         console.error('Error fetching categories:', err);
-        this.toastService.presentStdToastr('Error fetching categories.');
+        this.toastService.presentErrorToastr('Error fetching categories.');
       }
     );
   }
@@ -238,24 +238,30 @@ export class ProductsComponent implements OnInit {
   
 
   filterProductsByCategory() {
-    let filteredProducts = this.allProducts;
-  
-    // Filter by category if not 'All'
-    if (this.selectedCategory !== 'All') {
+    let filteredProducts = this.allProducts || [];
+
+    // For posted products (type === 'sell') we should not restrict by selected category
+    // since the posted view is the user's own listings. Only apply category filtering for 'buy' mode.
+    if (this.type !== 'sell' && this.selectedCategory && this.selectedCategory !== 'All') {
+      const sel = (this.selectedCategory || '').toString().trim().toLowerCase();
       filteredProducts = filteredProducts.filter(product => {
-        return product.category === this.selectedCategory;
+        const cat = (product.category || '').toString().trim().toLowerCase();
+        return cat === sel;
       });
     }
-  
-    // Further filter by search query
+
+    // Further filter by search query (case-insensitive)
     if (this.searchQuery) {
+      const q = this.searchQuery.toLowerCase();
       filteredProducts = filteredProducts.filter(product =>
-        product.label.toLowerCase().includes(this.searchQuery.toLowerCase())
+        (product.label || '').toString().toLowerCase().includes(q)
       );
     }
-  
+
     this.products = filteredProducts;  // Update the products array
-    console.log('Filtered products:', this.products);
+    // Keep filteredProducts in sync for search UI
+    this.filteredProducts = this.allProducts && this.searchQuery ? filteredProducts : this.allProducts.slice();
+    console.log('Filtered products:', this.products, 'allProducts count:', this.allProducts.length);
   }
   
   

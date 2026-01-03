@@ -9,6 +9,7 @@ import { User } from './../../../models/User';
 import { Post } from './../../../models/Post';
 import { PostFormComponent } from './post-form/post-form.component';
 import { DropDownComponent } from './../../drop-down/drop-down.component';
+import { ReportModalComponent } from '../../../components/report-modal/report-modal.component';
 import { OneSignalService } from 'src/app/services/one-signal.service';
 import { AuthService } from 'src/app/services/auth.service';
 
@@ -46,6 +47,12 @@ export class ChannelComponent implements OnInit {
   ngOnInit() {
     this.getUserData();
     this.getChannelParams();
+  }
+
+  isOwner(channel: Channel): boolean {
+    if (!channel) return false;
+    const uid = this.user?.id || this.user?._id || '';
+    return channel.isOwner(uid);
   }
 
   ionViewWillEnter() {
@@ -104,7 +111,20 @@ export class ChannelComponent implements OnInit {
       this.pageLoading = false;
       const channelData = JSON.parse(params.get('channel') || '{}');
       this.channel = Channel.createFromData(channelData);
-      this.getChannelPosts(null, true);
+      // fetch fresh channel data from server to ensure populated user/followers
+      if (this.channel && this.channel.id) {
+        this.channelService.show(this.channel.id).then((resp: any) => {
+          if (resp && resp.data && resp.data.channel) {
+            this.channel = Channel.createFromData(resp.data.channel);
+          }
+          this.getChannelPosts(null, true);
+        }, err => {
+          // fallback to local channel data
+          this.getChannelPosts(null, true);
+        });
+      } else {
+        this.getChannelPosts(null, true);
+      }
     });
   }
 
@@ -190,11 +210,16 @@ async showPostForm() {
 
   getPopoverItems() {
     const items = [];
-    if (this.channel.user.id == this.user._id) {
+    const chanUser: any = (this.channel && (this.channel as any).user) || null;
+    const chanUserId = chanUser && (chanUser.id || chanUser._id || (typeof chanUser.getId === 'function' ? chanUser.getId() : null)) || '';
+    const myId = this.user && (this.user.id || this.user._id) ? (this.user.id || this.user._id) : '';
+
+    if (chanUserId && this.user && String(chanUserId) === String(myId)) {
       items.push({ text: 'Delete', icon: 'fas fa-trash-alt', event: 'delete' });
     } else {
+      const authId = myId;
       items.push(
-        { text: this.channel.followedBy(this.user._id) ? 'Unfollow' : 'Follow', icon: this.channel.followedBy(this.user._id) ? 'fas fa-minus-circle' : 'fas fa-plus', event: 'follow' },
+        { text: this.channel.followedBy(authId) ? 'Unfollow' : 'Follow', icon: this.channel.followedBy(authId) ? 'fas fa-minus-circle' : 'fas fa-plus', event: 'follow' },
         { text: 'Report', icon: 'fas fa-exclamation-triangle', event: 'report' }
       );
     }
@@ -222,14 +247,30 @@ async showPostForm() {
   }
 
   togglefollow() {
+    const uid = this.user && (this.user.id || this.user._id) ? (this.user.id || this.user._id) : '';
     this.channelService.follow(this.channel.id).then(
       (resp: any) => {
-        this.toastService.presentStdToastr(resp.message);
-        if (resp.data) this.channel.followers.push(this.user._id);
-        else this.channel.followers.splice(this.channel.followers.indexOf(this.user._id), 1);
+        this.toastService.presentSuccessToastr(resp.message);
+        try {
+          let currentFollowers = [...(this.channel.followers || [])];
+          if (resp.data) {
+            // add uid if not present
+            const exists = currentFollowers.find((f: any) => (typeof f === 'string' ? f === uid : (f && (f._id === uid || f.id === uid))));
+            if (!exists) currentFollowers.push(uid);
+          } else {
+            // remove all entries matching uid
+            currentFollowers = currentFollowers.filter((f: any) => {
+              if (!f) return false;
+              if (typeof f === 'string') return f !== uid;
+              return String(f._id || f.id) !== String(uid);
+            });
+          }
+          this.channel.followers = currentFollowers;
+          this.changeDetectorRef.detectChanges();
+        } catch (e) { console.warn('Error updating channel.followers', e); }
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
@@ -249,153 +290,36 @@ async showPostForm() {
   deleteChannel() {
     this.channelService.deleteChannel(this.channel.id).then(
       (resp: any) => {
-        this.toastService.presentStdToastr(resp.message);
+        this.toastService.presentSuccessToastr(resp.message);
         this.router.navigateByUrl('/tabs/channels/list/mines');
       },
       err => {
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
   async reportChannel() {
-    const alert = await this.alertCtrl.create({
-      header: `Report ${this.channel.name}`,
-      inputs: [
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Abuse',
-          value: 'Abuse',
-          checked: true
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Spam',
-          value: 'Spam'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Inappropriate Content',
-          value: 'Inappropriate Content'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Hate Speech',
-          value: 'Hate Speech'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Misinformation/Fake News',
-          value: 'Misinformation'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Harassment or Bullying',
-          value: 'Harassment'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Violence or Threats',
-          value: 'Violence'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Copyright Infringement',
-          value: 'Copyright Infringement'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Scam or Fraud',
-          value: 'Scam'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Illegal Activities',
-          value: 'Illegal Activities'
-        },
-        {
-          name: 'reportType',
-          type: 'radio',
-          label: 'Other',
-          value: 'Other'
-        }
-      ],
-      buttons: [
-        { text: 'CANCEL', role: 'cancel' },
-        {
-          text: 'NEXT',
-          cssClass: 'text-danger',
-          handler: (selectedValue) => {  
-            console.log("Selected reportType:", selectedValue); // Debugging output
-  
-            if (!selectedValue) {  
-              this.toastService.presentStdToastr('Please select a reason for reporting.');
-              return false; // Stops the process if no option is selected
-            }
-  
-            // ✅ Pass the selected reportType to the next function
-            this.showReportDetailsForm(selectedValue);
-          }
-        }
-      ]
-    });
-  
-    await alert.present();
-  }
-  
-  async showReportDetailsForm(reportType: string) {
-    console.log("Opening details form for:", reportType); // Debugging output
-  
-    const alert = await this.alertCtrl.create({
-      header: 'Provide More Details',
-      inputs: [
-        {
-          type: 'text', 
-          name: 'message',
-          placeholder: 'Explain why you are reporting (required)'
-        }
-      ],
-      buttons: [
-        { text: 'CANCEL', role: 'cancel' },
-        {
-          text: 'SEND',
-          cssClass: 'text-danger',
-          handler: (data) => {  
-            if (!data.message || data.message.trim() === '') {  
-              this.toastService.presentStdToastr('Please provide details in the message field.');
-              return false; // Prevents submission if no message is entered
-            }
-  
-            console.log("Submitting report:", { reportType, message: data.message }); // Debugging output
-            this.sendReport(reportType, data.message);
-          }
-        }
-      ]
-    });
-  
-    await alert.present();
-  }
-  
-  sendReport(reportType: string, message: string) {
-    console.log("Final report data being sent:", { reportType, message }); // Debugging output
-  
-    this.channelService.reportChannel(this.channel.id, reportType, message).then(
-      (resp: any) => {
-        this.toastService.presentStdToastr('Report submitted successfully.');
+    const modal = await this.modalCtrl.create({
+      component: ReportModalComponent,
+      componentProps: {
+        targetName: this.channel.name
       },
-      err => {
-        this.toastService.presentStdToastr('Error submitting report.');
-      }
-    );
+      cssClass: 'report-modal-class'
+    });
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      this.channelService.reportChannel(this.channel.id, data).then(
+        (resp: any) => {
+          this.toastService.presentSuccessToastr('Report submitted successfully.');
+        },
+        err => {
+          this.toastService.presentErrorToastr('Error submitting report.');
+        }
+      );
+    }
   }
   
 

@@ -1,6 +1,7 @@
 import { SharingPipeModule } from './../../pipes/sharing/sharing-pipe.module';
 import { FriendsHeaderComponent } from './friends-header/friends-header.component';
 import { SharingModule } from './../sharing/sharing.module';
+import { SharedComponentsModule } from '../../components/shared.module';
 import { RequestsComponent } from './requests/requests.component';
 import { ListComponent } from './list/list.component';
 import { NgModule } from '@angular/core';
@@ -20,7 +21,8 @@ import { FriendsPage } from './friends.page';
     IonicModule,
     FriendsPageRoutingModule,
     SharingModule,
-    SharingPipeModule
+    SharingPipeModule,
+    SharedComponentsModule
   ],
   declarations: [
     FriendsPage,

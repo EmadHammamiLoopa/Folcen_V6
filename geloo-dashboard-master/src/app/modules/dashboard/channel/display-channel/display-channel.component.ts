@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { DataService } from 'src/app/services/data.service';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'app-display-channel',
@@ -14,7 +15,7 @@ export class DisplayChannelComponent implements OnInit {
   counts: any = {};
   loading = true;
   tab = 'info';
-  apiUrl = 'http://localhost:3000'; // Default API URL
+  apiUrl = environment.apiUrl; // Use environment API URL
 
   constructor(
     private route: ActivatedRoute,

@@ -57,6 +57,33 @@ ion-tab-button {
   }
 }
 
+.budget-indicator {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  z-index: 10;
+  pointer-events: none;
+  animation: budget-pulse 2s infinite ease-in-out;
+}
+
+@keyframes budget-pulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
 ion-badge {
   --background: #ef4444;
   --color: white;

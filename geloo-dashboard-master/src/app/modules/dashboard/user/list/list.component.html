@@ -1,28 +1,89 @@
 <div class="p-6 bg-gray-50 min-h-screen">
-  <!-- Header & Stats -->
+  <!-- Header -->
   <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-gray-800">User Management</h1>
-      <p class="text-gray-500">Manage and monitor all registered users</p>
+      <h1 class="text-2xl font-bold text-gray-800">User Control Center</h1>
+      <p class="text-gray-500">Manage users, roles, and direct communications</p>
     </div>
     <div class="flex gap-3">
+      <div class="flex bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <button (click)="exportUsers('csv')" class="px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2 border-r border-gray-100">
+          <i class="fas fa-file-csv text-green-600"></i> <span class="text-xs font-bold">CSV</span>
+        </button>
+        <button (click)="exportUsers('json')" class="px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2">
+          <i class="fas fa-file-code text-amber-600"></i> <span class="text-xs font-bold">JSON</span>
+        </button>
+      </div>
+      <a routerLink="/dashboard/Users/analytics" class="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm">
+        <i class="fas fa-chart-line text-indigo-500"></i> View Analytics
+      </a>
       <a routerLink="/dashboard/Users/form/create" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
         <i class="fas fa-user-plus"></i> Create User
       </a>
     </div>
   </div>
 
+  <!-- Bulk Actions & Messaging (Sticky when users selected) -->
+  <div *ngIf="selectedUsers.length > 0" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-bounce-in">
+    <div class="bg-white rounded-2xl shadow-2xl border border-indigo-100 p-4 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gray-50 pb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+            <i class="fas fa-paper-plane text-sm"></i>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-gray-800">Send Direct Message</p>
+            <p class="text-[10px] text-gray-500">{{selectedUsers.length}} users selected</p>
+          </div>
+        </div>
+        <button (click)="selectedUsers = []; table.clearSelection()" class="text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="flex gap-3">
+        <textarea 
+          [(ngModel)]="adminMessage.text"
+          placeholder="Type your message here... (Users will receive this as a direct message)"
+          class="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none h-20"
+        ></textarea>
+        <button 
+          (click)="sendBulkMessage()"
+          [disabled]="!adminMessage.text || adminMessage.sending"
+          class="px-6 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-1"
+        >
+          <i class="fas fa-paper-plane" [class.fa-spinner]="adminMessage.sending" [class.fa-spin]="adminMessage.sending"></i>
+          <span class="text-[10px] uppercase tracking-widest">Send</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Filters Card -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-    <div class="flex items-center gap-2 mb-4 text-gray-700 font-semibold">
-      <i class="fas fa-filter text-indigo-500"></i>
-      <span>Filter Users</span>
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-2 text-gray-700 font-bold">
+        <i class="fas fa-filter text-indigo-500"></i>
+        <span>Advanced Filters & Search</span>
+      </div>
+      <button (click)="filters = {searchQuery: '', role:'', enabled:null, minReports:null, fromDate:'', toDate:''}; applyFilters()" 
+              class="text-xs font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider">
+        Reset All
+      </button>
     </div>
     
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-      <div class="space-y-1">
-        <label class="text-xs font-bold text-gray-400 uppercase">Role</label>
-        <select [(ngModel)]="filters.role" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
+      <div class="space-y-2 md:col-span-2 lg:col-span-1">
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Search</label>
+        <div class="relative">
+          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
+          <input type="text" [(ngModel)]="filters.searchQuery" (keyup.enter)="applyFilters()" placeholder="ID, Name, Email..." class="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Role</label>
+        <select [(ngModel)]="filters.role" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
           <option value="">All Roles</option>
           <option value="USER">User</option>
           <option value="ADMIN">Admin</option>
@@ -30,59 +91,72 @@
         </select>
       </div>
 
-      <div class="space-y-1">
-        <label class="text-xs font-bold text-gray-400 uppercase">Status</label>
-        <select [(ngModel)]="filters.enabled" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</label>
+        <select [(ngModel)]="filters.enabled" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
           <option [ngValue]="null">All Status</option>
-          <option [ngValue]="true">Enabled</option>
-          <option [ngValue]="false">Disabled</option>
+          <option [ngValue]="true">Enabled Only</option>
+          <option [ngValue]="false">Disabled Only</option>
         </select>
       </div>
 
-      <div class="space-y-1">
-        <label class="text-xs font-bold text-gray-400 uppercase">Min Reports</label>
-        <input type="number" [(ngModel)]="filters.minReports" placeholder="0" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Min Reports</label>
+        <div class="relative">
+          <i class="fas fa-exclamation-triangle absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
+          <input type="number" [(ngModel)]="filters.minReports" placeholder="0" class="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+        </div>
       </div>
 
-      <div class="space-y-1">
-        <label class="text-xs font-bold text-gray-400 uppercase">From Date</label>
-        <input type="date" [(ngModel)]="filters.fromDate" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Joined From</label>
+        <input type="date" [(ngModel)]="filters.fromDate" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
       </div>
 
-      <div class="space-y-1">
-        <label class="text-xs font-bold text-gray-400 uppercase">To Date</label>
-        <input type="date" [(ngModel)]="filters.toDate" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Joined To</label>
+        <input type="date" [(ngModel)]="filters.toDate" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
       </div>
     </div>
 
-    <div class="flex justify-end mt-6 gap-2">
-      <button (click)="filters = {role:'', enabled:null, minReports:null, fromDate:'', toDate:''}; applyFilters()" 
-              class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-        Reset Filters
-      </button>
+    <div class="flex justify-end mt-8">
       <button (click)="applyFilters()" 
-              class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+              class="px-8 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2">
+        <i class="fas fa-search"></i>
         Apply Filters
       </button>
     </div>
   </div>
 
   <!-- Table Section -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-    <app-table
-      [headers]="headers"
-      [plurarName]="'Users'"
-      [singleName]="'user'"
-      deleteURL="user/:id"
-      retrieveURL="user/all"
-      [extraParams]="filters"
-      [displayLink]="getDisplayLink"
-      editLink="/dashboard/Users/form/edit"
-      createLink="/dashboard/Users/form/create"
-      [showDeleteButton]="true"
-      [showUpdateButton]="true"
-      [showCreateButton]="true"
-      icon="fas fa-users"
-    ></app-table>
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="p-6 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+      <h3 class="font-bold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-list text-indigo-500"></i>
+        User Directory
+      </h3>
+    </div>
+    <div class="p-2">
+      <app-table
+        [headers]="headers"
+        [plurarName]="'Users'"
+        [singleName]="'user'"
+        deleteURL="user/:id"
+        retrieveURL="user/all"
+        [extraParams]="filters"
+        [displayLink]="getDisplayLink"
+        editLink="/dashboard/Users/form/edit"
+        createLink="/dashboard/Users/form/create"
+        [showDeleteButton]="true"
+        [showUpdateButton]="true"
+        [showCreateButton]="false"
+        [hideHeader]="true"
+        [selectable]="true"
+        [promptReason]="true"
+        (selectionChange)="onSelectionChange($event)"
+        icon="fas fa-users"
+      ></app-table>
+    </div>
   </div>
 </div>
+

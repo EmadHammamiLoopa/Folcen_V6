@@ -6,9 +6,11 @@
   },
   "files": [
     "src/main.ts",
-    "src/polyfills.ts"  // These are the main entry points for the app
+    "src/polyfills.ts",
+    "src/app/guards/session-init.resolver.ts"
   ],
   "include": [
-    "src/**/*.d.ts"  // Includes all declaration files in the source
+    "src/**/*.ts",
+    "src/**/*.d.ts"
   ]
 }

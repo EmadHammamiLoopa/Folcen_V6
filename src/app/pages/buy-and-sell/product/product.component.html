@@ -57,10 +57,8 @@
         </div>
       </div>
 
-      <div class="poster-info" (click)="goToPosterProfile()">
-        <div class="avatar-placeholder">
-          <i class="fas fa-user"></i>
-        </div>
+      <div class="poster-info" (click)="goToPosterProfile()" data-cy="poster-profile">
+        <app-avatar [profile]="poster" [size]="40" class="poster-avatar"></app-avatar>
         <div class="poster-details">
           <span class="posted-by">Posted by</span>
           <span class="poster-name">{{ poster?.firstName }} {{ poster?.lastName }}</span>
@@ -115,22 +113,22 @@
 
     <!-- Action Buttons -->
     <div class="action-footer" *ngIf="!isSeller">
-      <button class="contact-btn" (click)="contactSeller()">
+    <button class="contact-btn" (click)="contactSeller()" data-cy="contact-seller-btn">
         <i class="fas fa-comment-dots"></i>
         <span>Contact Seller</span>
       </button>
-      <button class="buy-btn" (click)="buyNow()">
+      <button class="buy-btn" (click)="buyNow()" data-cy="buy-now-btn">
         <i class="fas fa-shopping-bag"></i>
         <span>Buy Now</span>
       </button>
     </div>
 
     <div class="seller-actions" *ngIf="isSeller">
-      <button class="edit-btn" (click)="editProduct()">
+      <button class="edit-btn" (click)="editProduct()" data-cy="edit-listing-btn">
         <i class="fas fa-edit"></i>
         <span>Edit Listing</span>
       </button>
-      <button class="delete-btn" (click)="removeConfirmation()">
+      <button class="delete-btn" (click)="removeConfirmation()" data-cy="remove-listing-btn">
         <i class="fas fa-trash-alt"></i>
         <span>Remove</span>
       </button>

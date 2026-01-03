@@ -49,6 +49,13 @@ export class SigninComponent implements OnInit {
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required]],
     });
+
+    // Clear validation errors when user starts typing
+    this.form.valueChanges.subscribe(() => {
+      if (Object.keys(this.validationErrors).length > 0) {
+        this.validationErrors = {};
+      }
+    });
   }
 
   clearForm() {
@@ -91,43 +98,53 @@ export class SigninComponent implements OnInit {
       });
     
       console.log('Sign-in response:', resp);
-      this.pageLoading = false;
       this.user = new User().initialize(resp.data.user);
     
-  await this.storeUserData(resp.data.token, resp.data.user);
-  // centralize current user writes
-  try { this.userService.setCurrentUser(new User().initialize(resp.data.user)); } catch(e) {}
+      await this.storeUserData(resp.data.token, resp.data.user);
     
-      // ✅ 1️⃣ Initialize Socket first (without userId)
+      // ✅ Initialize Socket (idempotent)
       try {
         await SocketService.initializeSocket();
-        console.log('✅ WebSocket initialized successfully');
-    
-        // ✅ 2️⃣ Then register the user after connection established
-        await SocketService.initializeSocket(); // after you store token
-        SocketService.bindToAuthUser();         // no params
-
-        // ✅ 3️⃣ Optional: check if socket instance is live
-        const socket = await SocketService.getSocket();
-        console.log('✅ WebSocket instance retrieved:', socket.id);
+        SocketService.bindToAuthUser();
+        console.log('✅ WebSocket initialized and bound');
       } catch (error) {
         console.error('❌ WebSocket initialization failed:', error);
       }
     
+      this.pageLoading = false;
+
       if (!this.user.loggedIn) {
+        console.log('User not logged in according to flag, showing welcome alert');
         await this.showWelcomeAlert();
       }
     
-      this.router.navigate(['/tabs/new-friends']);
+      console.log('Navigating to /tabs/new-friends');
+      await this.router.navigate(['/tabs/new-friends']);
     }  catch (err) {
       this.pageLoading = false;
       console.error('Sign-in error:', err);
+
+      let message = 'An unexpected error occurred.';
+      if (err && err.error) {
+        if (typeof err.error === 'string') {
+          message = err.error;
+        } else if (err.error.message) {
+          message = err.error.message;
+        } else if (err.error.error) {
+          message = err.error.error;
+        }
+      } else if (err && err.message) {
+        message = err.message;
+      } else if (typeof err === 'string') {
+        message = err;
+      }
+
       if (err && err.errors) {
         this.validationErrors = err.errors;
-      } else if (typeof err === 'string') {
-        this.toastService.presentStdToastr(err);
+      } else if (err && err.error && err.error.errors && typeof err.error.errors === 'object') {
+        this.validationErrors = err.error.errors;
       } else {
-        this.toastService.presentStdToastr('An unexpected error occurred.');
+        this.toastService.presentErrorToastr(message);
       }
     }
   }
@@ -148,7 +165,8 @@ export class SigninComponent implements OnInit {
 
     try {
       // Use UserService to persist the authenticated user safely (will write canonical + legacy keys)
-      this.userService.setCurrentUser(new User().initialize(user));
+      const userObj = new User().initialize(user);
+      this.userService.setCurrentUser(userObj, { force: true });
     } catch (e) {
       console.warn('Failed to persist user via UserService, falling back to local writes', e);
       const userData = JSON.stringify(user);
@@ -187,20 +205,16 @@ export class SigninComponent implements OnInit {
       this.pageLoading = false;
       this.user = new User().initialize(resp.data.user);
   
-  await this.storeUserData(resp.data.token, resp.data.user);
-  // centralize current user writes
-  try { this.userService.setCurrentUser(new User().initialize(resp.data.user)); } catch(e) {}
+      await this.storeUserData(resp.data.token, resp.data.user);
 
-  // ✅ 1️⃣ Initialize Socket first (without userId)
-      await SocketService.initializeSocket();
-      console.log('✅ WebSocket initialized successfully');
-  
-      // ✅ 2️⃣ Register the user after connection established
-  await SocketService.initializeSocket(); // after you store token
-  SocketService.bindToAuthUser();         // no params  
-      // ✅ 3️⃣ Optional: Check if socket instance is live
-      const socket = await SocketService.getSocket();
-      console.log('✅ WebSocket instance retrieved:', socket.id);
+      // ✅ Initialize Socket (idempotent)
+      try {
+        await SocketService.initializeSocket();
+        SocketService.bindToAuthUser();
+        console.log('✅ WebSocket initialized and bound');
+      } catch (error) {
+        console.error('❌ WebSocket initialization failed:', error);
+      }
   
       if (!this.user.loggedIn) {
         await this.showWelcomeAlert();
@@ -210,12 +224,28 @@ export class SigninComponent implements OnInit {
     } catch (err) {
       this.pageLoading = false;
       console.error('Google Sign-In error:', err);
+
+      let message = 'An unexpected error occurred.';
+      if (err && err.error) {
+        if (typeof err.error === 'string') {
+          message = err.error;
+        } else if (err.error.message) {
+          message = err.error.message;
+        } else if (err.error.error) {
+          message = err.error.error;
+        }
+      } else if (err && err.message) {
+        message = err.message;
+      } else if (typeof err === 'string') {
+        message = err;
+      }
+
       if (err && err.errors) {
         this.validationErrors = err.errors;
-      } else if (typeof err === 'string') {
-        this.toastService.presentStdToastr(err);
+      } else if (err && err.error && err.error.errors && typeof err.error.errors === 'object') {
+        this.validationErrors = err.error.errors;
       } else {
-        this.toastService.presentStdToastr('An unexpected error occurred.');
+        this.toastService.presentErrorToastr(message);
       }
     }
   }

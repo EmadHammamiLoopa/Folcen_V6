@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Camera } from '@ionic-native/camera/ngx';
 import { Platform } from '@ionic/angular';
@@ -15,13 +15,16 @@ import { User } from 'src/app/models/User';
 import { Product } from 'src/app/models/Product';
 import { CategoryService } from './Categories.service';
 import { DisclaimerComponent } from './disclaimer.component';
+import { UserService } from 'src/app/services/user.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-product-form',
   templateUrl: './product-form.component.html',
   styleUrls: ['./product-form.component.scss'],
 })
-export class ProductFormComponent implements OnInit {
+export class ProductFormComponent implements OnInit, OnDestroy {
 
   @ViewChild('fileInput', { static: false }) fileInput: ElementRef;
   pageLoading = false;
@@ -38,6 +41,7 @@ export class ProductFormComponent implements OnInit {
   productId: string;
   completionPercentage = 0;
   acceptedTerms = false;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private camera: Camera,
@@ -52,7 +56,8 @@ export class ProductFormComponent implements OnInit {
     private modalController: ModalController,
     private adMobFeeService: AdMobFeeService,
     private route: ActivatedRoute,
-    private categoryService: CategoryService
+    private categoryService: CategoryService,
+    private userService: UserService
   ) { }
 
   ngOnInit() {
@@ -60,11 +65,11 @@ export class ProductFormComponent implements OnInit {
     this.form.valueChanges.subscribe(() => {
       this.calculateCompletion();
     });
-    this.platform.ready().then(() => {
-      if (this.platform.is('cordova')) {
-        this.initializeCordova();
+    this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      if (user) {
+        this.user = user;
+        console.log('User updated in ProductFormComponent:', this.user);
       }
-      this.getUserData();
     });
   
     this.route.paramMap.subscribe(params => {
@@ -79,6 +84,11 @@ export class ProductFormComponent implements OnInit {
     });
   
     this.fetchCategories();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
   
   initializeNewProduct() {
@@ -164,6 +174,8 @@ export class ProductFormComponent implements OnInit {
       price: ['', [Validators.required, Validators.maxLength(12)]],
       currency: ['', [Validators.required]],
       category: ['', [Validators.required]],
+      country: [''],
+      city: [''],
       stock: ['', [Validators.required, Validators.min(0)]],
       brand: [''],
       condition: [''],
@@ -183,40 +195,6 @@ export class ProductFormComponent implements OnInit {
     });
   }
 
-  getUserData() {
-    (async () => {
-      try {
-        let u: any = null;
-        try { u = await this.nativeStorage.getItem('currentUser'); } catch (e) {}
-        if (!u) try { u = await this.nativeStorage.getItem('user'); } catch (e) {}
-        if (u) {
-          console.log('Fetched user data from NativeStorage:', u);
-          this.initializeUser(u);
-        } else {
-          this.fetchUserFromLocalStorage();
-        }
-      } catch (error) {
-        console.warn('Error fetching user data from NativeStorage:', error);
-        this.fetchUserFromLocalStorage();
-      }
-    })();
-  }
-
-  fetchUserFromLocalStorage() {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
-    if (user) {
-      console.log('Fetched user data from localStorage:', user);
-      this.initializeUser(user);
-    } else {
-      console.log('User data not found in localStorage');
-    }
-  }
-
-  initializeUser(user: any) {
-    this.user = new User().initialize(user);
-    console.log('User initialized successfully:', this.user);
-  }
   pickImages() {
     if (this.platform.is('cordova')) {
       this.imageLoading = true;
@@ -239,7 +217,7 @@ export class ProductFormComponent implements OnInit {
           },
           err => {
             this.imageLoading = false;
-            this.toastService.presentStdToastr(err);
+            this.toastService.presentErrorToastr(err);
           }
         );
     } else {
@@ -322,11 +300,11 @@ export class ProductFormComponent implements OnInit {
 
   async submit() {
     if (this.productImages.length === 0 && !this.isEditMode) {
-      this.toastService.presentStdToastr('Please select images for your product');
+      this.toastService.presentErrorToastr('Please select images for your product');
       return;
     }
     if (!this.selectedCurrency) {
-      this.toastService.presentStdToastr('Please select a currency for your product');
+      this.toastService.presentErrorToastr('Please select a currency for your product');
       return;
     }
 
@@ -355,16 +333,18 @@ export class ProductFormComponent implements OnInit {
         (resp: any) => {
           this.pageLoading = false;
           this.loading = false;
-          this.toastService.presentStdToastr('Product updated successfully');
+          console.log('Product update response:', resp);
+          this.toastService.presentSuccessToastr('Product updated successfully');
           this.router.navigateByUrl('/tabs/buy-and-sell/products/sell');
         },
         (err) => {
           this.pageLoading = false;
           this.loading = false;
+          console.error('Product update error:', err);
           if (err.error && err.error.errors) {
             this.validatorErrors = err.error.errors;
           } else {
-            this.toastService.presentStdToastr('An error occurred');
+            this.toastService.presentErrorToastr('An error occurred');
           }
           console.log('Error response:', err);
         }
@@ -374,17 +354,19 @@ export class ProductFormComponent implements OnInit {
         (resp: any) => {
           this.pageLoading = false;
           this.loading = false;
-          this.toastService.presentStdToastr('Product created successfully');
+          console.log('Product store response:', resp);
+          this.toastService.presentSuccessToastr('Product created successfully');
           this.router.navigateByUrl('/tabs/buy-and-sell/products/sell');
           this.clearProductForm();
         },
         (err) => {
           this.pageLoading = false;
           this.loading = false;
+          console.error('Product store error:', err);
           if (err.error && err.error.errors) {
             this.validatorErrors = err.error.errors;
           } else {
-            this.toastService.presentStdToastr('An error occurred');
+            this.toastService.presentErrorToastr('An error occurred');
           }
           console.log('Error response:', err);
         }
@@ -430,7 +412,7 @@ export class ProductFormComponent implements OnInit {
       },
       err => {
         console.error('Error fetching product details:', err);
-        this.toastService.presentStdToastr('Error fetching product details.');
+        this.toastService.presentErrorToastr('Error fetching product details.');
       }
     );
   }
@@ -444,7 +426,7 @@ export class ProductFormComponent implements OnInit {
       },
       err => {
         console.error('Error fetching categories:', err);
-        this.toastService.presentStdToastr('Error fetching categories.');
+        this.toastService.presentErrorToastr('Error fetching categories.');
       }
     );
   }

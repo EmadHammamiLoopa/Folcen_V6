@@ -18,34 +18,31 @@ export class GuestGuard implements CanActivate {
       if (!this.platform.is('cordova')) {
         // Running in a browser
         const token = localStorage.getItem('token');
-        if (token) {
-          console.log('Auth token found, redirecting to /tabs/new-friends:', token);
+        const user = localStorage.getItem('currentUser') || localStorage.getItem('user');
+        if (token && user) {
+          console.log('Auth token and user found, redirecting to /tabs/new-friends');
           this.router.navigate(['/tabs/new-friends']);
           return false; // Prevent access to guest routes
         } else {
-          console.log('Auth token not found, allowing access to guest routes');
+          console.log('Auth token or user not found, allowing access to guest routes');
           return true; // Allow access to guest routes
         }
       }
 
       // Running on a Cordova platform
-      return this.nativeStorage.getItem('token')
-        .then(
-          token => {
-            if (token) {
-              console.log('Auth token found, redirecting to /tabs/new-friends:', token);
-              this.router.navigate(['/tabs/new-friends']);
-              return false; // Prevent access to guest routes
-            } else {
-              console.log('Auth token not found, allowing access to guest routes');
-              return true; // Allow access to guest routes
-            }
-          },
-          err => {
-            console.log('Auth token not found, allowing access to guest routes', err);
-            return true; // Allow access to guest routes in case of an error
-          }
-        );
+      return Promise.all([
+        this.nativeStorage.getItem('token').catch(() => null),
+        this.nativeStorage.getItem('currentUser').catch(() => this.nativeStorage.getItem('user').catch(() => null))
+      ]).then(([token, user]) => {
+        if (token && user) {
+          console.log('Auth token and user found, redirecting to /tabs/new-friends');
+          this.router.navigate(['/tabs/new-friends']);
+          return false; // Prevent access to guest routes
+        } else {
+          console.log('Auth token or user not found, allowing access to guest routes');
+          return true; // Allow access to guest routes
+        }
+      });
     });
   }
 }

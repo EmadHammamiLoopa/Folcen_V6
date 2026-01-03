@@ -1,0 +1,18 @@
+<div class="school-picker">
+  <label for="country-select">Country</label>
+  <select id="country-select" [(ngModel)]="selectedCountryCode" (ngModelChange)="onCountryChange($event)">
+    <option value="" disabled selected>Select a country</option>
+    <option *ngFor="let c of countries$ | async" [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+  </select>
+
+  <div *ngIf="selectedCountryCode">
+    <ng-container *ngIf="(universities$ | async) as unis">
+      <ul *ngIf="unis.length; else noUnis">
+        <li *ngFor="let u of unis">{{ u }}</li>
+      </ul>
+      <ng-template #noUnis>
+        <p>No universities found</p>
+      </ng-template>
+    </ng-container>
+  </div>
+</div>

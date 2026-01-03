@@ -32,6 +32,36 @@
     </div>
   </div>
 
+  <div class="explore-filters animate__animated animate__fadeIn" *ngIf="type === 'explore' && (channels.length > 0 || searchWord || selectedCategory)">
+    <div class="search-wrapper">
+      <ion-searchbar 
+        placeholder="Search channels..." 
+        [value]="searchWord" 
+        (ionInput)="search($any($event).detail.value)"
+        class="custom-searchbar"
+        mode="ios"
+      ></ion-searchbar>
+    </div>
+    
+    <div class="category-scroll">
+      <div 
+        class="category-chip" 
+        [class.active]="selectedCategory === ''"
+        (click)="onCategoryChange('')"
+      >
+        All
+      </div>
+      <div 
+        *ngFor="let cat of categories"
+        class="category-chip" 
+        [class.active]="selectedCategory.toLowerCase() === cat.toLowerCase()"
+        (click)="onCategoryChange(cat)"
+      >
+        {{ cat }}
+      </div>
+    </div>
+  </div>
+
   <div class="channels-grid" *ngIf="channels && channels.length">
     <div
       *ngFor="let channel of channels; let i = index"
@@ -58,6 +88,7 @@
       </div>
 
       <div class="card-body">
+        <div class="category-tag" *ngIf="channel.category && channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">{{ channel.category }}</div>
         <h3 class="channel-title">{{ channel.name }}</h3>
         <p class="channel-desc">{{ channel.description }}</p>
       </div>
@@ -71,8 +102,8 @@
         </div>
 
         <div class="actions">
-          <!-- User's own channel status -->
-          <div *ngIf="user && getChannelUserId(channel) === user._id" class="owner-actions">
+          <!-- User's own channel status (owner can delete non-system channels) -->
+          <div *ngIf="user && isOwner(channel)" class="owner-actions">
             <span class="status-tag" [class.approved]="channel.approved">
               {{ channel.approved ? 'Live' : 'Pending' }}
             </span>
@@ -84,14 +115,14 @@
             </button>
           </div>
 
-          <!-- Follow/Unfollow for others -->
+          <!-- Follow/Unfollow for others (including static channels). Static channels are now followable and will be shown by default in Followed view. -->
           <button
-            *ngIf="user && getChannelUserId(channel) !== user._id && getTypechannel(channel) !== 'static' && getTypechannel(channel) !== 'static_events' && getTypechannel(channel) !== 'static_dating'"
+            *ngIf="user && !isOwner(channel)"
             class="follow-btn"
-            [class.followed]="channel.followedBy(user._id)"
+            [class.followed]="channel.followedBy(authUserId)"
             (click)="follow(channel); $event.stopPropagation()"
           >
-            {{ !channel.followedBy(user._id) ? 'Follow' : 'Unfollow' }}
+            {{ !channel.followedBy(authUserId) ? 'Follow' : 'Unfollow' }}
           </button>
         </div>
       </div>
@@ -104,12 +135,12 @@
   </ion-infinite-scroll>
 </ion-content>
 
-<ion-fab position="fixed" vertical="bottom" horizontal="end" *ngIf="type == 'mines'">
+<ion-fab class="channel-fab" position="fixed" vertical="bottom" horizontal="end" *ngIf="type == 'mines'">
   <ion-fab-button routerLink="/tabs/channels/form" color="primary">
     <ion-icon name="add"></ion-icon>
   </ion-fab-button>
 </ion-fab>
-<ion-fab position="fixed" vertical="bottom" horizontal="end" *ngIf="type == 'followed'">
+<ion-fab class="channel-fab" position="fixed" vertical="bottom" horizontal="end" *ngIf="type == 'followed'">
   <ion-fab-button routerLink="/tabs/channels/list/explore" color="primary">
     <i class="fas fa-globe-americas"></i>
   </ion-fab-button>

@@ -16,7 +16,7 @@
 
   <div class="top-overlay" *ngIf="partner && !answered">
     <div class="minimal-caller-card">
-      <img [src]="partner?.mainAvatar || 'assets/default-avatar.png'" class="mini-avatar" />
+      <app-avatar [profile]="partner" [size]="60" class="mini-avatar"></app-avatar>
       <div class="info">
         <h3>{{ partner?.fullName }}</h3>
         <span class="status">{{ answer ? 'Incoming Call' : 'Calling...' }}</span>

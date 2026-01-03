@@ -1,6 +1,7 @@
 import { Request } from './Request';
 import { Message } from './Message';
 import constants from 'src/app/helpers/constants';
+import { AvatarUrlUtil } from '../utils/avatar-url.util';
 
 type RequestEnum = 'requesting' | 'requested';
 
@@ -12,6 +13,9 @@ interface UserSubscription {
 
 
 export class User {
+
+  // Normalize idempotency cache to avoid re-running heavy normalization for identical payloads
+  private static normalizationCache = new Map<string, { fingerprint: string; normalized: User }>();
 
   public _id: string;
   private _firstName: string;
@@ -45,6 +49,7 @@ export class User {
   private _subscription: UserSubscription | null;
   private _randomVisible: boolean;
   private _ageVisible: boolean;
+  private _genderVisible: boolean;
   private _loggedIn: boolean;
   private _visitProfile: boolean;
   private _profileCreated: boolean;
@@ -68,6 +73,65 @@ export class User {
   private _lastSeen: Date | null;  // <-- New property added here
   private _peerId: string | null;  // ✅ Add peerId property
   public _lastSeenText: string | null;
+  private _missedCallBudget: number; // ✅ Add budget property
+  private _avatarStyle: string;
+  private _avatarSeed: string;
+  private _avatarVariant: string;
+  private _avatarOverrides: any;
+
+  private static computeFingerprint(payload: any): string {
+    if (!payload) return '';
+    const id = payload._id || payload.id || '';
+    const updated = payload.updatedAt || payload.updated_at || '';
+    const followersLen = Array.isArray(payload.followers) ? payload.followers.length : 0;
+    const followingLen = Array.isArray(payload.following) ? payload.following.length : 0;
+    const friendsLen = Array.isArray(payload.friends) ? payload.friends.length : 0;
+    const interestsStr = Array.isArray(payload.interests)
+      ? payload.interests.join('|')
+      : (payload.interests || '');
+    const languagesStr = Array.isArray(payload.languages)
+      ? payload.languages.join('|')
+      : (payload.languages || '');
+    const avatarFields = [
+      payload.avatarStyle || '',
+      payload.avatarSeed || '',
+      payload.avatarVariant || '',
+      payload.avatarOverrides ? JSON.stringify(payload.avatarOverrides) : '',
+      payload.mainAvatar || '',
+      Array.isArray(payload.avatar) ? payload.avatar.join(',') : (payload.avatar || '')
+    ].join('|');
+    return [id, updated, payload.email || '', payload.birthDate || '', followersLen, followingLen, friendsLen, interestsStr, languagesStr, avatarFields].join('|');
+  }
+
+  private static decodeMaybeEncodedList(value: string): string[] | null {
+    if (!value || typeof value !== 'string') return null;
+
+    // Attempt base64 decode if it looks encoded and has no spaces
+    // Lenient check: allow missing padding and length > 4 to avoid false positives with short words
+    const looksBase64 = /^[A-Za-z0-9+/=]+$/.test(value) && value.length > 4;
+    if (looksBase64) {
+      try {
+        // Add padding if missing for atob
+        let b64 = value;
+        while (b64.length % 4 !== 0) b64 += "=";
+        const decoded = atob(b64);
+        if (decoded && /[A-Za-z]/.test(decoded)) {
+          const parts = decoded.split(/[,;|]/).map(p => p.trim()).filter(Boolean);
+          if (parts.length) return parts;
+        }
+      } catch (e) {
+        // ignore decode errors
+      }
+    }
+
+    // Fallback: if the string already contains separators, split it
+    if (value.indexOf(',') !== -1 || value.indexOf('|') !== -1 || value.indexOf(';') !== -1) {
+      const parts = value.split(/[,;|]/).map(p => p.trim()).filter(Boolean);
+      if (parts.length) return parts;
+    }
+
+    return null;
+  }
 
   constructor(
     id: string = '',
@@ -98,6 +162,7 @@ export class User {
     subscription: UserSubscription | null = null,
     randomVisible: boolean = false,
     ageVisible: boolean = false,
+    genderVisible: boolean = false,
     loggedIn: boolean = false,
     visitProfile: boolean = false,
     profileCreated: boolean = false,
@@ -121,7 +186,10 @@ export class User {
     lastSeen: Date | null = null,  // <-- Initialize lastSeen here
     peerId: string | null = null,  // ✅ Add peerId to constructor
     lastSeenText: string | null = null,
-
+    avatarStyle: string = 'avataaars',
+    avatarSeed: string = '',
+    avatarVariant: string = 'classic',
+    avatarOverrides: any = null,
   ) {
     this._id = id;
     this._firstName = firstName;
@@ -151,6 +219,7 @@ export class User {
     this._subscription = subscription;
     this._randomVisible = randomVisible;
     this._ageVisible = ageVisible;
+    this._genderVisible = genderVisible;
     this._loggedIn = loggedIn;
     this._visitProfile = visitProfile;
     this._profileCreated = profileCreated;
@@ -174,7 +243,10 @@ export class User {
     this._lastSeen = lastSeen;  // <-- Assign lastSeen here
     this._peerId = peerId;  // ✅ Assign peerId
     this._lastSeenText = lastSeenText;
-
+    this._avatarStyle = avatarStyle;
+    this._avatarSeed = avatarSeed;
+    this._avatarVariant = avatarVariant;
+    this._avatarOverrides = avatarOverrides;
   }
 
   // Getter methods
@@ -186,20 +258,93 @@ export class User {
   get gender(): string { return this._gender; }
   get birthDate(): Date | null { return this._birthDate; }
   get address(): string { return this._address; }
+  get aboutMe(): string { return this._aboutMe; }
   get status(): string { return this._status; }
   get avatar(): string[] { return this._avatar; }
+
+  /**
+   * Returns a filtered list of avatars, excluding default/placeholder ones.
+   * Each item contains the raw path and the full URL.
+   */
+  get avatars(): { path: string, url: string }[] {
+    if (!Array.isArray(this._avatar)) return [];
+    const timestamp = this._updatedAt ? this._updatedAt.getTime() : Date.now();
+    return this._avatar
+      .filter(path => !this.isDefaultAvatar(path))
+      .map(path => {
+        const url = this.avatarUrl(path);
+        const separator = url.includes('?') ? '&' : '?';
+        return {
+          path: path,
+          url: `${url}${separator}v=${timestamp}`
+        };
+      });
+  }
+
+  /**
+   * Public wrapper for constructAvatarUrl
+   */
+  public avatarUrl(path: string): string {
+    return this.constructAvatarUrl(path);
+  }
+
+  get mainAvatarPath(): string {
+    return this._mainAvatar;
+  }
+
   get mainAvatar(): string {
-    return this._mainAvatar ? this.constructAvatarUrl(this._mainAvatar) : this.getDefaultAvatar(this._gender);
+    const timestamp = this._updatedAt ? this._updatedAt.getTime() : Date.now();
+    
+    // 1. Prioritize real uploaded photo (mainAvatar) if it's not a DiceBear/Default URL
+    if (this._mainAvatar && !this.isDefaultAvatar(this._mainAvatar)) {
+      const url = this.constructAvatarUrl(this._mainAvatar);
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}v=${timestamp}`;
+    }
+
+    // 2. Fallback to customized avataaars if style is set
+    if (this._avatarStyle === 'avataaars') {
+      return AvatarUrlUtil.buildAvataaarsUrl({
+        avatarStyle: this._avatarStyle,
+        avatarSeed: this._avatarSeed,
+        avatarVariant: this._avatarVariant,
+        avatarOverrides: this._avatarOverrides,
+        _id: this._id
+      });
+    }
+
+    // 3. Last resort: Default DiceBear URL
+    return this.getDefaultAvatar(this._gender);
+  }
+
+  public isDefaultAvatar(avatarUrl: string): boolean {
+    if (!avatarUrl) return true;
+    const urlStr = String(avatarUrl);
+    return this.isOldDefaultAvatar(urlStr) || 
+           urlStr.includes('dicebear.com') || 
+           urlStr.includes('default-avatar.png') ||
+           urlStr.includes('avatar-placeholder');
   }
   
-  get aboutMe(): string { return this._aboutMe; }
+  get avatarStyle(): string { return this._avatarStyle; }
+  get avatarSeed(): string { return this._avatarSeed; }
+  get avatarVariant(): string { return this._avatarVariant; }
+  get avatarOverrides(): any { return this._avatarOverrides; }
   get lastSeen(): Date | null { return this._lastSeen; }  // <-- Add a getter for lastSeen
+  get role(): string { return this._role; }
 
   get friends(): any[] { return this._friends; }
   set friends(friends: any[]) { this._friends = friends; }
 
+  // Expose followed channels via public accessor to allow safe merges
+  get followedChannels(): any[] { return this._followedChannels; }
+  set followedChannels(channels: any[]) { this._followedChannels = Array.isArray(channels) ? channels : []; }
+
   get followers(): any[] { return this._followers; }
   set followers(followers: any[]) { this._followers = followers; }
+
+  get blockedUsers(): any[] { return this._blockedUsers; }
+  set blockedUsers(blocked: any[]) { this._blockedUsers = blocked; }
 
   get following(): any[] { return this._following; }
   set following(following: any[]) { this._following = following; }
@@ -237,12 +382,17 @@ export class User {
   get subscription(): UserSubscription | null { return this._subscription; }
   get randomVisible(): boolean { return this._randomVisible; }
   get ageVisible(): boolean { return this._ageVisible; }
+  get genderVisible(): boolean { return this._genderVisible; }
   get loggedIn(): boolean { return this._loggedIn; }
   get visitProfile(): boolean { return this._visitProfile; }
+  get updatedAt(): Date | null { return this._updatedAt; }
+  get createdAt(): Date | null { return this._createdAt; }
 
   get lastSeenText(): string | null { return this._lastSeenText; }
   set lastSeenText(lastSeenText: string | null) { this._lastSeenText = lastSeenText; }
   
+  get missedCallBudget(): number { return this._missedCallBudget; }
+  set missedCallBudget(value: number) { this._missedCallBudget = value; }
   
   public getPeerId(): string | null {
     return this._peerId;
@@ -278,15 +428,16 @@ set peerId(peerId: string | null) {
   }
 
   set mainAvatar(mainAvatar: string) { this._mainAvatar = mainAvatar; }
+  set avatarStyle(avatarStyle: string) { this._avatarStyle = avatarStyle; }
 
   set status(status: string) { this._status = status; }
   set education(education: string) { this._education = education; }
   set profession(profession: string) { this._profession = profession; }
-  set school(school: string) { this._school = school; }
-  set country(country: string) { this._country = country; }
-  set aboutMe(aboutMe: string) { this._aboutMe = aboutMe; }
+  set school(school: string) { this._school = (school === 'undefined' || !school) ? '' : school; }
+  set country(country: string) { this._country = (country === 'undefined' || !country || !String(country).trim()) ? '-' : String(country).trim(); }
+  set aboutMe(aboutMe: string) { this._aboutMe = (aboutMe === 'undefined' || !aboutMe) ? '' : aboutMe; }
 
-  set city(city: string) { this._city = city; }
+  set city(city: string) { this._city = (city === 'undefined' || !city || !String(city).trim()) ? '-' : String(city).trim(); }
   set interests(interests: string[]) {
     this._interests = interests.filter(interest => interest.trim().length > 0);
     this.sortInterests();
@@ -308,6 +459,7 @@ set peerId(peerId: string | null) {
   }
   set randomVisible(randomVisible: boolean) { this._randomVisible = randomVisible; }
   set ageVisible(ageVisible: boolean) { this._ageVisible = ageVisible; }
+  set genderVisible(genderVisible: boolean) { this._genderVisible = genderVisible; }
   set loggedIn(loggedIn: boolean) { this._loggedIn = loggedIn; }
   set visitProfile(visitProfile: boolean) { this._visitProfile = visitProfile; }
 
@@ -327,6 +479,15 @@ set peerId(peerId: string | null) {
   }
 
   public getMainAvatar(): string {
+    if (this._avatarStyle === 'avataaars') {
+      return AvatarUrlUtil.buildAvataaarsUrl({
+        avatarStyle: this._avatarStyle,
+        avatarSeed: this._avatarSeed,
+        avatarVariant: this._avatarVariant,
+        avatarOverrides: this._avatarOverrides,
+        _id: this._id
+      });
+    }
     if (this._mainAvatar) {
       return this._mainAvatar.startsWith('http') ? this._mainAvatar : `${constants.DOMAIN_URL}${this._mainAvatar}`;
     }
@@ -336,14 +497,26 @@ set peerId(peerId: string | null) {
 
 
   private getDefaultAvatar(gender: string): string {
-    switch (gender) {
-      case 'male':
-        return `${constants.DOMAIN_URL}/public/images/avatars/male.webp`; // Replace with actual male default avatar URL
-      case 'female':
-        return `${constants.DOMAIN_URL}/public/images/avatars/female.webp`; // Replace with actual female default avatar URL
-      default:
-        return `${constants.DOMAIN_URL}/public/images/avatars/other.webp`; // Replace with actual other default avatar URL
-    }
+    const seed = this._id || Math.random().toString(36).substring(7);
+    // Use avataaars with happy eyes and smile mouth for a "happy face" default
+    return `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&eyes=happy&mouth=smile`;
+  }
+
+  private isOldDefaultAvatar(avatar: string): boolean {
+    if (!avatar) return false;
+    const oldDefaults = [
+      'male.webp', 'female.webp', 'other.webp',
+      '/public/images/avatars/male.webp',
+      '/public/images/avatars/female.webp',
+      '/public/images/avatars/other.webp',
+      'http://127.0.0.1:3300/public/images/avatars/male.webp',
+      'http://127.0.0.1:3300/public/images/avatars/female.webp',
+      'http://127.0.0.1:3300/public/images/avatars/other.webp',
+      'dicebear.com/9.x/bottts', // Old monster/robot style
+      'dicebear.com/7.x/bottts',
+      'dicebear.com/6.x/bottts'
+    ];
+    return oldDefaults.some(d => avatar.includes(d));
   }
 
   public getId(): string {
@@ -395,6 +568,26 @@ set peerId(peerId: string | null) {
   }
 
   initialize(user: any): User {
+    if (!user) return this;
+    if (typeof user === 'string') {
+      this._id = user;
+      return this;
+    }
+    const cacheKey = user && (user._id || user.id) ? String(user._id || user.id) : null;
+    const fingerprint = User.computeFingerprint(user);
+    if (cacheKey && fingerprint) {
+      const cached = User.normalizationCache.get(cacheKey);
+      if (cached && cached.fingerprint === fingerprint) {
+        console.log('📍 Skipping re-normalize for identical user payload', cacheKey);
+        return cached.normalized;
+      }
+    }
+    try {
+      const w: any = (typeof window !== 'undefined') ? window : {};
+      const counters = w.__initCounters || {};
+      counters.userInit = (counters.userInit || 0) + 1;
+      w.__initCounters = counters;
+    } catch (_) {}
    // console.log('Initializing user:', user);
 
     // tolerate Buffer-like or numeric-indexed objects produced by some backends
@@ -435,6 +628,18 @@ set peerId(peerId: string | null) {
         }
       }
 
+      // If backend returned underscored keys (e.g. `_firstName`), expose them without underscore
+      const normalizeUnderscoredKeys = (obj: any) => {
+        if (!obj || typeof obj !== 'object') return;
+        Object.keys(obj).forEach(k => {
+          if (k && k.startsWith('_')) {
+            const naked = k.slice(1);
+            if (!(naked in obj)) obj[naked] = obj[k];
+          }
+        });
+      };
+      normalizeUnderscoredKeys(user);
+
       // Normalize nested _id/id fields that might be buffers
       if (user && typeof user === 'object') {
         const maybeFixId = (candidate: any): string | null => {
@@ -446,6 +651,29 @@ set peerId(peerId: string | null) {
           return null;
         };
 
+        const maybeDecodeString = (candidate: any): string | null => {
+          if (!candidate || typeof candidate === 'string') return candidate;
+          const b = tryExtractBytes(candidate) || tryExtractBytes(candidate.buffer) || tryExtractBytes(candidate.data);
+          if (b && b.length) {
+            try { return new TextDecoder().decode(new Uint8Array(b)); } catch(e) {}
+          }
+          return null;
+        };
+
+        const maybeDecodeArray = (candidate: any): string[] | null => {
+          if (!candidate) return null;
+          if (Array.isArray(candidate)) return candidate.map(item => maybeDecodeString(item) || String(item));
+          const b = tryExtractBytes(candidate) || tryExtractBytes(candidate.buffer) || tryExtractBytes(candidate.data);
+          if (b && b.length) {
+            try {
+              const decoded = new TextDecoder().decode(new Uint8Array(b));
+              if (decoded.startsWith('[') && decoded.endsWith(']')) return JSON.parse(decoded);
+              return [decoded];
+            } catch(e) {}
+          }
+          return null;
+        };
+
         if (user._id && typeof user._id !== 'string') {
           const nid = maybeFixId(user._id);
           if (nid) user._id = nid;
@@ -454,30 +682,121 @@ set peerId(peerId: string | null) {
           const nid2 = maybeFixId(user.id);
           if (nid2) user._id = nid2;
         }
+
+        // normalize messages that may have underscored properties like _from, _createdAt, etc.
+        if (Array.isArray(user.messages)) {
+          user.messages = user.messages.map((m: any) => {
+            if (!m || typeof m !== 'object') return m;
+            const nm: any = {};
+            Object.keys(m).forEach(k => {
+              const nk = k.startsWith('_') ? k.slice(1) : k;
+              nm[nk] = m[k];
+            });
+            return nm;
+          });
+        }
+
+        // Decode fields that might be buffers
+        ['firstName', 'lastName', 'email', 'gender', 'address', 'aboutMe', 'status', 'education', 'profession', 'school', 'country', 'city'].forEach(key => {
+          if (user[key] && typeof user[key] !== 'string') {
+            const decoded = maybeDecodeString(user[key]);
+            if (decoded !== null) user[key] = decoded;
+          }
+        });
+
+        ['interests', 'languages'].forEach(key => {
+          if (user[key] && !Array.isArray(user[key])) {
+            const decoded = maybeDecodeArray(user[key]);
+            if (decoded !== null) user[key] = decoded;
+          } else if (Array.isArray(user[key])) {
+            user[key] = user[key].map((item: any) => maybeDecodeString(item) || String(item));
+          }
+        });
       }
     } catch (e) {
       console.warn('Error during user normalization:', e);
     }
     console.log('⚠️ Received raw user data from backend:', user);
+    console.log('🔍 DEBUG interests type:', typeof user.interests, 'value:', user.interests);
+    console.log('🔍 DEBUG languages type:', typeof user.languages, 'value:', user.languages);
+    
+    // Performance monitoring
+    if (typeof (window as any).__perfMonitor !== 'undefined') {
+      console.log('📍 User normalize caller stack:', new Error().stack);
+      (window as any).__perfMonitor.incrementUserNormalize();
+    }
 
-    this._id = user._id || '';
+    // Ensure simple defaults for missing country/city from backend payload
+    try {
+      if (!user.country || (typeof user.country === 'string' && !user.country.trim())) user.country = '-';
+      if (!user.city || (typeof user.city === 'string' && !user.city.trim())) user.city = '-';
+    } catch (e) {}
+
+    this._id = user._id || user.id || '';
     this._firstName = user.firstName || '';
     this._lastName = user.lastName || '';
     this._email = user.email || '';
-    this._birthDate = user.birthDate ? new Date(user.birthDate) : null;
+    this._birthDate = this.safeDate(user.birthDate);
     this._gender = user.gender || 'Not specified';
     this._address = user.address || '';
     this._aboutMe = user.aboutMe || '';
     this.avatar = Array.isArray(user.avatar) ? this.filterCustomAvatars(user.avatar, user.gender) : [];
-    this._mainAvatar = user.mainAvatar || this.getDefaultAvatar(this._gender);
+    
+    let mainAv = user.mainAvatar;
+    if (!mainAv || this.isOldDefaultAvatar(mainAv)) {
+      this._mainAvatar = this.getDefaultAvatar(this._gender);
+    } else {
+      this._mainAvatar = mainAv;
+    }
+
     this._status = user.status || '';
-    this._education = user.education || 'Undefined';
-    this._profession = user.profession || 'Undefined';
-    this._school = user.school || 'Undefined';
-    this._interests = Array.isArray(user.interests) ? (user.interests.length ? user.interests : ['No Interests']) : ['No Interests'];
-    this._languages = Array.isArray(user.languages) ? user.languages : [];
-    this._country = user.country || '';
-    this._city = user.city || '';
+    this._education = (user.education === 'undefined' || !user.education) ? 'Undefined' : user.education;
+    this._profession = (user.profession === 'undefined' || !user.profession) ? 'Undefined' : user.profession;
+    this._school = (user.school === 'undefined' || !user.school) ? '' : user.school;
+    
+    // Handle interests - ensure it's always an array
+    if (Array.isArray(user.interests)) {
+      if (user.interests.length === 1 && typeof user.interests[0] === 'string') {
+        const decoded = User.decodeMaybeEncodedList(user.interests[0]);
+        this._interests = decoded || user.interests;
+      } else {
+        this._interests = user.interests.length ? user.interests : ['No Interests'];
+      }
+    } else if (typeof user.interests === 'string') {
+      // Attempt to decode encoded/serialized lists first
+      const decodedList = User.decodeMaybeEncodedList(user.interests);
+      if (decodedList && decodedList.length) {
+        this._interests = decodedList;
+      } else {
+        this._interests = user.interests.split(',').map(i => i.trim()).filter(Boolean);
+        if (!this._interests.length) this._interests = ['No Interests'];
+      }
+    } else {
+      this._interests = ['No Interests'];
+    }
+    
+    // Handle languages - ensure it's always an array
+    if (Array.isArray(user.languages)) {
+      if (user.languages.length === 1 && typeof user.languages[0] === 'string') {
+        const decoded = User.decodeMaybeEncodedList(user.languages[0]);
+        this._languages = decoded || user.languages;
+      } else {
+        this._languages = user.languages;
+      }
+    } else if (typeof user.languages === 'string') {
+      // Attempt to decode encoded/serialized lists first
+      const decodedLanguages = User.decodeMaybeEncodedList(user.languages);
+      if (decodedLanguages && decodedLanguages.length) {
+        this._languages = decodedLanguages;
+      } else {
+        this._languages = user.languages.split(',').map(l => l.trim()).filter(Boolean);
+      }
+    } else {
+      this._languages = [];
+    }
+    
+    this._country = user.country ? String(user.country).trim() : '-';
+    this._city = user.city ? String(user.city).trim() : '-';
     this._followed = !!user.followed;
     this._friend = !!user.friend;
     this._isFriend = user.isFriend === undefined ? !!user.friend : !!user.isFriend;
@@ -491,10 +810,11 @@ set peerId(peerId: string | null) {
     this._messages = Array.isArray(user.messages) ? user.messages.map((msg: any) => new Message().initialize(msg)) : [];
     this._subscription = user.subscription ? {
       id: user.subscription.id,
-      expireDate: user.subscription.expireDate ? new Date(user.subscription.expireDate) : null
+      expireDate: this.safeDate(user.subscription.expireDate)
     } : null;
     this._randomVisible = user.randomVisible || false;
-    this._ageVisible = !!user.ageVisible;
+    this._ageVisible = user.ageVisible !== undefined ? !!user.ageVisible : true;
+    this._genderVisible = user.genderVisible !== undefined ? !!user.genderVisible : true;
     this._loggedIn = !!user.loggedIn;
     this._visitProfile = user.visitProfile ?? false;
     this._profileCreated = !!user.profileCreated;
@@ -504,23 +824,58 @@ set peerId(peerId: string | null) {
     this._role = user.role || 'USER';
     this._banned = !!user.banned;
     this._reports = Array.isArray(user.reports) ? user.reports : [];
-    this._followers = Array.isArray(user.followers) ? user.followers : [];
-    this._following = Array.isArray(user.following) ? user.following : [];
-    this._friends = Array.isArray(user.friends) ? user.friends : [];
-    this._blockedUsers = Array.isArray(user.blockedUsers) ? user.blockedUsers : [];
-    this._followedChannels = Array.isArray(user.followedChannels) ? user.followedChannels : [];
-    this._messagedUsers = Array.isArray(user.messagedUsers) ? user.messagedUsers : [];
-    this._deletedAt = user.deletedAt ? new Date(user.deletedAt) : null;
-    this._createdAt = user.createdAt ? new Date(user.createdAt) : null;
-    this._updatedAt = user.updatedAt ? new Date(user.updatedAt) : null;
+    
+    // Normalize ID arrays to ensure they contain strings, not Buffer-like objects
+    const normalizeIdArray = (arr: any[]) => {
+      if (!Array.isArray(arr)) return [];
+      return arr.map(item => {
+        if (typeof item === 'string') return item;
+        if (item && (item._id || item.id)) return String(item._id || item.id);
+        // Handle Buffer-like objects
+        const b = tryExtractBytes(item) || tryExtractBytes(item.buffer) || tryExtractBytes(item.data);
+        if (b && b.length) return b.map(x => ('0' + (x & 0xFF).toString(16)).slice(-2)).join('');
+        return String(item);
+      });
+    };
+
+    this._followers = normalizeIdArray(user.followers);
+    this._following = normalizeIdArray(user.following);
+    this._friends = normalizeIdArray(user.friends);
+    this._blockedUsers = normalizeIdArray(user.blockedUsers);
+    
+    // Handle followedChannels - allow populated objects
+    this._followedChannels = Array.isArray(user.followedChannels) ? user.followedChannels.map(c => {
+      if (c && typeof c === 'object' && (c._id || c.id)) return c;
+      return normalizeIdArray([c])[0];
+    }) : [];
+
+    this._messagedUsers = normalizeIdArray(user.messagedUsers);
+
+    this._deletedAt = this.safeDate(user.deletedAt);
+    this._createdAt = this.safeDate(user.createdAt);
+    this._updatedAt = this.safeDate(user.updatedAt);
     this._salt = user.salt || '';
     this._hashed_password = user.hashed_password || '';
-    this._lastSeen = user.lastSeen ? new Date(user.lastSeen) : null;  // <-- Initialize lastSeen here
+    this._lastSeen = this.safeDate(user.lastSeen);  // <-- Initialize lastSeen here
     this._lastSeenText = user.lastSeenText || null;
 
     this._peerId = user.peerId || null;  // ✅ Assign peerId
+    this._missedCallBudget = user.missedCallBudget || 0; // ✅ Assign budget
+
+    this._avatarStyle = user.avatarStyle !== undefined ? user.avatarStyle : 'avataaars';
+    this._avatarSeed = user.avatarSeed || '';
+    this._avatarVariant = user.avatarVariant || 'classic';
+    this._avatarOverrides = user.avatarOverrides || null;
+
+    if (cacheKey && fingerprint) {
+      User.normalizationCache.set(cacheKey, { fingerprint, normalized: this });
+    }
     console.log('✅ After initialization, lastSeenText:', this.lastSeenText);
-    console.log('✅ After initialization, full User object:', this.toObject());
+    try {
+      console.log('✅ After initialization, full User object:', JSON.stringify(this.toObject()));
+    } catch(e) {
+      console.log('✅ After initialization, full User object (raw):', this.toObject());
+    }
 
     if (!this._profileCreated) {
       this._profileCreated = true;
@@ -536,14 +891,7 @@ set peerId(peerId: string | null) {
   }
 
   private filterCustomAvatars(avatars: string[], gender: string): string[] {
-    const defaultAvatar = this.getDefaultAvatar(gender);
-    const normalizedDefaultAvatar = this.normalizeAvatarPath(defaultAvatar);
-  
-    return avatars.filter(avatar => {
-      const normalizedAvatar = this.normalizeAvatarPath(avatar);
-      console.log(`Comparing normalizedAvatar: ${normalizedAvatar} with normalizedDefaultAvatar: ${normalizedDefaultAvatar}`);
-      return normalizedAvatar !== normalizedDefaultAvatar;
-    });
+    return avatars.filter(avatar => !this.isDefaultAvatar(avatar));
   }
   
   
@@ -579,12 +927,14 @@ set peerId(peerId: string | null) {
       _id: this._id,
       firstName: this._firstName,
       lastName: this._lastName,
+      fullName: this.fullName,
       email: this._email,
       birthDate: this._birthDate,
       gender: this._gender,
       address: this._address,
       avatar: this._avatar,
-      mainAvatar: this._mainAvatar,
+      // provide a resolved, usable avatar URL for consumers
+      mainAvatar: this.getMainAvatar(),
       status: this._status,
       education: this._education,
       profession: this._profession,
@@ -601,6 +951,7 @@ set peerId(peerId: string | null) {
       } : null,
       randomVisible: this._randomVisible,
       ageVisible: this._ageVisible,
+      genderVisible: this._genderVisible,
       loggedIn: this._loggedIn,
       visitProfile: this._visitProfile,
       profileCreated: this._profileCreated,
@@ -626,7 +977,16 @@ set peerId(peerId: string | null) {
       hashed_password: this._hashed_password,
       aboutMe: this._aboutMe, // Added aboutMe field
       lastSeenText: this._lastSeenText,
-
+      avatarStyle: this._avatarStyle,
+      avatarSeed: this._avatarSeed,
+      avatarVariant: this._avatarVariant,
+      avatarOverrides: this._avatarOverrides,
     };
+  }
+
+  private safeDate(val: any): Date | null {
+    if (!val) return null;
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
   }
 }

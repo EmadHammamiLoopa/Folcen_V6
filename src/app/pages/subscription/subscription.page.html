@@ -19,7 +19,7 @@
   </div>
 </app-header>
 
-<app-loader *ngIf="loading"></app-loader>
+<app-sandglass-loader [visible]="loading" message="Please wait"></app-sandglass-loader>
 
 <ion-content>
   <div class="h-100 flex flex-column px-4" *ngIf="!loading && subscription && user">

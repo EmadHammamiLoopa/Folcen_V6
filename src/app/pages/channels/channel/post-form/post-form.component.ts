@@ -26,6 +26,8 @@ export class PostFormComponent implements OnInit {
   eventDate: string = '';      // Event Date
   eventLocation: string = '';  // Event Location
   eventTime: string = '';      // Event Time
+  minDate: string = new Date().toISOString(); // Minimum date for events (today)
+  maxDate: string = (new Date().getFullYear() + 20).toString(); // Maximum year for events
 
   relationshipGoals: string = '';
   ageRange = { lower: 18, upper: 99 };  // Adjusted to use `lower` and `upper` for ion-range
@@ -40,7 +42,7 @@ export class PostFormComponent implements OnInit {
     { background: '#10b981', text: '#ffffff' }, // Emerald
     { background: '#f59e0b', text: '#ffffff' }, // Amber
     { background: '#0f172a', text: '#ffffff' }, // Slate
-    { background: '#ffffff', text: '#0f172a' }, // White
+    { background: '#cbd5e1', text: '#0f172a' }, // Cool Slate Blue (Replaced White)
     { background: '#ec4899', text: '#ffffff' }, // Pink
   ];
 
@@ -51,6 +53,13 @@ export class PostFormComponent implements OnInit {
 
   postText = "";
   @ViewChild('fileInput', { static: false }) fileInput: ElementRef;
+  visibilitySelectOptions = {
+    cssClass: 'visibility-popover',
+    backdropDismiss: true,
+    showBackdrop: true,
+    animated: true,
+    mode: 'md'
+  } as const;
 
   constructor(private channelService: ChannelService, private route: ActivatedRoute,private toastService: ToastService, private modalCtrl:
               ModalController, private sanitizer: DomSanitizer) { }
@@ -87,6 +96,7 @@ export class PostFormComponent implements OnInit {
     setTimeout(() => this.shouldAutoGrow = true, 50);
   }
 
+
   
   triggerFileInput() {
     this.fileInput.nativeElement.click();
@@ -101,7 +111,7 @@ export class PostFormComponent implements OnInit {
       // Sanitize the blob URL
       this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
     } else {
-      this.toastService.presentStdToastr('Invalid media file selected');
+      this.toastService.presentErrorToastr('Invalid media file selected');
     }
   }
   
@@ -131,14 +141,14 @@ removeMedia() {
   // Reset the file input to allow the same file to be selected again
   this.fileInput.nativeElement.value = ''; 
 
-  this.toastService.presentStdToastr('Media file removed.');
+  this.toastService.presentSuccessToastr('Media file removed.');
 }
 
 
 addPost() {
   // Ensure postText is not null or undefined and check if it's empty after trimming
   if (!this.postText || !this.postText.trim()) {
-    this.toastService.presentStdToastr('Please add text or media before submitting.');
+    this.toastService.presentErrorToastr('Please add text or media before submitting.');
     return;
   }
 
@@ -156,6 +166,10 @@ addPost() {
 
   // Event-specific logic for static_events channels
   if (this.channel.type === 'static_events') {
+    if (!this.eventDate || !this.eventTime || !this.eventLocation) {
+      this.toastService.presentErrorToastr('Please fill all event details (Date, Time, Location)');
+      return;
+    }
     formData.append('eventDate', this.eventDate);
     formData.append('eventLocation', this.eventLocation);
     formData.append('eventTime', this.eventTime);
@@ -163,8 +177,9 @@ addPost() {
 
   if (this.channel.type === 'static_dating') {
     formData.append('relationshipGoals', this.relationshipGoals);
-    formData.append('ageRange', JSON.stringify(this.ageRange));
-    formData.append('interests', JSON.stringify(this.interests));
+    formData.append('ageRangeMin', this.ageRange.lower.toString());
+    formData.append('ageRangeMax', this.ageRange.upper.toString());
+    formData.append('interests', this.interests.toString());
     formData.append('hintAboutMe', this.hintAboutMe);
   }
 
@@ -176,7 +191,7 @@ addPost() {
       this.postLoading = false;
 
       // Successfully added the post
-      this.toastService.presentStdToastr('Post created successfully');
+      this.toastService.presentSuccessToastr('Post created successfully');
 
       // Reset form values
       this.resetForm();
@@ -189,7 +204,7 @@ addPost() {
     (err) => {
       this.postLoading = false;
       const errorMessage = err.error?.errors?.text?.[0] || err.message || 'Failed to create post';
-      this.toastService.presentStdToastr(`Error creating post: ${errorMessage}`);
+      this.toastService.presentErrorToastr(`Error creating post: ${errorMessage}`);
     }
   );
 }

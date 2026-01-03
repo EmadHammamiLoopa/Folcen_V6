@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 
 import { SmallBusinessPageRoutingModule } from './small-business-routing.module';
+import { SharedComponentsModule } from '../../components/shared.module';
 
 import { SmallBusinessPage } from './small-business.page';
 
@@ -16,7 +17,8 @@ import { SmallBusinessPage } from './small-business.page';
     FormsModule,
     IonicModule,
     SmallBusinessPageRoutingModule,
-    SharingModule
+    SharingModule,
+    SharedComponentsModule
   ],
   declarations: [
     SmallBusinessPage,

@@ -1,15 +1,118 @@
 .contaienr{
-  position: absolute;
-  top: 0px;
-  left: 0px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
-  // background-color: rgba(0, 0, 0, 0.5);
-  z-index: 100;
+  z-index: 99999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2); // subtle backdrop to help centering feel grounded
 }
 
-.spinner-container{
-  border-radius: 14px!important;
-  // background-color: rgba(0, 0, 0, 0.6);
-  color: var(--ion-color-primary)!important;
+.glass-loader {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+
+  :host-context(body.light-theme) & {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(0, 0, 0, 0.05);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.hourglass-mini {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--ion-color-primary);
+  border-radius: 50%;
+  margin-bottom: 8px;
+  animation: rotate-hourglass 2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+
+  &::before, &::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    transform: translateX(-50%);
+  }
+
+  &::before {
+    top: 4px;
+    border-top: 10px solid var(--ion-color-primary);
+    animation: sand-top 2s linear infinite;
+  }
+
+  &::after {
+    bottom: 4px;
+    border-bottom: 10px solid var(--ion-color-primary);
+    animation: sand-bottom 2s linear infinite;
+  }
+
+  .sand-stream {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.5px;
+    height: 0;
+    background: var(--ion-color-primary);
+    transform: translateX(-50%);
+    animation: stream 2s linear infinite;
+  }
+}
+
+@keyframes stream {
+  0% { height: 0; top: 50%; opacity: 0; }
+  10% { height: 12px; top: 16px; opacity: 1; }
+  40% { height: 12px; top: 16px; opacity: 1; }
+  45% { height: 0; top: 28px; opacity: 0; }
+  100% { height: 0; top: 28px; opacity: 0; }
+}
+
+@keyframes rotate-hourglass {
+  0% { transform: rotate(0deg); }
+  40% { transform: rotate(0deg); }
+  60% { transform: rotate(180deg); }
+  100% { transform: rotate(180deg); }
+}
+
+@keyframes sand-top {
+  0% { border-top-width: 10px; opacity: 1; }
+  40% { border-top-width: 0px; opacity: 0.4; }
+  60% { border-top-width: 0px; opacity: 0.4; }
+  100% { border-top-width: 10px; opacity: 1; }
+}
+
+@keyframes sand-bottom {
+  0% { border-bottom-width: 0px; opacity: 0.4; }
+  40% { border-bottom-width: 10px; opacity: 1; }
+  60% { border-bottom-width: 10px; opacity: 1; }
+  100% { border-bottom-width: 0px; opacity: 0.4; }
+}
+
+.loader-text { 
+  color: #ffffff; 
+  font-size: 0.85rem; 
+  font-weight: 600;
+  letter-spacing: 0.03em;
+
+  :host-context(body.light-theme) & {
+    color: var(--ion-color-dark);
+  }
 }

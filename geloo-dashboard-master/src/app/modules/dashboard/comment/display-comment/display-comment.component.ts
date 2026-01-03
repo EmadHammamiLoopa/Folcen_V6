@@ -22,7 +22,7 @@ export class DisplayCommentComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.route.queryParams.subscribe(params => {
+    this.route.params.subscribe(params => {
       const id = params['id'];
       if (id) {
         this.fetchComment(id);

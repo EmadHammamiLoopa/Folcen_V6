@@ -33,6 +33,11 @@ export class ListComponent implements OnInit {
       type: "text"
     },
     {
+      name: "severity",
+      title: "Severity",
+      type: "severity"
+    },
+    {
       name: "userId",
       title: "User ID",
       type: "text"

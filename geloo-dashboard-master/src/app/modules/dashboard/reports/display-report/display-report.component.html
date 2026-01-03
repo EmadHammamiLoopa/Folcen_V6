@@ -13,10 +13,23 @@
         </div>
       </div>
     </div>
-    <div class="space-x-2">
-      <button (click)="takeAction('ignore')" class="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600">Ignore</button>
-      <button (click)="takeAction('removeContent')" class="bg-orange-500 text-white px-3 py-2 rounded hover:bg-orange-600">Remove Content</button>
-      <button (click)="takeAction('banUser')" class="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700">Ban User</button>
+    <div class="flex gap-2">
+      <button (click)="takeAction('ignore')" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg font-medium hover:bg-gray-200 transition">Ignore</button>
+      <button (click)="takeAction('removeContent')" class="bg-orange-50 text-orange-700 border border-orange-200 px-3 py-2 rounded-lg font-medium hover:bg-orange-100 transition">Remove Content</button>
+      
+      <div class="relative group">
+        <button class="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700 transition flex items-center gap-2">
+          Ban User <i class="fas fa-chevron-down text-xs"></i>
+        </button>
+        <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 hidden group-hover:block">
+          <button (click)="takeAction('ban_1h')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition">Ban for 1 Hour</button>
+          <button (click)="takeAction('ban_24h')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition">Ban for 24 Hours</button>
+          <button (click)="takeAction('ban_7d')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition">Ban for 7 Days</button>
+          <button (click)="takeAction('ban_permanent')" class="w-full text-left px-4 py-2 text-sm text-red-600 font-bold hover:bg-red-600 hover:text-white transition">Permanent Ban</button>
+          <div class="border-t my-1"></div>
+          <button (click)="takeAction('deleteUser')" class="w-full text-left px-4 py-2 text-sm text-red-800 font-black hover:bg-red-100 transition">DELETE ACCOUNT (GDPR)</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -36,10 +49,25 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-500">Reporter</label>
-              <a *ngIf="report.user" [routerLink]="['/dashboard/Users/display', itemId(report.user)]" class="text-blue-500 hover:underline">
+              <a *ngIf="report.user && itemId(report.user)" [routerLink]="['/dashboard/Users/display', itemId(report.user)]" class="text-blue-500 hover:underline">
                 {{ report.user.email || itemId(report.user) }}
               </a>
-              <span *ngIf="!report.user">Unknown</span>
+              <span *ngIf="!report.user || !itemId(report.user)" class="text-gray-600 italic">
+                {{ report.isAnonymous ? 'Anonymous' : 'Unknown' }}
+              </span>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Severity Level</label>
+              <div class="mt-1">
+                <span [ngClass]="{
+                  'bg-blue-100 text-blue-800': report.severity === 'low',
+                  'bg-yellow-100 text-yellow-800': report.severity === 'medium',
+                  'bg-orange-100 text-orange-800': report.severity === 'high',
+                  'bg-red-100 text-red-800': report.severity === 'critical'
+                }" class="px-3 py-1 rounded-full text-xs font-bold uppercase shadow-sm border">
+                  {{ report.severity || 'medium' }}
+                </span>
+              </div>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-500">Created At</label>
@@ -51,6 +79,40 @@
 
       <div class="bg-white rounded shadow-sm p-4">
         <h3 class="text-lg font-semibold border-b pb-2 mb-4">Reported Content</h3>
+        
+        <!-- Evidence Images (e.g. Gallery Photos) -->
+        <div *ngIf="report.evidence && report.evidence.length > 0" class="mb-4 space-y-2">
+          <p class="text-sm font-medium text-gray-500">Evidence / Reported Images:</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div *ngFor="let img of report.evidence" class="rounded-lg overflow-hidden border bg-gray-100">
+              <img [src]="getEvidenceUrl(img)" class="w-full h-48 object-cover hover:scale-105 transition-transform cursor-pointer" (click)="openImage(img)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Media Preview Section -->
+        <div *ngIf="getMediaUrl() && report.entityModel !== 'User'" class="mb-4 rounded-lg overflow-hidden border bg-black flex items-center justify-center min-h-[200px]">
+          <video *ngIf="isMediaVideo()" [src]="getMediaUrl()" controls class="max-h-[400px] w-full"></video>
+          <img *ngIf="!isMediaVideo()" [src]="getMediaUrl()" class="max-h-[400px] object-contain" alt="Reported Media">
+        </div>
+
+        <!-- User Profile Report (No full image needed) -->
+        <div *ngIf="report.entityModel === 'User' || report.entityModel === 'Photo'" class="mb-4 p-6 bg-gray-50 rounded-lg border flex items-center gap-4">
+          <img [src]="report.entity?.mainAvatar ? (report.entity.mainAvatar.startsWith('http') ? report.entity.mainAvatar : getEvidenceUrl(report.entity.mainAvatar)) : 'assets/img/default-avatar.png'" 
+               class="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm">
+          <div>
+            <p class="font-bold text-gray-800">{{ report.entityModel === 'Photo' ? 'Photo Owner' : 'User Profile Report' }}</p>
+            <p class="text-sm text-gray-500">Reporting {{ report.entityModel === 'Photo' ? 'a photo from' : 'the account of' }} {{ report.entity ? report.entity.firstName : '' }} {{ report.entity ? report.entity.lastName : '' }}</p>
+          </div>
+        </div>
+
+        <!-- GDPR Expired Media Placeholder -->
+        <div *ngIf="!getMediaUrl() && (report.entity && report.entity.media && report.entity.media.expiryDate)" class="mb-4 p-8 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-500">
+          <i class="fas fa-eye-slash text-3xl mb-2"></i>
+          <p class="font-medium">Media Expired (GDPR)</p>
+          <p class="text-xs">This content was automatically removed per data retention policy.</p>
+        </div>
+
         <div class="flex items-center justify-between p-4 bg-blue-50 rounded border border-blue-100">
           <div>
             <div class="text-sm text-blue-600 font-semibold uppercase tracking-wider">{{ report.entityModel }}</div>
@@ -76,7 +138,13 @@
               class="w-full border rounded p-2 text-sm" 
               placeholder="Add notes about the action taken..."></textarea>
           </div>
-          <div class="text-xs text-gray-500 italic">
+          <button (click)="takeAction('resolve')" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition">
+            Mark as Resolved
+          </button>
+          <button (click)="takeAction('dismiss')" class="w-full bg-gray-200 text-gray-700 py-2 rounded-lg font-bold hover:bg-gray-300 transition">
+            Dismiss Report
+          </button>
+          <div class="text-xs text-gray-500 italic mt-2">
             Notes will be saved with the report status update.
           </div>
         </div>

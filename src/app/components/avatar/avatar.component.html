@@ -1,0 +1,24 @@
+<div class="avatar-container" [style.width.px]="size" [style.height.px]="size" [class.premium-ring]="premium" [class.rounded]="shape === 'rounded'">
+  <img 
+    *ngIf="avatarUrl && !hasError" 
+    [src]="avatarUrl" 
+    (error)="handleError()"
+    [style.width.px]="size" 
+    [style.height.px]="size"
+    alt="Avatar"
+  />
+  <div 
+    *ngIf="!avatarUrl || hasError" 
+    class="fallback"
+    [style.width.px]="size" 
+    [style.height.px]="size"
+    [style.font-size.px]="size * 0.4"
+  >
+    <ng-container *ngIf="initials && initials !== '?'; else noInitials">
+      {{ initials }}
+    </ng-container>
+    <ng-template #noInitials>
+      <i class="fas fa-user"></i>
+    </ng-template>
+  </div>
+</div>

@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "geloo-dashboard": {
+    "folcen-dashboard": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -20,7 +20,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
-            "outputPath": "dist/geloo-dashboard",
+            "outputPath": "dist/folcen-dashboard",
             "index": "src/index.html",
             "main": "src/main.ts",
             "polyfills": "src/polyfills.ts",
@@ -73,18 +73,18 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "geloo-dashboard:build"
+            "browserTarget": "folcen-dashboard:build"
           },
           "configurations": {
             "production": {
-              "browserTarget": "geloo-dashboard:build:production"
+              "browserTarget": "folcen-dashboard:build:production"
             }
           }
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "geloo-dashboard:build"
+            "browserTarget": "folcen-dashboard:build"
           }
         },
         "test": {
@@ -121,16 +121,16 @@
           "builder": "@angular-devkit/build-angular:protractor",
           "options": {
             "protractorConfig": "e2e/protractor.conf.js",
-            "devServerTarget": "geloo-dashboard:serve"
+            "devServerTarget": "folcen-dashboard:serve"
           },
           "configurations": {
             "production": {
-              "devServerTarget": "geloo-dashboard:serve:production"
+              "devServerTarget": "folcen-dashboard:serve:production"
             }
           }
         }
       }
     }
   },
-  "defaultProject": "geloo-dashboard"
+  "defaultProject": "folcen-dashboard"
 }

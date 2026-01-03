@@ -56,13 +56,6 @@ export class MenuComponent implements OnInit {
       icon: "fas fa-exclamation-triangle",
       path: "/dashboard/reports"
     },
-
-    {
-      name: "subscriptions",
-      icon: "fas fa-exclamation-triangle",
-      path: "/dashboard/subscriptions"
-    },
-
   ];
   user: User;
 
@@ -70,13 +63,15 @@ export class MenuComponent implements OnInit {
 
   ngOnInit(): void {
     this.getUser();
-    if(this.user.role == 'ADMIN'){
-      this.menuItems.push(
-        {
-          name: "subscriptions",
-          icon: "fas fa-money-check-alt",
-          path: "/dashboard/subscriptions/"
-        });
+    // Ensure both ADMIN and SUPER ADMIN see the subscriptions menu
+    const isAdmin = this.user && (this.user.role === 'ADMIN' || this.user.role === 'SUPER ADMIN');
+    
+    if (isAdmin) {
+      this.menuItems.push({
+        name: "subscriptions",
+        icon: "fas fa-money-check-alt",
+        path: "/dashboard/subscriptions/"
+      });
     }
   }
 

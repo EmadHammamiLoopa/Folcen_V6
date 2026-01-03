@@ -4,30 +4,31 @@ import { WebView } from '@ionic-native/ionic-webview/ngx';
 import { UploadFileService } from './../../../services/upload-file.service';
 import { MessageService } from './../../../services/message.service';
 import { User } from 'src/app/models/User';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, ParamMap } from '@angular/router';
 import { UserService } from './../../../services/user.service';
 import { Message } from './../../../models/Message';
 import { Camera } from '@ionic-native/camera/ngx';
 import { ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
-import { IonContent, IonInfiniteScroll, Platform, AlertController } from '@ionic/angular';
+import { IonContent, IonInfiniteScroll, Platform, AlertController, ModalController } from '@ionic/angular';
 import { SocketService } from 'src/app/services/socket.service';
-import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { ProductService } from 'src/app/services/product.service';
 import { Product } from 'src/app/models/Product';
-import { from } from 'rxjs';
+import { from, Subject, Observable } from 'rxjs';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
-import { take } from 'rxjs/operators';
+import { take, takeUntil, filter } from 'rxjs/operators';
 import { File as IonicFile, FileEntry } from '@ionic-native/file/ngx';
 import { FilePath } from '@ionic-native/file-path/ngx';
 import { NgZone } from '@angular/core';
 import { AppEventsService } from 'src/app/services/app-events.service';
 import { WebrtcService } from 'src/app/services/webrtc.service';
 import { IdService } from 'src/app/services/id.service';
+import { ImageModalComponent } from 'src/app/components/image-modal/image-modal.component';
+import { SessionStoreService } from 'src/app/services/session-store.service';
 
 
 
 interface ImageFileObject {
-  file: File;
+  file: any;
   imageData: string;
 }
 
@@ -46,6 +47,7 @@ const waitUntil = (cond: () => boolean, step = 100) =>
 
 
 export class ChatComponent implements OnInit {
+  private destroy$ = new Subject<void>();
   videoCallDeclined = false;
 
   page = 0;
@@ -60,6 +62,8 @@ private loadingMessages = false;
   sentMessages = {};
   index = 0;
   private listenersBound = false;
+
+  private lastLoadedPeerId: string | null = null;
 
   image: string = null;
   imageFile: ImageFileObject = null;
@@ -92,10 +96,25 @@ activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | null, messageI
               private platform: Platform, private uploadFileService: UploadFileService, private webView: WebView,  private file: IonicFile,
               private filePath: FilePath,private zone: NgZone, private badges: AppEventsService,
               private toastService: ToastService, private location: Location, private router: Router, private productService: ProductService, 
-              private alertController: AlertController, private socketService: SocketService, private nativeStorage: NativeStorage,
-              private webRTC: WebrtcService, private idService: IdService) {
+              private alertController: AlertController, private modalCtrl: ModalController, private socketService: SocketService,
+              private webRTC: WebrtcService, private idService: IdService, private sessionStore: SessionStoreService) {
                 // Backwards-compatible alias: some files expect `webrtcService`
                 (this as any).webrtcService = this.webRTC;
+  }
+
+  async openImage(url: string) {
+    if (!url) return;
+    try {
+      const modal = await this.modalCtrl.create({
+        component: ImageModalComponent,
+        componentProps: { image: url },
+        cssClass: 'image-fullscreen-modal'
+      });
+      await modal.present();
+    } catch (e) {
+      // fallback: open in new tab/window
+      try { window.open(url, '_blank'); } catch (_) {}
+    }
   }
 
 ionViewWillLeave() {
@@ -160,21 +179,39 @@ isLatestCall(message: Message): boolean {
 }
   ngOnInit() {
     console.log("ngOnInit called");
-    this.getAuthUser();
-  
-    this.route.paramMap.subscribe(params => {
+    
+    this.userService.currentUser$
+      .pipe(
+        takeUntil(this.destroy$),
+        filter(user => !!user)
+      )
+      .subscribe((user: User) => {
+        this.authUser = user;
+        console.log('✅ Authenticated user (stream):', this.authUser);
+        this.initializeSocket();
+      });
+
+    this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe((params: ParamMap) => {
       let userIdRaw = params.get('id');
       if (userIdRaw) {
         try { userIdRaw = decodeURIComponent(userIdRaw); } catch(e) {}
         const normalized = this.idService.normalizeId(userIdRaw) || userIdRaw;
         console.log("User ID detected (raw/normalized):", userIdRaw, normalized);
+        
+        // ✅ Reset state for new user thread
+        if (this.user?.id !== normalized) {
+          this.messages = [];
+          this.groupedMessages = [];
+          this.page = 0;
+          if (this.infScroll) this.infScroll.disabled = false;
+        }
+
         this.getUserProfile(normalized);
         this.videoCallDeclined = false;
-        this.initializeSocket(); // Pass userId directly
       }
     });
   
-    this.route.queryParams.subscribe(queryParams => {
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(queryParams => {
       const productId = queryParams['productId'];
       if (productId) {
         console.log("Product ID detected:", productId);
@@ -184,6 +221,29 @@ isLatestCall(message: Message): boolean {
     });
     this.setupActivityTracking();
 
+    // Refresh peer/auth profiles when notified by server
+    try {
+      SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
+        try {
+          const uid = payload?.userId;
+          if (!uid) return;
+          // if it's the chat peer or the auth user, refresh
+          const peerId = this.user && (this.user._id || this.user.id || this.user.id);
+          const authId = this.authUser && (this.authUser._id || this.authUser.id);
+          if (String(uid) === String(peerId)) {
+            this.userService.getUserProfile(uid, { forceRefresh: true }).pipe(takeUntil(this.destroy$)).subscribe(u => {
+              if (u && u._id) { this.user = u; this.changeDetection.detectChanges(); }
+            }, () => {});
+          }
+          if (String(uid) === String(authId)) {
+            // refresh current user observable
+            this.userService.getUserProfile(uid, { forceRefresh: true }).pipe(takeUntil(this.destroy$)).subscribe(u => {
+              if (u && u._id) this.userService.setCurrentUser(u);
+            }, () => {});
+          }
+        } catch (e) { console.warn('chat profile update handler error', e); }
+      });
+    } catch (e) {}
   }
   
   private async ensureRealId(m: Message, timeout = 5000): Promise<string|null> {
@@ -227,6 +287,8 @@ isLatestCall(message: Message): boolean {
   }
   
 ngOnDestroy() {
+  this.destroy$.next();
+  this.destroy$.complete();
   if (this.socket?.connected && this.user?.id) {
     this.socket.emit('leave-chat', { withUser: this.user.id });
   }
@@ -235,32 +297,13 @@ ngOnDestroy() {
 }
 
   ionViewWillEnter() {
-  this.inSession = true;
-  this.sessionStart = Date.now();
-  this.activeVideoCall = { status: null, messageId: undefined }
-  
-  console.log("ionViewWillEnter called");
-  // Do not reset global messages badge when entering a chat thread —
-  // clearing should be handled by markThreadRead() so we only clear per-user counts.
-
-    //this.pageLoading = true;
-    this.getUserId();
-    if (this.authUser && this.authUser.id) {
-      this.route.paramMap.subscribe(params => {
-        console.log("user params..................detected:", params);
-
-        let userIdRaw = params.get('id');
-        if (userIdRaw) {
-          try { userIdRaw = decodeURIComponent(userIdRaw); } catch(e) {}
-          const normalized = this.idService.normalizeId(userIdRaw) || userIdRaw;
-          this.getUserProfile(normalized);
-        } else if (this.productId) {
-          this.getProductDetails(this.productId);
-        } else {
-          this.pageLoading = false;
-        }
-      });
-    }
+    this.inSession = true;
+    this.sessionStart = Date.now();
+    this.activeVideoCall = { status: null, messageId: undefined }
+    
+    console.log("ionViewWillEnter called");
+    // Do not reset global messages badge when entering a chat thread —
+    // clearing should be handled by markThreadRead() so we only clear per-user counts.
   }
   
   toggleMediaOptions() {
@@ -294,13 +337,19 @@ ngOnDestroy() {
       err => {
         this.pageLoading = false;
         if (event) event.target.complete();
-        this.toastService.presentStdToastr(err);
+        this.toastService.presentErrorToastr(err);
       }
     );
   }
 
   goBack() {
     this.location.back();
+  }
+
+  isAdminChat(): boolean {
+    if (!this.user) return false;
+    const role = (this.user.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
   }
   
   openMenu() {
@@ -311,7 +360,7 @@ ngOnDestroy() {
 async acceptVideoCall(message: Message) {
   message['busy'] = true;
   const realId = await this.ensureRealId(message);
-  if (!realId) { message['busy'] = false; return this.toastService.presentStdToastr('Still preparing… try again'); }
+  if (!realId) { message['busy'] = false; return this.toastService.presentErrorToastr('Still preparing… try again'); }
 
   const other = message.from === this.authUser.id ? message.to : message.from;
   this.socket.emit('video-call-accepted', {
@@ -325,7 +374,7 @@ async acceptVideoCall(message: Message) {
 async cancelVideoCallRequest(message: Message) {
   message['busy'] = true;
   const realId = await this.ensureRealId(message);
-  if (!realId) { message['busy'] = false; return this.toastService.presentStdToastr('Still preparing… try again'); }
+  if (!realId) { message['busy'] = false; return this.toastService.presentErrorToastr('Still preparing… try again'); }
 
   const other = message.from === this.authUser.id ? message.to : message.from;
   this.socket.emit('video-call-cancelled', {
@@ -361,71 +410,40 @@ async cancelVideoCallRequest(message: Message) {
     this.pageLoading = true;
     (async () => {
       try {
-        let user: any = null;
-        try { user = await this.nativeStorage.getItem('currentUser'); } catch (e) { /* ignore */ }
-        if (!user) {
-          // Try canonical 'currentUser' then fallback to legacy 'user'
-          try { user = await this.nativeStorage.getItem('currentUser'); } catch (e) { /* ignore */ }
-          if (!user) { try { user = await this.nativeStorage.getItem('user'); } catch (e2) { /* ignore */ } }
-        }
-
+        const user = await this.sessionStore.init();
         if (user) {
-          this.authUser = new User().initialize(user);
-          console.log('✅ Authenticated user:', this.authUser);
-          this.getUserId();
-        } else {
-          this.fallbackToLocalStorage();
+          this.authUser = user;
+          console.log('✅ Authenticated user (session store):', this.authUser);
+          // Initialize socket; route paramMap subscription will load the recipient profile
+          this.initializeSocket();
+          return;
         }
+        console.error('❌ No authenticated user available');
+        this.handleUserInitError();
       } catch (err) {
-        this.fallbackToLocalStorage();
+        console.error('❌ Failed to initialize auth user from session store', err);
+        this.handleUserInitError();
       }
     })();
   }
   
-  fallbackToLocalStorage() {
-    try {
-      const stored = localStorage.getItem('currentUser') || localStorage.getItem('user');
-      if (stored) {
-        const parsedUser = JSON.parse(stored);
-        this.authUser = new User().initialize(parsedUser);
-        console.log("✅ Loaded from localStorage:", this.authUser);
-        this.getUserId();
-      } else {
-        console.error("❌ No user data found.");
-        this.pageLoading = false;
-      }
-    } catch (err) {
-      console.error("❌ Error parsing localStorage user data:", err);
-      this.pageLoading = false;
-    }
-  }
-  
-  
+
 
   handleUserInitError() {
     this.pageLoading = false;
     this.router.navigate(['/auth/signin']);
   }
 
-  getUserId() {
-    if (this.authUser && this.authUser.id) {
-      this.route.paramMap.subscribe(params => {
-        const id = params.get('id');
-        if (id && this.authUser.id !== id) {
-          this.getUserProfile(id); // Fetch the recipient's profile (seller)
-        } else {
-          console.error('Recipient ID is the same as authenticated user ID or missing');
-          this.handleUserInitError();
-        }
-      });
-    } else {
-      this.handleUserInitError();
-    }
-  }
-  
-  
+
 getUserProfile(userId: string) {
   if (!userId) { this.pageLoading = false; return; }
+
+  // Avoid duplicate fetches for the same peer during a single view session
+  if (this.lastLoadedPeerId === userId && this.user?.id === userId) {
+    this.pageLoading = false;
+    return;
+  }
+  this.lastLoadedPeerId = userId;
 
   console.log('Fetching profile for user ID:', userId);
   this.userService.getUserProfile(userId).subscribe(
@@ -436,13 +454,13 @@ getUserProfile(userId: string) {
       if (raw?.id === this.authUser?.id && userId !== this.authUser.id) {
         console.warn('⚠️ Backend returned self instead of friend, skipping.');
         this.pageLoading = false;
-        this.toastService.presentStdToastr('Sorry, this user is not available');
+        this.toastService.presentErrorToastr('Sorry, this user is not available');
         return this.location.back();
       }
 
       if (!raw) {
         this.pageLoading = false;
-        this.toastService.presentStdToastr('Sorry, this user is not available');
+        this.toastService.presentErrorToastr('Sorry, this user is not available');
         return this.location.back();
       }
 
@@ -451,23 +469,20 @@ getUserProfile(userId: string) {
 
       await waitUntil(() => !!this.authUser?.id);
 
-      
-      if (!this.messages.length) {
-        await this.getMessages();
-      } else {
-  this.pageLoading = false;             // ✅ prevent lingering loader when messages already exist
-}
-
+      // ✅ Always fetch messages to ensure history is loaded, but clear cache first
+      // to avoid showing stale data if a message was just sent from another view.
+      this.messageService.clearCacheForThread(this.user.id);
+      await this.getMessages();
     },
     err => {
       this.pageLoading = false;
 
       if (err.status === 403 || err.status === 404) {
-        this.toastService.presentStdToastr('This user is not available anymore');
+        this.toastService.presentErrorToastr('This user is not available anymore');
         return this.location.back();
       }
 
-      this.toastService.presentStdToastr('Error loading user profile');
+      this.toastService.presentErrorToastr('Error loading user profile');
       this.location.back();
     }
   );
@@ -532,7 +547,10 @@ groupMessagesByDate() {
 
 // Format date for grouping
 formatMessageDate(date: Date | string): string {
+  if (!date) return 'Unknown Date';
   const messageDate = new Date(date);
+  if (isNaN(messageDate.getTime())) return 'Unknown Date';
+  
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -558,10 +576,50 @@ formatMessageDate(date: Date | string): string {
 
 // Format time for display
 formatMessageTime(date: Date | string): string {
-  return new Date(date).toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit' 
-  });
+  if (!date) return '—';
+  // Accept Date objects, ISO strings, or numeric timestamps
+  let d: Date;
+  try {
+    if (date instanceof Date) d = date as Date;
+    else if (!isNaN(Number(date))) d = new Date(Number(date));
+    else d = new Date(String(date));
+  } catch (e) {
+    return '—';
+  }
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+// Derive a date from a Mongo ObjectId string (first 8 hex chars are seconds)
+private dateFromObjectId(id: string): Date | null {
+  try {
+    if (!id || typeof id !== 'string') return null;
+    if (!/^[a-fA-F0-9]{24}$/.test(id)) return null;
+    const secs = parseInt(id.slice(0, 8), 16);
+    if (isNaN(secs)) return null;
+    return new Date(secs * 1000);
+  } catch (e) { return null; }
+}
+
+// Normalize messages: if a message has a createdAt very close to 'now' (likely set locally),
+// but the message id encodes an older timestamp, replace createdAt with the id-derived time.
+private normalizeMessagesTimestamps(): void {
+  try {
+    const now = Date.now();
+    for (const m of this.messages) {
+      try {
+        const id = (m as any).id || (m as any)._id;
+        const created = m.createdAt instanceof Date ? m.createdAt.getTime() : (m.createdAt ? new Date(m.createdAt).getTime() : 0);
+        // if createdAt is within 5s of now, it's probably a local placeholder
+        if (created && Math.abs(now - created) < 5000 && id) {
+          const derived = this.dateFromObjectId(String(id));
+          if (derived) {
+            m.createdAt = derived;
+          }
+        }
+      } catch (_) {}
+    }
+  } catch (e) { console.warn('normalizeMessagesTimestamps failed', e); }
 }
 
   // Scroll to bottom when new messages arrive
@@ -598,17 +656,21 @@ async getMessages(event?) {
       newMessages.forEach(m => { if (!seen.has(m.id)) this.messages.unshift(m); });
 
       if (this.page === 1) this.markThreadRead();
+      // Normalize timestamps derived from ObjectIds for messages that lacked createdAt
+      try { this.normalizeMessagesTimestamps(); } catch(_) {}
       this.groupMessagesByDate();
       this.recomputeActiveCall();
   if (!resp?.data?.more && this.infScroll) this.infScroll.disabled = true;
     }
   } catch (err) {
     console.error('❌ getMessages error:', err);
-    this.toastService.presentStdToastr('Failed to load messages');
+    this.toastService.presentErrorToastr('Failed to load messages');
   } finally {
     this.loadingMessages = false;   // ✅ always release lock
     this.pageLoading = false;       // ✅ always hide overlay
     event?.target?.complete?.();
+    // Ensure the UI updates immediately (clears loader / refreshes groupedMessages)
+    try { this.changeDetection.detectChanges(); } catch (e) { /* ignore */ }
   }
 }
 
@@ -656,7 +718,7 @@ private recomputeActiveCall() {
           console.log('Friend info:', resp);
         },
         err => {
-          this.toastService.presentStdToastr('Error fetching friend info');
+          this.toastService.presentErrorToastr('Error fetching friend info');
         }
       );
   }
@@ -678,7 +740,9 @@ const normalize = (m: any): Message => {
   const copy: any = { ...m };
   copy.id = copy.id || copy._id || `${copy.from}-${copy.to}-${copy.createdAt || Date.now()}`;
   copy.tempId = copy.tempId ?? m.tempId;     // ⬅️ keep tempId for replacement
-  copy.createdAt = copy.createdAt ? new Date(copy.createdAt) : new Date();
+  // Do not default to `new Date()` here — leave undefined/null so Message.initialize
+  // can derive a proper timestamp (e.g. from ObjectId) instead of showing 'now'
+  copy.createdAt = copy.createdAt ? new Date(copy.createdAt) : null;
   if (copy.image && typeof copy.image === 'object' && copy.image.path) {
     copy.image = copy.image.path;
   }
@@ -713,10 +777,14 @@ this.socket.on('new-message', (raw: any) => {
 
       if (this.user && (msg.from === this.user.id || msg.to === this.user.id)) {
         this.markThreadRead();
+        // ✅ Clear REST cache for this thread since we just received a live update
+        this.messageService.clearCacheForThread(this.user.id);
       }
       if (this.messages.some(m => m.id === msg.id)) return;
 
       this.messages.push(msg);
+      // Normalize timestamps in-case msg was stamped with local 'now' earlier
+      try { this.normalizeMessagesTimestamps(); } catch(_) {}
       if (msg.type === 'video-call-request') this.recomputeActiveCall(); // <— add
       this.groupMessagesByDate();
       this.scrollToBottom();
@@ -745,6 +813,10 @@ this.socket.on('message-sent', (saved: any) => {
     }
 
     if (msg.type === 'video-call-request') this.recomputeActiveCall(); // <— add
+
+    // Normalize timestamps in case server-sent object lacked createdAt and
+    // a previous local placeholder used current time.
+    try { this.normalizeMessagesTimestamps(); } catch(_) {}
 
     this.groupMessagesByDate();
     this.changeDetection.detectChanges();
@@ -889,7 +961,7 @@ onVideoButtonPressed() {
   }
 
   if (this.activeVideoCall.status === 'pending') {
-    return this.toastService.presentStdToastr('Waiting for a response…');
+    return this.toastService.presentSuccessToastr('Waiting for a response…');
   }
 
   // no active request -> open confirm and send a request
@@ -932,7 +1004,7 @@ private handleIncomingVideoCall(message: Message) {
             }
           },
           err => {
-            this.toastService.presentStdToastr(err);
+            this.toastService.presentErrorToastr(err);
             reject(false);
           }
         );
@@ -1002,7 +1074,7 @@ private async uploadImageAndGetUrl(): Promise<string> {
     return uploadResponse?.fileUrl || null;
   } catch (error) {
     console.error('Image upload failed:', error);
-    this.toastService.presentStdToastr('Failed to upload image');
+    this.toastService.presentErrorToastr('Failed to upload image');
     return null;
   }
 }
@@ -1050,7 +1122,7 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     image: message.image ?? null,
     type: message.type || (this.productId ? 'product' : 'friend'),
     productId: message.productId ?? this.productId ?? null,
-    createdAt: message.createdAt || new Date(),
+    createdAt: message.createdAt ?? null,
   };
 
   // Update local temp message immediately
@@ -1062,6 +1134,9 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
 
   // Queue-safe emit (works even if socket reconnects)
   SocketService.emit('send-message', payload);
+  
+  // ✅ Clear REST cache for this thread so subsequent loads (or re-entry) get the new message
+  this.messageService.clearCacheForThread(this.user.id);
 
   return true;
 }
@@ -1079,7 +1154,7 @@ async addMessage() {
   if (!this.conversationStarted()) {
     // Provide user feedback instead of silently clearing the input
     const name = this.user?.fullName || 'the user';
-    this.toastService.presentStdToastr(`Please wait for ${name} to reply before sending more messages.`);
+    this.toastService.presentErrorToastr(`Please wait for ${name} to reply before sending more messages.`);
     return;
   }
 
@@ -1184,7 +1259,7 @@ async pickMedia(mediaType: 'image' | 'video') {
 
   } catch (err) {
     console.error('Error capturing media:', err);
-    this.toastService.presentStdToastr('Failed to capture media');
+    this.toastService.presentErrorToastr('Failed to capture media');
   }
 }
 
@@ -1322,7 +1397,7 @@ showUproduct() {
     // Ensure conversation is started and the user can still send messages (if non-friend)
     if (!this.conversationStarted() || !this.nonFriendsChatEnabled()) {
       console.log("Cannot request video call: conversation not started or message limit reached.");
-      this.toastService.presentStdToastr('Please start a conversation first');
+      this.toastService.presentErrorToastr('Please start a conversation first');
       return;
     }
   

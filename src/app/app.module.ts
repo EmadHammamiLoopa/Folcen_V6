@@ -53,6 +53,9 @@ import { EditProductComponent } from './edit-product/edit-product.component';
 import { MissedCallsModalComponent } from './pages/messages/list/missed-calls-modal.component';
 import { EventsComponent } from './pages/admin/events/events.component';
 import { AcceptancesComponent } from './pages/admin/acceptances/acceptances.component';
+import { ImageModalComponent } from './components/image-modal/image-modal.component';
+import { SchoolPickerComponent } from './components/school-picker/school-picker.component';
+import { SharedComponentsModule } from './components/shared.module';
 
 @NgModule({
   declarations: [
@@ -66,10 +69,16 @@ import { AcceptancesComponent } from './pages/admin/acceptances/acceptances.comp
     AcceptancesComponent,
     EditProductComponent 
     , MissedCallsModalComponent
+    , ImageModalComponent
+    , SchoolPickerComponent
   ],
   imports: [
     BrowserModule,
     IonicModule.forRoot(),
+    SharedComponentsModule,
+    // Shared components (loader, small UI widgets)
+    // keep this near App imports so lazy modules can import SharedComponentsModule themselves
+    
     AppRoutingModule,
     FormsModule,
     HttpClientModule,

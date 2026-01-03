@@ -618,10 +618,12 @@ export class WebrtcService {
       VideoEvents.MISSED_TIMEOUT as any,
       VideoEvents.MISSED_CANCELED as any,
       VideoEvents.MISSED_REJECTED as any,
-      'missed-call'
+      'missed-call',
+      'video-canceled',
+      'video-call-timeout'
     ].includes(eventName as any);
 
-    const isExplicitByReason = reasonPayload === 'missed' || reasonPayload === 'missed-call';
+    const isExplicitByReason = reasonPayload === 'missed' || reasonPayload === 'missed-call' || reasonPayload === 'timeout' || reasonPayload === 'cancel';
 
     if (!(iAmCallee && (isExplicitByEvent || isExplicitByReason))) {
       console.log('[webrtc] addMissedCallFromSignaling -> ignored (not callee or not explicit)', { iAmCallee, isExplicitByEvent, isExplicitByReason });
@@ -1185,7 +1187,7 @@ WebrtcService.peer.once('open', async () => {
   
       } catch (fallbackError) {
         console.error('Fallback media acquisition failed:', fallbackError);
-        this.toastService.presentStdToastr(
+        this.toastService.presentErrorToastr(
           'All cameras/microphones are in use. Please close other applications using these devices and try again.'
         );
         return null;
@@ -1382,7 +1384,7 @@ WebrtcService.peer.once('open', async () => {
 
   handleError(error: any) {
     if (error.name === 'NotReadableError') {
-      this.toastService.presentStdToastr(
+      this.toastService.presentErrorToastr(
         'Camera/mic is being used by another app. ' +
         'Please close other applications using your devices.'
       );

@@ -7,6 +7,7 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ImgLoaderComponent } from '../img-loader/img-loader.component';
 import { RouterModule } from '@angular/router';
+import { SharedComponentsModule } from 'src/app/components/shared.module';
 
 @NgModule({
   declarations: [
@@ -19,13 +20,15 @@ import { RouterModule } from '@angular/router';
   imports: [
     CommonModule,
     IonicModule,
-    RouterModule
+    RouterModule,
+    SharedComponentsModule
   ],
   exports: [
     HeaderComponent,
     LoaderComponent,
     ImgLoaderComponent,
-    ListSearchComponent
+    ListSearchComponent,
+    SharedComponentsModule
   ],
 })
 export class SharingModule { }

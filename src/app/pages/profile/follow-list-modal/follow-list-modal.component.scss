@@ -1,16 +1,251 @@
-ion-avatar {
-  width: 48px;
-  height: 48px;
+.custom-content {
+  --background: var(--ion-background-color);
+  position: relative;
 }
 
-ion-item {
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --inner-padding-end: 0;
+.mesh-gradient {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(var(--ion-color-tertiary-rgb), 0.1) 0px, transparent 50%);
+  z-index: -1;
+  pointer-events: none;
 }
 
-ion-button {
-  --border-radius: 8px;
-  font-size: 12px;
-  text-transform: none;
+.glass-toolbar {
+  --background: var(--loopa-toolbar-background);
+  --color: var(--loopa-toolbar-color);
+  backdrop-filter: blur(16px) saturate(180%);
+  --border-style: none;
+  
+  ion-title {
+    font-weight: 800;
+    font-size: 1.2rem;
+    letter-spacing: -0.5px;
+  }
+}
+
+.glassy-card {
+  background: var(--loopa-glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--loopa-glass-border);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+}
+
+.section-container {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--loopa-text-muted);
+  margin: 0 0 16px 8px;
+}
+
+.user-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  transition: transform 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.follow-request-card {
+    border-left: 4px solid var(--ion-color-primary);
+  }
+}
+
+.request-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .action-btn {
+    height: 36px;
+    border-radius: 12px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 18px;
+    }
+
+    &.accept {
+      background: var(--ion-color-primary);
+      color: white;
+      padding: 0 16px;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
+
+      &:active {
+        transform: scale(0.95);
+        background: var(--ion-color-primary-shade);
+      }
+    }
+
+    &.reject {
+      background: rgba(var(--ion-color-danger-rgb), 0.1);
+      color: var(--ion-color-danger);
+      width: 36px;
+
+      &:active {
+        transform: scale(0.95);
+        background: rgba(var(--ion-color-danger-rgb), 0.2);
+      }
+    }
+  }
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+
+.avatar-container {
+  position: relative;
+  
+  .status-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--ion-item-background);
+    background: #10b981;
+  }
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  
+  .user-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--ion-text-color);
+  }
+  
+  .user-handle {
+    font-size: 0.8rem;
+    color: var(--loopa-text-muted);
+    margin-top: 2px;
+  }
+}
+
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  gap: 12px;
+
+  ion-icon {
+    font-size: 1.2rem;
+    color: var(--loopa-text-muted);
+  }
+
+  input {
+    background: transparent;
+    border: none;
+    color: var(--ion-text-color);
+    font-size: 1rem;
+    width: 100%;
+    outline: none;
+
+    &::placeholder {
+      color: var(--loopa-text-muted);
+      opacity: 0.6;
+    }
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+
+  ion-button {
+    margin: 0;
+    height: 36px;
+    font-weight: 700;
+    --border-radius: 12px;
+  }
+
+  .accept-btn { --color: var(--ion-color-success); font-size: 1.8rem; }
+  .reject-btn { --color: var(--ion-color-danger); font-size: 1.8rem; }
+  
+  .unfollow-btn {
+    --background: var(--ion-color-light);
+    --color: var(--ion-text-color);
+    --box-shadow: none;
+    font-size: 0.8rem;
+  }
+
+  .remove-btn {
+    --border-color: var(--ion-color-light-shade);
+    --color: var(--ion-text-color);
+    font-size: 0.8rem;
+  }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+
+  .empty-icon-wrapper {
+    width: 80px;
+    height: 80px;
+    background: var(--loopa-glass-bg);
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+
+    ion-icon {
+      font-size: 2.5rem;
+      color: var(--loopa-text-muted);
+      opacity: 0.5;
+    }
+  }
+
+  p {
+    color: var(--loopa-text-muted);
+    font-weight: 500;
+  }
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px;
 }

@@ -146,7 +146,7 @@
 }
 
 .chat-content {
-  padding-bottom: 80px;
+  padding-bottom: 140px; /* ensure space for fixed footer */
 }
 
 .product-glass-card {
@@ -387,6 +387,14 @@
   border-top: 1px solid var(--loopa-tabbar-border);
   padding: 12px 16px;
 
+  /* Pin footer to viewport bottom so input remains visible */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  box-shadow: 0 -6px 20px rgba(0,0,0,0.25);
+
   ion-toolbar {
     --background: transparent;
   }
@@ -433,5 +441,81 @@
     &[disabled] {
       --color: rgba(var(--ion-text-color-rgb), 0.2);
     }
+  }
+}
+
+.chat-limits {
+  margin: 20px;
+  display: flex;
+  justify-content: center;
+  
+  .limit-content {
+    background: rgba(var(--ion-color-primary-rgb), 0.08);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(var(--ion-color-primary-rgb), 0.15);
+    border-radius: 16px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 90%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+
+    ion-icon {
+      font-size: 22px;
+      color: var(--ion-color-primary);
+      flex-shrink: 0;
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--ion-text-color);
+      line-height: 1.4;
+      opacity: 0.9;
+
+      strong {
+        color: var(--ion-color-primary);
+        font-weight: 700;
+      }
+    }
+  }
+
+  :host-context(body.light-theme) & {
+    .limit-content {
+      background: rgba(99, 102, 241, 0.05);
+      border-color: rgba(99, 102, 241, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+  }
+}
+
+.admin-chat-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  margin: 20px;
+  background: rgba(var(--ion-color-primary-rgb), 0.1);
+  border: 1px solid rgba(var(--ion-color-primary-rgb), 0.2);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  text-align: center;
+  color: var(--ion-color-primary);
+
+  ion-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    opacity: 0.8;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 500;
+    line-height: 1.4;
+    opacity: 0.9;
   }
 }

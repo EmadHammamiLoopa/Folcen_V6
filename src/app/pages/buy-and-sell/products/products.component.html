@@ -42,8 +42,15 @@
     <div class="empty-icon-container">
       <ion-icon name="bag-handle-outline"></ion-icon>
     </div>
-    <h3>No products found</h3>
-    <p>Try selecting a different category or check back later.</p>
+    <h3 *ngIf="type !== 'sell'">No products found</h3>
+    <p *ngIf="type !== 'sell'">Try selecting a different category or check back later.</p>
+
+    <!-- Seller empty state CTA -->
+    <div *ngIf="type === 'sell'" class="seller-empty">
+      <h3>You haven't posted any products yet</h3>
+      <p>Start selling by posting your first product to the marketplace.</p>
+      <button class="vibrant-btn" data-cy="post-product-btn" (click)="showProductForm()">Post your first product</button>
+    </div>
   </div>
 
   <!-- Product Grid -->
@@ -52,7 +59,7 @@
       <ion-col size="6" size-sm="4" size-md="3" *ngFor="let product of products; let i = index" 
                class="animate__animated animate__fadeInUp"
                [style.animation-delay]="(i * 0.05) + 's'">
-        <div class="product-card" [routerLink]="['/tabs/buy-and-sell/product', product.id]">
+        <div class="product-card" [routerLink]="['/tabs/buy-and-sell/product', product.id]" [attr.data-cy]="'product-card-'+product.id">
           <div class="product-image-container">
             <img [src]="getProductImage(product)" alt="Product Image" loading="lazy">
             <div class="product-badge" *ngIf="product.condition">{{ product.condition }}</div>
@@ -79,7 +86,7 @@
       <ion-col size="6" size-sm="4" size-md="3" *ngFor="let product of filteredProducts; let i = index"
                class="animate__animated animate__fadeInUp"
                [style.animation-delay]="(i * 0.05) + 's'">
-        <div class="product-card" [routerLink]="['/tabs/buy-and-sell/product', product.id]">
+        <div class="product-card" [routerLink]="['/tabs/buy-and-sell/product', product.id]" [attr.data-cy]="'product-card-'+product.id">
           <div class="product-image-container">
             <img [src]="getProductImage(product)" alt="Product Image" loading="lazy">
           </div>

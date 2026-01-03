@@ -1,0 +1,14 @@
+<div class="p-4">
+    <h1 class="text-2xl font-bold mb-4">Plan Rule Form</h1>
+    <app-form
+        [headers]="headers"
+        plurarName="Plan Rules"
+        singleName="rule"
+        icon="fas fa-gavel"
+        redirectLink="/dashboard/subscriptions/rules"
+        retrieveURL="subscription/rules/:id"
+        storeURL="subscription/rules"
+        updateURL="subscription/rules/:id"
+        (headersChanged)="changeHeaders($event)"
+    ></app-form>
+</div>

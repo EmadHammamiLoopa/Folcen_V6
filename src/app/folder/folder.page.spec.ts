@@ -10,7 +10,7 @@ describe('FolderPage', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ FolderPage ],
-      imports: [IonicModule.forChild(), RouterModule.forChild([])]
+      imports: [IonicModule.forRoot(), RouterModule.forChild([])]
     }).compileComponents();
 
     fixture = TestBed.createComponent(FolderPage);

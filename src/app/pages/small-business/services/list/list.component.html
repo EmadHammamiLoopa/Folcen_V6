@@ -28,7 +28,7 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <app-loader *ngIf="pageLoading"></app-loader>
+  <app-sandglass-loader [visible]="pageLoading" message="Please wait"></app-sandglass-loader>
 
   <!-- Empty State -->
   <div class="empty-state animate__animated animate__fadeIn" *ngIf="services && !services.length && !pageLoading">

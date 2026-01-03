@@ -1,11 +1,12 @@
-<div class="comment-card" [style]="{'--accent': backgroundColor, '--text': color}">
+<div [id]="'comment-' + comment.id" class="comment-card" [style]="{'--accent': backgroundColor, '--text': color}">
   <div class="card-accent-line"></div>
   
   <div class="card-header">
-    <div class="user-info" (click)="!comment.anonyme && showUserProfile(comment.user.id)">
+    <div class="user-info" (click)="showUserProfile(comment.user.id)" [style.cursor]="(comment.anonyme || isAdminComment()) ? 'default' : 'pointer'">
       <div class="avatar-ring" [class.anonyme]="comment.anonyme">
-        <div class="avatar-inner">
-          <i class="fas" [ngClass]="comment.anonyme ? 'fa-user-secret' : 'fa-user'"></i>
+        <div class="avatar-inner" [class.is-anonyme]="comment.anonyme">
+          <i *ngIf="comment.anonyme" class="fas fa-user-secret"></i>
+          <app-avatar *ngIf="!comment.anonyme" [profile]="comment.user" [size]="38"></app-avatar>
         </div>
       </div>
       <div class="meta">
@@ -38,7 +39,7 @@
         <div *ngIf="comment.media.expiryDate" class="expiry-overlay">
           <div class="expiry-pill">
             <div class="pulse-dot"></div>
-            <span>{{ getTimeRemaining(comment.media.expiryDate.toISOString()) }}</span>
+            <span>{{ getTimeRemaining(comment.media.expiryDate) }}</span>
           </div>
         </div>
       </div>

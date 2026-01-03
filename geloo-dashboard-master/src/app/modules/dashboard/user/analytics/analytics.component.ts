@@ -29,6 +29,14 @@ export class AnalyticsComponent implements OnInit {
   // Feature Usage
   features: any = {};
 
+  announcements: any[] = [];
+  newAnnouncement = {
+    title: '',
+    content: '',
+    type: 'info',
+    target: 'all'
+  };
+
   chartOptions: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -59,6 +67,29 @@ export class AnalyticsComponent implements OnInit {
   ngOnInit(): void {
     this.loadAnalytics();
     this.loadRetention();
+    this.loadAnnouncements();
+  }
+
+  loadAnnouncements() {
+    this.dataService.sendGetRequest('admin/announcements').subscribe((resp: any) => {
+      this.announcements = resp.data;
+    });
+  }
+
+  createAnnouncement() {
+    if (!this.newAnnouncement.title || !this.newAnnouncement.content) return;
+    this.dataService.sendPostRequest('admin/announcements', this.newAnnouncement).subscribe(() => {
+      this.loadAnnouncements();
+      this.newAnnouncement = { title: '', content: '', type: 'info', target: 'all' };
+    });
+  }
+
+  deleteAnnouncement(id) {
+    if (confirm('Are you sure you want to delete this announcement?')) {
+      this.dataService.sendDeleteRequest('admin/announcements/' + id).subscribe(() => {
+        this.loadAnnouncements();
+      });
+    }
   }
 
   loadAnalytics() {

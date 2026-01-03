@@ -19,6 +19,7 @@ import { IonicModule } from '@ionic/angular';
 import { ServicesPageRoutingModule } from './services-routing.module';
 import { ServicesPage } from './services.page';
 import { CallNumber } from '@ionic-native/call-number/ngx';
+import { SharedComponentsModule } from '../../../components/shared.module';
 
 @NgModule({
   imports: [
@@ -28,7 +29,8 @@ import { CallNumber } from '@ionic-native/call-number/ngx';
     IonicModule,
     ServicesPageRoutingModule,
     SharingModule,
-    SharingPipeModule
+    SharingPipeModule,
+    SharedComponentsModule
   ],
   declarations: [
     ServicesPage,

@@ -31,6 +31,11 @@ export class ListComponent implements OnInit {
       type: "text"
     },
     {
+      name: "userStatus",
+      title: "User Status",
+      type: "text"
+    },
+    {
       name: "reportsCount",
       title: "Reports",
       type: "number"
