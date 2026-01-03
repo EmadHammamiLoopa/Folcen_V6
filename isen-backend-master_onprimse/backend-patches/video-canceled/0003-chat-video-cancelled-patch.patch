@@ -1,0 +1,28 @@
+*** Begin Patch
+*** Update File: app/sockets/chat.js
+@@
+ socket.on("video-call-cancelled", async (data) => {
+@@
+-    // Existing backward-compatible event for DB/message consumers
+-    emitToUser(data.to,   "video-call-cancelled", { messageId: msg.id, status: "cancelled" });
+-    emitToUser(data.from, "video-call-cancelled", { messageId: msg.id, status: "cancelled" });
+-
+-    // Canonical real-time signaling so video UI reliably tears down
+-    const now = Date.now();
+-    const canonical = { from: data.from, to: data.to, messageId: msg.id, reason: 'cancel', at: now };
+-    // Notify callee so they can register a missed call and close UI
+-    emitToUser(data.to, 'video-canceled', { ...canonical, notify: true });
+-    // Notify caller for local cleanup only (no missed call)
+-    emitToUser(data.from, 'video-canceled', { ...canonical, notify: false });
++    // Existing backward-compatible event for DB/message consumers
++    emitToUser(data.to,   "video-call-cancelled", { messageId: msg.id, status: "cancelled" });
++    emitToUser(data.from, "video-call-cancelled", { messageId: msg.id, status: "cancelled" });
++
++    // Canonical real-time signaling so video UI reliably tears down
++    const now = Date.now();
++    const canonical = { from: data.from, to: data.to, messageId: msg.id, reason: 'cancel', at: now };
++    // Notify callee so they can register a missed call and close UI
++    emitToUser(data.to, 'video-canceled', { ...canonical, notify: true });
++    // Notify caller for local cleanup only (no missed call)
++    emitToUser(data.from, 'video-canceled', { ...canonical, notify: false });
+*** End Patch

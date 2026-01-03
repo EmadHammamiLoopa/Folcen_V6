@@ -1,0 +1,327 @@
+const User = require("../models/User");
+const Message = require("../models/Message");
+const { connectedUsers, isUserOnline } = require("../utils/socketManager"); // ✅ import only
+const { createCallRequest, appendCallLifecycle } = require('../utils/eventLogger');
+
+// Track ongoing 1:1 calls
+const activeVideoCalls = Object.create(null);
+// Map to store active callId per pair: key `${from}:${to}` -> callId
+const activeCallIds = Object.create(null);
+const ringTimers = new Map();
+const RING_TIMEOUT_MS = 30_000;
+
+module.exports = (io, socket) => {   // ✅ no extra param
+  // ─────────────────────────────── helpers ───────────────────────────────
+  function getUserSockets(userId) {
+    const bucket = connectedUsers.get(userId); // ✅ Map access
+    return bucket ? Array.from(bucket) : [];
+  }
+
+  function emitToUser(userId, event, payload) {
+    const sids = getUserSockets(userId);
+    if (!sids.length) return false;
+    for (const sid of sids) io.to(sid).emit(event, payload);
+    return true;
+  }
+
+  function emitToBoth(a, b, event, payload) {
+    emitToUser(a, event, payload);
+    emitToUser(b, event, payload);
+  }
+
+  function keyOf(from, to) {
+    return `${from}:${to}`;
+  }
+
+  function clearRingTimer(from, to) {
+    const k1 = keyOf(from, to);
+    const k2 = keyOf(to, from); // guard both directions
+    const t1 = ringTimers.get(k1);
+    const t2 = ringTimers.get(k2);
+    if (t1) { clearTimeout(t1); ringTimers.delete(k1); }
+    if (t2) { clearTimeout(t2); ringTimers.delete(k2); }
+  }
+
+  function setActivePair(from, to, callId = null) {
+    activeVideoCalls[from] = to;
+    activeVideoCalls[to] = from;
+    if (callId) {
+      activeCallIds[`${from}:${to}`] = callId;
+      activeCallIds[`${to}:${from}`] = callId;
+    }
+  }
+
+  function clearActivePair(from, to) {
+    if (from) delete activeVideoCalls[from];
+    if (to)   delete activeVideoCalls[to];
+    if (from && to) {
+      delete activeCallIds[`${from}:${to}`];
+      delete activeCallIds[`${to}:${from}`];
+    }
+  }
+
+  function forceEndCall(from, to, reason = 'ended') {
+    try {
+      clearRingTimer(from, to);
+      clearActivePair(from, to);
+      emitToBoth(from, to, 'video-call-ended', { from, to, reason, at: Date.now() });
+    } catch (err) {
+      console.error('❌ forceEndCall error:', err);
+    }
+  }
+
+  // ─────────────────────────────── cancel (caller) ───────────────────────────
+  // Backward compatible: accepts either (userId) OR ({ to, callerName })
+  socket.on('cancel-video', (payload) => {
+    try {
+      const callerId = socket.userId;
+      const calleeId = typeof payload === 'string' ? payload : payload?.to;
+
+      if (!callerId || !calleeId) return;
+
+      const now = Date.now();
+
+      // canonical real-time signaling event for immediate UI teardown
+      const canonical = {
+        from: callerId,
+        to: calleeId,
+        reason: 'cancel',
+        at: now,
+        callerName: payload?.callerName || null,
+        messageId: payload?.messageId
+      };
+
+      // Emit to callee (notify=true) so their incoming UI tears down and can register missed-call locally
+      emitToUser(calleeId, 'video-canceled', { ...canonical, notify: true });
+
+      // Emit to caller (notify=false) for local cleanup without producing missed-call entries
+      emitToUser(callerId, 'video-canceled', { ...canonical, notify: false });
+
+      // Backward-compatible DB/message update event (kept for compatibility)
+      emitToUser(calleeId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, callerName: payload?.callerName, messageId: payload?.messageId });
+      emitToUser(callerId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, notify: false, messageId: payload?.messageId });
+
+      // finalize cleanup
+      forceEndCall(callerId, calleeId, 'cancel');
+    } catch (err) {
+      console.error('❌ Error during video call cancellation:', err);
+    }
+  });
+
+  // ───────────────────────────── accept / decline ────────────────────────────
+  socket.on('video-call-accepted', ({ from, to }) => {
+    const accepter = socket.userId;
+    const caller = from || null;
+    const callee = to || null;
+    if (!caller || !callee) return;
+    // Ensure accepter is callee
+    if (String(accepter) !== String(callee)) return;
+    clearRingTimer(caller, callee);
+    setActivePair(caller, callee);
+    // Append lifecycle
+    try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'matched', at: new Date() }); } catch (e) {}
+    try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'connected', at: new Date() }); } catch (e) {}
+    emitToUser(caller, 'video-call-accepted', { from: caller, to: callee, at: Date.now() });
+    emitToUser(callee, 'video-call-accepted', { from: caller, to: callee, at: Date.now() });
+  });
+
+  socket.on('video-call-declined', ({ from, to }) => {
+    if (!from || !to) return;
+    clearRingTimer(from, to);
+    emitToBoth(from, to, 'video-call-declined', { from, to, at: Date.now() });
+    // end for both
+    forceEndCall(from, to, 'declined');
+  });
+
+  // ─────────────────────────────── call request ──────────────────────────────
+  socket.on('video-call-request', async (data, callback) => {
+    try {
+      const { to, text, messageId } = data || {};
+      const from = socket.userId; // authoritative
+      if (!from || !to || !text || !messageId) {
+        return callback?.({ success: false, error: 'Invalid request' });
+      }
+
+      if (activeVideoCalls[from] || activeVideoCalls[to]) {
+        emitToUser(from, 'video-call-busy', { message: 'User is already in a call.' });
+        return callback?.({ success: false, error: 'Call already active' });
+      }
+
+      const [sender, receiver] = await Promise.all([
+        User.findById(from), User.findById(to)
+      ]);
+      if (!sender || !receiver) {
+        return callback?.({ success: false, error: 'User not found' });
+      }
+
+      // Create minimal call event record (server-generated callId)
+      let callEvent = null;
+      try { callEvent = await createCallRequest({ initiatedBy: from, participants: [from, to], initialEvent: 'requested' }); } catch (e) { console.warn('call event create failed', e); }
+      // mark pair active during ringing (prevents duplicates while ringing)
+      setActivePair(from, to, callEvent ? callEvent.callId : null);
+
+      // deliver ring
+      const delivered = emitToUser(to, 'incoming-video-call', { from, to, text, messageId, at: Date.now() });
+      if (!delivered) {
+        console.warn(`⚠️ Receiver ${to} offline—cannot deliver call request.`);
+      }
+
+      // store a "request" message (optional)
+      const newMessage = new Message({ from, to, text, type: 'video-call-request', state: 'sent', createdAt: new Date() });
+      await newMessage.save();
+
+      // start ring timeout (missed call)
+      clearRingTimer(from, to);
+      const timerId = setTimeout(() => {
+        const now = Date.now();
+
+        // canonical timeout signaling so callee UI closes and registers missed call
+        const canonical = { from, to, reason: 'timeout', at: now };
+        emitToUser(to, 'video-canceled', { ...canonical, notify: true });
+        // keep backward-compatible timeout event (existing handlers)
+        emitToUser(to, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now });
+
+        // caller cleanup only
+        emitToUser(from, 'video-canceled', { ...canonical, notify: false });
+        emitToUser(from, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now, notify: false });
+
+        // end for both
+        forceEndCall(from, to, 'timeout');
+        // append lifecycle timeout
+        try { if (callEvent && callEvent.callId) appendCallLifecycle(callEvent.callId, { event: 'timeout', at: new Date(now) }); } catch (e) {}
+      }, RING_TIMEOUT_MS);
+      ringTimers.set(keyOf(from, to), timerId);
+
+      callback?.({ success: true, messageId, callId: callEvent ? callEvent.callId : null });
+    } catch (err) {
+      console.error('❌ Error in video-call-request:', err);
+      callback?.({ success: false, error: 'Server error' });
+    }
+  });
+
+  // ─────────────────────────────── started / ended / failed ─────────────────
+  socket.on('video-call-started', ({ from, to }) => {
+    const caller = from; const callee = to;
+    if (!caller || !callee) return;
+    clearRingTimer(caller, callee);
+    setActivePair(caller, callee);
+    emitToBoth(caller, callee, 'video-call-started', { from: caller, to: callee, at: Date.now() });
+    // append lifecycle
+    try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'connected', at: new Date() }); } catch (e) {}
+  });
+
+  // Any side can emit this; we end it for both
+  socket.on('video-call-ended', ({ from, to, reason }) => {
+    const caller = from; const callee = to;
+    if (!caller || !callee) return;
+    forceEndCall(caller, callee, reason || 'ended');
+    // append lifecycle with duration if provided via reason.meta (optional)
+    try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'ended', at: new Date(), durationSeconds: null }); } catch (e) {}
+  });
+
+  socket.on('video-call-failed', ({ from, to, error }) => {
+    if (!from || !to) return;
+    clearRingTimer(from, to);
+    emitToBoth(from, to, 'video-call-failed', { from, to, error, at: Date.now() });
+    forceEndCall(from, to, 'failed');
+  });
+
+  // ───────────────────────────── authoritative missed events ────────────────
+  // Frontend emits these BEFORE any cleanup; backend should update budget & record here.
+  async function handleMissed(reason, payload = {}) {
+    try {
+      const from = payload.from || payload.callerId;
+      const to   = payload.to   || payload.calleeId;
+      const at   = Number(payload.at) || Date.now();
+      if (!from || !to) return; // invalid
+
+      // Dedup key per attempt to avoid double processing
+      const dedupKey = `${from}|${to}|${Math.floor(at/1000)}|${reason}`;
+      // Cheap in-memory dedupe bucket; auto-expire after 60s
+      handleMissed._seen = handleMissed._seen || new Map();
+      if (handleMissed._seen.has(dedupKey)) return;
+      handleMissed._seen.set(dedupKey, true);
+      setTimeout(() => handleMissed._seen.delete(dedupKey), 60_000);
+
+      // Increment missedCallBudget in DB
+      try {
+        const updatedUser = await User.findByIdAndUpdate(to, { $inc: { missedCallBudget: 1 } }, { new: true });
+        console.log('[sockets][video] incremented missedCallBudget for', to);
+        // Emit budget update to the user
+        emitToUser(to, 'budget-update', { missedCallBudget: updatedUser.missedCallBudget });
+      } catch (e) { console.warn('Failed to increment missedCallBudget', e); }
+
+      // Include callerName if provided by the emitter
+      const payloadOut = { from, to, at, reason, callerName: payload.callerName || payload.fromName || null };
+
+      // Emit explicit event matching frontend names for stronger compatibility
+      try {
+        if (reason === 'timeout') emitToUser(to, 'video-call-missed-timeout', payloadOut);
+        else if (reason === 'cancel') emitToUser(to, 'video-call-missed-canceled', payloadOut);
+        else if (reason === 'rejected') emitToUser(to, 'video-call-missed-rejected', payloadOut);
+      } catch (e) { console.warn('Failed to emit explicit missed event', e); }
+
+      // Always broadcast the legacy event as well (UI listens to this too)
+      emitToUser(to, 'missed-call', payloadOut);
+      console.log('[sockets][video] handleMissed -> emitted missed for', to, 'from', from, 'reason', reason);
+    } catch (err) {
+      console.error('❌ handleMissed error', err);
+    }
+  }
+
+  socket.on('video-call-missed-timeout',  (payload) => handleMissed('timeout',  payload));
+  socket.on('video-call-missed-canceled', (payload) => handleMissed('cancel',   payload));
+  socket.on('video-call-missed-rejected', (payload) => handleMissed('rejected', payload));
+  // Legacy generic event
+  socket.on('missed-call', (payload = {}) => handleMissed(payload.reason || 'timeout', payload));
+
+  // ───────────────────────────── disconnect safety ───────────────────────────
+  socket.on('disconnect', () => {
+    const me = socket.userId;
+    if (!me) return;
+    const other = activeVideoCalls[me];
+    if (other) {
+      // tell the other side this ended due to disconnect
+      forceEndCall(me, other, 'disconnect');
+    }
+  });
+
+  // ───────────────────────────── missed calls sync ─────────────────────────
+  // Client emits when user clears all missed calls (e.g., opens inbox or clears badge)
+  // payload: { userId, clearedAt }
+  socket.on('missed-calls-cleared', async (payload = {}) => {
+    try {
+      const emitter = socket.userId; // the authenticated socket's user
+      const { userId, clearedAt } = payload;
+      // Only allow emitter to clear their own missed calls
+      if (!emitter || String(emitter) !== String(userId)) {
+        console.warn('Unauthorized missed-calls-cleared attempt', { emitter, userId });
+        return;
+      }
+
+      const at = clearedAt ? new Date(clearedAt) : new Date();
+      // No DB writes: simply broadcast clear-all to user's sockets
+      emitToUser(userId, 'missed-calls-cleared', { userId, clearedAt: at.getTime() });
+    } catch (err) {
+      console.error('Error in missed-calls-cleared handler', err);
+    }
+  });
+
+  // Client emits when removing a single missed-call entry (owner clears a specific caller)
+  // payload: { ownerUserId, removedUserId, at }
+  socket.on('missed-call-removed', async (payload = {}) => {
+    try {
+      const emitter = socket.userId;
+      const { ownerUserId, removedUserId, at } = payload;
+      if (!emitter || String(emitter) !== String(ownerUserId)) {
+        console.warn('Unauthorized missed-call-removed attempt', { emitter, ownerUserId });
+        return;
+      }
+
+      // Broadcast the removal to all sockets of the owner user
+      emitToUser(ownerUserId, 'missed-call-removed', { ownerUserId, removedUserId, at: at || Date.now() });
+    } catch (err) {
+      console.error('Error in missed-call-removed handler', err);
+    }
+  });
+};

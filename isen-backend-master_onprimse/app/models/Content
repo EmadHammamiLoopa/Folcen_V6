@@ -1,0 +1,40 @@
+// In app/models/Content.js
+const mongoose = require('mongoose');
+
+const contentSchema = new mongoose.Schema({
+    // Basic information that could be applicable to any content type
+    title: {
+        type: String,
+        trim: true,
+        required: [true, 'Title is required'],
+    },
+    description: {
+        type: String,
+        trim: true,
+    },
+    contentType: {
+        type: String,
+        required: [true, 'Content type is required'],
+        enum: ['post', 'comment', 'media'], // Extend this list based on your app's needs
+    },
+    contentUrl: {
+        type: String,
+        required: function() { return this.contentType === 'media'; }, // Required if it's media content
+    },
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: [true, 'User reference is required']
+    },
+    // Track the visibility or status of the content
+    status: {
+        type: String,
+        enum: ['active', 'reported', 'removed'],
+        default: 'active'
+    },
+    // Additional metadata like tags or categories could go here
+    tags: [String],
+    // Timestamps for creation and last update
+}, { timestamps: true });
+
+module.exports = mongoose.model('Content', contentSchema);

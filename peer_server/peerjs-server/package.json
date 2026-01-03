@@ -1,0 +1,16 @@
+{
+  "name": "peerjs-server",
+  "version": "1.0.0",
+  "description": "A PeerJS signaling server deployed on Render",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.17.3",
+    "peer": "^1.0.2",
+    "ws": "^8.11.0"
+  }
+}

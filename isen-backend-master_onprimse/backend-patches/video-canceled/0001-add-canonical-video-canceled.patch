@@ -1,0 +1,62 @@
+*** Begin Patch
+*** Update File: app/sockets/video.js
+@@
+-  // ─────────────────────────────── cancel (caller) ───────────────────────────
+-  // backward-compatible: accepts either (userId) OR ({ to, callerName })
+-  socket.on('cancel-video', (payload) => {
+-    try {
+-      const callerId = socket.userId;
+-      const calleeId = typeof payload === 'string' ? payload : payload?.to;
+-
+-      if (!callerId || !calleeId) return;
+-
+-      const now = Date.now();
+-
+-      // existing cleanup logic (old code kept for reference)
+-      emitToUser(calleeId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, callerName: payload?.callerName, messageId: payload?.messageId });
+-      emitToUser(callerId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, notify: false, messageId: payload?.messageId });
+-
+-      // finalize cleanup
+-      forceEndCall(callerId, calleeId, 'cancel');
+-    } catch (err) {
+-      console.error('❌ Error during video call cancellation:', err);
+-    }
+-  });
++  // ─────────────────────────────── cancel (caller) ───────────────────────────
++  // Backward-compatible: accepts either (userId) OR ({ to, callerName, messageId })
++  socket.on('cancel-video', (payload) => {
++    try {
++      const callerId = socket.userId;
++      const calleeId = typeof payload === 'string' ? payload : payload?.to;
++
++      if (!callerId || !calleeId) return;
++
++      const now = Date.now();
++
++      // canonical real-time signaling event for immediate UI teardown
++      const canonical = {
++        from: callerId,
++        to: calleeId,
++        reason: 'cancel',
++        at: now,
++        callerName: payload?.callerName || null,
++        messageId: payload?.messageId
++      };
++
++      // Emit to callee (notify=true) so their incoming UI tears down and can register missed-call locally
++      emitToUser(calleeId, 'video-canceled', { ...canonical, notify: true });
++
++      // Emit to caller (notify=false) for local cleanup without producing missed-call entries
++      emitToUser(callerId, 'video-canceled', { ...canonical, notify: false });
++
++      // Backward-compatible DB/message update event (kept for compatibility)
++      emitToUser(calleeId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, callerName: payload?.callerName, messageId: payload?.messageId });
++      emitToUser(callerId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, notify: false, messageId: payload?.messageId });
++
++      // finalize cleanup
++      forceEndCall(callerId, calleeId, 'cancel');
++    } catch (err) {
++      console.error('❌ Error during video call cancellation:', err);
++    }
++  });
+*** End Patch

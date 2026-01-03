@@ -1,0 +1,30 @@
+*** Begin Patch
+*** Update File: app/sockets/video.js
+@@
+-      const timerId = setTimeout(() => {
+-        const now = Date.now();
+-
+-        // existing timeout behavior
+-        emitToUser(to, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now });
+-        emitToUser(from, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now, notify: false });
+-
+-        // end for both
+-        forceEndCall(from, to, 'timeout');
+-      }, RING_TIMEOUT_MS);
++      const timerId = setTimeout(() => {
++        const now = Date.now();
++
++        // canonical timeout signaling so callee UI closes and registers missed call
++        const canonical = { from, to, reason: 'timeout', at: now };
++        emitToUser(to, 'video-canceled', { ...canonical, notify: true });
++        // keep backward-compatible timeout event (existing handlers)
++        emitToUser(to, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now });
++
++        // caller cleanup only
++        emitToUser(from, 'video-canceled', { ...canonical, notify: false });
++        emitToUser(from, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now, notify: false });
++
++        // end for both
++        forceEndCall(from, to, 'timeout');
++      }, RING_TIMEOUT_MS);
+*** End Patch
