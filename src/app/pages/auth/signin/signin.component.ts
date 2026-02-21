@@ -208,33 +208,42 @@ export class SigninComponent implements OnInit {
         {
           text: 'Send Reset Link',
           cssClass: 'alert-confirm',
-          handler: async (data) => {
+          // handler MUST be synchronous — async handlers return a Promise
+          // (truthy) so Ionic closes the alert immediately and `return false`
+          // never keeps it open.
+          handler: (data) => {
             const email = (data.email || '').trim();
             if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
               this.toastService.presentErrorToastr('Please enter a valid email address.');
-              return false; // keep alert open
+              return false; // keep alert open — works because handler is sync
             }
-            try {
-              await this.firebaseService.resetPassword(email);
-              this.toastService.presentSuccessToastr(
-                `Password reset email sent to ${email}. Check your inbox.`
-              );
-            } catch (err: any) {
-              let msg = 'Failed to send reset email. Please try again.';
-              if (err?.code === 'auth/user-not-found') {
-                msg = 'No account found with that email address.';
-              } else if (err?.code === 'auth/invalid-email') {
-                msg = 'Invalid email address.';
-              } else if (err?.code === 'auth/too-many-requests') {
-                msg = 'Too many requests. Please wait a moment and try again.';
-              }
-              this.toastService.presentErrorToastr(msg);
-            }
+            // email looks valid — let the alert close, then send asynchronously
+            this._sendPasswordReset(email);
+            // returning undefined / truthy closes the alert
           },
         },
       ],
     });
     await alert.present();
+  }
+
+  private async _sendPasswordReset(email: string) {
+    try {
+      await this.firebaseService.resetPassword(email);
+      this.toastService.presentSuccessToastr(
+        `Password reset email sent to ${email}. Check your inbox.`
+      );
+    } catch (err: any) {
+      let msg = 'Failed to send reset email. Please try again.';
+      if (err?.code === 'auth/user-not-found') {
+        msg = 'No account found with that email address.';
+      } else if (err?.code === 'auth/invalid-email') {
+        msg = 'Invalid email address.';
+      } else if (err?.code === 'auth/too-many-requests') {
+        msg = 'Too many requests. Please wait a moment and try again.';
+      }
+      this.toastService.presentErrorToastr(msg);
+    }
   }
 
   async showWelcomeAlert() {
