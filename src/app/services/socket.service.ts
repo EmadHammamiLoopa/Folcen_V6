@@ -37,6 +37,34 @@ export class SocketService {
   private static friendRequestsUpdatedSubject = new Subject<any>();
   static friendRequestsUpdated$ = SocketService.friendRequestsUpdatedSubject.asObservable();
 
+  // Emits when a new message arrives
+  private static newMessageSubject = new Subject<any>();
+  static newMessage$ = SocketService.newMessageSubject.asObservable();
+
+  // Emits when budget is updated (for call credits)
+  private static budgetUpdateSubject = new Subject<any>();
+  static budgetUpdate$ = SocketService.budgetUpdateSubject.asObservable();
+
+  // Emits when a new friend request arrives
+  private static newFriendRequestSubject = new Subject<any>();
+  static newFriendRequest$ = SocketService.newFriendRequestSubject.asObservable();
+
+  // Emits when a push/in-app notification is received
+  private static notificationReceivedSubject = new Subject<any>();
+  static notificationReceived$ = SocketService.notificationReceivedSubject.asObservable();
+
+  // Emits when all notifications have been marked as read (server confirmation)
+  private static notificationsReadSubject = new Subject<any>();
+  static notificationsRead$ = SocketService.notificationsReadSubject.asObservable();
+
+  // Emits when a message-sent confirmation arrives (for UI optimistic reconcile)
+  private static messageSentSubject = new Subject<any>();
+  static messageSent$ = SocketService.messageSentSubject.asObservable();
+
+  // Emits when a new post lands in the current user's feed
+  private static newFeedPostSubject = new Subject<any>();
+  static newFeedPost$ = SocketService.newFeedPostSubject.asObservable();
+
   /** Base64url-safe decoder (for JWT payload). */
   private static base64UrlDecode(b64url: string): string {
     const pad = (s: string) => s + '==='.slice((s.length + 3) % 4);
@@ -206,6 +234,12 @@ export class SocketService {
         auth: { token },
       });
 
+      // Respond to backend custom heartbeat so the server does not forcibly
+      // disconnect sockets that fail to reply within the 30-second window.
+      SocketService.socketInstance.on('ping', () => {
+        SocketService.socketInstance?.emit('pong');
+      });
+
       const onConnect = () => {
         SocketService.reconnectionInProgress = false;
         console.log('✅ WebSocket Connected:', SocketService.socketInstance?.id);
@@ -299,6 +333,60 @@ export class SocketService {
           console.log('📣 friend-requests-updated received:', payload);
           SocketService.friendRequestsUpdatedSubject.next(payload);
         } catch (e) { console.warn('Error handling friend-requests-updated payload', e); }
+      });
+
+      // New message notification
+      SocketService.socketInstance.on('new-message', (payload: any) => {
+        try {
+          console.log('📣 new-message received:', payload);
+          SocketService.newMessageSubject.next(payload);
+        } catch (e) { console.warn('Error handling new-message payload', e); }
+      });
+
+      // Budget update notification (for call credits)
+      SocketService.socketInstance.on('budget-update', (payload: any) => {
+        try {
+          console.log('📣 budget-update received:', payload);
+          SocketService.budgetUpdateSubject.next(payload);
+        } catch (e) { console.warn('Error handling budget-update payload', e); }
+      });
+
+      // New friend request notification
+      SocketService.socketInstance.on('new-friend-request', (payload: any) => {
+        try {
+          console.log('📣 new-friend-request received:', payload);
+          SocketService.newFriendRequestSubject.next(payload);
+          // Also fire friendRequestsUpdated so all subscribers stay in sync
+          SocketService.friendRequestsUpdatedSubject.next(payload);
+        } catch (e) { console.warn('Error handling new-friend-request payload', e); }
+      });
+
+      // In-app notification (e.g. likes, comments, mentions)
+      SocketService.socketInstance.on('notification-received', (payload: any) => {
+        try {
+          SocketService.notificationReceivedSubject.next(payload);
+        } catch (e) { console.warn('Error handling notification-received payload', e); }
+      });
+
+      // Server confirms all notifications have been marked read
+      SocketService.socketInstance.on('notifications-read', (payload: any) => {
+        try {
+          SocketService.notificationsReadSubject.next(payload);
+        } catch (e) { console.warn('Error handling notifications-read payload', e); }
+      });
+
+      // Sender-side message confirmation (optimistic UI reconcile)
+      SocketService.socketInstance.on('message-sent', (payload: any) => {
+        try {
+          SocketService.messageSentSubject.next(payload);
+        } catch (e) { console.warn('Error handling message-sent payload', e); }
+      });
+
+      // New post in feed (recipients of a channel/follower post)
+      SocketService.socketInstance.on('new_feed_post', (payload: any) => {
+        try {
+          SocketService.newFeedPostSubject.next(payload);
+        } catch (e) { console.warn('Error handling new_feed_post payload', e); }
       });
 
       // Server-initiated forced logout (e.g. account deleted or token revoked)

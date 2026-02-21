@@ -1,29 +1,37 @@
+import { devLogger } from "../../../utils/dev-logger";
 import { ListSearchComponent } from './../../list-search/list-search.component';
 import { AuthService } from './../../../services/auth.service';
 import { Router } from '@angular/router';
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ModalController } from '@ionic/angular';
+import { ModalController, Platform } from '@ionic/angular';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { TermsOfServiceComponent } from '../../terms-of-service/terms-of-service.component';
 import { PrivacyPolicyComponent } from '../../privacy-policy/privacy-policy.component';
 import { JsonService } from '../../../services/json.service';
 import { SchoolService } from '../../profile/form/school.service';
 import { ToastService } from '../../../services/toast.service';
+import { UserService } from '../../../services/user.service';
+import { User } from '../../../models/User';
+import { SocketService } from '../../../services/socket.service';
 
 @Component({
   selector: 'app-signup',
   templateUrl: './signup.component.html',
   styleUrls: ['./signup.component.scss'],
 })
-export class SignupComponent implements OnInit {
+export class SignupComponent implements OnInit, OnDestroy {
 
   gender = "prefer not to say";
   step = 0;
-  steps = ['email', 'name', 'password', 'birthDate', 'gender', 'location', 'school', 'education', 'profession', 'interests', 'languages', 'aboutMe', 'randomRequests', 'ageVisibility', 'success'];
+  steps = ['email', 'name', 'password', 'birthDate', 'gender', 'location', 'school', 'education', 'profession', 'interests', 'languages', 'aboutMe', 'randomRequests', 'ageVisibility', 'verifyEmail', 'success'];
+  isSubmitted = false;
   validationErrors: any = {};
   btnLoading = false;
   pageLoading = false;
+  adjustingEmail = false;
+  resendCooldown = 0;
+  resendInterval: any;
   form: FormGroup;
 
   countriesObject: any;
@@ -62,10 +70,26 @@ export class SignupComponent implements OnInit {
     private jsonService: JsonService,
     private schoolService: SchoolService,
     private toastService: ToastService,
+    private userService: UserService,
+    private platform: Platform
   ) { }
 
   ionViewWillEnter() {
     this.step = 0;
+    
+    // Check if we have a logged-in but unverified user
+    const user = this.userService.currentUserValue;
+    if (user && user.emailVerified === false) {
+      devLogger.log('SignupComponent: Unverified user detected, jumping to verifyEmail step');
+      const verifyStepIndex = this.steps.indexOf('verifyEmail');
+      if (verifyStepIndex !== -1) {
+        this.step = verifyStepIndex;
+        // Ensure the email is shown in the template
+        if (user.email) {
+          this.form.patchValue({ email: user.email });
+        }
+      }
+    }
   }
 
   ngOnInit() {
@@ -74,6 +98,12 @@ export class SignupComponent implements OnInit {
     this.loadEducations();
     this.loadProfessions();
     this.loadInterests();
+  }
+
+  ngOnDestroy() {
+    if (this.resendInterval) {
+      clearInterval(this.resendInterval);
+    }
   }
 
   initializeForm() {
@@ -146,7 +176,7 @@ export class SignupComponent implements OnInit {
   }
 
   googleSignUp() {
-    console.log('Google sign-up triggered.');
+    devLogger.log('Google sign-up triggered.');
   }
 
   async loadCountries() {
@@ -175,16 +205,41 @@ export class SignupComponent implements OnInit {
   }
 
   continue() {
-    if (this.steps[this.step] == 'email') this.verifyEmail();
-    else if (this.step < this.steps.length - 2) {
-      this.validationErrors[this.steps[this.step]] = undefined;
+    this.isSubmitted = true;
+    devLogger.log('Continue clicked. Current step:', this.steps[this.step]);
+    
+    if (!this.isValid()) {
+      devLogger.log('Validation failed for step:', this.steps[this.step]);
+      return;
+    }
+
+    const currentStep = this.steps[this.step];
+
+    if (currentStep === 'email') {
+      this.verifyEmail();
+    } else if (currentStep === 'ageVisibility') {
+      devLogger.log('Calling submit() from ageVisibility step');
+      this.submit();
+    } else if (currentStep === 'verifyEmail') {
+      this.checkVerification();
+    } else if (this.step < this.steps.length - 1) {
+      this.validationErrors[currentStep] = undefined;
+      this.isSubmitted = false;
       this.step++;
-    } else this.submit();
+    }
   }
 
   back() {
+    this.isSubmitted = false;
     if (this.step > 0) this.step--;
     else this.router.navigate(['/auth/home']);
+  }
+
+  adjustEmail() {
+    this.step = 0;
+    this.adjustingEmail = true;
+    this.isSubmitted = false;
+    this.cdr.detectChanges();
   }
 
   getUserInfo() {
@@ -230,7 +285,7 @@ export class SignupComponent implements OnInit {
           this.isLoadingSchools = true;
           this.schoolService.getUniversityNames(country).subscribe({
             next: names => { this.schools = names || []; this.isLoadingSchools = false; },
-            error: (err) => { console.error('Failed to load universities for', country, err); this.schools = []; this.isLoadingSchools = false; }
+            error: (err) => { devLogger.error('Failed to load universities for', country, err); this.schools = []; this.isLoadingSchools = false; }
           });
         }
       }
@@ -268,8 +323,17 @@ export class SignupComponent implements OnInit {
     this.auth.verifyEmail(this.form.get('email')?.value)
       .then((resp: any) => {
         this.btnLoading = false;
+        this.isSubmitted = false; // Reset submitted flag when moving to next step
         this.cdr.detectChanges();
-        if (!resp.data) ++this.step;
+        if (!resp.data) {
+          if (this.adjustingEmail) {
+            const ageStepIndex = this.steps.indexOf('ageVisibility');
+            this.step = ageStepIndex !== -1 ? ageStepIndex : this.step + 1;
+            this.adjustingEmail = false;
+          } else {
+            ++this.step;
+          }
+        }
         else this.validationErrors['email'] = ['this email is already exists'];
       }, err => {
         this.btnLoading = false;
@@ -290,32 +354,126 @@ export class SignupComponent implements OnInit {
       });
   }
 
-  submit() {
+  async submit() {
     this.pageLoading = true;
     this.validationErrors = {};
-    this.auth.signup(this.getUserInfo())
-      .then(resp => {
-        this.pageLoading = false;
-        this.step++;
-      }, err => {
-        this.pageLoading = false;
-        if (err && err.error && err.error.errors) {
-          this.validationErrors = err.error.errors;
-          this.backToError();
-        } else if (err && err.errors) {
-          this.validationErrors = err.errors;
-          this.backToError();
-        } else {
-          let message = 'An unexpected error occurred.';
-          if (err && err.error) {
-            if (typeof err.error === 'string') message = err.error;
-            else if (err.error.message) message = err.error.message;
-          } else if (err && err.message) {
-            message = err.message;
-          }
-          this.toastService.presentErrorToastr(message);
+    
+    const userInfo = this.getUserInfo();
+    const email = this.form.get('email')?.value;
+    const password = this.form.get('password')?.value;
+
+    try {
+      const resp = await this.auth.firebaseSignup(email, password, userInfo);
+      if (resp && resp.data && resp.data.token) {
+        await this.storeUserData(resp.data.token, resp.data.user);
+      }
+      this.pageLoading = false;
+      this.step++;
+    } catch (err) {
+      this.pageLoading = false;
+      devLogger.error('Signup error:', err);
+      
+      if (err && err.error && err.error.errors) {
+        this.validationErrors = err.error.errors;
+        this.backToError();
+      } else if (err && err.errors) {
+        this.validationErrors = err.errors;
+        this.backToError();
+      } else {
+        let message = 'An unexpected error occurred.';
+        if (err && err.error) {
+          if (typeof err.error === 'string') message = err.error;
+          else if (err.error.message) message = err.error.message;
+        } else if (err && err.message) {
+          message = err.message;
         }
-      });
+        this.toastService.presentErrorToastr(message);
+      }
+    }
+  }
+
+  async resendEmail() {
+    if (this.resendCooldown > 0) return;
+    
+    this.btnLoading = true;
+    try {
+      await this.auth.resendVerification();
+      this.toastService.presentSuccessToastr('Verification email resent!');
+      
+      // Start cooldown
+      this.resendCooldown = 60;
+      this.resendInterval = setInterval(() => {
+        this.resendCooldown--;
+        if (this.resendCooldown <= 0) {
+          clearInterval(this.resendInterval);
+        }
+      }, 1000);
+
+    } catch (err: any) {
+      devLogger.error('Resend error:', err);
+      if (err.code === 'auth/too-many-requests') {
+        this.toastService.presentErrorToastr('Too many requests. Please wait a moment before trying again.');
+        this.resendCooldown = 30; // Force a shorter cooldown
+      } else {
+        this.toastService.presentErrorToastr('Failed to resend email. ' + (err.message || ''));
+      }
+    } finally {
+      this.btnLoading = false;
+    }
+  }
+
+  async checkVerification() {
+    this.btnLoading = true;
+    try {
+      const resp = await this.auth.checkVerification();
+      if (resp && resp.data && resp.data.token) {
+        // Success! User is verified and logged in.
+        await this.storeUserData(resp.data.token, resp.data.user);
+        
+        // Initialize Socket
+        try {
+          await SocketService.initializeSocket();
+          SocketService.bindToAuthUser();
+        } catch (e) {}
+
+        this.step++; // Go to success step
+      } else {
+        this.toastService.presentErrorToastr('Email not verified yet. Please check your inbox and click the link.');
+      }
+    } catch (err) {
+      devLogger.error('Verification check error:', err);
+      this.toastService.presentErrorToastr('Failed to check verification status.');
+    } finally {
+      this.btnLoading = false;
+    }
+  }
+
+  private async storeUserData(token: string, user: any) {
+    try {
+      if (this.platform.is('cordova')) {
+        await this.nativeStorage.setItem('token', token);
+      } else {
+        try { localStorage.setItem('token', token); } catch (e) {}
+      }
+    } catch (e) {}
+
+    try {
+      const userObj = new User().initialize(user);
+      this.userService.setCurrentUser(userObj, { force: true });
+    } catch (e) {
+      const userData = JSON.stringify(user);
+      try {
+        if (this.platform.is('cordova')) {
+          await this.nativeStorage.setItem('currentUser', userData);
+        } else {
+          localStorage.setItem('currentUser', userData);
+        }
+      } catch (e2) {}
+    }
+  }
+
+  enterApp() {
+    this.router.navigate(['/tabs/new-friends']);
   }
 
   isValid() {
@@ -328,8 +486,10 @@ export class SignupComponent implements OnInit {
     } else if (this.steps[this.step] == 'randomRequests') {
       return true;
     } else if (this.steps[this.step] == 'ageVisibility') {
-      // Last step before success: require terms acceptance
+      // Last step before submit: require terms acceptance
       return this.form.get('acceptedTerms')?.value === true;
+    } else if (this.steps[this.step] == 'verifyEmail') {
+      return true;
     } else if (this.steps[this.step] != 'gender') {
       return this.form.get(this.steps[this.step])?.valid;
     }

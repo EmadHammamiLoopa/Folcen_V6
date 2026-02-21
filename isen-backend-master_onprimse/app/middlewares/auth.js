@@ -1,17 +1,68 @@
 const expressJWT = require('express-jwt');
 const Response = require('../controllers/Response');
-const { adminCheck } = require('../helpers');
+const { adminCheck, normalizeLeanDoc } = require('../helpers');
 const User = require('../models/User');
 require('dotenv').config();
 const tokenBlacklist = require('../utils/tokenBlacklist');
+const logger = require('../utils/logger');
 
 exports.requireSignin = (req, res, next) => {
-    console.log('requireSignin middleware called');
+    // Short-circuit if we've already processed auth for this request
+    if (req._requireSigninRun) return next();
+    req._requireSigninRun = true;
+
     // Do not unconditionally clear `req.user` here — that may remove param-populated
     // users set by router.param handlers before this middleware runs. Only clear
     // passport session markers if present (rare for API routes).
     if (req.user && req.user._passport) {
         delete req.user;
+    }
+
+    // If another middleware already decoded the JWT and set `req.auth`, reuse it
+    if (req.auth) {
+        (async () => {
+            try {
+                const jti = req.auth && req.auth.jti;
+                if (jti) {
+                    if (await tokenBlacklist.isRevokedByJti(jti)) {
+                        logger.warn('Rejected request with revoked token jti');
+                        return Response.sendError(res, 401, 'Unauthorized: token revoked');
+                    }
+                }
+                const userId = req.auth && req.auth._id;
+                if (userId && (await tokenBlacklist.isUserRevoked(userId))) {
+                    logger.warn('Rejected request: user has been revoked/erased');
+                    return Response.sendError(res, 401, 'Unauthorized: token revoked');
+                }
+            } catch (e) {
+                logger.error('requireSignin: token blacklist check failed', e);
+                return Response.sendError(res, 500, 'Server error');
+            }
+
+            try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+            return next();
+        })();
+        return;
+    }
+
+    // Fast-path: if there's no token in common places, return immediately
+    const _hasToken = (() => {
+        const h = req.headers && (req.headers.authorization || req.headers.Authorization);
+        if (h && String(h).split(' ')[0] === 'Bearer') return true;
+        if (req.cookies && req.cookies.token) return true;
+        if (req.query && req.query.token) return true;
+        return false;
+    })();
+
+    // If this is an admin endpoint and there's no token, reject quickly (avoid heavy processing)
+    if (! _hasToken && req.path && req.path.startsWith('/api/v1/admin')) {
+        logger.warn('Fast reject admin endpoint without token:', req.path);
+        return Response.sendError(res, 403, 'Access forbidden');
+    }
+
+    // If there's no token at all, respond with 401 quickly instead of invoking express-jwt
+    if (! _hasToken) {
+        return Response.sendError(res, 401, 'Unauthorized: No authorization token provided');
     }
 
     expressJWT({
@@ -40,44 +91,39 @@ exports.requireSignin = (req, res, next) => {
         }
     })(req, res, async (err) => {
         if (err) {
-            console.log('JWT error:', err.message || err);
+            logger.info('JWT error:', err.message || err);
             // If it's a download request (CSV), maybe log more
             if (req.path && req.path.includes('export')) {
-                console.log('Export auth failure. Headers:', req.headers);
-                console.log('Cookies:', req.cookies);
+                logger.info('Export auth failure. Headers:', req.headers);
+                logger.info('Cookies:', req.cookies);
             }
             return Response.sendError(res, 401, 'Unauthorized: Invalid token');
         }
-
-            // After decoding, require a `jti` claim and reject tokens that are revoked.
-            // Security: treat tokens missing `jti` as invalid — do not allow legacy tokens.
-            try {
-                const jti = req.auth && req.auth.jti;
-                if (!jti) {
-                    console.warn('requireSignin: token missing jti claim — allowing for now but this is insecure');
-                    // return Response.sendError(res, 401, 'Unauthorized: token missing jti');
-                } else {
-                    // Check revocation via persistent store (Redis-backed). This must be fast.
-                    if (await tokenBlacklist.isRevokedByJti(jti)) {
-                        console.warn('Rejected request with revoked token jti');
-                        return Response.sendError(res, 401, 'Unauthorized: token revoked');
-                    }
-                }
-                
-                // Also check whether the user (subject) has been revoked/erased by admin/privacy actions
-                const userId = req.auth && req.auth._id;
-                if (userId && (await tokenBlacklist.isUserRevoked(userId))) {
-                    console.warn('Rejected request: user has been revoked/erased');
+        // After decoding, require a `jti` claim and reject tokens that are revoked.
+        try {
+            const jti = req.auth && req.auth.jti;
+            if (jti) {
+                if (await tokenBlacklist.isRevokedByJti(jti)) {
+                    logger.warn('Rejected request with revoked token jti');
                     return Response.sendError(res, 401, 'Unauthorized: token revoked');
                 }
-            } catch (e) {
-                console.error('requireSignin: token blacklist check failed', e);
-                return Response.sendError(res, 500, 'Server error');
+            } else {
+                logger.warn('requireSignin: token missing jti claim');
             }
 
-        // Do not log sensitive token contents. Only log presence and user id for tracing.
-        try { console.log('Decoded token present for user:', req.auth && req.auth._id); } catch (e) {}
-        next();
+            const userId = req.auth && req.auth._id;
+            if (userId && (await tokenBlacklist.isUserRevoked(userId))) {
+                logger.warn('Rejected request: user has been revoked/erased');
+                return Response.sendError(res, 401, 'Unauthorized: token revoked');
+            }
+        } catch (e) {
+            logger.error('requireSignin: token blacklist check failed', e);
+            return Response.sendError(res, 500, 'Server error');
+        }
+
+        // Only log non-sensitive identifiers
+        try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+        return next();
     });
 };
 
@@ -91,14 +137,14 @@ exports.isAuth = (req, res, next) => {
             return Response.sendError(res, 403, 'Access denied');
         return next();
    } catch (error) {
-       console.log('isAuth error:', error);
+       logger.info('isAuth error:', error);
    }
 };
 
 exports.isAdmin = (req, res, next) => {
     // avoid logging request headers
     if(!adminCheck(req)) {
-        console.warn(`isAdmin check failed for user ${req.auth?._id}. Role: ${req.auth?.role}`);
+        logger.warn(`isAdmin check failed for user ${req.auth?._id}. Role: ${req.auth?.role}`);
         return Response.sendError(res, 403, 'Access forbidden');
     }
     next();
@@ -113,23 +159,38 @@ exports.isSuperAdmin = (req, res, next) => {
 
 exports.withAuthUser = async (req, res, next) => {
     try {
-        console.log('withAuthUser middleware started');
         const userId = req.auth && req.auth._id;
 
         if (!userId) {
-            console.log('withAuthUser: No userId in req.auth');
+            logger.info('withAuthUser: No userId in req.auth');
             return Response.sendError(res, 401, 'Unauthorized: No user ID found in token');
         }
+        // Avoid refetching if we've already loaded the user for this request
+        if (req._userLoaded && req.user && String(req.user._id) === String(userId)) {
+            req.authUser = req.user;
+            return next();
+        }
 
-        console.log('withAuthUser: Fetching user from DB:', userId);
-        const user = await User.findById(userId);
+        // Only select the minimal necessary fields to avoid transferring/storing full docs
+        let user = await User.findById(userId)
+            .select('_id email role banned banUntil isDeleted emailVerified bannedReason lastSeen friends followers city country')
+            .lean();
         if (!user) {
-            console.log('withAuthUser error: User not found in DB for ID:', userId);
+            logger.info('withAuthUser error: User not found in DB for ID:', userId);
             return Response.sendError(res, 404, 'User not found');
         }
 
-        console.log('withAuthUser: User found:', user.email);
+        // Normalize all ObjectIds to strings to prevent buffer serialization
+        user = normalizeLeanDoc(user);
+
+        logger.info('withAuthUser: User loaded id/email:', user._id, user.email);
+        // Attach to `req.authUser` always. Only attach to `req.user` if not already set 
+        // (to avoid overwriting param-loaded target users).
         req.authUser = user;
+        if (!req.user) {
+            req.user = user;
+        }
+        req._userLoaded = true;
 
         // Check if user is banned
         if (user.banned) {
@@ -141,7 +202,7 @@ exports.withAuthUser = async (req, res, next) => {
                 // Ban expired
                 user.banned = false;
                 user.banUntil = null;
-                await user.save().catch(e => console.warn('Failed to unban user after expiry', e));
+                await user.save().catch(e => logger.warn('Failed to unban user after expiry', e));
             }
         }
 
@@ -150,13 +211,18 @@ exports.withAuthUser = async (req, res, next) => {
             return Response.sendError(res, 403, 'Account is deactivated. Please restore it to continue.');
         }
 
+        // Global check: if email is not verified, block access (strict GDPR/Security enforcement)
+        if (user.emailVerified === false) {
+            logger.warn(`withAuthUser: User ${user._id} attempted to access ${req.originalUrl} without email verification`);
+            return Response.sendError(res, 403, 'Please verify your email to access this feature.');
+        }
+
         // Update lastSeen and record daily activity (lightweight)
         try {
             const UserActivityDaily = require('../models/UserActivityDaily');
             const now = new Date();
-            user.lastSeen = now;
-            // Use updateOne to avoid ParallelSaveError on the document instance
-            User.updateOne({ _id: user._id }, { $set: { lastSeen: now } }).catch(e => console.warn('Failed to save lastSeen', e));
+            // Update lastSeen without modifying the in-memory `user` object
+            User.updateOne({ _id: user._id }, { $set: { lastSeen: now } }).catch(e => logger.warn('Failed to save lastSeen', e));
 
             // Normalize date to UTC midnight for the activity doc
             const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -165,15 +231,23 @@ exports.withAuthUser = async (req, res, next) => {
                 { userId: user._id, date: dayStart },
                 { $setOnInsert: { userId: user._id, date: dayStart, createdAt: now } },
                 { upsert: true }
-            ).catch(e => console.warn('Failed to update UserActivityDaily', e));
+            ).catch(e => logger.warn('Failed to update UserActivityDaily', e));
         } catch (e) {
-            console.warn('Activity tracking disabled or failed', e);
+            logger.warn('Activity tracking disabled or failed', e);
         }
 
         next();
     } catch (err) {
-        console.error('withAuthUser critical error:', err);
+        logger.error('withAuthUser critical error:', err);
         return Response.sendError(res, 500, 'Internal server error');
     }
+};
+
+exports.requireEmailVerified = (req, res, next) => {
+    if (req.authUser && !req.authUser.emailVerified) {
+        logger.warn(`requireEmailVerified: User ${req.authUser._id} attempted to access ${req.originalUrl} without verification`);
+        return Response.sendError(res, 403, 'Please verify your email to access this feature.');
+    }
+    next();
 };
 

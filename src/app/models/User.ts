@@ -21,6 +21,7 @@ export class User {
   private _firstName: string;
   private _lastName: string;
   private _email: string;
+  private _emailVerified: boolean;
   private _birthDate: Date | null;
   private _gender: string;
   private _address: string;
@@ -78,6 +79,11 @@ export class User {
   private _avatarSeed: string;
   private _avatarVariant: string;
   private _avatarOverrides: any;
+  private _followersCount: number;
+  private _followingCount: number;
+  private _friendsCount: number;
+  private _pendingFollowRequestsCount: number;
+  private _pendingFriendRequestsCount: number;
 
   private static computeFingerprint(payload: any): string {
     if (!payload) return '';
@@ -138,6 +144,7 @@ export class User {
     firstName: string = '',
     lastName: string = '',
     email: string = '',
+    emailVerified: boolean = false,
     birthDate: Date | null = null,
     gender: string = 'Not specified',
     address: string = '',
@@ -190,11 +197,17 @@ export class User {
     avatarSeed: string = '',
     avatarVariant: string = 'classic',
     avatarOverrides: any = null,
+    followersCount: number = 0,
+    followingCount: number = 0,
+    friendsCount: number = 0,
+    pendingFollowRequestsCount: number = 0,
+    pendingFriendRequestsCount: number = 0,
   ) {
     this._id = id;
     this._firstName = firstName;
     this._lastName = lastName;
     this._email = email;
+    this._emailVerified = emailVerified;
     this._birthDate = birthDate;
     this._gender = gender;
     this._address = address;
@@ -247,6 +260,11 @@ export class User {
     this._avatarSeed = avatarSeed;
     this._avatarVariant = avatarVariant;
     this._avatarOverrides = avatarOverrides;
+    this._followersCount = followersCount;
+    this._followingCount = followingCount;
+    this._friendsCount = friendsCount;
+    this._pendingFollowRequestsCount = pendingFollowRequestsCount;
+    this._pendingFriendRequestsCount = pendingFriendRequestsCount;
   }
 
   // Getter methods
@@ -255,6 +273,7 @@ export class User {
   get lastName(): string { return this._lastName; }
   get fullName(): string { return `${this._firstName} ${this._lastName}`; }
   get email(): string { return this._email; }
+  get emailVerified(): boolean { return this._emailVerified; }
   get gender(): string { return this._gender; }
   get birthDate(): Date | null { return this._birthDate; }
   get address(): string { return this._address; }
@@ -394,6 +413,21 @@ export class User {
   get missedCallBudget(): number { return this._missedCallBudget; }
   set missedCallBudget(value: number) { this._missedCallBudget = value; }
   
+  get followersCount(): number { return this._followersCount; }
+  set followersCount(value: number) { this._followersCount = value; }
+  
+  get followingCount(): number { return this._followingCount; }
+  set followingCount(value: number) { this._followingCount = value; }
+  
+  get friendsCount(): number { return this._friendsCount; }
+  set friendsCount(value: number) { this._friendsCount = value; }
+  
+  get pendingFollowRequestsCount(): number { return this._pendingFollowRequestsCount; }
+  set pendingFollowRequestsCount(value: number) { this._pendingFollowRequestsCount = value; }
+  
+  get pendingFriendRequestsCount(): number { return this._pendingFriendRequestsCount; }
+  set pendingFriendRequestsCount(value: number) { this._pendingFriendRequestsCount = value; }
+  
   public getPeerId(): string | null {
     return this._peerId;
 }
@@ -416,6 +450,7 @@ set peerId(peerId: string | null) {
   set firstName(firstName: string) { this._firstName = firstName; }
   set lastName(lastName: string) { this._lastName = lastName; }
   set email(email: string) { this._email = email; }
+  set emailVerified(emailVerified: boolean) { this._emailVerified = emailVerified; }
   set birthDate(birthDate: Date | null) { this._birthDate = birthDate; }
   set gender(gender: string) { this._gender = gender; }
   set address(address: string) { this._address = address; }
@@ -736,6 +771,7 @@ set peerId(peerId: string | null) {
     this._firstName = user.firstName || '';
     this._lastName = user.lastName || '';
     this._email = user.email || '';
+    this._emailVerified = user.emailVerified !== undefined ? !!user.emailVerified : false;
     this._birthDate = this.safeDate(user.birthDate);
     this._gender = user.gender || 'Not specified';
     this._address = user.address || '';

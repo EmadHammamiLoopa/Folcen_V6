@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { sendNotification, emitNewFriendRequest, emitFriendRequestsUpdated, emitFriendRequestAccepted, emitFriendRequestDeclined } = require("../helpers");
 const Request = require("../models/Request");
 const User = require("../models/User");
+const Follow = require("../models/Follow");
 const Response = require("./Response");
 
 /**
@@ -152,10 +153,17 @@ exports.acceptRequest = async (req, res) => {
       return Response.sendError(res, 403, "Cannot accept request due to block relationship");
     }
 
-    // Add each other to friends (idempotent)
+    // Add each other to friends and remove from followers/following —
+    // friends are a separate relationship; follow lists should not overlap.
     await Promise.all([
-      User.updateOne({ _id: fromId }, { $addToSet: { friends: new mongoose.Types.ObjectId(toId) } }),
-      User.updateOne({ _id: toId   }, { $addToSet: { friends: new mongoose.Types.ObjectId(fromId) } }),
+      User.updateOne({ _id: fromId }, {
+        $addToSet: { friends: new mongoose.Types.ObjectId(toId) },
+        $pull:     { followers: new mongoose.Types.ObjectId(toId), following: new mongoose.Types.ObjectId(toId) }
+      }),
+      User.updateOne({ _id: toId }, {
+        $addToSet: { friends: new mongoose.Types.ObjectId(fromId) },
+        $pull:     { followers: new mongoose.Types.ObjectId(fromId), following: new mongoose.Types.ObjectId(fromId) }
+      }),
     ]);
 
     // Remove request + clean from users
@@ -163,6 +171,13 @@ exports.acceptRequest = async (req, res) => {
       Request.deleteOne({ _id: id }),
       User.updateOne({ _id: fromId }, { $pull: { requests: new mongoose.Types.ObjectId(id) } }),
       User.updateOne({ _id: toId   }, { $pull: { requests: new mongoose.Types.ObjectId(id) } }),
+      // Remove follow records in both directions — friends don't appear in followers/following
+      Follow.deleteMany({
+        $or: [
+          { follower: fromId, followed: toId },
+          { follower: toId,   followed: fromId }
+        ]
+      })
     ]);
 
     // Notify sender that it was accepted

@@ -7,7 +7,7 @@ const fsp = fs.promises;
 const path = require('path')
 const _ = require('lodash')
 const Request = require("../models/Request")
-const { manAvatarPath, womenAvatarPath, setOnlineUsers, extractDashParams, report, sendNotification, emitFriendRequestsUpdated, emitToUsers, validatePassword } = require("../helpers")
+const { manAvatarPath, womenAvatarPath, normalizeId, normalizeLeanDoc, setOnlineUsers, extractDashParams, report, sendNotification, emitFriendRequestsUpdated, emitToUsers, validatePassword, realtime } = require("../helpers")
 const Report = require("../models/Report")
 const Channel = require("../models/Channel")
 const Product = require("../models/Product")
@@ -26,27 +26,11 @@ const defaultOtherAvatarUrl = '/public/images/avatars/other.webp';
 const { isUserOnline, connectedUsers } = require("../utils/socketManager");
 const tokenBlacklist = require('../utils/tokenBlacklist');
 const jwt = require('jsonwebtoken');
-
-/**
- * Helper to normalize User ID (handles Base64 encoded IDs from frontend)
- */
-const normalizeId = (id) => {
-    if (!id) return id;
-    id = String(id).trim();
-    if (mongoose.Types.ObjectId.isValid(id)) return id;
-    try {
-        const safe = id.replace(/-/g, '+').replace(/_/g, '/');
-        const padded = safe.padEnd(safe.length + (4 - safe.length % 4) % 4, '=');
-        const decoded = Buffer.from(padded, 'base64').toString('utf8');
-        if (mongoose.Types.ObjectId.isValid(decoded)) return decoded;
-    } catch (e) {}
-    return id;
-};
-
+const logger = require('../utils/logger');
 
 exports.resetBudget = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.authUser._id;
         const updatedUser = await User.findByIdAndUpdate(userId, { missedCallBudget: 0 }, { new: true });
         
         // Emit budget update to the user
@@ -55,7 +39,7 @@ exports.resetBudget = async (req, res) => {
 
         return Response.sendResponse(res, { missedCallBudget: 0 }, 'Budget reset successfully');
     } catch (error) {
-        console.error('Error resetting budget:', error);
+        logger.error('Error resetting budget:', error);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -65,7 +49,7 @@ exports.reportUser = async (req, res) => {
     try {
         const userId = normalizeId(req.params.userId); // Get the user ID from the request parameters
 
-        console.log('Request body:', req.body); // Debugging log
+        logger.info('Request body:', req.body); // Debugging log
 
         // Find the user being reported
         const reportedUser = await User.findById(userId);
@@ -93,7 +77,16 @@ exports.reportUser = async (req, res) => {
 
 exports.removeAvatar = async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId);
+        const actor = req.authUser;
+        const isAdmin = actor && (actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN');
+        const targetId = req.params.userId || req.params.id;
+
+        // 🔥 SECURITY: Only admins or owner can remove avatar
+        if (targetId && String(targetId) !== String(actor._id)) {
+            if (!isAdmin) return Response.sendError(res, 403, 'Unauthorized');
+        }
+
+        const user = await User.findById(targetId || actor._id);
         if (!user) return res.status(404).send('User not found');
 
         let avatarUrl = req.params.avatarUrl;
@@ -115,7 +108,7 @@ exports.removeAvatar = async (req, res) => {
 
         const avatarPath = path.join(__dirname, '..', '..', 'public', 'uploads', filename); // Adjusted to include 'uploads' directory
 
-        console.log(`Requested path to delete: ${avatarPath}`);
+        logger.info(`Requested path to delete: ${avatarPath}`);
 
         // Check if the avatar is a default avatar
         const isDefaultAvatar = [
@@ -132,15 +125,15 @@ exports.removeAvatar = async (req, res) => {
             // Ensure file exists (throws if not)
             await fsp.access(avatarPath);
         } catch (e) {
-            console.log(`File not found or inaccessible: ${avatarPath}`);
+            logger.info(`File not found or inaccessible: ${avatarPath}`);
             return res.status(404).send('Avatar file not found');
         }
 
         try {
-            console.log(`File found: ${avatarPath}`);
+            logger.info(`File found: ${avatarPath}`);
             await fsp.unlink(avatarPath);
         } catch (e) {
-            console.log(`Failed to unlink avatar: ${avatarPath}`, e);
+            logger.info(`Failed to unlink avatar: ${avatarPath}`, e);
             // continue to attempt cleanup of user record
         }
 
@@ -160,7 +153,7 @@ exports.removeAvatar = async (req, res) => {
                 await fsp.access(candidatePath);
                 cleanedAvatars.push(url);
             } catch (err) {
-                console.log(`File not found: ${candidatePath}`);
+                logger.info(`File not found: ${candidatePath}`);
             }
         }
 
@@ -188,16 +181,13 @@ exports.removeAvatar = async (req, res) => {
 
         await user.save();
 
-        // Emit socket event for real-time updates
-        try {
-            const io = req.app.get('io');
-            if (io) io.emit('user-profile-updated', { userId: user._id, at: new Date() });
-        } catch (e) { console.warn('Failed to emit socket event for removeAvatar', e); }
+        // 🔥 REAL-TIME: Emit targeted profile update
+        realtime.emitProfileUpdate(user);
 
         // Return the updated user object to update the UI (public view only)
         return res.status(200).send({ message: 'Avatar removed successfully', user: user.publicInfo() });
     } catch (err) {
-        console.error('Error removing avatar:', err);
+        logger.error('Error removing avatar:', err);
         return res.status(500).send('Server error');
     }
 };
@@ -247,13 +237,13 @@ exports.banUser = async (req, res) => {
         // Write log to the Blockingusers.txt file
         fs.appendFile(logPath, logMessage, (err) => {
             if (err) {
-                console.error('Failed to write to log file', err);
+                logger.error('Failed to write to log file', err);
             }
         });
 
     return Response.sendResponse(res, user.publicInfo(), 'User has been banned');
     } catch (error) {
-        console.log(error);
+        logger.info(error);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -272,7 +262,7 @@ exports.unbanUser = async (req, res) => {
 
     return Response.sendResponse(res, user.publicInfo(), 'User unbanned successfully');
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         return Response.sendError(res, 500, 'Server error, unable to unban the user');
     }
 };
@@ -312,7 +302,7 @@ exports.changeRole = async (req, res) => {
         await user.save();
         return Response.sendResponse(res, user.publicInfo(), `User role updated to ${role}`);
     } catch (err) {
-        console.error('Error changing role:', err);
+        logger.error('Error changing role:', err);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -425,7 +415,7 @@ exports.allUsers = async (req, res) => {
         });
         
     } catch (err) {
-        console.log(err);
+        logger.info(err);
         return Response.sendError(res, 500, 'Server error, please try again later');
     }
 };
@@ -443,7 +433,7 @@ exports.getMyAnnouncements = async (req, res) => {
             // Filter: active, not seen by user, not expired, AND created on/after user joined
             announcements = await Announcement.find({ 
                 isActive: true, 
-                seenBy: { $ne: new mongoose.Types.ObjectId(userId) },
+                seenBy: { $ne: String(userId) },
                 createdAt: { $gte: user.createdAt },
                 $or: [
                     { expiresAt: { $exists: false } },
@@ -452,19 +442,22 @@ exports.getMyAnnouncements = async (req, res) => {
                 ]
             }).sort({ createdAt: -1 }).lean();
             
+            // Normalize ObjectIds to strings
+            announcements = normalizeLeanDoc(announcements);
+            
             // Dedupe by _id in case of accidental duplicates
             const map = new Map();
             announcements.forEach(a => { if (a && a._id) map.set(String(a._id), a); });
             announcements = Array.from(map.values()).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
         } catch (qErr) {
-            console.error('Announcement.find failed:', qErr);
+            logger.error('Announcement.find failed:', qErr);
             // Return empty result instead of failing the client with 400/500
             return Response.sendResponse(res, []);
         }
 
         return Response.sendResponse(res, announcements);
     } catch (err) {
-        console.error('getMyAnnouncements error:', err);
+        logger.error('getMyAnnouncements error:', err);
         return Response.sendError(res, 500, 'Failed to load announcements');
     }
 };
@@ -476,11 +469,11 @@ exports.markAnnouncementSeen = async (req, res) => {
 
         await Announcement.updateOne(
             { _id: req.params.id },
-            { $addToSet: { seenBy: new mongoose.Types.ObjectId(userId) } }
+            { $addToSet: { seenBy: String(userId) } }
         );
         return Response.sendResponse(res, null, 'Marked as seen');
     } catch (err) {
-        console.error('markAnnouncementSeen error:', err);
+        logger.error('markAnnouncementSeen error:', err);
         return Response.sendError(res, 500, 'Failed to mark announcement as seen');
     }
 };
@@ -510,7 +503,7 @@ exports.storeUser = async (req, res) => {
 
         return Response.sendResponse(res, user.publicInfo(), 'User created successfully');
     } catch (err) {
-        console.error('Error in storeUser:', err);
+        logger.error('Error in storeUser:', err);
         return Response.sendError(res, 500, 'Internal server error');
     }
 };
@@ -546,7 +539,7 @@ addLocalChannels = async (user) => {
         channel.followers.push(user._id)
         await channel.save()
     } catch(err){
-        console.log(err);
+        logger.info(err);
     }
 }
 
@@ -558,7 +551,7 @@ addGlobalChannels = async(user) => {
         })
         await Channel.updateMany({global: true}, {$push: {followers: user._id}})
     } catch(err){
-        console.log(err);
+        logger.info(err);
     }
 }
 
@@ -603,19 +596,22 @@ exports.updateUserDash = async (req, res) => {
         // ✅ Save using `await` (without a callback)
         await user.save();
 
+        // 🔥 SECURITY: If password was changed, revoke tokens
+        if (req.fields.password && req.fields.password !== 'undefined') {
+            try {
+                const tokenBlacklist = require('../utils/tokenBlacklist');
+                await tokenBlacklist.revokeUser(String(user._id));
+            } catch (e) { logger.warn('Failed to revoke tokens on Dash password change', e); }
+        }
+
         // Emit socket event for real-time updates
-        try {
-            const io = req.app.get('io');
-            if (io) {
-                io.emit('user-profile-updated', { userId: user._id, at: new Date() });
-            }
-        } catch (e) { console.warn('Failed to emit socket event for updateUserDash', e); }
+        realtime.emitProfileUpdate(user);
 
         // Remove sensitive data before sending response
         const updatedUser = user.publicInfo();
         return Response.sendResponse(res, updatedUser, 'The user has been updated successfully');
     } catch (err) {
-        console.error('Error updating user dashboard:', err);
+        logger.error('Error updating user dashboard:', err);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -636,7 +632,7 @@ exports.uploadChatMedia = async (req, res) => {
             fileUrl: chatFileUrl
         });
     } catch (err) {
-        console.error('Error uploading chat media:', err);
+        logger.error('Error uploading chat media:', err);
         return res.status(500).json({ success: false, message: 'Server error' });
     }
 };
@@ -644,9 +640,9 @@ exports.uploadChatMedia = async (req, res) => {
 exports.showUserDash = async (req, res) => {
     try {
         const userId = normalizeId(req.params.userId);
-        console.log(`[showUserDash] userId: ${userId}, original: ${req.params.userId}`);
+        logger.info(`[showUserDash] userId: ${userId}, original: ${req.params.userId}`);
         if (!mongoose.Types.ObjectId.isValid(userId)) {
-            console.error(`[showUserDash] Invalid User ID: ${userId}`);
+            logger.error(`[showUserDash] Invalid User ID: ${userId}`);
             return Response.sendError(res, 400, 'Invalid User ID');
         }
 
@@ -668,7 +664,7 @@ exports.showUserDash = async (req, res) => {
 
         // Mask anonymous reports
         const processedReports = reports.map(r => {
-            const reportObj = r.toObject();
+            const reportObj = normalizeLeanDoc(r.toObject());
             if (reportObj.isAnonymous) {
                 reportObj.reporter = { firstName: 'Anonymous', lastName: '', email: 'Anonymous', _id: null };
             }
@@ -706,7 +702,7 @@ exports.showUserDash = async (req, res) => {
             channels
         });
     } catch (error) {
-        console.error('Error in showUserDash:', error);
+        logger.error('Error in showUserDash:', error);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -714,13 +710,16 @@ exports.showUserDash = async (req, res) => {
 exports.showUserEditDash = async (req, res) => {
     try {
         const userId = normalizeId(req.params.userId);
-        const user = await User.findById(userId).lean();
+        let user = await User.findById(userId).lean();
         if (!user) return Response.sendError(res, 404, 'User not found');
+        
+        // Normalize ObjectIds to strings
+        user = normalizeLeanDoc(user);
         
         // Wrap in a user object to match FormComponent's expectation for 'users' plurarName
         return Response.sendResponse(res, { user: user });
     } catch (error) {
-        console.error('Error in showUserEditDash:', error);
+        logger.error('Error in showUserEditDash:', error);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -730,18 +729,44 @@ exports.showUser = (req, res) => {
     try {
         return Response.sendResponse(res, req.user.publicInfo())
     } catch (error) {
-        console.log(error);
+        logger.info(error);
     }
 }
 
 exports.updateUser = async (req, res) => {
     try {
+        const actor = req.authUser;
+        const isAdmin = actor && (actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN');
+        
         // Determine which user to update: param userId (admin) or authenticated user
-        const targetId = req.params.userId || (req.authUser && req.authUser._id) || req.body._id || req.body.id;
+        let targetId = actor ? actor._id : null;
+        const requestedId = req.params.userId || req.body._id || req.body.id;
+
+        // 🔥 SECURITY: Only admins can update other users
+        if (requestedId && String(requestedId) !== String(targetId)) {
+            if (!isAdmin) return Response.sendError(res, 403, 'Unauthorized to update this profile');
+            targetId = requestedId;
+        }
+
         if (!targetId) return Response.sendError(res, 400, 'No user id specified');
 
         let user = await User.findById(targetId);
         if (!user) return Response.sendError(res, 404, 'User not found');
+
+        // Guarded debug logging: activate when env PROFILE_DEBUG_ID matches targetId or ?debug=1
+        const debugActive = (process.env.PROFILE_DEBUG_ID && String(process.env.PROFILE_DEBUG_ID) === String(targetId)) || (req.query && (req.query.debug === '1' || req.query.debug === 'true'));
+        if (debugActive) {
+            try {
+                const incoming = Object.keys(req.body || {}).map(k => ({ key: k, type: Array.isArray(req.body[k]) ? 'array' : typeof req.body[k], empty: req.body[k] === '' || req.body[k] === null || req.body[k] === undefined }));
+                logger.info('PROFILE_DEBUG: incoming payload keys/types for', String(targetId), incoming);
+                // append to debug file
+                try {
+                    const dbg = { at: new Date().toISOString(), userId: String(targetId), incoming };
+                    const logPath = path.join(process.cwd(), `profile-debug-${String(targetId)}.log`);
+                    fs.appendFileSync(logPath, JSON.stringify(dbg) + '\n');
+                } catch (e) { logger.warn('PROFILE_DEBUG: failed to write debug file', e); }
+            } catch (e) { logger.warn('PROFILE_DEBUG: failed to stringify incoming payload', e); }
+        }
 
         // Normalize some frontend field names and formats
         if (req.body.birthDate && !req.body.birthdate) {
@@ -867,7 +892,7 @@ exports.updateUser = async (req, res) => {
 
             // Debug log to help diagnose malformed client payloads (remove or gate in production)
             try {
-                console.log('Debug: raw languages payload:', req.body.languages);
+                logger.info('Debug: raw languages payload:', req.body.languages);
                 const normalizedLangs = normalizeLanguages(req.body.languages);
                 // Validate language names: allow letters (including common Latin accents), digits, spaces,
                 // dashes, apostrophes, periods and parentheses — avoid `\p{L}` for older Node regex engines
@@ -875,13 +900,13 @@ exports.updateUser = async (req, res) => {
                 if (normalizedLangs.length > 10) return Response.sendError(res, 400, 'Too many languages');
                 for (const lg of normalizedLangs) {
                     if (!langPattern.test(lg)) {
-                        console.log('Invalid language rejected by pattern:', lg);
+                        logger.info('Invalid language rejected by pattern:', lg);
                         return Response.sendError(res, 400, 'Invalid language value');
                     }
                 }
                 req.body.languages = normalizedLangs;
             } catch (e) {
-                console.error('Error normalizing languages:', e);
+                logger.error('Error normalizing languages:', e);
                 return Response.sendError(res, 400, 'Invalid languages format');
             }
         }
@@ -891,16 +916,53 @@ exports.updateUser = async (req, res) => {
             'firstName','lastName','phone','city','country','gender','birthDate',
             'education','profession','interests','languages','bio','aboutMe','website','socialLinks',
             'studyCountry','isPrivate', 'settings', 'school', 'genderVisible', 'ageVisible', 'randomVisible',
-            'avatarStyle', 'avatarSeed', 'avatarVariant', 'avatarOverrides'
+            'avatarStyle', 'avatarSeed', 'avatarVariant', 'avatarOverrides', 'fcmToken', 'themePreference'
         ];
 
         let changed = false;
+        const changedFields = [];
         for (const key of allowed) {
-            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                let val = req.body[key];
-                // Sanitize "undefined" string from frontend
-                if (val === 'undefined') val = '';
+            if (!Object.prototype.hasOwnProperty.call(req.body, key)) continue;
+
+            let val = req.body[key];
+
+            // Sanitize literal "undefined" string from some clients
+            if (val === 'undefined') val = undefined;
+
+            // Explicit clear: client must send `null` to clear a value
+            if (val === null) {
+                user[key] = null;
+                if (!changedFields.includes(key)) changedFields.push(key);
+                changed = true;
+                continue;
+            }
+
+            // Arrays: allow empty arrays (explicit clear)
+            if (Array.isArray(val)) {
                 user[key] = val;
+                if (!changedFields.includes(key)) changedFields.push(key);
+                changed = true;
+                continue;
+            }
+
+            // Strings: do NOT overwrite existing value with empty string.
+            // Only set non-empty strings (after trimming) to avoid accidental blanks.
+            if (typeof val === 'string') {
+                const trimmed = val.trim();
+                if (trimmed.length === 0) {
+                    // Skip empty string — treat as "no-op". To clear, client should send null.
+                    continue;
+                }
+                user[key] = trimmed;
+                if (!changedFields.includes(key)) changedFields.push(key);
+                changed = true;
+                continue;
+            }
+
+            // Numbers/booleans/objects: set as provided
+            if (typeof val !== 'undefined') {
+                user[key] = val;
+                if (!changedFields.includes(key)) changedFields.push(key);
                 changed = true;
             }
         }
@@ -909,18 +971,44 @@ exports.updateUser = async (req, res) => {
 
         await user.save();
 
-        // Emit socket event for real-time updates
-        const io = req.app.get('io');
-        if (io) {
-            io.emit('user-profile-updated', {
-                userId: user._id,
-                at: new Date()
-            });
+        // Audit log changes (redact details in audit util). Only store field names to avoid PII.
+        try {
+            if (changedFields.length) {
+                const audit = require('../utils/audit');
+                const actorId = (req.authUser && req.authUser._id) || (req.user && req.user._id) || null;
+                await audit.recordAudit({
+                    actorId,
+                    action: 'PROFILE_UPDATED',
+                    targetUserId: user._id,
+                    details: { changedFields },
+                    ip: req.ip,
+                    userAgent: req.get && req.get('User-Agent')
+                });
+            }
+        } catch (e) {
+            logger.warn('Audit record failed (non-fatal):', e);
         }
 
-        return Response.sendResponse(res, user.publicInfo(), 'Profile updated successfully');
+        // If debug was active for this update, record a post-save snapshot of changed fields (types only)
+        try {
+            const debugActiveAfter = (process.env.PROFILE_DEBUG_ID && String(process.env.PROFILE_DEBUG_ID) === String(targetId)) || (req.query && (req.query.debug === '1' || req.query.debug === 'true'));
+            if (debugActiveAfter) {
+                try {
+                    const saved = changedFields.map(k => ({ key: k, type: Array.isArray(user[k]) ? 'array' : typeof user[k], empty: user[k] === '' || user[k] === null || user[k] === undefined }));
+                    logger.info('PROFILE_DEBUG: saved snapshot for', String(targetId), saved);
+                    const dbg2 = { at: new Date().toISOString(), userId: String(targetId), saved };
+                    const logPath2 = path.join(process.cwd(), `profile-debug-${String(targetId)}.log`);
+                    fs.appendFileSync(logPath2, JSON.stringify(dbg2) + '\n');
+                } catch (e) { logger.warn('PROFILE_DEBUG: failed to write post-save debug file', e); }
+            }
+        } catch (e) { /* non-fatal */ }
+
+        // 🔥 REAL-TIME: Emit targeted profile update
+        realtime.emitProfileUpdate(user);
+
+        return Response.sendResponse(res, user.publicInfo(true), 'Profile updated successfully');
     } catch (err) {
-        console.error('Server error:', err);
+        logger.error('Server error:', err);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -931,20 +1019,20 @@ exports.updateEmail = async (req, res) => {
         const { email, current_password } = req.body;
         const authUser = req.authUser;
 
-        console.log('Attempting to update email for user:', authUser._id);
-        console.log('New email to be set:', email);
+        logger.info('Attempting to update email for user:', authUser._id);
+        logger.info('New email to be set:', email);
 
         // Verify password before allowing email change
         const isPasswordValid = await authUser.authenticate(current_password);
         if (!isPasswordValid) {
-            console.log('Password verification failed for email change');
+            logger.info('Password verification failed for email change');
             return Response.sendError(res, 401, 'Invalid current password');
         }
 
         // Find if the email is already being used
         const user = await User.findOne({ email });
         if (user) {
-            console.log('Email is already in use by another account:', email);
+            logger.info('Email is already in use by another account:', email);
             return Response.sendError(res, 400, 'email already used in another account');
         }
 
@@ -954,14 +1042,14 @@ exports.updateEmail = async (req, res) => {
         // Save the updated user information
         const updatedUser = await authUser.save();
         if (!updatedUser) {
-            console.error('Error saving updated user');
+            logger.error('Error saving updated user');
             return Response.sendError(res, 400, 'failed');
         }
 
-        console.log('Email updated successfully for user:', updatedUser._id);
+        logger.info('Email updated successfully for user:', updatedUser._id);
         return Response.sendResponse(res, updatedUser.publicInfo(), 'email changed');
     } catch (err) {
-        console.error('Unexpected error in updateEmail:', err);
+        logger.error('Unexpected error in updateEmail:', err);
         return Response.sendError(res, 500, 'Internal server error');
     }
 };
@@ -970,19 +1058,19 @@ exports.updatePassword = async (req, res) => {
         const { current_password, password } = req.body;
         const authUser = req.authUser;
 
-        console.log('Comparing current password for user:', authUser._id);
-        console.log('Provided current password:', current_password);
-        console.log('Stored hashed password in the database:', authUser.hashed_password);
+        logger.info('Comparing current password for user:', authUser._id);
+        logger.info('Provided current password:', current_password);
+        logger.info('Stored hashed password in the database:', authUser.hashed_password);
 
         // Compare provided current password with the stored hashed password
         const isMatch = await authUser.authenticate(current_password);
 
         if (!isMatch) {
-            console.log('Password comparison result: Password does not match');
+            logger.info('Password comparison result: Password does not match');
             return Response.sendError(res, 400, 'Current password is incorrect');
         }
 
-        console.log('Password comparison result: Password matches');
+        logger.info('Password comparison result: Password matches');
 
         // Update to the new password
         if (!validatePassword(password)) {
@@ -991,10 +1079,18 @@ exports.updatePassword = async (req, res) => {
         authUser.password = password; // This will trigger the setter to hash the new password
         await authUser.save();
 
-        console.log('Password updated successfully for user:', authUser._id);
+        // 🔥 SECURITY: Revoke all existing sessions on password change
+        try {
+            const tokenBlacklist = require('../utils/tokenBlacklist');
+            await tokenBlacklist.revokeUser(String(authUser._id));
+        } catch (e) {
+            logger.error('Failed to revoke tokens on password change', e);
+        }
+
+        logger.info('Password updated successfully for user:', authUser._id);
         return Response.sendResponse(res, authUser.publicInfo(), 'Password updated successfully');
     } catch (err) {
-        console.error('Error updating password:', err);
+        logger.error('Error updating password:', err);
         return Response.sendError(res, 500, 'Failed to update password');
     }
 };
@@ -1007,24 +1103,24 @@ exports.storeAvatar = async (avatar, user) => {
         const avatarDir = path.join(process.cwd(), 'public/uploads');
         const avatarPath = path.join(avatarDir, avatarName);
 
-        console.log(`Avatar directory: ${avatarDir}`);
-        console.log(`Avatar path: ${avatarPath}`);
+        logger.info(`Avatar directory: ${avatarDir}`);
+        logger.info(`Avatar path: ${avatarPath}`);
 
         // Ensure the uploads directory exists
         try {
             await fsp.access(avatarDir);
         } catch (e) {
-            console.log(`Creating directory: ${avatarDir}`);
+            logger.info(`Creating directory: ${avatarDir}`);
             await fsp.mkdir(avatarDir, { recursive: true });
         }
 
         // Write the new avatar file (async)
-        console.log(`Writing new avatar file: ${avatarPath}`);
+        logger.info(`Writing new avatar file: ${avatarPath}`);
         try {
             const data = await fsp.readFile(avatar.path);
             await fsp.writeFile(avatarPath, data);
         } catch (e) {
-            console.error('Error writing avatar file:', e);
+            logger.error('Error writing avatar file:', e);
         }
 
         // Remove the old avatar file if it exists and is not the default (async)
@@ -1034,7 +1130,7 @@ exports.storeAvatar = async (avatar, user) => {
             const lastAvatarPath = path.join(__dirname, `./../../public${user.mainAvatar}`);
             try {
                 await fsp.access(lastAvatarPath);
-                console.log(`Removing old avatar file: ${lastAvatarPath}`);
+                logger.info(`Removing old avatar file: ${lastAvatarPath}`);
                 await fsp.unlink(lastAvatarPath);
             } catch (e) {
                 // ignore if not exists
@@ -1050,16 +1146,13 @@ exports.storeAvatar = async (avatar, user) => {
         user.avatar.type = avatar.type;
 
         // Save the user object to the database
-        console.log(`Saving user data with new avatar path: ${user.avatar.path}`);
+        logger.info(`Saving user data with new avatar path: ${user.avatar.path}`);
         await user.save();
 
-        // Emit socket event for real-time updates
-        try {
-            const io = (global && global.io) ? global.io : (typeof req !== 'undefined' && req && req.app ? req.app.get('io') : null);
-            if (io) io.emit('user-profile-updated', { userId: user._id, at: new Date() });
-        } catch (e) { console.warn('Failed to emit socket event in storeAvatar', e); }
+        // 🔥 REAL-TIME: Emit targeted profile update
+        realtime.emitProfileUpdate(user);
     } catch (error) {
-        console.log('Error storing avatar:', error);
+        logger.info('Error storing avatar:', error);
     }
 };
 
@@ -1093,14 +1186,14 @@ exports.updateMainAvatar = async (req, res) => {
             try {
                     const io = req.app.get('io');
                     if (io) io.emit('user-profile-updated', { userId: user._id, at: new Date() });
-            } catch (e) { console.warn('Failed to emit socket event in updateMainAvatar', e); }
+            } catch (e) { logger.warn('Failed to emit socket event in updateMainAvatar', e); }
 
             return res.status(200).send({
                 message: 'Main avatar updated successfully',
                 user: user.publicInfo()
             });
     } catch (err) {
-      console.error('Error updating main avatar:', err);
+      logger.error('Error updating main avatar:', err);
       return res.status(500).send('Server error');
     }
   };
@@ -1122,11 +1215,8 @@ exports.updateAvatar = async (req, res) => {
 
             await user.save();
 
-            // Emit socket event for real-time updates
-            try {
-                const io = req.app.get('io');
-                if (io) io.emit('user-profile-updated', { userId: user._id, at: new Date() });
-            } catch (e) { console.warn('Failed to emit socket event in updateAvatar', e); }
+            // 🔥 REAL-TIME: Emit targeted profile update
+            realtime.emitProfileUpdate(user);
 
             return res.status(200).send({
                 message: 'Avatar updated successfully',
@@ -1137,7 +1227,7 @@ exports.updateAvatar = async (req, res) => {
             return res.status(400).send('No avatar file uploaded');
         }
     } catch (err) {
-        console.error('Error updating avatar:', err);
+        logger.error('Error updating avatar:', err);
         return res.status(500).send('Server error');
     }
 };
@@ -1165,9 +1255,9 @@ exports.deleteAccount = async(req, res) => {
             if (helpers && typeof helpers.sendNotification === 'function') {
                 helpers.sendNotification(String(user._id), msg, { en: 'System' }, String(user._id)).catch(() => {});
             }
-        } catch (e) { console.warn('Failed to send deletion notification', e); }
+        } catch (e) { logger.warn('Failed to send deletion notification', e); }
         // Revoke any tokens for this user (user-scoped revocation)
-        try { await tokenBlacklist.revokeUser(String(user._id)); } catch (e) { console.warn('Failed to revoke user tokens', e); }
+        try { await tokenBlacklist.revokeUser(String(user._id)); } catch (e) { logger.warn('Failed to revoke user tokens', e); }
 
         // If an Authorization header / cookie token was used for this request, try to revoke that specific JTI too
         try {
@@ -1184,9 +1274,9 @@ exports.deleteAccount = async(req, res) => {
                         const ttl = decoded.exp ? Math.max(0, decoded.exp - Math.floor(Date.now() / 1000)) : undefined;
                         await tokenBlacklist.revokeByJti(jti, ttl);
                     }
-                } catch (e) { console.warn('Failed to decode token for jti revocation', e); }
+                } catch (e) { logger.warn('Failed to decode token for jti revocation', e); }
             }
-        } catch (e) { console.warn('Failed to revoke jti for current token', e); }
+        } catch (e) { logger.warn('Failed to revoke jti for current token', e); }
 
         // Notify and disconnect any active sockets for this user
         try {
@@ -1200,18 +1290,18 @@ exports.deleteAccount = async(req, res) => {
                         if (sock && typeof sock.disconnect === 'function') {
                             sock.disconnect(true);
                         }
-                    } catch (e) { console.warn('Error forcing socket logout for', sid, e); }
+                    } catch (e) { logger.warn('Error forcing socket logout for', sid, e); }
                 }
             }
-        } catch (e) { console.warn('Failed to notify sockets on account delete', e); }
+        } catch (e) { logger.warn('Failed to notify sockets on account delete', e); }
 
         // record audit for self-delete
         try {
             const { recordAudit } = require('../utils/audit');
             await recordAudit({ actorId: user._id, actorRole: user.role || null, action: 'USER_SELF_DELETE', targetUserId: user._id, details: { retentionDays: process.env.DATA_RETENTION_DAYS || 30 }, ip: req.ip, userAgent: req.get('User-Agent') });
-        } catch (e) { console.warn('Failed to record audit for self-delete', e); }
+        } catch (e) { logger.warn('Failed to record audit for self-delete', e); }
 
-    } catch (e) { console.warn('deleteAccount post-delete hooks failed', e); }
+    } catch (e) { logger.warn('deleteAccount post-delete hooks failed', e); }
 
     return Response.sendResponse(res, { retentionDays: days }, 'account deleted')
 }
@@ -1229,11 +1319,11 @@ exports.restoreAccount = async (req, res) => {
         await user.save();
 
         // Unrevoke user in blacklist
-        try { await tokenBlacklist.unrevokeUser(String(user._id)); } catch (e) { console.warn('Failed to unrevoke user', e); }
+        try { await tokenBlacklist.unrevokeUser(String(user._id)); } catch (e) { logger.warn('Failed to unrevoke user', e); }
 
         return Response.sendResponse(res, user, 'Account restored successfully');
     } catch (err) {
-        console.error('UserController.restoreAccount error', err);
+        logger.error('UserController.restoreAccount error', err);
         return Response.sendError(res, 500, 'Failed to restore account');
     }
 };
@@ -1287,11 +1377,11 @@ exports.deleteUser = async (req, res) => {
                             } catch (e) {}
                         }
                     }
-                } catch (e) { console.warn('Failed to disconnect sockets on delete', e); }
+                } catch (e) { logger.warn('Failed to disconnect sockets on delete', e); }
 
                 return Response.sendResponse(res, null, 'User permanently deleted by administrator (GDPR Hard Delete)');
             } catch (e) {
-                console.error('Permanent delete failed', e);
+                logger.error('Permanent delete failed', e);
                 return Response.sendError(res, 500, 'Could not permanently delete user');
             }
         } else {
@@ -1333,12 +1423,12 @@ exports.deleteUser = async (req, res) => {
                         } catch (e) {}
                     }
                 }
-            } catch (e) { console.warn('Failed to disconnect sockets on soft-delete', e); }
+            } catch (e) { logger.warn('Failed to disconnect sockets on soft-delete', e); }
 
             return Response.sendResponse(res, null, `Account scheduled for deletion in ${days} days. You can restore it before then.`);
         }
     } catch (err) {
-        console.error('UserController.deleteUser error', err);
+        logger.error('UserController.deleteUser error', err);
         return Response.sendError(res, 500, 'Failed to process deletion');
     }
 };
@@ -1356,16 +1446,16 @@ exports.restoreUser = async (req, res) => {
         await user.save();
 
         // Unrevoke user in blacklist
-        try { await tokenBlacklist.unrevokeUser(String(user._id)); } catch (e) { console.warn('Failed to unrevoke user', e); }
+        try { await tokenBlacklist.unrevokeUser(String(user._id)); } catch (e) { logger.warn('Failed to unrevoke user', e); }
 
         try {
             const { recordAudit } = require('../utils/audit');
             await recordAudit({ actorId: req.auth && req.auth._id, actorRole: req.auth && req.auth.role, action: 'USER_RESTORE', targetUserId: user._id, details: null, ip: req.ip, userAgent: req.get('User-Agent') });
-        } catch (e) { console.warn('Failed to record audit for restore', e); }
+        } catch (e) { logger.warn('Failed to record audit for restore', e); }
 
         return Response.sendResponse(res, user.publicInfo(), 'user restored');
     } catch (err) {
-        console.error('Error restoring user:', err);
+        logger.error('Error restoring user:', err);
         return Response.sendError(res, 500, 'Could not restore the user');
     }
 };
@@ -1380,7 +1470,7 @@ exports.toggleUserStatus = async (req, res) => {
 
         return Response.sendResponse(res, user.enabled, 'The user account has been ' + (user.enabled ? 'enabled' : 'disabled'));
     } catch (err) {
-        console.error('Error toggling user status:', err);
+        logger.error('Error toggling user status:', err);
         return Response.sendError(res, 500, 'Server error, please try again later');
     }
 };
@@ -1391,19 +1481,25 @@ exports.follow = async(req, res) => {
     let followed = false
 
     if(!authUser.following.includes(user._id)){
+        // Ensure they are NOT friends if they are following
+        authUser.friends = authUser.friends.filter(id => id.toString() !== user._id.toString());
+        user.friends = user.friends.filter(id => id.toString() !== authUser._id.toString());
+
         authUser.following.push(user._id)
         if(!user.followers.includes(authUser._id))
             user.followers.push(authUser._id)
         followed = true
     }
     else{
-        authUser.following.splice(authUser.following.indexOf(user._id), 1)
-        if(user.followers.includes(authUser._id))
-            user.followers.splice(user.following.indexOf(authUser._id), 1)
+        authUser.following = authUser.following.filter(id => id.toString() !== user._id.toString());
+        user.followers = user.followers.filter(id => id.toString() !== authUser._id.toString());
     }
 
     await user.save()
     await authUser.save()
+
+    // Emit real-time follow update to both parties so follower/following counts refresh instantly
+    realtime.emitFollowUpdate(authUser._id, user._id, followed ? 'followed' : 'unfollowed');
 
     if(followed)
         sendNotification({en: req.authUser.firstName + ' ' + req.authUser.lastName}, {en: 'started following you'}, {
@@ -1422,8 +1518,7 @@ exports.getUsers = async (req, res) => {
             return usersArray.map(u => {
                 try {
                     let obj = (u && typeof u.toObject === 'function') ? u.toObject() : (u && u._doc ? u._doc : u);
-                    if (obj && obj._id && typeof obj._id !== 'string') obj._id = String(obj._id);
-                    return obj;
+                    return normalizeLeanDoc(obj);
                 } catch (e) {
                     return u;
                 }
@@ -1555,16 +1650,17 @@ exports.getUsers = async (req, res) => {
         }
 
     } catch (err) {
-        console.log("Server error:", err);
+        logger.info("Server error:", err);
         return Response.sendError(res, 500, 'Server error!');
     }
 };
 
 // Helper function to build the base filter
 function buildBaseFilter(req) {
-    // Ensure that req.auth._id and req.authUser._id are properly converted to ObjectId
-    const authUserId = new mongoose.Types.ObjectId(req.auth._id);
-    const authUserBlockedIds = (req.authUser.blockedUsers || []).map(id => new mongoose.Types.ObjectId(id));
+    // Use string IDs directly - MongoDB handles string to ObjectId comparison automatically
+    // This prevents buffer serialization issues when logging or serializing filters
+    const authUserId = String(req.auth._id);
+    const authUserBlockedIds = (req.authUser.blockedUsers || []).map(id => String(id));
 
     // normalize query helpers: treat empty strings, literal 'null'/'undefined' and placeholder '0' as absent
     const isEmptyParam = (v) => v === undefined || v === null || String(v).trim() === '' || String(v).toLowerCase() === 'null' || String(v).toLowerCase() === 'undefined';
@@ -1660,14 +1756,15 @@ function buildBaseFilter(req) {
         }
     }
 
-    console.log("🛠️ Generated MongoDB Filter:", JSON.stringify(filter, null, 2));
+    logger.info("🛠️ Generated MongoDB Filter:", JSON.stringify(filter, null, 2));
     return filter;
 }
 
 // Build a relaxed filter used when strict filters return zero results
 function buildMinimalFilter(req) {
-    const authUserId = new mongoose.Types.ObjectId(req.auth._id);
-    const authUserBlockedIds = req.authUser.blockedUsers.map(id => new mongoose.Types.ObjectId(id));
+    // Use string IDs directly - MongoDB handles string to ObjectId comparison automatically
+    const authUserId = String(req.auth._id);
+    const authUserBlockedIds = (req.authUser.blockedUsers || []).map(id => String(id));
 
     const minimal = {
         _id: { $ne: authUserId, $nin: authUserBlockedIds },
@@ -1733,11 +1830,14 @@ async function fetchUsersThenFilterOnline(req, baseFilter, skip, limit) {
         .limit(fetchLimit)
         .lean();
 
+    // Normalize all ObjectIds to strings
+    const normalizedCandidates = normalizeLeanDoc(candidates);
+
     // batch-check online status using presence module (Redis-backed if available)
     const presence = require('../utils/presence');
-    const ids = candidates.map(c => c._id.toString());
+    const ids = normalizedCandidates.map(c => c._id.toString());
     const onlineSet = await presence.getOnlineSet(ids);
-    const onlineFiltered = candidates.filter(u => onlineSet.has(u._id.toString()));
+    const onlineFiltered = normalizedCandidates.filter(u => onlineSet.has(u._id.toString()));
 
     // apply skip/limit on filtered results
     const sliced = onlineFiltered.slice(skip, skip + limit);
@@ -1748,13 +1848,18 @@ async function fetchUsersThenFilterOnline(req, baseFilter, skip, limit) {
 // Helper function to find users in a specific city
 async function findUsersInCity(req, filter, skip, limit) {
     if (!req.authUser || !req.authUser.city) {
-        console.log("findUsersInCity: No city found for auth user");
+        logger.info("findUsersInCity: No city found for auth user", {
+            hasAuthUser: !!req.authUser,
+            authUserId: req.authUser?._id,
+            city: req.authUser?.city,
+            country: req.authUser?.country
+        });
         return [];
     }
     // Use case-insensitive regex for city matching
     const cityRegex = new RegExp('^' + req.authUser.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
     const cityFilter = { ...filter, city: cityRegex };
-    console.log("Filter being used for city search:", cityFilter);
+    logger.info("Filter being used for city search:", cityFilter);
 
     if (req.query.online === '1' || req.query.online === 'true') {
         return await fetchUsersThenFilterOnline(req, cityFilter, skip, limit);
@@ -1773,14 +1878,19 @@ async function findUsersInCity(req, filter, skip, limit) {
 // Helper function to find users in a specific country
 async function findUsersInCountry(req, filter, skip, limit) {
     if (!req.authUser || !req.authUser.country) {
-        console.log("findUsersInCountry: No country found for auth user");
+        logger.info("findUsersInCountry: No country found for auth user", {
+            hasAuthUser: !!req.authUser,
+            authUserId: req.authUser?._id,
+            city: req.authUser?.city,
+            country: req.authUser?.country
+        });
         return [];
     }
     // Use case-insensitive regex for country matching
     const countryRegex = new RegExp('^' + req.authUser.country.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
     const countryFilter = { ...filter, country: countryRegex };
     delete countryFilter['city'];
-    console.log("Filter being used for country search:", countryFilter);
+    logger.info("Filter being used for country search:", countryFilter);
 
     if (req.query.online === '1' || req.query.online === 'true') {
         return await fetchUsersThenFilterOnline(req, countryFilter, skip, limit);
@@ -1801,7 +1911,7 @@ async function findUsersGlobally(req, filter, skip, limit) {
     const globalFilter = { ...filter };
     delete globalFilter['city'];
     delete globalFilter['country'];
-    console.log("Filter being used for global search:", globalFilter);
+    logger.info("Filter being used for global search:", globalFilter);
 
     if (req.query.online === '1' || req.query.online === 'true') {
         return await fetchUsersThenFilterOnline(req, globalFilter, skip, limit);
@@ -1837,7 +1947,7 @@ async function findRandomUsers(req, filter, limit) {
   // Ensure we only show users who want to be visible in random discovery
   filter['randomVisible'] = true;
 
-  console.log("🔎 Random Discovery filter:", JSON.stringify(filter));
+  logger.info("🔎 Random Discovery filter:", JSON.stringify(filter));
 
   // Fetch candidates matching the filters (gender, age, interests, etc.)
   const candidates = await User.find(filter)
@@ -1846,12 +1956,15 @@ async function findRandomUsers(req, filter, limit) {
     .sort({ createdAt: -1 })
     .lean();
 
-  console.log(`👥 Candidates before online filter: ${candidates.length}`);
+  // Normalize all ObjectIds to strings
+  const normalizedCandidates = normalizeLeanDoc(candidates);
+
+  logger.info(`👥 Candidates before online filter: ${normalizedCandidates.length}`);
 
   // Apply online filter in Node.js
-  const onlineUsers = candidates.filter(u => isUserOnline(u._id.toString()));
+  const onlineUsers = normalizedCandidates.filter(u => isUserOnline(u._id.toString()));
 
-  console.log(`✅ Online candidates after filter: ${onlineUsers.length}`);
+  logger.info(`✅ Online candidates after filter: ${onlineUsers.length}`);
 
   // Random slice
   const count = onlineUsers.length;
@@ -1868,16 +1981,18 @@ function hasMoreUsers(users, limit, page) {
 
 // Helper function to build the request population query
 function getRequestPopulationQuery(req) {
+    const authUserId = String(req.auth._id);
     return {
         $or: [
-            { from: new mongoose.Types.ObjectId(req.auth._id) },
-            { to: new mongoose.Types.ObjectId(req.auth._id) }
+            { from: authUserId },
+            { to: authUserId }
         ]
     };
 }
 
 // Helper function to select fields for users
 function getUserSelectFields(req) {
+    const authUserId = String(req.auth._id);
     return {
         firstName: 1,
         lastName: 1,
@@ -1888,8 +2003,8 @@ function getUserSelectFields(req) {
         avatar: 1,
         mainAvatar: 1,
         birthDate: { $cond: [{ $eq: ["$ageVisible", true] }, "$birthDate", null] },
-        followed: { $in: [new mongoose.Types.ObjectId(req.auth._id), "$followers"] },
-        friend: { $in: [new mongoose.Types.ObjectId(req.auth._id), "$friends"] },
+        followed: { $in: [authUserId, "$followers"] },
+        friend: { $in: [authUserId, "$friends"] },
         requests: 1,
         profession: 1,
         interests: 1,
@@ -1899,6 +2014,7 @@ function getUserSelectFields(req) {
         avatarSeed: 1,
         avatarVariant: 1,
         avatarOverrides: 1,
+        themePreference: 1,
         updatedAt: 1,
         enabled: 1,
         is2FAEnabled: 1,
@@ -1933,13 +2049,15 @@ const isFriend = (authUser, user) => {
         return {
             isLoggedInUser: false,
             isFriend: false,
+            friend: false,
         };
     }
     const isLoggedInUser = authUser._id.toString() === user._id.toString();
-    const isFriend = user.friends.some(friendId => friendId.toString() === authUser._id.toString());
+    const isFriendResult = user.friends.some(friendId => friendId.toString() === authUser._id.toString());
     return {
         isLoggedInUser,
-        isFriend,
+        isFriend: isFriendResult,
+        friend: isFriendResult,
     };
 };
 
@@ -1958,13 +2076,13 @@ function formatLastSeen(lastSeenDate) {
 }
 
 exports.getUserProfile = async (req, res) => {
-    console.log(`Fetching user profile for ID: ${req.params.userId}`);
+    logger.info(`Fetching user profile for ID: ${req.params.userId}`);
   
     try {
       const userId = normalizeId(req.params.userId);
       const authUserId = req.auth._id.toString();
   
-      console.log(`Authenticated user ID: ${authUserId}`);
+      logger.info(`Authenticated user ID: ${authUserId}`);
   
       // Find the user by ID and populate subscription details
       const userDoc = await User.findOne({ _id: userId })
@@ -1972,6 +2090,7 @@ exports.getUserProfile = async (req, res) => {
           firstName: 1,
           lastName: 1,
           email: 1,
+          emailVerified: 1,
           country: 1,
           city: 1,
           gender: 1,
@@ -1992,11 +2111,13 @@ exports.getUserProfile = async (req, res) => {
           followers: 1,
           following: 1,
           friends: 1,
+          missedCallBudget: 1,
           blockedUsers: 1,
           followedChannels: 1,
           messagedUsers: 1,
           randomVisible: 1,
           ageVisible: 1,
+          genderVisible: 1,
           visitProfile: 1,
           isPrivate: 1,
           lastSeen: 1,
@@ -2006,6 +2127,7 @@ exports.getUserProfile = async (req, res) => {
           avatarVariant: 1,
           avatarOverrides: 1,
           subscription: 1,
+          themePreference: 1,
           createdAt: 1,
           updatedAt: 1,
           deletedAt: 1
@@ -2046,16 +2168,39 @@ exports.getUserProfile = async (req, res) => {
         return res.status(404).send("User not found");
       }
   
-      // Convert to plain object
-      const user = userDoc.toObject();
+      // Convert to plain object and normalize all ObjectIds to strings
+      const user = normalizeLeanDoc(userDoc.toObject());
+      const isMe = authUserId === userId;
+
+      // Add pending counts for self
+      if (isMe) {
+          user.pendingFollowRequestsCount = await Follow.countDocuments({ followed: authUserId, status: 'pending' });
+          user.pendingFriendRequestsCount = await Request.countDocuments({ to: authUserId, accepted: false });
+      }
   
       // Default avatar if missing
       if (!user.mainAvatar && typeof userDoc.getDefaultAvatar === "function") {
         user.mainAvatar = userDoc.getDefaultAvatar();
       }
   
-      // Relationship status
-      const relationshipStatus = isFriend(req.auth, userDoc);
+      // Relationship status — bidirectional check:
+      // The viewed user may have the auth user in their friends, OR the auth user may have the
+      // viewed user in their friends (DB can be inconsistent if one side was updated first).
+      // Fetch auth user's own friends to cross-check.
+      const authUserFriends = await User.findById(authUserId).select('friends').lean();
+      const authFriendIds = (authUserFriends?.friends || []).map(id => String(id));
+      const isFriendBidirectional = (doc, friendIdStr) => {
+        const inViewedSide = doc.friends && doc.friends.some(id => String(id) === friendIdStr);
+        const inAuthSide   = authFriendIds.includes(String(doc._id));
+        return inViewedSide || inAuthSide;
+      };
+      const isLoggedInUser = authUserId === userId;
+      const isFriendResult = isLoggedInUser ? false : isFriendBidirectional(userDoc, authUserId);
+      const relationshipStatus = {
+        isLoggedInUser,
+        isFriend: isFriendResult,
+        friend:   isFriendResult,
+      };
 
       // Add follow status
       const followRecord = await Follow.findOne({
@@ -2072,12 +2217,12 @@ exports.getUserProfile = async (req, res) => {
       relationshipStatus.isFollowing = !!(followRecord && followRecord.status === 'active');
       relationshipStatus.isFollower = !!(isFollowerRecord && isFollowerRecord.status === 'active');
 
-      // If profile is private and not following/friend/self, hide sensitive info
-      const isMe = authUserId === userId;
-      if (userDoc.isPrivate && !relationshipStatus.isFollowing && !relationshipStatus.isFriend && !isMe) {
+      // If profile is private and not a friend/self, restrict exposed data.
+      // - Active followers can see aboutMe only (bio revealed, rest stays hidden).
+      // - Everyone else (strangers) sees the locked placeholder for aboutMe too.
+      if (userDoc.isPrivate && !relationshipStatus.isFriend && !isMe) {
           user.email = undefined;
           user.birthDate = undefined;
-          user.aboutMe = "This profile is private. Follow to see more.";
           user.interests = [];
           user.languages = [];
           user.education = undefined;
@@ -2085,6 +2230,11 @@ exports.getUserProfile = async (req, res) => {
           user.school = undefined;
           user.avatar = []; // Hide gallery
           user.followedChannels = [];
+          if (!relationshipStatus.isFollowing) {
+              // Stranger — hide bio too
+              user.aboutMe = "This profile is private. Follow to see their bio.";
+          }
+          // Active followers keep the real aboutMe but nothing else
       }
 
             // Defensive: decode legacy/base64-encoded interests or languages if present
@@ -2139,7 +2289,7 @@ exports.getUserProfile = async (req, res) => {
       };
       
   
-            console.log("Sending user profile:", {
+            logger.info("Sending user profile:", {
                 _id: response._id,
                 isLoggedInUser: response.isLoggedInUser,
                 isFriend: response.isFriend,
@@ -2154,9 +2304,11 @@ exports.getUserProfile = async (req, res) => {
                 res.set('Expires', '0');
             } catch (e) { /* ignore header errors */ }
 
-            return res.status(200).json({ data: response });
+            // Use centralized response helper to ensure consistent shape and sanitization
+            const Response = require('./Response');
+            return Response.sendResponse(res, response);
     } catch (err) {
-      console.error("Error fetching user profile:", err);
+      logger.error("Error fetching user profile:", err);
       return res.status(500).send("Server error");
     }
   };
@@ -2171,31 +2323,31 @@ exports.getFriends = async (req, res) => {
         const page = parseInt(req.query.page, 10);
 
         if (isNaN(page) || page < 0) {
-            console.error('Invalid page parameter:', req.query.page);
+            logger.error('Invalid page parameter:', req.query.page);
             return res.status(400).json({ error: 'Invalid page parameter' });
         }
 
-        console.log('Authenticated user:', req.authUser);
+        logger.info('Authenticated user:', req.authUser);
 
         if (!req.authUser || !req.authUser._id) {
-            console.error('req.authUser is undefined or does not have _id');
+            logger.error('req.authUser is undefined or does not have _id');
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const userId = new mongoose.Types.ObjectId(req.authUser._id);
+        const userId = String(req.authUser._id);
 
         const user = await User.findById(userId);
         if (!user) {
-            console.error('User not found:', userId);
+            logger.error('User not found:', userId);
             return res.status(404).json({ error: 'User not found' });
         }
 
-        console.log('User document:', user);
+        logger.info('User document:', user);
 
         // If the user has no friends, return empty result immediately to avoid
         // querying with an empty $in array which will always return no documents.
         if (!user.friends || user.friends.length === 0) {
-            console.warn('User has no friends, returning empty list for:', userId);
+            logger.warn('User has no friends, returning empty list for:', userId);
             return res.status(200).json({ friends: [], more: false });
         }
 
@@ -2207,7 +2359,7 @@ exports.getFriends = async (req, res) => {
             deletedAt: { $eq: null }
         };
 
-        console.log('Filter being used:', filter);
+        logger.info('Filter being used:', filter);
 
         const friends = await User.find(filter, {
             firstName: 1,
@@ -2226,7 +2378,7 @@ exports.getFriends = async (req, res) => {
         .exec();
 
         if (!friends || friends.length === 0) {
-            console.warn('No friends found for user:', userId);
+            logger.warn('No friends found for user:', userId);
             return res.status(200).json({ friends: [], more: false });
         }
 
@@ -2243,7 +2395,7 @@ exports.getFriends = async (req, res) => {
         });
 
     } catch (err) {
-        console.error('Error in getFriends:', err);
+        logger.error('Error in getFriends:', err);
         return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
@@ -2256,21 +2408,30 @@ exports.removeFriendship = async(req, res) => {
         const user = req.user;
 
         if (!authUser || !authUser._id || !user || !user._id) {
-            console.warn('removeFriendship: missing authUser or user', { authUser: !!authUser, user: !!user });
+            logger.warn('removeFriendship: missing authUser or user', { authUser: !!authUser, user: !!user });
             return Response.sendError(res, 400, 'Invalid users');
         }
 
         // perform idempotent removal
         await User.updateOne({ _id: user._id }, { $pull: { friends: authUser._id } });
         await User.updateOne({ _id: authUser._id }, { $pull: { friends: user._id } });
-        console.log('removeFriendship: removed friendship between', String(authUser._id), 'and', String(user._id));
+        
+        // Also remove any pending friendship requests between these two
+        await Request.deleteMany({
+            $or: [
+                { from: authUser._id, to: user._id },
+                { from: user._id, to: authUser._id }
+            ]
+        });
+
+        logger.info('removeFriendship: removed friendship and requests between', String(authUser._id), 'and', String(user._id));
 
         // 🔁 Notify both sides to refresh friends list
         emitFriendRequestsUpdated(authUser._id, user._id);
 
         return Response.sendResponse(res, true, 'Friendship is removed');
     }catch(err){
-        console.log(err);
+        logger.info(err);
         return Response.sendError(res, 400, 'failed')
     }
 }
@@ -2301,18 +2462,21 @@ exports.blockUser = async (req, res) => {
     try { emitToUsers([authUser._id, user._id], 'user-profile-updated', { userId: user._id }); } catch (e) {}
   
       // Remove any requests between the two users
+      const authUserId = String(req.auth._id);
+      const targetUserId = String(req.user._id);
+      
       await Request.deleteMany({
         $or: [
           {
             $and: [
-              { from: new mongoose.Types.ObjectId(req.auth._id) },
-              { to: new mongoose.Types.ObjectId(req.user._id) }
+              { from: authUserId },
+              { to: targetUserId }
             ]
           },
           {
             $and: [
-              { to: new mongoose.Types.ObjectId(req.auth._id) },
-              { from: new mongoose.Types.ObjectId(req.user._id) }
+              { to: authUserId },
+              { from: targetUserId }
             ]
           }
         ]
@@ -2322,7 +2486,7 @@ exports.blockUser = async (req, res) => {
       return Response.sendResponse(res, true, 'User blocked');
       
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       return Response.sendError(res, 500, 'Internal Server Error');
     }
   };
@@ -2351,41 +2515,47 @@ exports.unblockUser = async (req, res) => {
 
         return Response.sendResponse(res, true, 'user unblocked');
     } catch (err) {
-        console.error('unblockUser error:', err);
+        logger.error('unblockUser error:', err);
         return Response.sendError(res, 500, 'Internal Server Error');
     }
 }
 
 exports.updateRandomVisibility = async (req, res) => {
     try {
-        const { userId, visible } = req.body;
+        const { visible } = req.body;
+        const userId = req.authUser ? req.authUser._id : req.auth._id;
+        logger.info(`[UserController] updateRandomVisibility: visible=${visible}, userId=${userId}`);
+        
         const user = await User.findByIdAndUpdate(userId, { $set: { randomVisible: visible } }, { new: true });
 
         if (!user) {
+            logger.warn(`[UserController] updateRandomVisibility: User not found for ID ${userId}`);
             return Response.sendError(res, 404, 'User not found');
         }
 
-        return Response.sendResponse(res, user.publicInfo(), 'Updated');
+        return Response.sendResponse(res, user.publicInfo(true), 'Updated');
     } catch (error) {
-        console.log('Exception error:', error);
+        logger.error('[UserController] updateRandomVisibility error:', error);
         return Response.sendError(res, 500, 'Internal Server Error');
     }
 };
 
-  
-
 exports.updateAgeVisibility = async (req, res) => {
     try {
         const { visible } = req.body;
-        const user = await User.findByIdAndUpdate(req.auth._id, { $set: { ageVisible: visible } }, { new: true });
+        const userId = req.authUser ? req.authUser._id : req.auth._id;
+        logger.info(`[UserController] updateAgeVisibility: visible=${visible}, userId=${userId}`);
+
+        const user = await User.findByIdAndUpdate(userId, { $set: { ageVisible: visible } }, { new: true });
 
         if (!user) {
+            logger.warn(`[UserController] updateAgeVisibility: User not found for ID ${userId}`);
             return Response.sendError(res, 404, 'User not found');
         }
         
-        return Response.sendResponse(res, user.publicInfo(), 'Age visibility updated');
+        return Response.sendResponse(res, user.publicInfo(true), 'Age visibility updated');
     } catch (error) {
-        console.error(error);
+        logger.error('[UserController] updateAgeVisibility error:', error);
         return Response.sendError(res, 500, 'Internal server error');
     }
 };
@@ -2393,15 +2563,39 @@ exports.updateAgeVisibility = async (req, res) => {
 exports.updatePrivacy = async (req, res) => {
     try {
         const { isPrivate } = req.body;
-        const user = await User.findByIdAndUpdate(req.auth._id, { $set: { isPrivate: isPrivate } }, { new: true });
+        const userId = req.authUser ? req.authUser._id : req.auth._id;
+        logger.info(`[UserController] updatePrivacy: isPrivate=${isPrivate}, userId=${userId}`);
+
+        const user = await User.findByIdAndUpdate(userId, { $set: { isPrivate: isPrivate } }, { new: true });
 
         if (!user) {
+            logger.warn(`[UserController] updatePrivacy: User not found for ID ${userId}`);
             return Response.sendError(res, 404, 'User not found');
         }
         
-        return Response.sendResponse(res, user.publicInfo(), 'Privacy settings updated');
+        return Response.sendResponse(res, user.publicInfo(true), 'Privacy settings updated');
     } catch (error) {
-        console.error(error);
+        logger.error('[UserController] updatePrivacy error:', error);
+        return Response.sendError(res, 500, 'Internal server error');
+    }
+};
+
+exports.updateGenderVisibility = async (req, res) => {
+    try {
+        const { visible } = req.body;
+        const userId = req.authUser ? req.authUser._id : req.auth._id;
+        logger.info(`[UserController] updateGenderVisibility: visible=${visible}, userId=${userId}`);
+
+        const user = await User.findByIdAndUpdate(userId, { $set: { genderVisible: visible } }, { new: true });
+
+        if (!user) {
+            logger.warn(`[UserController] updateGenderVisibility: User not found for ID ${userId}`);
+            return Response.sendError(res, 404, 'User not found');
+        }
+        
+        return Response.sendResponse(res, user.publicInfo(true), 'Gender visibility updated');
+    } catch (error) {
+        consoleee.error('[UserController] updateGenderVisibility error:', error);
         return Response.sendError(res, 500, 'Internal server error');
     }
 };

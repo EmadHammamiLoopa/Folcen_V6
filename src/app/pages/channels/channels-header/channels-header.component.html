@@ -1,12 +1,26 @@
-<app-header title="Channels" [menu]="true" class="glass-header-wrapper"></app-header>
+<app-header title="Channels" [menu]="true" class="glass-header-wrapper">
+  <div id="end-buttons">
+    <button class="header-action-btn create-btn" 
+            routerLink="/tabs/channels/form" 
+            *ngIf="isMines()">
+      <ion-icon name="add-circle"></ion-icon>
+    </button>
+    
+    <button class="header-action-btn explore-btn" 
+            (click)="router.navigate(['/tabs/channels/list/explore'])" 
+            *ngIf="isFollowed()">
+      <ion-icon name="globe-outline"></ion-icon>
+    </button>
+  </div>
+</app-header>
 
 <div class="glass-tabs-container">
   <div class="glass-tabs-inner">
-    <div class="tab-item" routerLink="/tabs/channels/list/mines" routerLinkActive="active">
+    <div class="tab-item" routerLink="/tabs/channels/list/mines" routerLinkActive="active" data-testid="channels-tab-managed">
       <i class="fas fa-user-circle"></i>
       <span>My Channels</span>
     </div>
-    <div class="tab-item" routerLink="/tabs/channels/list/followed" routerLinkActive="active">
+    <div class="tab-item" routerLink="/tabs/channels/list/followed" routerLinkActive="active" data-testid="channels-tab-followed">
       <i class="fas fa-heart"></i>
       <span>Followed</span>
     </div>

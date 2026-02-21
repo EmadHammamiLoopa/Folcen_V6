@@ -1,3 +1,4 @@
+import { devLogger } from "src/app/utils/dev-logger";
 import { Injectable } from '@angular/core';
 import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent } from '@angular/common/http';
 import { Observable, from } from 'rxjs';
@@ -14,7 +15,7 @@ export class AuthInterceptor implements HttpInterceptor {
       switchMap(() => {
         if (this.platform.is('cordova')) {
           return from(this.nativeStorage.getItem('token').catch(err => {
-            console.log('Auth token not found in NativeStorage', err);
+            devLogger.log('Auth token not found in NativeStorage', err);
             return null;
           }));
         } else {

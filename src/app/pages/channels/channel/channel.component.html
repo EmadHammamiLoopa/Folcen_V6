@@ -1,54 +1,62 @@
 <ion-content #content [fullscreen]="true" scrollEvents="true">
-  <!-- Immersive Header -->
+  <!-- Compact Channel Header -->
   <div class="channel-hero" *ngIf="channel">
-    <div class="hero-bg" [style.background-image]="'url(' + channel.photo + ')'"></div>
+    <div class="hero-bg"
+      [style.background-image]="channel.photo && channel.photo !== 'assets/images/default-channel.png' ? 'url(' + channel.photo + ')' : 'none'"
+      [style.background-color]="(!channel.photo || channel.photo === 'assets/images/default-channel.png') ? 'hsl(' + ((channel.name?.charCodeAt(0) || 65) * 137 % 360) + ', 35%, 18%)' : 'transparent'"
+    ></div>
     <div class="hero-overlay"></div>
-    
-    <div class="hero-content">
-      <div class="top-bar">
-        <ion-back-button defaultHref="/tabs/channels" text="" icon="chevron-back"></ion-back-button>
-        <div class="spacer"></div>
-        <ion-button fill="clear" class="action-btn" (click)="presentPopover($event)">
-          <i class="fas fa-ellipsis-v"></i>
-        </ion-button>
+
+    <div class="top-bar">
+      <ion-back-button defaultHref="/tabs/channels" text="" icon="chevron-back"></ion-back-button>
+      <div class="spacer"></div>
+      <ion-button fill="clear" class="action-btn" (click)="presentPopover($event)">
+        <i class="fas fa-ellipsis-v"></i>
+      </ion-button>
+    </div>
+
+    <div class="hero-row">
+      <div class="ch-avatar">
+        <img *ngIf="channel.photo && channel.photo !== 'assets/images/default-channel.png'"
+          [src]="channel.photo" class="ch-avatar-img"
+          (error)="$any($event.target).style.display='none'" />
+        <div class="ch-avatar-initials"
+          [style.background]="'hsl(' + ((channel.name?.charCodeAt(0) || 65) * 137 % 360) + ', 55%, 38%)'"
+          *ngIf="!channel.photo || channel.photo === 'assets/images/default-channel.png'"
+        >{{ channel.name?.charAt(0)?.toUpperCase() }}</div>
+        <span class="verified-dot" *ngIf="channel.approved">
+          <ion-icon name="checkmark-circle"></ion-icon>
+        </span>
       </div>
 
-      <div class="channel-info">
-        <div class="category-badge" *ngIf="channel.category && channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">{{ channel.category }}</div>
-        <h1 class="channel-name">{{ channel.name }}</h1>
-        <p class="channel-desc" *ngIf="channel.description">{{ channel.description }}</p>
-        
-        <div class="channel-stats">
-          <div class="stat">
-            <span class="value">{{ channel.followers?.length || 0 }}</span>
-            <span class="label">Followers</span>
-          </div>
-          <div class="stat" *ngIf="posts">
-            <span class="value">{{ posts.length }}</span>
-            <span class="label">Posts</span>
-          </div>
-          <div class="stat" *ngIf="channel.city">
-            <span class="value"><i class="fas fa-map-marker-alt"></i></span>
-            <span class="label">{{ channel.city }}</span>
-          </div>
+      <div class="ch-info">
+        <div class="ch-top-line">
+          <span class="ch-name">{{ channel.name }}</span>
+          <span class="ch-badge"
+            *ngIf="channel.category && channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'"
+          >{{ channel.category }}</span>
         </div>
-
-        <div class="channel-actions">
-            <ion-button 
-              class="follow-btn" 
-              *ngIf="!isOwner(channel)"
-              [class.followed]="channel.followedBy(user.id || user._id)"
-              (click)="handlePopoverEvent('follow')"
-            >
-              <ion-icon [name]="channel.followedBy(user.id || user._id) ? 'checkmark-circle' : 'add-circle'" slot="start"></ion-icon>
-              {{ channel.followedBy(user.id || user._id) ? 'Following' : 'Follow' }}
-            </ion-button>
-          
-          <ion-button 
-            class="post-btn" 
+        <p class="ch-desc" *ngIf="channel.description">{{ channel.description }}</p>
+        <div class="ch-stats">
+          <span class="ch-stat"><strong>{{ channel.followers?.length || 0 }}</strong> Followers</span>
+          <span class="ch-dot">·</span>
+          <span class="ch-stat" *ngIf="posts"><strong>{{ posts.length }}</strong> Posts</span>
+          <ng-container *ngIf="channel.city">
+            <span class="ch-dot">·</span>
+            <span class="ch-stat"><i class="fas fa-map-marker-alt"></i> {{ channel.city }}</span>
+          </ng-container>
+        </div>
+        <div class="ch-actions">
+          <ion-button class="ch-btn follow-btn"
+            *ngIf="!isOwner(channel)"
+            [class.followed]="channel.followedBy(user.id || user._id)"
+            (click)="handlePopoverEvent('follow')">
+            <ion-icon [name]="channel.followedBy(user.id || user._id) ? 'checkmark-circle' : 'add-circle'" slot="start"></ion-icon>
+            {{ channel.followedBy(user.id || user._id) ? 'Following' : 'Follow' }}
+          </ion-button>
+          <ion-button class="ch-btn post-btn"
             (click)="showPostForm()"
-            *ngIf="channel && user && (channel.followedBy(user.id || user._id) || isOwner(channel))"
-          >
+            *ngIf="channel && user && (channel.followedBy(user.id || user._id) || isOwner(channel))">
             <ion-icon name="create-outline" slot="start"></ion-icon>
             Post
           </ion-button>

@@ -16,6 +16,77 @@ const othersAvatarPath = '/avatars/other.webp';
 
 const ERROR_CODES     = { SUBSCRIPTION_ERROR: 1001 };
 
+/**
+ * Helper to normalize User ID (handles Base64 encoded IDs from frontend)
+ */
+const normalizeId = (id) => {
+    if (!id) return id;
+    id = String(id).trim();
+    if (mongoose.Types.ObjectId.isValid(id)) return id;
+    try {
+        const safe = id.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = safe.padEnd(safe.length + (4 - safe.length % 4) % 4, '=');
+        const decoded = Buffer.from(padded, 'base64').toString('utf8');
+        if (mongoose.Types.ObjectId.isValid(decoded)) return decoded;
+    } catch (e) {}
+    return id;
+};
+
+/**
+ * Normalize ObjectIds in lean query results to strings
+ * Use this after .lean() queries to prevent buffer serialization issues
+ */
+const normalizeLeanDoc = (doc) => {
+    if (!doc) return doc;
+    
+    // Handle arrays
+    if (Array.isArray(doc)) {
+        return doc.map(item => normalizeLeanDoc(item));
+    }
+    
+    // Handle non-objects
+    if (typeof doc !== 'object') return doc;
+    
+    // Handle ObjectId instances
+    if (doc.constructor && doc.constructor.name === 'ObjectId') {
+        return doc.toString();
+    }
+    
+    // Handle plain objects - clone and normalize all fields
+    const normalized = {};
+    for (const key in doc) {
+        if (doc.hasOwnProperty(key)) {
+            const value = doc[key];
+            
+            // Convert ObjectId to string
+            if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'ObjectId') {
+                normalized[key] = value.toString();
+            }
+            // Recursively handle arrays
+            else if (Array.isArray(value)) {
+                normalized[key] = value.map(item => {
+                    if (item && typeof item === 'object' && item.constructor && item.constructor.name === 'ObjectId') {
+                        return item.toString();
+                    } else if (item && typeof item === 'object') {
+                        return normalizeLeanDoc(item);
+                    }
+                    return item;
+                });
+            }
+            // Recursively handle nested objects
+            else if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'Object') {
+                normalized[key] = normalizeLeanDoc(value);
+            }
+            // Keep other values as-is
+            else {
+                normalized[key] = value;
+            }
+        }
+    }
+    
+    return normalized;
+};
+
 /*───────────────────── Socket-IO bootstrap & helpers ───────────*/
 
 // Live Socket.IO reference (initialized in server bootstrap via initSocket)
@@ -55,10 +126,133 @@ function setOnlineUsers(users) {
 }
 
 /** Emit an event to all sockets of a single user */
-function emitToUser(userId, event, payload = {}) {
+async function emitToUser(userId, event, payload = {}, options = {}) {
   if (!io) return;
+
+  // Reliability Hardening: Inject metadata (timestamp/version) for Task 2
+  if (payload && typeof payload === 'object') {
+     payload._metadata = {
+       version: '1.0.0',
+       timestamp: Date.now(),
+       persistent: !!options.persistIfOffline
+     };
+  }
+
   const sockets = userSocketIds(String(userId));
-  sockets.forEach(sid => io.to(sid).emit(event, payload));
+  if (sockets.length > 0) {
+    sockets.forEach(sid => io.to(sid).emit(event, payload));
+  } else if (options.persistIfOffline) {
+    // Guaranteed Delivery: Save to Outbox if user is offline (Task 1)
+    try {
+      const EventOutbox = require('./models/EventOutbox');
+      await EventOutbox.create({
+        userId: String(userId),
+        event,
+        payload
+      });
+      console.log(`[STASHED] User ${userId} offline. Event ${event} saved to Outbox.`);
+    } catch (err) {
+      console.error('Failed to stash offline event:', err.message);
+    }
+  }
+}
+
+/** Replay events stashed while the user was offline */
+async function replayOfflineEvents(userId, socket) {
+  try {
+    const EventOutbox = require('./models/EventOutbox');
+    const events = await EventOutbox.find({ userId: String(userId) }).sort({ createdAt: 1 });
+    if (events.length > 0) {
+      console.log(`[REPLAY] Replaying ${events.length} events for user ${userId} on socket ${socket.id}`);
+      for (const evt of events) {
+        socket.emit(evt.event, evt.payload);
+      }
+      // Clear outbox after successful replay
+      await EventOutbox.deleteMany({ userId: String(userId) });
+    }
+  } catch (err) {
+    console.warn(`[REPLAY] Replay failed for user ${userId}:`, err.message);
+  }
+}
+
+/**
+ * Shared policy for chat initiation permissions (Task 1: Single Source of Truth).
+ * Enforces "Max 3 unique non-friend recipients per 24 hours" unless subscribed or friends.
+ * Handles Block, Privacy (Follow fallback), and Thread Unlock.
+ */
+async function canInitiateChat(senderId, receiverId) {
+  const User = require('./models/User');
+  const Message = require('./models/Message');
+  const Follow = require('./models/Follow');
+  const { userSubscribed } = require('./middlewares/subscription');
+
+  // Fetch users with minimal projection to avoid overhead
+  const [sender, receiver] = await Promise.all([
+    User.findById(senderId).select('friends blockedUsers subscription'),
+    User.findById(receiverId).select('friends blockedUsers isPrivate')
+  ]);
+
+  if (!sender || !receiver) return { allowed: false, reason: 'user_not_found' };
+
+  // 1. Block Check (Highest Priority)
+  const isBlockedByReceiver = receiver.blockedUsers && receiver.blockedUsers.some(id => id.toString() === String(senderId));
+  const isBlockedBySender = sender.blockedUsers && sender.blockedUsers.some(id => id.toString() === String(receiverId));
+  if (isBlockedByReceiver || isBlockedBySender) return { allowed: false, reason: 'blocked' };
+
+  // 2. Friendship / Unlock Bypass
+  const isFriend = (sender.friends || []).map(String).includes(String(receiverId));
+  if (isFriend) return { allowed: true, budgetRemaining: Infinity };
+
+  // If receiver has ever replied, the conversation is "unlocked"
+  const hasReplied = await Message.exists({ from: receiverId, to: senderId });
+  if (hasReplied) return { allowed: true, budgetRemaining: Infinity };
+
+  // 3. Privacy Check (Follow Fallback)
+  if (receiver.isPrivate) {
+    const follow = await Follow.findOne({ follower: senderId, followed: receiverId, status: 'active' });
+    if (!follow) return { allowed: false, reason: 'privacy_restricted' };
+  }
+
+  // 4. Recipient Budget Check (Max 3 unique non-friends / 24h)
+  if (await userSubscribed(sender)) return { allowed: true, budgetRemaining: Infinity };
+
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  
+  // Get unique recipients messaged in last 24h who are NOT friends
+  const recentRecipients = await Message.find({
+    from: senderId,
+    createdAt: { $gte: yesterday },
+    to: { $nin: (sender.friends || []) }
+  }).distinct('to');
+
+  const distinctCount = recentRecipients.length;
+  const alreadyMessagedThisTarget = recentRecipients.some(id => String(id) === String(receiverId));
+
+  if (!alreadyMessagedThisTarget && distinctCount >= 3) {
+    return { allowed: false, reason: 'budget_exhausted', budgetRemaining: 0 };
+  }
+
+  // Calculate remaining budget (for UI indicator)
+  const budget = alreadyMessagedThisTarget ? Infinity : Math.max(0, 3 - distinctCount);
+  return { allowed: true, budgetRemaining: budget };
+}
+
+/** Simple memory-based rate limiting per user/type for reliability */
+const rateLimitMap = new Map();
+function checkRateLimit(userId, type, limit, windowMs) {
+  const now = Date.now();
+  const key = `${userId}:${type}`;
+  const record = rateLimitMap.get(key) || { count: 0, startTime: now };
+
+  if (now - record.startTime > windowMs) {
+    record.count = 1;
+    record.startTime = now;
+  } else {
+    record.count++;
+  }
+
+  rateLimitMap.set(key, record);
+  return record.count <= limit;
 }
 
 /** Emit an event to multiple users */
@@ -80,18 +274,220 @@ function emitNewFriendRequest(toUserId, fromUserId) {
   emitToUser(toUserId, 'new-friend-request', { from: String(fromUserId) });
 }
 
+/**
+ * Compute full statistics snapshot for a user
+ */
+async function getUserStatistics(userId) {
+  try {
+    const User = require('./models/User');
+    const Follow = require('./models/Follow');
+    const Request = require('./models/Request');
+
+    const [u, pendingFollows, pendingFriends] = await Promise.all([
+      User.findById(userId).select('friends followers following missedCallBudget'),
+      Follow.countDocuments({ followed: userId, status: 'pending' }),
+      Request.countDocuments({ to: userId, accepted: false })
+    ]);
+
+    if (!u) return null;
+
+    return {
+      friends: u.friends ? u.friends.length : 0,
+      followers: u.followers ? u.followers.length : 0,
+      following: u.following ? u.following.length : 0,
+      budget: u.missedCallBudget || 0,
+      pendingFollowRequests: pendingFollows,
+      pendingFriendRequests: pendingFriends
+    };
+  } catch (e) {
+    console.error(`Error computing stats for ${userId}:`, e.message);
+    return null;
+  }
+}
+
 function emitFriendRequestsUpdated(userAId, userBId) {
   // Client will re-count precisely (API fetch) for both sides
-  emitToUsers([userAId, userBId], 'friend-requests-updated', {});
+  // We attach a snapshot of statistics to avoid force-reloading if possible
+  setImmediate(async () => {
+    try {
+      const statsA = await getUserStatistics(userAId);
+      const statsB = await getUserStatistics(userBId);
+
+      const payloadA = { from: userBId, userId: userBId };
+      const payloadB = { from: userAId, userId: userAId };
+
+      if (statsA) {
+        payloadA.statistics = statsA;
+        // Explicit budget update for the notification badge
+        emitToUser(userAId, 'budget-update', { missedCallBudget: statsA.budget });
+      }
+      if (statsB) {
+        payloadB.statistics = statsB;
+        // Explicit budget update for the notification badge
+        emitToUser(userBId, 'budget-update', { missedCallBudget: statsB.budget });
+      }
+
+      emitToUser(userAId, 'friend-requests-updated', payloadA);
+      emitToUser(userBId, 'friend-requests-updated', payloadB);
+    } catch (e) {
+      console.error('Failed to emit friend stats:', e);
+      emitToUser(userAId, 'friend-requests-updated', { from: userBId, userId: userBId });
+      emitToUser(userBId, 'friend-requests-updated', { from: userAId, userId: userAId });
+    }
+  });
 }
 
 function emitFriendRequestAccepted(userAId, userBId) {
-  emitToUsers([userAId, userBId], 'friend-request-accepted', {});
+  emitToUser(userAId, 'friend-requests-updated', { from: userBId, type: 'accepted', userId: userBId });
+  emitToUser(userBId, 'friend-requests-updated', { from: userAId, type: 'accepted', userId: userAId });
 }
 
 function emitFriendRequestDeclined(userAId, userBId) {
-  emitToUsers([userAId, userBId], 'friend-request-declined', {});
+  emitToUser(userAId, 'friend-requests-updated', { from: userBId, type: 'declined', userId: userBId });
+  emitToUser(userBId, 'friend-requests-updated', { from: userAId, type: 'declined', userId: userAId });
 }
+
+/**
+ * Create a persistent notification and optionally send push
+ */
+async function createNotification({ recipientId, senderId, type, title, body, data = {} }) {
+  try {
+    const Notification = require('./models/Notification');
+    const notification = await Notification.create({
+      recipient: recipientId,
+      sender: senderId,
+      type,
+      title,
+      body,
+      data
+    });
+
+    // Notify user via socket immediately if online (NotificationService listens)
+    emitToUser(recipientId, 'notification-received', notification);
+
+    // Trigger push via existing helper
+    sendNotification([recipientId], body, title, senderId).catch(() => {});
+
+    return notification;
+  } catch (err) {
+    console.error('Failed to create notification:', err.message);
+  }
+}
+
+/*───────────────────── REAL-TIME SIGNALING HELPERS ───────────*/
+
+const realtime = {
+  /** Global or friend-based presence broadcast */
+  broadcastPresence: (userId, isOnline) => {
+    if (!io) return;
+    io.emit('user-status-changed', { userId, online: isOnline });
+  },
+
+  /** Chat: Notify recipient of a new message (persistent) */
+  emitNewMessage: (senderId, recipientId, messageData) => {
+    emitToUser(recipientId, 'new_message', messageData, { persistIfOffline: true });
+  },
+
+  /** Chat: Confirm to sender that message was sent */
+  emitMessageSent: (senderId, tempId, messageData) => {
+    emitToUser(senderId, 'message_sent', { tempId, ...messageData });
+  },
+
+  /** Chat: Notify sender that message was delivered */
+  emitMessageDelivered: (messageId, senderId, recipientId) => {
+    emitToUser(senderId, 'message_delivered', { messageId, recipientId });
+  },
+
+  /** Chat: Notify sender that message was read */
+  emitMessageRead: (messageId, senderId, recipientId) => {
+    emitToUser(senderId, 'message_read', { messageId, recipientId });
+  },
+
+  /** Profile: Notify everyone (or listeners) of a profile change */
+  emitProfileUpdate: (user) => {
+    if (!io) return;
+    io.emit('user-profile-updated', { 
+        userId: user._id, 
+        fields: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            avatar: user.avatar,
+            online: user.online
+        }
+    });
+  },
+
+  /** Social: Sync friend request status */
+  emitFriendRequest: (fromId, toId, status) => {
+    emitToUser(toId, 'friend-requests-updated', { type: status, from: fromId });
+  },
+
+  /** Social: Sync follow/unfollow status */
+  emitFollowUpdate: (fromId, toId, status) => {
+    setImmediate(async () => {
+        try {
+            const statsA = await getUserStatistics(fromId);
+            const statsB = await getUserStatistics(toId);
+
+            // Explicit budget updates for both parties
+            if (statsA) emitToUser(fromId, 'budget-update', { missedCallBudget: statsA.budget });
+            if (statsB) emitToUser(toId, 'budget-update', { missedCallBudget: statsB.budget });
+
+            emitToUser(toId, 'follow-update', { 
+                type: status, 
+                userId: fromId,
+                followerId: fromId,
+                followedId: toId,
+                actorId: fromId,
+                targetId: toId,
+                actorStatistics: statsA,
+                targetStatistics: statsB
+            });
+            emitToUser(fromId, 'follow-update', { 
+                type: status, 
+                userId: toId,
+                followerId: fromId,
+                followedId: toId,
+                actorId: fromId,
+                targetId: toId,
+                actorStatistics: statsA,
+                targetStatistics: statsB
+            });
+        } catch (e) {
+            console.error('Failed to emit follow stats:', e);
+            emitToUser(toId, 'follow-update', { type: status, userId: fromId });
+            emitToUser(fromId, 'follow-update', { type: status, userId: toId });
+        }
+    });
+  },
+
+  /** Mentions: Immediate propagation of mentions */
+  emitMention: (userId, type, targetId, text) => {
+    emitToUser(userId, 'mention-received', { type, targetId, text });
+  },
+
+  /** Feed: Notify recipients of new post in their feed */
+  emitFeedPost: (recipients, postData) => {
+    if (!io || !recipients || !Array.isArray(recipients)) return;
+    
+    // Normalize the post data to ensure all IDs are strings
+    const normalizedPost = {
+      ...postData,
+      _id: postData._id ? String(postData._id) : undefined,
+      user: postData.user ? {
+        ...postData.user,
+        _id: postData.user._id ? String(postData.user._id) : undefined
+      } : undefined,
+      channel: postData.channel ? String(postData.channel) : undefined
+    };
+
+    // Emit to each recipient
+    recipients.forEach(recipientId => {
+      const rid = String(recipientId);
+      emitToUser(rid, 'new_feed_post', normalizedPost, { persistIfOffline: true });
+    });
+  }
+};
 
 /**
  * Validate password strength
@@ -407,6 +803,8 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
 /*──────────────────────── Module exports ───────────────────────*/
 module.exports = {
   /* constants */
+  normalizeId,
+  normalizeLeanDoc,            // 👈 NEW - prevents buffer serialization in lean queries
   manAvatarPath,
   womenAvatarPath,
   othersAvatarPath,
@@ -420,14 +818,19 @@ module.exports = {
   isUserConnected,
   setOnlineUsers,
   emitToUser,                  // 👈 NEW
+  replayOfflineEvents,         // 👈 NEW
+  checkRateLimit,              // 👈 NEW
   emitToUsers,                 // 👈 NEW
   emitToAll,                   // 👈 NEW
   emitNewFriendRequest,        // 👈 NEW
   emitFriendRequestsUpdated,   // 👈 NEW
   emitFriendRequestAccepted,
   emitFriendRequestDeclined,
+  createNotification,
+  realtime,
 
   /* misc utilities */
+  canInitiateChat,
   extractDashParams,
   report,
   adminCheck,

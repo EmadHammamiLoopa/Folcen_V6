@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-channels-header',
@@ -7,8 +8,16 @@ import { Component, OnInit } from '@angular/core';
 })
 export class ChannelsHeaderComponent implements OnInit {
 
-  constructor() { }
+  constructor(public router: Router) { }
 
   ngOnInit() {}
+
+  isMines() {
+    return this.router.url.includes('/mines');
+  }
+
+  isFollowed() {
+    return this.router.url.includes('/followed');
+  }
 
 }

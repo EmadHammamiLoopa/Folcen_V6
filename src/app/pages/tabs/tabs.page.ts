@@ -1,8 +1,8 @@
 import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { Socket } from 'socket.io-client';
-import { BehaviorSubject, of } from 'rxjs';
-import { filter } from 'rxjs/operators';
+import { BehaviorSubject, Subject, of } from 'rxjs';
+import { filter, takeUntil } from 'rxjs/operators';
 
 import { RequestService } from 'src/app/services/request.service';
 import { AppEventsService, TabKey } from 'src/app/services/app-events.service';
@@ -16,9 +16,11 @@ import { UserService } from 'src/app/services/user.service';
 })
 export class TabsPage implements OnInit, OnDestroy {
   private socket: Socket | null = null;
+  private destroy$ = new Subject<void>();
   private listenersAttached = false;
 
   private currentUrl = '';
+  private activeTab = ''; // track active tab directly from ionTabsDidChange
   private routerSub: any;
   private badgeCounts = new Map<TabKey, number>();
   showTabs = true;
@@ -62,10 +64,15 @@ export class TabsPage implements OnInit, OnDestroy {
     });
 
     // track route changes for smarter message badge behavior
-    this.routerSub = this.router.events.subscribe(ev => {
-      if (ev instanceof NavigationEnd) this.currentUrl = ev.urlAfterRedirects || ev.url;
-    });
+
     this.currentUrl = this.router.url;
+    // Pre-populate activeTab from initial URL so badge guards work before
+    // the first ionTabsDidChange event fires (e.g. app starting on messages tab).
+    const urlParts = this.currentUrl.split('/');
+    const tabsIdx = urlParts.indexOf('tabs');
+    if (tabsIdx !== -1 && urlParts[tabsIdx + 1]) {
+      this.activeTab = urlParts[tabsIdx + 1];
+    }
 
     try {
       // bind + connect socket
@@ -74,52 +81,85 @@ export class TabsPage implements OnInit, OnDestroy {
       await SocketService.ensureConnected();
       this.socket = await SocketService.getSocket();
 
-      // realtime listeners (only if socket created)
-      if (this.socket) {
-        this.attachSocketListenersOnce();
+      // seed exact count for friends on first load
+      this.recountFriends();
 
-        // seed exact count for friends on first load
-        this.recountFriends();
-
-        // seed again on reconnect
-        this.socket.on('connect', () => this.recountFriends());
-      }
+      // seed again on reconnect
+      if (this.socket) this.socket.on('connect', () => this.recountFriends());
     } catch (error) {
       console.error('Failed to init Tabs sockets:', error);
     }
+
+    // ── Observable-based real-time listeners (reconnect-safe) ──────────────
+    // New incoming message → increment messages badge (skip only if already on messages tab)
+    SocketService.newMessage$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+      this.zone.run(() => {
+        if (this.activeTab === 'messages') return; // on messages tab — no badge needed
+        const incomingFrom = payload?.from?._id || payload?.from;
+        if (incomingFrom && this.isInChatWith(String(incomingFrom))) return;
+        this.badges.inc('messages', 1);
+      });
+    });
+
+    // New feed post → increment feed badge
+    SocketService.newFeedPost$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      this.zone.run(() => {
+        if (this.activeTab !== 'feed') {
+          this.badges.inc('feed', 1);
+        }
+      });
+    });
+
+    // New incoming friend request → increment immediately then recount from API after a short delay
+    SocketService.newFriendRequest$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      this.zone.run(() => {
+        if (this.activeTab !== 'friends') {
+          this.badges.inc('friends', 1);
+        }
+        // Delayed API recount to get accurate count (avoids race with DB write)
+        setTimeout(() => this.recountFriends(), 1500);
+      });
+    });
+
+    // Friend request accepted/declined/cancelled → recount from API after delay
+    SocketService.friendRequestsUpdated$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      this.zone.run(() => {
+        // Delay to avoid race condition where API is queried before DB write completes
+        setTimeout(() => {
+          this.recountFriends();
+          this.userService.triggerFriendsRefresh();
+        }, 800);
+      });
+    });
+
+    // Connection restored → re-seed counts
+    SocketService.connection$.pipe(takeUntil(this.destroy$)).subscribe(status => {
+      if (status === 'connected') {
+        this.zone.run(() => this.recountFriends());
+      }
+    });
 
     this.routerSub = this.router.events
       .pipe(filter(ev => ev instanceof NavigationEnd))
       .subscribe((ev: NavigationEnd) => {
         this.currentUrl = ev.urlAfterRedirects || ev.url;
-
-        // Only clear the messages badge when landing on the Messages root view
-        // (not when navigating to chat threads like /messages/chat/:id)
-        if (this.isMessagesRoot()) {
-          this.badges.reset('messages');
+        // Feed / friends: reset badge whenever landing on those tab roots.
+        // Messages: handled exclusively in onTabChanged to avoid resetting while navigating
+        //           within a chat conversation (entering a chat is not a "tab change").
+        if (this.currentUrl.includes('/tabs/feed')) {
+          this.badges.reset('feed');
+        }
+        if (this.currentUrl.includes('/tabs/friends')) {
+          this.badges.reset('friends');
         }
       });
-  
   }
 
   ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
     if (this.routerSub) this.routerSub.unsubscribe();
-
-    if (this.socket) {
-      // remove per-tab generics
-      this.tabs.forEach(t => t.notificationEvent && this.socket!.off(t.notificationEvent));
-
-      // remove friends specifics
-      this.socket.off('friend-requests-updated');
-      this.socket.off('friend-request-accepted');
-      this.socket.off('friend-request-declined');
-
-      // remove messages specifics
-      this.socket.off('messages-updated');
-
-      this.socket.off('connect');
-      this.socket.off('disconnect');
-    }
+    if (this.socket) this.socket.off('connect');
   }
 
   // ----- template helpers -----
@@ -132,55 +172,7 @@ export class TabsPage implements OnInit, OnDestroy {
   }
 
   // ----- realtime / API -----
-  private attachSocketListenersOnce() {
-    if (!this.socket || this.listenersAttached) return;
-
-    // generic per-tab events
-    this.tabs.forEach(tab => {
-      if (!tab.notificationEvent) return;
-      const eventName = tab.notificationEvent;
-
-      this.socket!.on(eventName, (payload: any) => {
-        this.zone.run(() => {
-          if (tab.url === 'friends') {
-            // keep friends exact
-            this.recountFriends();
-            return;
-          }
-
-          if (tab.url === 'messages' && eventName === 'new-message') {
-            // Skip bump if already on Messages root or in the same chat thread
-            if (this.isOnMessagesScreen()) return;
-            const incomingFrom = payload?.from?._id || payload?.from;
-            if (incomingFrom && this.isInChatWith(incomingFrom)) return;
-
-            this.badges.inc('messages', 1);
-            return;
-          }
-
-          // all other tabs
-          this.badges.inc(tab.url, 1);
-        });
-      });
-    });
-
-    // precise recount hooks for friends
-    ['friend-requests-updated', 'friend-request-accepted', 'friend-request-declined']
-      .forEach(ev => this.socket!.on(ev, () => this.zone.run(() => {
-        this.recountFriends();
-        this.userService.triggerFriendsRefresh();
-      })));
-
-    // optional precise messages recount hook (if server emits totals)
-    this.socket.on('messages-updated', (data: any) => {
-      this.zone.run(() => {
-        const total = Number(data?.totalUnread);
-        if (Number.isFinite(total)) this.badges.set('messages', Math.max(0, total));
-      });
-    });
-
-    this.listenersAttached = true;
-  }
+  private attachSocketListenersOnce() {}
 
   private async recountFriends() {
     try {
@@ -195,17 +187,27 @@ export class TabsPage implements OnInit, OnDestroy {
 
   // ----- UI events -----
   onTabChanged(event: any) {
-    const activeTab = event?.detail?.tab || event?.tab;
+    // The template passes the already-extracted tab string:
+    //   (ionTabsDidChange)="onTabChanged(($any($event)?.tab) || ($any($event)?.detail?.tab))"
+    // so `event` is a string like 'messages', 'feed', etc.
+    // Also handle raw CustomEvent in case the binding is changed later.
+    const activeTab: string =
+      typeof event === 'string' ? event : (event?.detail?.tab || event?.tab || '');
     if (!activeTab) return;
+    this.activeTab = activeTab; // track for guard checks
 
     if (activeTab === 'friends') {
-      // visually clear; recount keeps it correct
       this.badges.reset('friends');
+      this.recountFriends();
     }
 
     if (activeTab === 'messages') {
       // visually clear when entering messages root
       if (this.isMessagesRoot()) this.badges.reset('messages');
+    }
+
+    if (activeTab === 'feed') {
+      this.badges.reset('feed');
     }
 
     if (activeTab === 'channels') {
@@ -215,16 +217,12 @@ export class TabsPage implements OnInit, OnDestroy {
   }
 
   private isMessagesRoot(): boolean {
-    // Consider messages root as exactly '/messages' or '/tabs/messages' variants
-    const url = this.currentUrl || '';
-    return url === '/messages' || url.startsWith('/messages?') || url.endsWith('/messages') || url.includes('/tabs/messages');
+    return this.activeTab === 'messages';
   }
 
   // ----- helpers -----
   private isOnMessagesScreen(): boolean {
-    // covers /messages, /messages/..., /messages/chat/:id
-    return this.currentUrl?.includes('/messages');
-    // You can tighten this to `^/tabs/messages` with a proper router tree if needed
+    return this.activeTab === 'messages';
   }
 
   private isInChatWith(peerId: string): boolean {

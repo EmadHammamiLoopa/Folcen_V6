@@ -1,3 +1,5 @@
+
+import { devLogger } from '../utils/dev-logger';
 import { Channel } from './Channel';
 import { Comment } from './Comment';
 import { User } from './User';
@@ -53,7 +55,7 @@ export class Post{
       this.id = post;
       return this;
     }
-    console.log("Initializing Post:", post); // Log the entire comment object
+    devLogger.log("Initializing Post:", post); // Log the entire comment object
 
     this.id = post._id;
     this.text = post.text;
@@ -89,7 +91,18 @@ export class Post{
 
     this.channel = post.channel ? new Channel().initialize(post.channel) : null;
     this.user = post.user ? new User().initialize(post.user) : null;
-    console.log("Initialized post Object:", this); // Log the initialized object
+    
+    // Log warning if post has no user data (unless it's anonymous)
+    if (!this.user && !post.anonyme) {
+      devLogger.warn('Post missing user data:', {
+        postId: this._id,
+        text: this._text?.substring(0, 50),
+        hasUser: !!post.user,
+        userValue: post.user
+      });
+    }
+    
+    devLogger.log("Initialized post Object:", this); // Log the initialized object
 
     return this;
   }

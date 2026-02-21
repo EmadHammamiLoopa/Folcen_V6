@@ -1,4 +1,4 @@
-const { report, extractDashParams, sendNotification, emitToUser } = require("../helpers")
+const { report, extractDashParams, sendNotification, emitToUser, createNotification } = require("../helpers")
 const User = require("../models/User")
 const Channel = require("../models/Channel")
 const Post = require("../models/Post")
@@ -7,6 +7,7 @@ const Report = require("../models/Report")
 const Activity = require('../models/Activity');
 const Response = require("./Response")
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
+const logger = require('../utils/logger');
 
 // excerpt helper
 const makeExcerpt = (text, max = 150) => {
@@ -176,10 +177,31 @@ exports.postComments = async (req, res) => {
             totalPages: Math.ceil(count / dashParams.limit)
         });
     } catch (err) {
-        console.log(err);
+        console.error('getComments error:', err);
         return Response.sendError(res, 500, 'Server error');
     }
 };
+
+exports.getComments = async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { page = 0 } = req.query;
+        const limit = 20;
+
+        const comments = await Comment.find({ post: postId, parentComment: null })
+            .select('-reports -__v')
+            .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides')
+            .sort({ createdAt: -1 })
+            .skip(page * limit)
+            .limit(limit)
+            .lean();
+
+        return Response.sendResponse(res, comments);
+    } catch (err) {
+        logger.error('getComments critical error:', err);
+        return Response.sendError(res, 500, 'Server error');
+    }
+}
 
 
 
@@ -193,136 +215,149 @@ exports.storeComment = async (req, res) => {
                     return Response.sendError(res, 400, 'Error uploading media');
                 }
 
-                console.log('Multer processed request successfully');
-                console.log('Request Body:', req.body);
-                console.log('Uploaded File:', req.file);
-
                 const post = req.post;
                 const authorId = post.user.toString();
                 const commenterId = req.auth._id.toString();
 
-                const isBlockedByAuthor = await User.findOne({
-                    _id: authorId,
-                    blockedUsers: commenterId
-                });
-                
+                // Block checks
+                const isBlockedByAuthor = await User.findOne({ _id: authorId, blockedUsers: commenterId });
                 const isBlockedByMe = req.authUser.blockedUsers && req.authUser.blockedUsers.some(id => id.toString() === authorId);
-
-                if (isBlockedByAuthor || isBlockedByMe) {
-                    return Response.sendError(res, 403, 'You cannot comment on this post');
-                }
+                if (isBlockedByAuthor || isBlockedByMe) return Response.sendError(res, 403, 'You cannot comment on this post');
 
                 // Visibility Check
                 const isOwner = authorId === commenterId;
                 const isFriend = req.authUser.friends && req.authUser.friends.some(id => id.toString() === authorId);
-
                 if (!isOwner) {
-                    if (post.visibility === 'private') {
-                        return Response.sendError(res, 403, 'This post is private');
-                    }
-                    if (post.visibility === 'friends-only' && !isFriend) {
-                        return Response.sendError(res, 403, 'This post is for friends only');
-                    }
+                    if (post.visibility === 'private') return Response.sendError(res, 403, 'This post is private');
+                    if (post.visibility === 'friends-only' && !isFriend) return Response.sendError(res, 403, 'This post is for friends only');
                 }
 
                 const commentText = req.body.text ? req.body.text.trim() : '';
-                
-                if (!commentText && !req.file) {
-                    return Response.sendError(res, 400, 'Comment text or media is required');
-                }
+                if (!commentText && !req.file) return Response.sendError(res, 400, 'Comment text or media is required');
 
+                // Prepare anonym name if requested
                 let anonymName = null;
-
-                if (req.body.anonyme === 'true') {
-                    // Ensure that the user always gets the same anonymous name from the post
+                const isAnon = req.body.anonyme === 'true';
+                if (isAnon) {
                     if (!post.anonymName) {
                         post.anonymName = generateAnonymName(req.auth._id, post._id);
-                        await post.save();  // Ensure consistency across all comments
+                        await post.save();
                     }
                     anonymName = post.anonymName;
-                    console.log('Using post anonymName:', anonymName);
                 }
 
-                // Create a new comment
+                // Create & save comment
                 const comment = new Comment({
                     text: commentText,
                     user: req.auth._id,
                     post: post._id,
-                    anonymName: anonymName, // Use the same anonymous name as the post
-                    anonyme: req.body.anonyme === 'true',
+                    parentComment: req.body.parentComment || null,
+                    anonymName: anonymName,
+                    anonyme: isAnon,
                     moderationStatus: req.body.moderationStatus || 'approved'
                 });
 
-                // If media is uploaded, attach it to the comment
-                if (req.file) {
-                    comment.media = {
-                        url: req.file.path,
-                        expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000)
-                    };
-                    console.log('Media attached to comment:', comment.media);
-                }
+                if (req.file) comment.media = { url: req.file.path, expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000) };
 
-                console.log('Saving Comment:', comment);
                 const savedComment = await comment.save();
-                console.log('Saved Comment:', savedComment);
 
-                // Populate the user details immediately after saving
-                const populatedComment = await Comment.populate(savedComment, { 
-                    path: 'user', 
-                    select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides' 
-                });
-                console.log('Populated Comment:', populatedComment);
-
-                if (!populatedComment) {
-                    return Response.sendError(res, 400, 'Error populating comment data');
-                }
-
-                // Add votes info to the comment
+                // Populate and enrich
+                const populatedComment = await Comment.populate(savedComment, { path: 'user', select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides' });
+                if (!populatedComment) return Response.sendError(res, 400, 'Error populating comment data');
                 const commentWithVotes = withVotesInfo(populatedComment, req.auth._id, post._id);
-                console.log('Comment with Votes Info:', commentWithVotes);
 
-                // Push the new comment into the post's comment list
+                // Push to post
                 post.comments.push(commentWithVotes._id);
                 await post.save();
-                console.log('Updated Post with New Comment:', post);
 
-                // Create an Activity record for this comment. For anonymous comments, create a private activity
-                // so the comment author can see it, but do not notify followers or emit to the general feed.
+                // Activity: private for anonymous, normal for non-anon
                 try {
-                    if (!comment.anonyme) {
-                        const activity = await Activity.create({
-                            type: 'comment',
-                            actor: req.auth._id,
-                            targetType: 'post',
-                            targetId: post._id,
-                            channel: post.channel,
-                            content: makeExcerpt ? makeExcerpt(commentText || commentWithVotes.text, 150) : (commentText || commentWithVotes.text),
-                            visibility: post.visibility,
-                            meta: { commentId: commentWithVotes._id }
-                        });
-                        try { const io = req.app && req.app.get('io'); if (io) io.emit('activity:created', activity); } catch (e) { console.warn('emit activity failed', e); }
-                    } else {
-                        // Anonymous comment: create a private activity visible only to the actor
+                    if (!isAnon) {
+                        const activity = await Activity.create({ type: 'comment', actor: req.auth._id, targetType: 'post', targetId: post._id, channel: post.channel, content: makeExcerpt(commentText || commentWithVotes.text, 150), visibility: post.visibility, meta: { commentId: commentWithVotes._id } });
                         try {
-                            const activity = await Activity.create({
-                                type: 'comment',
-                                actor: req.auth._id,
-                                targetType: 'post',
-                                targetId: post._id,
-                                channel: post.channel,
-                                content: makeExcerpt ? makeExcerpt(commentText || commentWithVotes.text, 150) : (commentText || commentWithVotes.text),
-                                visibility: 'private',
-                                meta: { commentId: commentWithVotes._id, anonyme: true }
+                            realtime.emitPostInteraction(post._id, authorId, req.auth._id, 'comment', { comment: commentWithVotes });
+                            const { emitToUsers } = require('../helpers');
+                            const recipients = [...(req.authUser.followers || []), authorId].map(id => String(id));
+                            emitToUsers(recipients, 'activity:created', activity);
+                        } catch (e) { logger.warn('emit activity failed', e); }
+                    } else {
+                        const activity = await Activity.create({ type: 'comment', actor: req.auth._id, targetType: 'post', targetId: post._id, channel: post.channel, content: makeExcerpt(commentText || commentWithVotes.text, 150), visibility: 'private', meta: { commentId: commentWithVotes._id, anonyme: true } });
+                        try { emitToUser(req.auth._id, 'activity:created', activity); } catch (e) {}
+                    }
+                } catch (e) { logger.warn('Failed to create activity for comment:', e.message || e); }
+
+                // --- Notification Logic ---
+                try {
+                    // Scenario 7: Skip all notifications if post is "Only-Me"
+                    if (post.visibility === 'private') return Response.sendResponse(res, commentWithVotes, 'Comment created (Private)');
+
+                    const senderName = isAnon ? (anonymName || 'Anonymous') : (req.authUser.firstName + ' ' + req.authUser.lastName);
+                    const postOwnerId = post.user.toString();
+
+                    // Build participants and friends list
+                    const participantsRaw = await Comment.find({ post: post._id }).distinct('user');
+                    const participants = new Set(participantsRaw.map(u => u.toString()));
+                    participants.add(postOwnerId);
+                    const friends = (req.authUser.friends || []).map(f => f.toString());
+
+                    // Mentions parsing (resolve real users and anonymName->user)
+                    const mentionRegex = /@([\w\s._-]+?)(?=\s|$|@)/g;
+                    let match;
+                    const mentionedUsers = new Set();
+                    while ((match = mentionRegex.exec(commentText)) !== null) {
+                        const name = match[1].trim();
+                        let user = await User.findOne({ firstName: new RegExp(`^${name}$`, 'i') });
+                        if (!user && name.includes(' ')) {
+                            const parts = name.split(' ');
+                            user = await User.findOne({ 
+                                firstName: new RegExp(`^${parts[0]}$`, 'i'),
+                                lastName: new RegExp(`^${parts.slice(1).join(' ')}$`, 'i')
                             });
-                            // Emit private activity only to the author so their UI updates
-                            try { emitToUser(req.auth._id, 'activity:created', activity); } catch (e) {}
-                        } catch (e) {
-                            console.warn('Failed to create private activity for anonymous comment:', e.message || e);
+                        }
+                        if (!user) {
+                            const anonComment = await Comment.findOne({ post: post._id, anonymName: new RegExp(`^${name}$`, 'i') });
+                            if (anonComment) user = await User.findById(anonComment.user);
+                        }
+                        if (!user) continue;
+                        const uid = user._id.toString();
+                        if (uid === req.auth._id.toString()) continue; // cannot tag self
+                        if (isAnon) {
+                            if (!participants.has(uid)) continue; // anon can only tag participants
+                        } else {
+                            if (!participants.has(uid) && !friends.includes(uid)) continue; // non-anon must be participant or friend
+                        }
+                        mentionedUsers.add(uid);
+                    }
+
+                    // Send notifications and realtime mentions
+                    for (const userId of mentionedUsers) {
+                        await createNotification({ recipientId: userId, senderId: req.auth._id, type: 'mention_comment', title: 'You were mentioned', body: `${senderName} mentioned you in a comment`, data: { postId: post._id, commentId: commentWithVotes._id, link: `/tabs/channels/post/${post._id}`, anonymName: isAnon ? anonymName : null } });
+                        try {
+                            const payload = JSON.stringify({ senderName, text: commentText, anonymName: isAnon ? anonymName : null });
+                            realtime.emitMention(userId, 'comment', post._id, payload);
+                        } catch (e) { logger.warn('emitMention failed', e); }
+                    }
+
+                    // Reply notification
+                    if (comment.parentComment) {
+                        const parent = await Comment.findById(comment.parentComment);
+                        if (parent && parent.user.toString() !== req.auth._id.toString() && !mentionedUsers.has(parent.user.toString())) {
+                            await createNotification({ recipientId: parent.user, senderId: req.auth._id, type: 'reply_to_my_comment', title: 'New reply', body: `${senderName} replied to your comment`, data: { postId: post._id, commentId: commentWithVotes._id, link: `/tabs/channels/post/${post._id}`, anonymName: isAnon ? anonymName : null } });
                         }
                     }
-                } catch (e) {
-                    console.warn('Failed to create activity for comment:', e.message || e);
-                }
+
+                    // Post owner notification
+                    if (postOwnerId !== req.auth._id.toString() && !mentionedUsers.has(postOwnerId)) {
+                        let alreadyNotified = false;
+                        if (comment.parentComment) {
+                            const parent = await Comment.findById(comment.parentComment);
+                            if (parent && parent.user.toString() === postOwnerId) alreadyNotified = true;
+                        }
+                        if (!alreadyNotified) {
+                            await createNotification({ recipientId: postOwnerId, senderId: req.auth._id, type: 'post_commented', title: 'New comment', body: `${senderName} commented on your post`, data: { postId: post._id, commentId: commentWithVotes._id, link: `/tabs/channels/post/${post._id}`, anonymName: isAnon ? anonymName : null } });
+                        }
+                    }
+                } catch (notifyErr) { logger.warn('Notification logic failed:', notifyErr); }
 
                 return Response.sendResponse(res, commentWithVotes, 'Comment created');
             } catch (innerErr) {

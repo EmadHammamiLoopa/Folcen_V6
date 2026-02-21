@@ -1,3 +1,4 @@
+import { devLogger } from "../../../utils/dev-logger";
 import { User } from './../../../models/User';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import constants from 'src/app/helpers/constants';
@@ -48,7 +49,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
       if (user) {
         this.user = user;
-        console.log('User updated in ProductComponent:', this.user);
+        devLogger.log('User updated in ProductComponent:', this.user);
         if (this.productId) {
           this.getProduct();
         }
@@ -75,14 +76,14 @@ export class ProductComponent implements OnInit, OnDestroy {
     if (!event) this.pageLoading = true;
     this.productService.get(this.productId).then(
       (resp: any) => {
-        console.log("resp for get prod.........!", resp);
+        devLogger.log("resp for get prod.........!", resp);
         this.pageLoading = false;
         this.product = new Product(resp.data);
         this.product.photos = this.product.photos.map(photo => ({
           ...photo,
           url: `http://127.0.0.1:3300/public${photo.path}` // Construct the full URL for each photo
         }));
-        console.log(this.product);
+        devLogger.log(this.product);
         this.page++;
         this.checkIfSellerOrBuyer();
         this.getPosterDetails(); // Fetch poster details
@@ -90,7 +91,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       },
       err => {
         this.pageLoading = false;
-        console.log(err);
+        devLogger.log(err);
         if (event) event.target.complete();
         this.toastService.presentErrorToastr(err);
       }
@@ -102,10 +103,10 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.userService.getUserProfile(userId).subscribe(
       (user: User) => {
         this.poster = user;
-        console.log("nammmmmmmmmmmmm",this.poster);
+        devLogger.log("nammmmmmmmmmmmm",this.poster);
       },
       err => {
-        console.log('Error fetching poster details:', err);
+        devLogger.log('Error fetching poster details:', err);
       }
     );
 }
@@ -115,24 +116,24 @@ export class ProductComponent implements OnInit, OnDestroy {
     if (this.user && this.product && this.product.user && this.user._id) {
       const userId = this.user._id.toString();
       const productUserId = typeof this.product.user === 'string' ? this.product.user : this.product.user._id.toString();
-      console.log("User ID:", userId);
-      console.log("Product User ID:", productUserId);
+      devLogger.log("User ID:", userId);
+      devLogger.log("Product User ID:", productUserId);
       this.isSeller = userId === productUserId;
       this.isBuyer = userId !== productUserId;
-      console.log("isSeller:", this.isSeller);
-      console.log("isBuyer:", this.isBuyer);
+      devLogger.log("isSeller:", this.isSeller);
+      devLogger.log("isBuyer:", this.isBuyer);
     }
   }
 
   removeProduct() {
     this.productService.remove(this.product.id).then(
       (resp: any) => {
-        console.log(resp);
+        devLogger.log(resp);
         this.toastService.presentSuccessToastr(resp.message);
         this.router.navigateByUrl('/tabs/buy-and-sell/products/sell');
       },
       err => {
-        console.log(err);
+        devLogger.log(err);
         this.toastService.presentErrorToastr(err);
       }
     );

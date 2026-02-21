@@ -1,6 +1,8 @@
+import { devLogger } from "../utils/dev-logger";
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { HTTP } from '@ionic-native/http/ngx';import { NativeStorage } from '@ionic-native/native-storage/ngx';
+import { HTTP } from '@ionic-native/http/ngx';
+import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { Platform } from '@ionic/angular';
 import { HttpClient } from '@angular/common/http';
 import { DataService } from './data.service';
@@ -66,7 +68,7 @@ export class JsonService extends DataService {
       }
       return value;
     } catch (err) {
-      console.error('Failed to load static JSON:', path, err);
+      devLogger.error('Failed to load static JSON:', path, err);
       return null;
     }
   }

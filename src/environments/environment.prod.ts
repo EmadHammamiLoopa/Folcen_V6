@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://127.0.0.1:3300/api/v1',
-  socketUrl: 'http://127.0.0.1:3300',
+  apiUrl: 'https://your-backend-url.com/api/v1',  // ⚠️ CHANGE THIS TO YOUR DEPLOYED BACKEND URL
+  socketUrl: 'https://your-backend-url.com',
   socketPath: '/socket.io',
   SELLER_DISCLAIMER_VERSION: 'v1.0',
 };

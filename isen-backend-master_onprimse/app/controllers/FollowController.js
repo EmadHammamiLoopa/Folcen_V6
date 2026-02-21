@@ -5,6 +5,23 @@ const { sendNotification } = require('../helpers');
 const mongoose = require('mongoose');
 
 /**
+ * Fetch live follow statistics for a user to attach to socket events.
+ * Pulls counts directly from the User document arrays + pending Follow records.
+ */
+async function getUserStats(userId) {
+    const [user, pendingCount] = await Promise.all([
+        User.findById(userId).select('followers following friends').lean(),
+        Follow.countDocuments({ followed: userId, status: 'pending' })
+    ]);
+    return {
+        followers: user?.followers?.length || 0,
+        following: user?.following?.length || 0,
+        friends:   user?.friends?.length   || 0,
+        pendingFollowRequests: pendingCount
+    };
+}
+
+/**
  * ✅ Follow a user
  * Supports private profiles (pending status)
  */
@@ -52,22 +69,38 @@ exports.followUser = async (req, res) => {
             { upsert: true, new: true }
         );
 
-        // Emit socket event for real-time updates
-        const io = req.app.get('io');
-        if (io) {
-            io.emit('follow-update', {
-                followerId,
-                followedId,
-                status,
-                at: new Date()
-            });
-        }
-
         // Update User arrays for backward compatibility and performance
         if (status === 'active') {
             await User.findByIdAndUpdate(followerId, { $addToSet: { following: followedId } });
             await User.findByIdAndUpdate(followedId, { $addToSet: { followers: followerId } });
-            
+        }
+
+        // Emit socket event AFTER array updates so stats reflect new counts
+        const io = req.app.get('io');
+        if (io) {
+            try {
+                const [actorStats, targetStats] = await Promise.all([
+                    getUserStats(followerId),
+                    getUserStats(followedId)
+                ]);
+                console.log('[FollowController] followUser emitting stats — actor:', JSON.stringify(actorStats), 'target:', JSON.stringify(targetStats));
+                io.emit('follow-update', {
+                    followerId,
+                    followedId,
+                    status,
+                    at: new Date(),
+                    actorStatistics: actorStats,
+                    targetStatistics: targetStats
+                });
+            } catch (statsErr) {
+                console.error('[FollowController] getUserStats failed, emitting without stats:', statsErr);
+                io.emit('follow-update', { followerId, followedId, status, at: new Date() });
+            }
+        } else {
+            console.error('[FollowController] io is null/undefined — socket event NOT sent');
+        }
+
+        if (status === 'active') {
             sendNotification(
                 { en: `${req.authUser.firstName} ${req.authUser.lastName}` },
                 { en: 'started following you' },
@@ -106,14 +139,20 @@ exports.unfollowUser = async (req, res) => {
             await User.findByIdAndUpdate(followerId, { $pull: { following: followedId } });
             await User.findByIdAndUpdate(followedId, { $pull: { followers: followerId } });
 
-            // Emit socket event for real-time updates
+            // Emit socket event AFTER array updates so stats are accurate
             const io = req.app.get('io');
             if (io) {
+                const [actorStats, targetStats] = await Promise.all([
+                    getUserStats(followerId),
+                    getUserStats(followedId)
+                ]);
                 io.emit('follow-update', {
                     followerId,
                     followedId,
                     status: 'unfollowed',
-                    at: new Date()
+                    at: new Date(),
+                    actorStatistics: actorStats,
+                    targetStatistics: targetStats
                 });
             }
         }
@@ -151,14 +190,20 @@ exports.handleFollowRequest = async (req, res) => {
             await User.findByIdAndUpdate(followerId, { $addToSet: { following: followedId } });
             await User.findByIdAndUpdate(followedId, { $addToSet: { followers: followerId } });
 
-            // Emit socket event for real-time updates
+            // Emit socket event AFTER array updates so stats are accurate
             const io = req.app.get('io');
             if (io) {
+                const [actorStats, targetStats] = await Promise.all([
+                    getUserStats(followerId),
+                    getUserStats(followedId)
+                ]);
                 io.emit('follow-update', {
                     followerId,
                     followedId,
                     status: 'active',
-                    at: new Date()
+                    at: new Date(),
+                    actorStatistics: actorStats,
+                    targetStatistics: targetStats
                 });
             }
 
@@ -195,14 +240,20 @@ exports.removeFollower = async (req, res) => {
             await User.findByIdAndUpdate(followerId, { $pull: { following: followedId } });
             await User.findByIdAndUpdate(followedId, { $pull: { followers: followerId } });
 
-            // Emit socket event for real-time updates
+            // Emit socket event AFTER array updates so stats are accurate
             const io = req.app.get('io');
             if (io) {
+                const [actorStats, targetStats] = await Promise.all([
+                    getUserStats(followerId),
+                    getUserStats(followedId)
+                ]);
                 io.emit('follow-update', {
                     followerId,
                     followedId,
                     status: 'removed',
-                    at: new Date()
+                    at: new Date(),
+                    actorStatistics: actorStats,
+                    targetStatistics: targetStats
                 });
             }
         }
@@ -241,14 +292,20 @@ exports.blockUser = async (req, res) => {
             $pull: { following: blockerId, followers: blockerId, friends: blockerId }
         });
 
-        // Emit socket event for real-time updates
+        // Emit socket event AFTER array updates so stats are accurate
         const io = req.app.get('io');
         if (io) {
+            const [actorStats, targetStats] = await Promise.all([
+                getUserStats(blockerId),
+                getUserStats(blockedId)
+            ]);
             io.emit('follow-update', {
                 followerId: blockerId,
                 followedId: blockedId,
                 status: 'blocked',
-                at: new Date()
+                at: new Date(),
+                actorStatistics: actorStats,
+                targetStatistics: targetStats
             });
         }
 

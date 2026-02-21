@@ -119,6 +119,21 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     return '';
   }
 
+  isImageMedia(url?: string): boolean {
+    if (!url) return false;
+    const lowerUrl = url.toLowerCase();
+    return lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || 
+           lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif') || 
+           lowerUrl.endsWith('.webp');
+  }
+
+  isVideoMedia(url?: string): boolean {
+    if (!url) return false;
+    const lowerUrl = url.toLowerCase();
+    return lowerUrl.endsWith('.mp4') || lowerUrl.endsWith('.webm') || 
+           lowerUrl.endsWith('.ogg');
+  }
+
   getExpirationProgress(expiryDate: any): string {
     if (!expiryDate) return '';
     if (this.previousExpiryDate === expiryDate && this.cachedStrokeOffset) {

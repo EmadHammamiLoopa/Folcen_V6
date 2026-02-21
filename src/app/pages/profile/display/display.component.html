@@ -1,4 +1,7 @@
 <ion-content class="profile-content" [fullscreen]="true" scroll-y="true">
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
+    <ion-refresher-content pullingIcon="chevron-down-circle-outline" refreshingSpinner="crescent"></ion-refresher-content>
+  </ion-refresher>
   <app-sandglass-loader [visible]="pageLoading" message="Loading profile..."></app-sandglass-loader>
   
   <div *ngIf="user && !pageLoading" class="immersive-profile">
@@ -57,13 +60,16 @@
 
         <!-- Quick Stats -->
         <div class="stats-bar">
-          <div class="stat-item">
+          <div class="stat-item clickable" (click)="openFollowModal('friends')">
             <span class="value">{{ user.friends?.length || 0 }}</span>
             <span class="label">Friends</span>
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item" [class.clickable]="myProfile" (click)="myProfile && openFollowModal('followers')">
-            <span class="value">{{ user.followers?.length || 0 }}</span>
+            <span class="value" style="position:relative; display:inline-block;">
+              {{ user.followers?.length || 0 }}
+              <ion-badge *ngIf="myProfile && pendingRequestsCount > 0" color="danger" class="pending-badge">{{ pendingRequestsCount }}</ion-badge>
+            </span>
             <span class="label">Followers</span>
           </div>
           <div class="stat-divider"></div>
@@ -79,17 +85,20 @@
     <div class="profile-body">
       <!-- Action Bar for Visitors -->
       <div class="visitor-actions" *ngIf="!myProfile">
-        <ion-button class="primary-action" (click)="request()" [color]="user.isFriend ? 'light' : 'primary'" *ngIf="!user.isPrivate || user.isFriend">
+        <!-- Add Friend / Unfriend — hidden on private profiles for non-friends (followers use Follow button only) -->
+        <ion-button class="primary-action" (click)="request()" [color]="user.isFriend ? 'light' : 'primary'"
+            *ngIf="!user.isPrivate || user.isFriend">
           <ion-icon [name]="user.isFriend ? 'person-remove' : 'person-add'" slot="start"></ion-icon>
-          {{ user.isFriend ? 'Unfriend' : (user.request === 'requested' ? 'Cancel' : 'Add Friend') }}
+          {{ user.isFriend ? 'Unfriend' : (user.request === 'requesting' ? 'Accept' : (user.request === 'requested' ? 'Cancel Request' : 'Add Friend')) }}
         </ion-button>
 
-        <ion-button class="primary-action" (click)="toggleFollow()" [color]="user.isFollowing ? 'light' : 'secondary'">
+        <ion-button class="primary-action" (click)="toggleFollow()" [color]="user.isFollowing ? 'light' : 'secondary'"
+            *ngIf="!user.isFriend && !isFriend">
           <ion-icon [name]="user.isFollowing ? 'eye-off-outline' : 'eye-outline'" slot="start"></ion-icon>
           {{ user.isFollowing ? 'Unfollow' : (user.followStatus === 'pending' ? 'Requested' : 'Follow') }}
         </ion-button>
         
-        <ion-button class="secondary-action" [routerLink]="['/messages/chat/', user.id]" color="secondary" *ngIf="!isLocked || user.isFriend">
+        <ion-button class="secondary-action" [routerLink]="['/messages/chat/', user.id]" color="secondary" *ngIf="user.isFriend || isFriend || !user.isPrivate">
           <ion-icon name="chatbubble-ellipses"></ion-icon>
         </ion-button>
 
@@ -104,22 +113,7 @@
           <ion-icon name="lock-closed-outline"></ion-icon>
         </div>
         <h3>This Profile is Private</h3>
-        <p>Follow this user to see their photos and details.</p>
-        <ion-button fill="outline" color="secondary" (click)="toggleFollow()" *ngIf="user.followStatus !== 'pending'">
-          <ion-icon name="eye-outline" slot="start"></ion-icon>
-          Follow to Unlock
-        </ion-button>
-        <div class="pending-request-info" *ngIf="user.followStatus === 'pending'" style="text-align: center; margin-top: 15px;">
-          <ion-badge color="warning" style="padding: 8px 15px; border-radius: 20px;">
-            <ion-icon name="time-outline" style="vertical-align: middle; margin-right: 5px;"></ion-icon>
-            Follow Request Pending
-          </ion-badge>
-          <div style="margin-top: 10px;">
-            <ion-button fill="clear" size="small" color="danger" (click)="toggleFollow()">
-              Cancel Request
-            </ion-button>
-          </div>
-        </div>
+        <p>Follow this user to see their bio.</p>
       </div>
 
       <!-- Unified Info Container -->
@@ -130,8 +124,8 @@
           <p class="about-bio">{{ user.aboutMe }}</p>
         </section>
 
-        <!-- Details Grid -->
-        <section class="info-section">
+        <!-- Details Grid — friends of private profiles only -->
+        <section class="info-section" *ngIf="myProfile || !user.isPrivate || user.isFriend || isFriend">
           <h3 class="section-header">Details</h3>
           <div class="details-grid">
             <div class="grid-item" *ngIf="user.birthDate && (user.ageVisible || myProfile)">
@@ -172,8 +166,8 @@
           </div>
         </section>
 
-        <!-- Interests & Languages -->
-        <section class="info-section" *ngIf="(user.interests && isArray(user.interests) && user.interests.length) || (user.languages && isArray(user.languages) && user.languages.length)">
+        <!-- Interests & Languages — hidden for friends of private profiles -->
+        <section class="info-section" *ngIf="(myProfile || !user.isPrivate || user.isFriend || isFriend) && ((user.interests && isArray(user.interests) && user.interests.length) || (user.languages && isArray(user.languages) && user.languages.length))">
           <h3 class="section-header">Interests & Languages</h3>
           <div class="tags-container">
             <ng-container *ngIf="user.interests && isArray(user.interests)">
@@ -189,8 +183,8 @@
           </div>
         </section>
 
-        <!-- Suggested Channels (Social Discovery) -->
-        <section class="info-section suggested-channels-section" *ngIf="suggestedChannels.length > 0">
+        <!-- Suggested Channels — hidden for friends of private profiles -->
+        <section class="info-section suggested-channels-section" *ngIf="(myProfile || !user.isPrivate || user.isFriend || isFriend) && suggestedChannels.length > 0">
           <h3 class="section-header">Channels {{ user.fullName }} Follows</h3>
           <div class="channels-horizontal-scroll">
             <div class="channel-suggestion-card animate__animated animate__fadeInRight" *ngFor="let channel of suggestedChannels; let i = index" 
@@ -210,8 +204,8 @@
           </div>
         </section>
 
-        <!-- Photo Gallery -->
-        <section class="info-section">
+        <!-- Photo Gallery — friends of private profiles only -->
+        <section class="info-section" *ngIf="myProfile || !user.isPrivate || user.isFriend || isFriend">
           <div class="section-header-row">
             <h3 class="section-header">Gallery</h3>
             <span class="photo-count">{{ user?.avatars?.length || 0 }} photos</span>

@@ -18,6 +18,7 @@ export class Channel {
   private _category: string;
   private _city?: string;
   private _country?: string;
+  private _tags: string[];
   
   // Optional properties for static channels
   private _icon?: string;
@@ -68,6 +69,7 @@ export class Channel {
     this._createdAt = channel.createdAt ? new Date(channel.createdAt) : new Date();
     this._category = channel.category ?? '';
     this._followers = channel.followers ?? [];
+    this._tags = channel.tags ?? [];
     this._icon = channel.icon;
     this._type = channel.type;
     this._city = channel.city;
@@ -127,6 +129,7 @@ export class Channel {
     }
     channel._followers = data.followers || [];
     channel._category = data.category || '';
+    channel._tags = data.tags || [];
     channel._icon = data.icon;
     channel._type = data.type;
     channel._city = data.city;
@@ -181,6 +184,7 @@ export class Channel {
   get category(): string { return this._category; }
   get city(): string | undefined { return this._city; }
   get country(): string | undefined { return this._country; }
+  get tags(): string[] { return this._tags; }
 
   get icon(): string | undefined { return this._icon; }
   get type(): 'static' | 'user' | 'static_events' |'static_dating'| undefined { 
@@ -215,6 +219,7 @@ export class Channel {
   set category(category: string) { this._category = category; }
   set city(city: string | undefined) { this._city = city; }
   set country(country: string | undefined) { this._country = country; }
+  set tags(tags: string[]) { this._tags = tags; }
 
   set icon(icon: string | undefined) { this._icon = icon; }
   set type(type: 'static' | 'user' | 'static_events' |'static_dating'| undefined) { 
@@ -232,6 +237,7 @@ export class Channel {
       createdAt: this.createdAt,
       user: this.user instanceof User ? this.user.toObject() : {},
       followers: this.followers,
+      tags: this.tags,
       icon: this.icon,
       type: this.type,
       city: this.city,

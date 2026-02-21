@@ -37,9 +37,8 @@ export class ListComponent implements OnInit, OnDestroy {
   public missedMap$: Observable<{ [userId: string]: number }>;
   // Latest snapshot for template-friendly access
   public missedMapLatest: { [userId: string]: number } = {};
-  private socket: any;                   
+  private socket: any;
   private destroy$ = new Subject<void>();
-  private listenersBound = false;        
   private authId: string | null = null;  
   private static READ_KEY = 'chatLastReadAt';
   private lastReadAt: Record<string, number> = {};
@@ -216,8 +215,120 @@ export class ListComponent implements OnInit, OnDestroy {
       console.warn('Failed to bind missed-call socket handlers from list view', e);
     }
 
-    // ✅ socket live updates for list
+    // ✅ socket live updates for list — reconnect-safe via Observable
     this.initSocket();
+
+    SocketService.newMessage$.pipe(takeUntil(this.destroy$)).subscribe((raw: any) => {
+      this.zone.run(() => {
+        try {
+          const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+          const normalized = new Message().initialize({
+            id: msg.id || msg._id,
+            from: msg.from,
+            to: msg.to,
+            text: msg.text ?? '',
+            image: msg.image ?? null,
+            type: msg.type ?? 'friend',
+            productId: msg.productId ?? null,
+            createdAt: this.getMessageDate(msg),
+            state: msg.state ?? 'sent',
+          });
+
+          const peerId = (this.authId && normalized.from === this.authId)
+            ? normalized.to
+            : normalized.from;
+
+          const peerKey = this.keyOf(peerId);
+          const isIncoming = !this.authId || normalized.from !== this.authId;
+          const shouldHighlight = this.isUnread(peerKey, normalized, isIncoming);
+
+          const existingIdx = this.users.findIndex(u => this.keyOf(u) === peerKey);
+          if (existingIdx !== -1) {
+            const user = this.users[existingIdx];
+            user.messages = [normalized, ...(user.messages || [])];
+            user.hasUnread = shouldHighlight;
+            const [moved] = this.users.splice(existingIdx, 1);
+            this.users.unshift(moved);
+            this.sortUsersByLatestMessage();
+            this.cdr.markForCheck();
+            return;
+          }
+
+          this.userService.getUserProfile(peerId).subscribe((profile: any) => {
+            const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
+            if (idx2 !== -1) {
+              const user = this.users[idx2];
+              user.messages = [normalized, ...(user.messages || [])];
+              user.hasUnread = shouldHighlight;
+              const [moved] = this.users.splice(idx2, 1);
+              this.users.unshift(moved);
+            } else {
+              const user = new User().initialize({
+                ...profile,
+                _id: peerKey,
+                id: peerKey,
+                messages: [normalized],
+              }) as ListUser;
+              user.hasUnread = shouldHighlight;
+              this.users.unshift(user);
+            }
+            this.sortUsersByLatestMessage();
+            this.cdr.markForCheck();
+          });
+        } catch (e) {
+          console.error('list/new-message error', e, raw);
+        }
+      });
+    });
+
+    // ✅ messageSent$ — update SENDER's conversation list when they send a message.
+    // This mirrors the newMessage$ logic but always treats the recipient (msg.to) as the peer
+    // and never marks it as unread (since it's our own outbound message).
+    SocketService.messageSent$.pipe(takeUntil(this.destroy$)).subscribe((raw: any) => {
+      this.zone.run(() => {
+        try {
+          const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+          const normalized = new Message().initialize({
+            id: msg._id || msg.id,
+            from: msg.from,
+            to: msg.to,
+            text: msg.text ?? '',
+            image: msg.image ?? null,
+            type: msg.type ?? 'friend',
+            productId: msg.productId ?? null,
+            createdAt: this.getMessageDate(msg),
+            state: msg.state ?? 'sent',
+          });
+
+          // The peer is always the recipient (msg.to) for a sent message
+          const peerKey = this.keyOf(normalized.to);
+
+          const existingIdx = this.users.findIndex(u => this.keyOf(u) === peerKey);
+          if (existingIdx !== -1) {
+            const user = this.users[existingIdx];
+            // Replace optimistic message or prepend confirmed one
+            const tmpIdx = (user.messages || []).findIndex((m: any) =>
+              m.id === (msg.tempId || normalized.id) || m.tempId === msg.tempId
+            );
+            if (tmpIdx !== -1) {
+              user.messages[tmpIdx] = normalized;
+            } else {
+              user.messages = [normalized, ...(user.messages || [])];
+            }
+            user.hasUnread = false; // our own sent msg never marks unread
+            const [moved] = this.users.splice(existingIdx, 1);
+            this.users.unshift(moved);
+            this.sortUsersByLatestMessage();
+            this.cdr.markForCheck();
+          }
+          // If peer row doesn't exist yet, it will appear on next list refresh
+        } catch (e) {
+          console.error('list/message-sent error', e, raw);
+        }
+      });
+    });
 
     // Refresh cached user profiles when server notifies updates
     try {
@@ -245,12 +356,8 @@ export class ListComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.socket) {
-      this.socket.off('new-message');
-      this.socket.off('video-call-cancelled');
-      this.socket.off('video-call-timeout');
-      this.socket.off('missed-call');
-    }
+    this.destroy$.next();
+    this.destroy$.complete();
     try { this.missedSub?.unsubscribe(); } catch(e) {}
   }
 
@@ -270,104 +377,12 @@ export class ListComponent implements OnInit, OnDestroy {
 
   
   async initSocket() {
-    await SocketService.initializeSocket();          // ✅ static
-    this.socket = await SocketService.getSocket();   // ✅ static
-  
-    if (!this.listenersBound) {
-      this.bindSocketListeners();
-      this.listenersBound = true;
-    }
+    await SocketService.initializeSocket();
+    this.socket = await SocketService.getSocket();
+    // new-message is now bound via SocketService.newMessage$ Observable (reconnect-safe)
   }
 
-  private bindSocketListeners() {
-    if (!this.socket) return;
-  
-    // prevent double-binding on hot reload / re-enter
-    this.socket.off('new-message');
-    this.socket.off('video-call-cancelled');
-  this.socket.off('video-call-timeout'); // if your server emits this
-  this.socket.off('missed-call');        // if your server emits this
-
-
-    this.socket.on('new-message', (raw: any) => {
-      this.zone.run(() => {
-        try {
-          const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
-  
-          const normalized = new Message().initialize({
-            id: msg.id || msg._id,
-            from: msg.from,
-            to: msg.to,
-            text: msg.text ?? '',
-            image: msg.image ?? null,
-            type: msg.type ?? 'friend',
-            productId: msg.productId ?? null,
-            createdAt: this.getMessageDate(msg),
-            state: msg.state ?? 'sent',
-          });
-  
-          // determine peer row (the other user)
-          const peerId = (this.authId && normalized.from === this.authId)
-            ? normalized.to
-            : normalized.from;
-  
-          const peerKey = this.keyOf(peerId);
-          const isIncoming = !this.authId || normalized.from !== this.authId;
-  
-          // ✅ compute unread using local last-read map
-          const shouldHighlight = this.isUnread(peerKey, normalized, isIncoming);
-  
-          // if row exists, update & move to top
-          const existingIdx = this.users.findIndex(u => this.keyOf(u) === peerKey);
-          if (existingIdx !== -1) {
-            const user = this.users[existingIdx];
-            user.messages = [normalized, ...(user.messages || [])];
-            user.hasUnread = shouldHighlight;
-  
-            const [moved] = this.users.splice(existingIdx, 1);
-            this.users.unshift(moved);
-  
-            this.sortUsersByLatestMessage();
-            this.cdr.markForCheck();
-            return;
-          }
-
-          
-  
-          // else fetch profile and insert (with race guard)
-          this.userService.getUserProfile(peerId).subscribe((profile: any) => {
-            const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
-            if (idx2 !== -1) {
-              const user = this.users[idx2];
-              user.messages = [normalized, ...(user.messages || [])];
-              user.hasUnread = shouldHighlight;
-  
-              const [moved] = this.users.splice(idx2, 1);
-              this.users.unshift(moved);
-            } else {
-              const user = new User().initialize({
-                ...profile,
-                _id: peerKey,
-                id: peerKey,
-                messages: [normalized],
-              }) as ListUser;
-  
-              user.hasUnread = shouldHighlight;
-              this.users.unshift(user);
-            }
-  
-            this.sortUsersByLatestMessage();
-            this.cdr.markForCheck();
-          });
-        } catch (e) {
-          console.error('list/new-message error', e, raw);
-        }
-      });
-    });
-
-    
-  
-  }
+  private bindSocketListeners() { /* replaced by SocketService.newMessage$ Observable in ngOnInit */ }
   
   
   ionViewWillEnter() {

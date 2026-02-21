@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const GdprController = require('../app/controllers/GdprController');
+const { rectifySchema } = require('../app/middlewares/validators');
 const { requireSignin, withAuthUser, isAdmin } = require('../app/middlewares/auth');
 const rateLimit = require('express-rate-limit');
 const { recordAcceptance, getAcceptancesForUser } = require('../app/utils/legalAccept');
@@ -47,7 +48,7 @@ router.get('/acceptance/check', requireSignin, withAuthUser, async (req, res) =>
 			}
 		});
 	} catch (e) {
-		console.error('check acceptance error', e);
+		logger.error('check acceptance error', e);
 		return res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
@@ -69,7 +70,7 @@ router.post('/acceptance', requireSignin, withAuthUser, rateLimit({ windowMs: 60
 		});
 		return res.json({ success: true, data: { id: rec._id, documentType: rec.documentType, documentVersion: rec.documentVersion, acceptedAt: rec.acceptedAt, acceptanceContext: rec.acceptanceContext } });
 	} catch (e) {
-		console.error('acceptance endpoint error', e);
+		logger.error('acceptance endpoint error', e);
 		return res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
@@ -95,7 +96,7 @@ router.get('/acceptances', requireSignin, withAuthUser, isAdmin, rateLimit({ win
 						rawDate = new Date(parseInt(idStr.substring(0, 8), 16) * 1000);
 					}
 				} catch (e) {
-					console.warn('Failed to extract timestamp from _id', e);
+					logger.warn('Failed to extract timestamp from _id', e);
 				}
 			}
 
@@ -116,13 +117,13 @@ router.get('/acceptances', requireSignin, withAuthUser, isAdmin, rateLimit({ win
 				}
 			};
 		});
-		console.log('DEBUG: GDPR acceptances for user', qUserId, JSON.stringify(safe, null, 2));
+		logger.info('DEBUG: GDPR acceptances for user', qUserId, JSON.stringify(safe, null, 2));
 
 		// Audit the admin/dashboard retrieval (do not include PII in audit meta)
 		try { await recordAudit({ actorId: req.auth && req.auth._id, actorRole: req.auth && req.auth.role, action: 'DASHBOARD_VIEW_ACCEPTANCES', targetUserId: qUserId, details: { reason: 'Admin viewed legal acceptance history', count: safe.length } }); } catch (e) {}
 		return res.json({ success: true, data: safe });
 	} catch (e) {
-		console.error('acceptances list error', e);
+		logger.error('acceptances list error', e);
 		return res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
@@ -140,10 +141,13 @@ router.get('/events', requireSignin, withAuthUser, isAdmin, rateLimit({ windowMs
 		await recordAudit({ actorId: req.auth && req.auth._id, actorRole: req.auth && req.auth.role, action: 'DASHBOARD_VIEW_EVENTS', targetUserId: null, details: { calls: calls.length, messageEvents: msgs.length } });
 		return res.json({ success: true, data: { calls, messageEvents: msgs } });
 	} catch (e) {
-		console.error('events list error', e);
+		logger.error('events list error', e);
 		return res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
+
+// Record a new acceptance
+router.post('/accept', [requireSignin, withAuthUser, dsarLimiter], GdprController.accept);
 
 // Right of access (self or admin query)
 router.get('/access', [requireSignin, withAuthUser, requireLatestTermsPrivacy, dsarLimiter], GdprController.access);
@@ -158,7 +162,7 @@ router.post('/erase', [requireSignin, withAuthUser, requireLatestTermsPrivacy, d
 router.get('/portability', requireSignin, withAuthUser, dsarLimiter, GdprController.portability);
 
 // Rectification (self or admin)
-router.post('/rectify', requireSignin, withAuthUser, dsarLimiter, GdprController.rectify);
+router.post('/rectify', [requireSignin, withAuthUser, rectifySchema, dsarLimiter], GdprController.rectify);
 
 // Erasure: soft-delete + revoke; admin may operate on other users
 router.post('/erase', requireSignin, withAuthUser, dsarLimiter, GdprController.erase);

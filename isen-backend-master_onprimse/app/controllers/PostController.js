@@ -1,6 +1,6 @@
 const e = require("express");
 const mongoose = require("mongoose");
-const { report, extractDashParams, sendNotification } = require("../helpers");
+const { report, extractDashParams, sendNotification, realtime, normalizeLeanDoc } = require("../helpers");
 const Channel = require("../models/Channel");
 const Comment = require("../models/Comment");
 const Follow = require("../models/Follow");
@@ -14,6 +14,7 @@ const Service = require("../models/Service");
 const { destroyComment } = require("./CommentController");
 const Response = require("./Response");
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
+const logger = require('../utils/logger');
 
 // Create a short excerpt like Facebook: cut at word boundary and append ellipsis
 const makeExcerpt = (text, max = 150) => {
@@ -222,12 +223,14 @@ exports.getFeed = async (req, res) => {
 
         // 2. Get followed users (include follow timestamp so we can show only posts/comments after the follow time)
         const following = await Follow.find({ follower: userId, status: 'active' }).select('followed createdAt');
+        
         // build entries with id and follow timestamp
         const followedEntries = following.map(f => {
             let fid = null;
             try { fid = new mongoose.Types.ObjectId((f.followed && f.followed._id) ? f.followed._id : f.followed); } catch (e) { fid = f.followed; }
             return { id: fid, since: f.createdAt || null };
         });
+
         const followedUserIds = followedEntries.map(e => e.id);
 
         const dashParams = extractDashParams(req, ['text']);
@@ -254,38 +257,60 @@ exports.getFeed = async (req, res) => {
 
         const allBlockedIds = Array.from(new Set([...blockedByMe, ...blockedMeIds, ...inactiveUserIds]));
 
-        // 3. Fetch Posts
+        // 3. Find posts I've commented on (to include them in feed even if not followed)
+        const myComments = await Comment.find({ user: userId }).select('post');
+        const postsICommentedOn = myComments.map(c => c.post);
+
+        // 4. Fetch Posts
         // build a per-follow OR clause so we only include posts from followed users made after they were followed
-        const followOr = [];
-        // for each followed user, either include all posts (if no since) or only posts created after follow time
+        const feedCriteria = [];
+        
+        // Following or Friends
         followedEntries.forEach(fe => {
             if (fe.since) {
-                followOr.push({ $and: [ { user: fe.id }, { createdAt: { $gte: fe.since } } ] });
+                feedCriteria.push({ $and: [{ user: fe.id }, { createdAt: { $gte: fe.since } }] });
             } else {
-                followOr.push({ user: fe.id });
+                feedCriteria.push({ user: fe.id });
             }
         });
-        followOr.push({ user: { $in: friendIds } });
+
+        const followedSet = new Set(followedUserIds.map(id => id.toString()));
+        friendIds.forEach(fid => {
+            if (!followedSet.has(fid.toString())) {
+                feedCriteria.push({ user: fid });
+            }
+        });
+
+        // Mentioned in text
+        feedCriteria.push({ text: { $regex: `@${req.authUser.firstName}`, $options: 'i' } });
+
+        // Commented on
+        if (postsICommentedOn.length > 0) {
+            feedCriteria.push({ _id: { $in: postsICommentedOn } });
+        }
 
         const postQuery = {
             moderationStatus: 'approved',
             deletedAt: null,
             user: { $nin: [...allBlockedIds, userId] }, // Exclude blocked, inactive, and self
             anonyme: { $ne: true }, // Strictly exclude anonymous posts from the feed
-            $and: [
-                {
-                    $or: followOr
-                },
-                {
-                    $or: [
-                        { visibility: 'public' },
-                        { $and: [{ visibility: 'friends-only' }, { user: { $in: friendIds } }] }
-                    ]
-                }
+            $or: feedCriteria.length > 0 ? feedCriteria : [{ _id: null }] // Match nothing if no criteria
+        };
+
+        // Visibility constraints still apply unless it's a mention or my own comment? 
+        // Usually, mentions/comments bypass 'friends-only' if you're the one tagged.
+        const visibilityQuery = {
+            $or: [
+                { visibility: 'public' },
+                { $and: [{ visibility: 'friends-only' }, { user: { $in: friendIds } }] },
+                { text: { $regex: `@${req.authUser.firstName}`, $options: 'i' } },
+                { _id: { $in: postsICommentedOn } }
             ]
         };
 
-        const posts = await Post.find(postQuery)
+        const posts = await Post.find({
+            $and: [postQuery, visibilityQuery]
+        })
             .populate({
                 path: 'user',
                 select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides enabled isDeleted deletedAt',
@@ -602,6 +627,18 @@ exports.storePost = async (req, res) => {
             console.log('Multer processed request successfully');
             console.log('Request Body:', req.body);  // Log the text and anonymity status
             console.log('Uploaded File:', req.file);  // Log the file info if any
+            console.log('Request headers:', req.headers);
+            console.log('Content-Type:', req.get('content-type'));
+
+            // Validate that text field is present
+            if (!req.body.text || req.body.text.trim() === '') {
+                logger.warn('Post creation failed: text field is missing or empty', {
+                    body: req.body,
+                    hasFile: !!req.file,
+                    contentType: req.get('content-type')
+                });
+                return Response.sendError(res, 400, 'Post text is required. Please make sure you are sending the "text" field in your FormData.');
+            }
 
             // Create a new post
             const post = new Post({
@@ -708,14 +745,59 @@ exports.storePost = async (req, res) => {
                         visibility: savedPost.visibility,
                         meta: { media: savedPost.media }
                     });
-                    // Emit socket event
-                    try { 
-                        const io = req.app && req.app.get('io'); 
-                        if (io) {
-                            io.emit('activity:created', activity);
-                            // Also emit specific tab event for real-time badges
-                            io.emit('new-channel-activity', { channelId: req.channel._id });
+
+                    // --- Mentions Handling ---
+                    const mentionRegex = /@([\w\s._-]+?)(?=\s|$|@)/g;
+                    let match;
+                    const mentionedUsers = new Set();
+                    if (savedPost.text) {
+                        while ((match = mentionRegex.exec(savedPost.text)) !== null) {
+                            const name = match[1].trim();
+                            const user = await User.findOne({ firstName: new RegExp(`^${name}$`, 'i') });
+                            if (user && user._id.toString() !== req.auth._id.toString()) {
+                                mentionedUsers.add(user._id.toString());
+                            } else {
+                                // Try first name + last name match if name has space
+                                if (name.includes(' ')) {
+                                    const parts = name.split(' ');
+                                    const complexUser = await User.findOne({ 
+                                        firstName: new RegExp(`^${parts[0]}$`, 'i'),
+                                        lastName: new RegExp(`^${parts.slice(1).join(' ')}$`, 'i')
+                                    });
+                                    if (complexUser && complexUser._id.toString() !== req.auth._id.toString()) {
+                                        mentionedUsers.add(complexUser._id.toString());
+                                    }
+                                }
+                            }
                         }
+                    }
+                    
+                    const { createNotification } = require('../helpers');
+                    for (const userId of mentionedUsers) {
+                        await createNotification({
+                            recipientId: userId,
+                            senderId: req.auth._id,
+                            type: 'mention_post',
+                            title: 'You were mentioned',
+                            body: `${req.authUser.firstName} mentioned you in a post`,
+                            data: { postId: savedPost._id, link: `/tabs/channels/post/${savedPost._id}` }
+                        });
+                        // 🔔 REAL-TIME: Immediate mention propagation — include sender name in payload
+                        try {
+                            const payload = JSON.stringify({ senderName: `${req.authUser.firstName} ${req.authUser.lastName}`, text: savedPost.text, anonymName: populatedPost.anonyme ? populatedPost.anonymName : null });
+                            realtime.emitMention(userId, 'post', savedPost._id, payload);
+                        } catch (e) { logger.warn('emitMention failed', e); }
+                    }
+
+                    // 🔥 REAL-TIME: Emit targeted feed activity
+                    try { 
+                        // Use the same refined recipients list as notifications
+                        realtime.emitFeedPost(recipients, savedPost);
+                        
+                        // Emit activity to followers
+                        const activityPayload = { ...activity.toObject(), type: activity.type };
+                        const { emitToUsers } = require('../helpers');
+                        emitToUsers(recipients, 'activity:created', activityPayload);
                     } catch(e) { console.warn('emit activity failed', e); }
                 } catch (e) {
                     console.warn('Failed to create activity record:', e.message || e);
@@ -740,12 +822,11 @@ exports.storePost = async (req, res) => {
                 }
             }
 
-                        // Return the populated post as the response
-                        console.log('Returning Populated Post:', processedPost);
+                        // 🔥 PERFORMANCE: Respond immediately
                         return Response.sendResponse(res, processedPost, 'Post created');
         });
     } catch (err) {
-        console.log('Error in storePost:', err);
+        logger.error('Error in storePost:', err);
         return Response.sendError(res, 500, 'Server error');
     }
 };
@@ -755,165 +836,200 @@ exports.getPosts = async (req, res) => {
         const { channelId } = req.params;
         const { page = 0 } = req.query;
         const limit = 10;
+        const userId = req.auth._id;
 
-        // Get blocked users (both ways) and disabled/deleted/banned users
-        const blockedByMe = req.authUser.blockedUsers || [];
-        const blockedMe = await User.find({ blockedUsers: req.auth._id }).select('_id');
-        const disabledUsers = await User.find({ 
+        // 1. Optimized Exclusion List (API Efficiency)
+        // Combine multiple queries into a single focused lookup
+        const excludedUsersRaw = await User.find({
             $or: [
+                { blockedUsers: userId },            // People who blocked me
+                { _id: { $in: req.authUser.blockedUsers || [] } }, // People I blocked
                 { enabled: false },
                 { isDeleted: true },
-                { deletedAt: { $ne: null } },
                 { banned: true }
             ]
-        }).select('_id');
+        }).select('_id').lean();
         
-        const blockedMeIds = blockedMe.map(u => u._id);
-        const disabledUserIds = disabledUsers.map(u => u._id);
-        const allExcludedIds = [...blockedByMe, ...blockedMeIds, ...disabledUserIds];
-
-        const followedUserIds = req.authUser.following || [];
-        const friendIds = req.authUser.friends || [];
+        // Normalize ObjectIds to strings
+        const allExcludedIds = excludedUsersRaw.map(u => String(u._id));
+        const friendIds = (req.authUser.friends || []).map(id => String(id));
 
         const visibilityQuery = {
             channel: channelId,
             moderationStatus: 'approved',
             deletedAt: null,
+            user: { $nin: allExcludedIds },
             $or: [
-                { user: req.auth._id }, // Always allow owner to see their own post
-                { 
-                    user: { $nin: allExcludedIds },
-                    $or: [
-                        { visibility: 'public' },
-                        { visibility: 'friends-only', user: { $in: friendIds } }
-                    ]
-                }
+                { user: userId }, // Always allow owner to see their own post
+                { visibility: 'public' },
+                { visibility: 'friends-only', user: { $in: friendIds } }
             ]
         };
 
-        // Fetch posts based on visibility query
-        const posts = await Post.find(visibilityQuery)
-            .populate({
-                path: 'comments',
-                populate: {
-                    path: 'user',
-                    select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides'
-                }
-            })
-            .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides')
-            .populate({ path: 'reports', model: 'Report' })
+        // 2. High-Throughput Fetch (Database Access)
+        // Removed heavy 'comments' populate for feed performance. 
+        // Feed only needs counts (handled below via projection/processing).
+        let posts = await Post.find(visibilityQuery)
+            .select('-reports -__v') // Explicit projection: exclude unwanted heavy fields
+            .populate('user', '_id firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides')
             .sort({ createdAt: -1 })
             .skip(page * limit)
             .limit(limit)
+            .lean() // Drastically faster than full Mongoose documents
             .exec();
 
         if (!posts) {
             return Response.sendError(res, 400, 'Could not get the posts');
         }
 
-        // ✅ Ensure Anonymous Name is Always Stored and Used
-        const postsWithVotes = posts.map(post => {
-            if (post.anonyme) {
-                // If anonymName is missing, generate and store it permanently
-                if (!post.anonymName) {
-                    post.anonymName = generateAnonymName(post.user, post._id);
-                    post.save(); // Ensure it's stored in the database
-                }
+        // Normalize all ObjectIds to strings to prevent buffer serialization
+        posts = normalizeLeanDoc(posts);
+
+        // Filter out posts with missing users (due to deleted/invalid user references)
+        // This prevents frontend errors when posts reference non-existent users
+        const validPosts = posts.filter(post => {
+            if (!post.user && !post.anonyme) {
+                logger.warn('Filtering out post with missing user:', {
+                    postId: post._id,
+                    text: post.text?.substring(0, 50)
+                });
+                return false;
             }
-            const pw = withVotesInfo(post, req.auth._id, post._id);
+            return true;
+        });
+
+        logger.info(`Posts filtered: ${posts.length} -> ${validPosts.length} (removed ${posts.length - validPosts.length} posts with missing users)`);
+
+        // 3. Lean Post Processing
+        const postsWithVotes = validPosts.map(post => {
+            if (post.anonyme && !post.anonymName) {
+                setImmediate(async () => {
+                    const name = generateAnonymName(post.user, post._id);
+                    await Post.updateOne({ _id: post._id }, { $set: { anonymName: name } });
+                });
+                post.anonymName = 'User'; // Immediate fallback string
+            }
+
+            const pw = withVotesInfo(post, userId, post._id);
             const ex = makeExcerpt(post.text, 150);
             pw.excerpt = ex;
-            pw.text = ex; // shortened text for feed preview
+            // Keep full text for frontend, send excerpt separately
+            // Frontend can decide whether to show excerpt or full text
+            
+            // Add comment count manually if not in projection
+            pw.commentCount = post.comments ? post.comments.length : 0;
+            delete pw.comments; // Remove the full array to keep payload lean
+            
             return pw;
         });
 
-        console.log("getPosts hit, posts:", postsWithVotes);
-
-        // Count total number of posts matching the query
+        // 4. Counts & Response
         const count = await Post.countDocuments(visibilityQuery).exec();
 
-        // Return posts with pagination info
         return Response.sendResponse(res, {
             posts: postsWithVotes,
             more: (count - (limit * (parseInt(page) + 1))) > 0
         });
-
     } catch (err) {
-        console.error('Error in getPosts:', err);
+        logger.error('getPosts critical error:', err);
         return Response.sendError(res, 500, 'Server error');
     }
 };
 
 exports.voteOnPost = async (req, res) => {
-    try{
-        const post = req.post
+    try {
+        const postId = req.post._id;
+        const userId = req.auth._id;
+        const { vote } = req.body;
 
-        const userVoteInd =  post.votes.findIndex(vote => vote.user == req.auth._id)
-        console.log(userVoteInd);
-        if(userVoteInd != -1){
-            if(post.votes[userVoteInd].vote != req.body.vote)
-                post.votes.splice(userVoteInd, 1)
-        }else{
-            post.votes.push({
-                user: req.auth._id,
-                vote: req.body.vote
-            });
+        // 1. Atomic State Commit (API Hardening)
+        // Check if user already voted to determine push vs pull vs update
+        const post = await Post.findById(postId).select('votes user channel text anonyme');
+        if (!post) return Response.sendError(res, 404, 'Post not found');
+
+        const existingVote = post.votes.find(v => v.user.toString() === userId.toString());
+        let updatedPost;
+
+        if (existingVote) {
+            if (existingVote.vote !== vote) {
+                // Change vote: Remove old one
+                updatedPost = await Post.findOneAndUpdate(
+                    { _id: postId },
+                    { $pull: { votes: { user: userId } } },
+                    { new: true, lean: true }
+                );
+            } else {
+                // Same vote: No-op based on existing legacy logic
+                const pw = withVotesInfo(post.toObject(), userId, postId);
+                return Response.sendResponse(res, {
+                    votes: pw.votes,
+                    voted: pw.voted
+                });
+            }
+        } else {
+            // New vote: Push
+            updatedPost = await Post.findOneAndUpdate(
+                { _id: postId },
+                { $push: { votes: { user: userId, vote } } },
+                { new: true, lean: true }
+            );
         }
 
-        try{
-            const savedPost = await post.save();
-            const postWithVotes = withVotesInfo(savedPost, req.auth._id, savedPost._id);
+        const postWithVotes = withVotesInfo(updatedPost, userId, postId);
 
-            // Create activity for the vote
-            if (userVoteInd === -1) { // Only if it's a new vote
-                try {
-                    await Activity.create({
+        // 2. Background Tasks (Non-blocking Socket & Activity)
+        setImmediate(async () => {
+            try {
+                if (!existingVote) {
+                    // 🔥 REAL-TIME: Immediate propagation
+                    realtime.emitPostInteraction(postId, post.user, userId, 'like');
+
+                    // Secondary Writes (Activity Log)
+                    Activity.create({
                         type: 'like',
-                        actor: req.auth._id,
+                        actor: userId,
                         targetType: 'post',
-                        targetId: savedPost._id,
-                        channel: savedPost.channel,
-                        content: savedPost.text ? (savedPost.text.length > 100 ? savedPost.text.substring(0, 97) + '...' : savedPost.text) : 'Liked a post',
+                        targetId: postId,
+                        channel: post.channel,
+                        content: post.text ? (post.text.length > 100 ? post.text.substring(0, 97) + '...' : post.text) : 'Liked a post',
                         visibility: 'private'
-                    });
-                } catch (activityErr) {
-                    console.warn('Failed to create activity for vote:', activityErr.message);
-                }
-            }
+                    }).catch(e => logger.warn('Background activity creation failed', e));
 
-            if(userVoteInd && savedPost.user != req.auth._id){
-                try{
-                    const channel = await Channel.findOne({_id: savedPost.channel}).exec();
-                    if(channel){
-                        sendNotification(
-                            {en: channel.name},
-                            {en: (savedPost.anonyme ? 'Anonym' : req.authUser.firstName + ' ' + req.authUser.lastName) + ' has voted on your post'}, 
-                            {
-                                type: 'vote-channel-post',
-                                link: '/tabs/channels/post/' + savedPost._id
-                            }, 
-                            [], 
-                            [savedPost.user]
-                        )
+                    // Notifications
+                    if (String(post.user) !== String(userId)) {
+                        let channel = await Channel.findById(post.channel).select('name').lean();
+                        if (channel) {
+                            // Normalize ObjectIds to strings
+                            channel = normalizeLeanDoc(channel);
+                            
+                            sendNotification(
+                                { en: channel.name },
+                                { en: (post.anonyme ? 'Anonym' : req.authUser.firstName + ' ' + req.authUser.lastName) + ' has voted on your post' },
+                                {
+                                    type: 'vote-channel-post',
+                                    link: '/tabs/channels/post/' + postId
+                                },
+                                [],
+                                [post.user]
+                            );
+                        }
                     }
-                }catch(e){
-                    console.warn('Failed to find channel or send notification:', e.message || e);
                 }
+            } catch (bgErr) {
+                logger.error('Background vote processing error:', bgErr);
             }
+        });
 
-            return Response.sendResponse(res, {
-                votes: postWithVotes.votes,
-                voted: postWithVotes.voted
-            }, 'voted')
-        }catch(saveErr){
-            console.error('Error saving post votes:', saveErr);
-            return Response.sendError(res, 400, 'failed')
-        }
-    }catch(err){
-        console.log(err);
-        return Response.sendError(res, 500, 'Server error')
+        // 3. Lean Response (API Efficiency)
+        return Response.sendResponse(res, {
+            votes: postWithVotes.votes,
+            voted: postWithVotes.voted
+        }, 'voted');
+    } catch (err) {
+        logger.error('voteOnPost critical error:', err);
+        return Response.sendError(res, 500, 'Server error');
     }
-}
+};
 
 exports.deletePost = (req, res) => {
     try {

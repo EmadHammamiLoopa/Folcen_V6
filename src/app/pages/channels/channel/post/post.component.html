@@ -45,8 +45,8 @@
   <!-- text -->
   <div class="jdl-text" [style]="{'color':'var(--post-fg)'}" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
-      {{ post.text | slice:0:150 }}{{ post.text.length > 150 ? '...' : '' }}
-      <span *ngIf="post.text.length > 150" class="see-more">See More</span>
+      {{ post.text | slice:0:150 }}{{ post.text?.length > 150 ? '...' : '' }}
+      <span *ngIf="post.text?.length > 150" class="see-more">See More</span>
     </ng-container>
     <ng-container *ngIf="!showCommentsBtn">
       {{ post.text }}
@@ -113,7 +113,7 @@
   <ng-container *ngIf="channel.type === 'static_dating' && post.hintAboutMe">
     <div *ngIf="showCommentsBtn" class="jdl-hint-teaser" (click)="showComments()">
       <i class="fas fa-quote-left"></i>
-      <span>{{ post.hintAboutMe | slice:0:60 }}{{ post.hintAboutMe.length > 60 ? '...' : '' }}</span>
+      <span>{{ post.hintAboutMe | slice:0:60 }}{{ post.hintAboutMe?.length > 60 ? '...' : '' }}</span>
     </div>
     <div *ngIf="!showCommentsBtn" class="hint-box full-width-hint">
       <strong><i class="fas fa-quote-left"></i> Hint about me</strong>
@@ -125,10 +125,10 @@
   <div *ngIf="mediaUrl || (isMediaExpired && !showCommentsBtn)" class="jdl-media" (click)="handleMediaClick()">
     <div class="media-container" [class.enlarged-container]="isImageEnlarged && !showCommentsBtn">
       <ng-container *ngIf="!isMediaExpired">
-        <img *ngIf="post.media?.url?.endsWith('.jpg') || post.media?.url?.endsWith('.webp') || post.media?.url?.endsWith('.png')"
+        <img *ngIf="isImageMedia(post.media?.url)"
              [src]="mediaUrl" alt="media" [class.enlarged]="isImageEnlarged && !showCommentsBtn" />
         
-        <video *ngIf="post.media?.url?.endsWith('.mp4') || post.media?.url?.endsWith('.webm')"
+        <video *ngIf="isVideoMedia(post.media?.url)"
                [src]="mediaUrl" controls playsinline (click)="$event.stopPropagation()"></video>
         
         <div class="media-overlay" *ngIf="showCommentsBtn">

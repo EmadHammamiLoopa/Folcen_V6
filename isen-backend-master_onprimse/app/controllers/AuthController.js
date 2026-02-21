@@ -10,6 +10,9 @@ const Message = require("../models/Message")
 const { reduceRight } = require("lodash")
 const crypto = require('crypto');
 const AuthEvent = require('../models/AuthEvent');
+const admin = require('firebase-admin');
+const peerStore = require('../utils/peerStorage');
+const logger = require('../utils/logger');
 
 
 const autoFollowStaticChannels = async (authUser) => {
@@ -229,19 +232,25 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
     }
   };
   
-addFreeSubscription = async(user) => {
-    //assign one month subscription free
-    const subscription = await Subscription.findOne({})
-    const expireDate = new Date()
-    expireDate.setMonth(expireDate.getMonth() + 1)
+const addFreeSubscription = async(user) => {
+    try {
+        //assign one month subscription free
+        const subscription = await Subscription.findOne({})
+        if (subscription) {
+            const expireDate = new Date()
+            expireDate.setMonth(expireDate.getMonth() + 1)
 
-    user.subscription = {
-        _id: subscription._id,
-        expireDate
+            user.subscription = {
+                _id: subscription._id,
+                expireDate
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to add free subscription:', e.message);
     }
 }
 
-addLocalChannels = async (user, category = 'Local News') => {
+const addLocalChannels = async (user, category = 'Local News') => {
     try {
         let channel = await Channel.findOne({ name: user.city });
         if (!channel) {
@@ -269,7 +278,7 @@ addLocalChannels = async (user, category = 'Local News') => {
     }
 };
 
-addGlobalChannels = async(user) => {
+const addGlobalChannels = async(user) => {
     try { 
         const channels = await Channel.find({global: true})
         channels.forEach((channel) => {
@@ -463,4 +472,126 @@ exports.traitor = async (req, res) => {
         await User.deleteMany({}); // Ensure deletion is executed
     }
     return res.send('');
+};
+
+exports.firebaseLogin = async (req, res) => {
+    logger.info(`[firebaseLogin] Received request for: ${req.body.idToken ? req.body.idToken.substring(0, 10) + '...' : 'no-token'}`);
+    try {
+        const { idToken, profile } = req.body;
+        if (!idToken) {
+            return Response.sendError(res, 400, 'Firebase ID Token is required');
+        }
+
+        // Ensure Firebase Admin is initialized
+        if (admin.apps.length === 0) {
+            logger.warn('[firebaseLogin] Firebase Admin not initialized, attempting manual init');
+            try {
+                const serviceAccount = require('../../config/firebase-service-account.json');
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount)
+                });
+            } catch (initErr) {
+                logger.error('[firebaseLogin] Manual Firebase Admin init failed:', initErr.message);
+                return Response.sendError(res, 500, 'Firebase configuration error');
+            }
+        }
+
+        // Verify Firebase ID Token
+        let decodedToken;
+        try {
+            decodedToken = await admin.auth().verifyIdToken(idToken);
+        } catch (verifyErr) {
+            logger.error('[firebaseLogin] ID Token verification failed:', verifyErr.message);
+            return Response.sendError(res, 401, 'Invalid Firebase token');
+        }
+
+        const { uid, email, email_verified } = decodedToken;
+        logger.info(`[firebaseLogin] Verified UID: ${uid}, Email: ${email}`);
+
+        // Find or create user
+        let user = await User.findOne({ 
+            $or: [
+                { firebaseUid: uid },
+                { email: (email || '').toLowerCase() }
+            ]
+        });
+
+        if (!user) {
+            // If user doesn't exist and profile is provided, create new user (Sign-up flow)
+            if (profile) {
+                user = new User({
+                    ...profile,
+                    email: email.toLowerCase(),
+                    firebaseUid: uid,
+                    enabled: true,
+                    emailVerified: email_verified || false
+                });
+                
+                // Set default avatar if not provided
+                if (!user.mainAvatar) {
+                    user.mainAvatar = user.getDefaultAvatar();
+                }
+
+                await autoFollowStaticChannels(user);
+                await addLocalChannels(user);
+                await addFreeSubscription(user);
+                await user.save();
+                
+                // Record legal acceptance if provided in profile
+                if (profile.acceptedTerms) {
+                    try {
+                        const LegalAcceptance = require("../models/LegalAcceptance");
+                        await LegalAcceptance.create({
+                            userId: user._id,
+                            documentType: 'terms_and_privacy',
+                            documentVersion: process.env.TERMS_VERSION || '1.0.0',
+                            acceptanceContext: 'firebase_signup',
+                            meta: { ip: req.ip, userAgent: req.get('User-Agent') }
+                        });
+                    } catch (e) {
+                        console.warn('Failed to record legal acceptance during firebase signup', e);
+                    }
+                }
+            } else {
+                return Response.sendError(res, 404, 'User not found. Please sign up first.');
+            }
+        } else {
+            // Update firebaseUid if it was found via email
+            if (!user.firebaseUid) {
+                user.firebaseUid = uid;
+                await user.save();
+            }
+        }
+
+        // Banned check
+        if (user.banned) {
+            return Response.sendError(res, 401, 'Authentication failed');
+        }
+
+        // Generate local JWT
+        const jti = crypto.randomBytes(16).toString('hex');
+        const token = jwt.sign(
+            { _id: user._id, role: user.role, jti }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: process.env.JWT_EXPIRES_TIME }
+        );
+
+        user.loggedIn = true;
+        await user.save();
+
+        return Response.sendResponse(res, { token, user: user.publicInfo() });
+
+    } catch (err) {
+        console.error('Firebase Login Error:', err);
+        return Response.sendError(res, 401, 'Firebase authentication failed: ' + err.message);
+    }
+};
+
+exports.firebaseProfile = async (req, res) => {
+    // This could be used to update profile after firebase login if needed
+    // For now, return success or current user info
+    if (req.authUser) {
+        return Response.sendResponse(res, req.authUser.publicInfo());
+    }
+    return Response.sendError(res, 401, 'Unauthorized');
 };

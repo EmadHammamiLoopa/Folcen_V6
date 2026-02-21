@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { Platform, ModalController } from '@ionic/angular';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { JsonService } from './services/json.service';
@@ -67,6 +68,7 @@ export class AppComponent implements OnDestroy {
   private userSub: Subscription | null = null;
   private forceLogoutHandler: any = null;
   private forceLogoutMessageHandler: any = null;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private platform: Platform,
@@ -134,6 +136,68 @@ export class AppComponent implements OnDestroy {
         }
       });
     } catch (e) {}
+
+    // --- Observable-based socket subscriptions (reconnect-safe) ---
+    // follow-update: patch local user stats without a full API round-trip
+    SocketService.followUpdate$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+      try {
+        if (!this.user?.id) return;
+        if (payload.followerId !== this.user.id && payload.followedId !== this.user.id) return;
+        const isActor = payload.followerId === this.user.id;
+        const stats = isActor ? payload.actorStatistics : payload.targetStatistics;
+        if (stats) {
+          if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
+          if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
+          if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
+          this.userService.setCurrentUser(this.user);
+          this.changeDetectorRef.detectChanges();
+        }
+      } catch (e) {}
+    });
+
+    // user-profile-updated: patch local user if the update concerns us
+    SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+      try {
+        if (!this.user?.id || !payload?.userId) return;
+        if (String(payload.userId) !== String(this.user.id)) return;
+        const fields = payload.fields || {};
+        if (fields.firstName)  this.user.firstName  = fields.firstName;
+        if (fields.lastName)   this.user.lastName   = fields.lastName;
+        if (fields.avatar)     this.user.avatar     = fields.avatar;
+        this.userService.setCurrentUser(this.user);
+        this.changeDetectorRef.detectChanges();
+      } catch (e) {}
+    });
+
+    // budget-update: keep call budget in sync (already in AppEventsService but
+    // we also need to update this.user.missedCallBudget for the local view)
+    SocketService.budgetUpdate$.pipe(takeUntil(this.destroy$)).subscribe((budget: number) => {
+      try {
+        if (this.user) {
+          this.user.missedCallBudget = budget;
+          this.userService.setCurrentUser(this.user);
+          this.changeDetectorRef.detectChanges();
+        }
+      } catch (e) {}
+    });
+
+    // friend-requests-updated / new-friend-request: keep newRequestsCount badge live
+    SocketService.friendRequestsUpdated$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+      try {
+        const stats = payload?.statistics;
+        if (stats?.pendingFriendRequests !== undefined) {
+          this.newRequestsCount = stats.pendingFriendRequests;
+          this.changeDetectorRef.detectChanges();
+        }
+      } catch (e) {}
+    });
+
+    SocketService.newFriendRequest$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      try {
+        this.newRequestsCount = (this.newRequestsCount || 0) + 1;
+        this.changeDetectorRef.detectChanges();
+      } catch (e) {}
+    });
   }
 
   
@@ -181,6 +245,7 @@ export class AppComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    try { this.destroy$.next(); this.destroy$.complete(); } catch (e) {}
     try { if (this.userSub) this.userSub.unsubscribe(); } catch (e) {}
     try {
       this.activityHandlers.forEach(({ type, handler }) => {
@@ -539,42 +604,8 @@ export class AppComponent implements OnDestroy {
         }
       });
 
-      socket.off('follow-update').on('follow-update', (data) => {
-        console.log('👥 Follow update received:', data);
-        if (this.user?.id && (data.followerId === this.user.id || data.followedId === this.user.id)) {
-          console.log('🔄 Refreshing user data due to follow update...');
-          this.userService.refreshCurrentUser().subscribe({
-            next: (refreshedUser) => {
-              this.user = refreshedUser;
-              this.changeDetectorRef.detectChanges();
-            }
-          });
-        }
-      });
-
-      socket.off('user-profile-updated').on('user-profile-updated', (data) => {
-        console.log('👤 Profile update received:', data);
-        if (this.user?.id && data.userId === this.user.id) {
-          console.log('🔄 Refreshing user data due to profile update...');
-          this.userService.refreshCurrentUser().subscribe({
-            next: (refreshedUser) => {
-              this.user = refreshedUser;
-              this.changeDetectorRef.detectChanges();
-            }
-          });
-        }
-      });
-
-      socket.off('budget-update').on('budget-update', (data) => {
-        console.log('💰 Budget update received:', data);
-        if (this.user) {
-          this.user.missedCallBudget = data.missedCallBudget;
-          this.userService.setCurrentUser(this.user);
-          // broadcast budget to other UI pieces (feed, tabs)
-          try { this.appEvents.setBudget(data.missedCallBudget); } catch(e) {}
-          this.changeDetectorRef.detectChanges();
-        }
-      });
+      // follow-update, user-profile-updated and budget-update are handled
+      // via reconnect-safe SocketService Observables subscribed in the constructor.
     } catch (e) {
       console.error('connectUser failed:', e);
     }

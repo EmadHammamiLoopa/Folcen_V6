@@ -1,6 +1,6 @@
 <ion-header class="ion-no-border">
   <ion-toolbar class="glass-toolbar">
-    <ion-title>{{ type === 'followers' ? 'Followers' : 'Following' }}</ion-title>
+    <ion-title>{{ type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Friends' }}</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="dismiss()" class="close-btn">
         <ion-icon name="close-outline"></ion-icon>
@@ -58,7 +58,7 @@
         <div class="empty-icon-wrapper">
           <ion-icon name="people-outline"></ion-icon>
         </div>
-        <p>{{ searchTerm ? 'No matches found' : 'No ' + type + ' found yet' }}</p>
+        <p>{{ searchTerm ? 'No matches found' : 'No ' + (type === 'friends' ? 'friends' : type) + ' found yet' }}</p>
       </div>
 
       <div class="user-card-list" *ngIf="!loading && filteredUsers.length > 0">
@@ -90,6 +90,13 @@
                           class="remove-btn" 
                           (click)="removeFollower(user._id)">
                 Remove
+              </ion-button>
+              <ion-button *ngIf="type === 'friends'" 
+                          fill="outline" 
+                          color="danger"
+                          class="remove-btn" 
+                          (click)="removeFriend(user._id || user.id)">
+                Unfriend
               </ion-button>
             </ng-container>
           </div>

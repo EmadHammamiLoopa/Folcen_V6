@@ -1,3 +1,4 @@
+import { devLogger } from "../utils/dev-logger";
 import { Router } from '@angular/router';
 import { HTTP } from '@ionic-native/http/ngx';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
@@ -44,7 +45,7 @@ export class MessageService extends DataService {
       url: '/' + id,
       params: { page: page.toString() }
     }).then((response) => {
-      console.log("📥 Raw message response from backend:", response);
+      devLogger.log("📥 Raw message response from backend:", response);
       cacheForThread.set(page, { at: Date.now(), resp: response });
       this.threadCache.set(id, cacheForThread);
       return response;
@@ -76,14 +77,14 @@ export class MessageService extends DataService {
   }
 
   clearCaches(reason = 'manual') {
-    console.log(`🧹 Clearing message cache (${reason})`);
+    devLogger.log(`🧹 Clearing message cache (${reason})`);
     this.threadInflight.clear();
     this.threadCache.clear();
   }
 
   clearCacheForThread(id: string) {
     if (!id) return;
-    console.log(`🧹 Clearing message cache for thread: ${id}`);
+    devLogger.log(`🧹 Clearing message cache for thread: ${id}`);
     this.threadCache.delete(id);
     this.threadInflight.delete(id);
   }

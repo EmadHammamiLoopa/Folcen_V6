@@ -6,9 +6,10 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const Response = require('./Response');
 const helpers = require('../helpers');          // path to helpers/index.js
+const logger = require('../utils/logger');
 
 exports.indexMessages = async (req, res) => {
-    console.log("hereeeeeeeeeeeeeeeeeeeee");
+    logger.info("hereeeeeeeeeeeeeeeeeeeee");
 
     const limit = 20;
     const page = +req.query.page || 0;
@@ -22,7 +23,7 @@ exports.indexMessages = async (req, res) => {
         ]
     };
 
-    console.log('Message filter:', JSON.stringify(filter, null, 2)); // Log the filter
+    logger.info('Message filter:', JSON.stringify(filter, null, 2)); // Log the filter
 
     try {
         const messages = await Message.find(filter)
@@ -30,26 +31,29 @@ exports.indexMessages = async (req, res) => {
             .skip(limit * page)
             .limit(limit);
 
-        console.log('Messages found:', messages); // Log the messages
+        logger.info('Messages found:', messages); // Log the messages
 
         const count = await Message.countDocuments(filter);
-        const allowToChat =
-        req.authUser?.friends?.map(id => id.toString()).includes(userId.toString()) ||
-        (await Message.countDocuments({ from: userId, to: authUserId })) > 0;
+        
+        // Task 1: Use shared policy for initial state
+        const check = await helpers.canInitiateChat(authUserId, userId);
+        const allowToChat = check.allowed;
+        const budgetRemaining = check.budgetRemaining;
     
 
             messages.forEach((msg, i) => {
-              console.log(`📥 [${i}] Image path:`, msg.image?.path || null);
+              logger.info(`📥 [${i}] Image path:`, msg.image?.path || null);
             });
 
             
         return Response.sendResponse(res, {
             messages,
             more: (count - (limit * (page + 1))) > 0,
-            allowToChat
+            allowToChat,
+            budgetRemaining
         });
     } catch (error) {
-        console.error('Error fetching messages:', error); // Log the error
+        logger.error('Error fetching messages:', error); // Log the error
         return Response.sendError(res, 400, 'Failed to fetch messages');
     }
 };
@@ -58,73 +62,103 @@ exports.getUsersMessages = async (req, res) => {
   try {
     const limit = 20;
     const page  = req.query.page ? +req.query.page : 0;
+    const authId = new mongoose.Types.ObjectId(req.authUser._id);
+    const authIdStr = String(req.authUser._id);
+    const blocked = (req.authUser.blockedUsers || []).map(id => String(id));
 
-    const authId   = new mongoose.Types.ObjectId(req.authUser._id);
-    const blocked  = req.authUser.blockedUsers || [];
-
-    // 1) Get distinct peers you've exchanged messages with, newest first
-    const peersPage = await Message.aggregate([
-      { $match: { $or: [ { from: authId }, { to: authId } ] } },
+    // 1) Optimized High-Throughput Aggregation (API Efficiency & Database Access)
+    const usersWithMessages = await Message.aggregate([
+      // Stage 1: Initial filtering (Handle both ObjectId and String storage)
+      { $match: { 
+          $or: [ 
+            { from: authId }, { to: authId },
+            { from: authIdStr }, { to: authIdStr }
+          ] 
+      } },
+      
+      // Stage 2: Identify Peer and sort by age
+      { $sort: { createdAt: -1 } },
       { $project: {
           createdAt: 1,
-          peerId: { $cond: [ { $eq: ['$from', authId] }, '$to', '$from' ] }
+          text: 1,
+          from: 1,
+          to: 1,
+          type: 1,
+          productId: 1, // Capture productId for frontend
+          // Peer identification comparing strings to be safe
+          peerId: { $cond: [ 
+              { $eq: [{ $toString: '$from' }, authIdStr] }, 
+              '$to', 
+              '$from' 
+          ] }
         }
       },
-      { $sort: { createdAt: -1 } },
+      
+      // Stage 3: Group by peer to get 'lastMessage'
       { $group: {
           _id: '$peerId',
-          lastMessageAt: { $first: '$createdAt' }
+          lastMessageAt: { $first: '$createdAt' },
+          lastMessage: { $first: '$$ROOT' } 
         }
       },
-      // filter out blocked/soft-deleted here with a $lookup to users
-      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
-      { $unwind: '$user' },
+      
+      // Stage 4: Fetch Peer Metadata
+      { $lookup: { 
+          from: 'users', 
+          let: { peerId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $or: [
+                { $eq: ['$_id', '$$peerId'] },
+                { $eq: [{ $toString: '$_id' }, { $toString: '$$peerId' }] }
+            ] } } },
+            { $project: { firstName: 1, lastName: 1, mainAvatar: 1, avatarStyle: 1, avatarSeed: 1, deletedAt: 1, blockedUsers: 1, enabled: 1 } }
+          ],
+          as: 'peerInfo' 
+      }},
+      { $unwind: '$peerInfo' },
+      
+      // Stage 5: Security & Lifecycle Filter (Privacy Hardening)
       { $match: {
-          'user.deletedAt': null,
-          '_id': { $nin: blocked },
-          'user.blockedUsers': { $ne: authId }
+          'peerInfo.deletedAt': null,
+          'peerInfo.enabled': { $ne: false },
+          // Filter out users I have blocked
+          '_id': { $nin: (req.authUser.blockedUsers || []) },
+          // Hide me from people who blocked me (normalized comparison)
+          'peerInfo.blockedUsers': { $ne: authId }
         }
       },
+      
+      // Stage 6: Sorting & Pagination
       { $sort: { lastMessageAt: -1 } },
       { $skip: limit * page },
-      { $limit: limit }
+      { $limit: limit },
+      
+      // Stage 7: Clean Object Construction
+      { $project: {
+          _id: { $toString: '$_id' },
+          firstName: '$peerInfo.firstName',
+          lastName: '$peerInfo.lastName',
+          mainAvatar: '$peerInfo.mainAvatar',
+          avatarStyle: '$peerInfo.avatarStyle',
+          avatarSeed: '$peerInfo.avatarSeed',
+          messages: [{
+            text: '$lastMessage.text',
+            createdAt: '$lastMessage.createdAt',
+            from: '$lastMessage.from',
+            to: '$lastMessage.to',
+            type: '$lastMessage.type',
+            productId: '$lastMessage.productId'
+          }]
+        }
+      }
     ]);
 
-    // 2) Fetch messages for each peer (newest first) and shape the response
-    const usersWithMessages = await Promise.all(
-      peersPage.map(async ({ _id: peerId, user }) => {
-        const messages = await Message.find({
-          $or: [
-            { from: peerId, to: authId },
-            { from: authId, to: peerId }
-          ]
-        }).sort({ createdAt: -1 });
-
-        return {
-          _id: user._id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          avatar: user.avatar,
-          mainAvatar: user.mainAvatar,
-          messages
-        };
-      })
-    );
-
-    // 3) Compute total number of distinct peers for pagination
-    const totalPeersAgg = await Message.aggregate([
-      { $match: { $or: [ { from: authId }, { to: authId } ] } },
-      { $project: { peerId: { $cond: [ { $eq: ['$from', authId] }, '$to', '$from' ] } } },
-      { $group: { _id: '$peerId' } },
-      { $count: 'count' }
-    ]);
-    const total = totalPeersAgg?.[0]?.count || 0;
-
-    const more = total - limit * (page + 1) > 0;
+    // Simple "more" estimation based on limit
+    const more = usersWithMessages.length === limit;
 
     return Response.sendResponse(res, { users: usersWithMessages, more });
   } catch (err) {
-    console.error('Error fetching users messages:', err);
+    logger.error('Error fetching users messages:', err);
     return Response.sendError(res, 500, 'Internal server error');
   }
 };
@@ -153,7 +187,7 @@ exports.deleteMessage = async (req, res) => {
 
         return Response.sendResponse(res, { success: true, message: 'Message deleted successfully' });
     } catch (error) {
-        console.error('Error deleting message:', error);
+        logger.error('Error deleting message:', error);
         return Response.sendError(res, 500, 'Failed to delete message');
     }
 };
@@ -161,36 +195,14 @@ exports.deleteMessage = async (req, res) => {
 
 exports.sendMessagePermission = async (req, res) => {
     try {
-        const now = new Date();
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const user = req.user;
-        const authUser = req.authUser;
+        const targetId = req.params.userId || req.body.to;
+        const authId = req.auth._id;
 
-        if (authUser.friends && authUser.friends.includes(user._id)) {
-            return Response.sendResponse(res, true);
-        }
+        const check = await helpers.canInitiateChat(authId, targetId);
 
-        const messages = await Message.find({
-            from: req.auth._id,
-            createdAt: {
-                $lt: now.toISOString(),
-                $gt: yesterday.toISOString()
-            },
-            to: {
-                $nin: req.authUser.friends
-            }
-        }).distinct('to');
-
-        console.log(messages);
-
-        if (!await userSubscribed(req.authUser) && messages.length > 3) {
-            return Response.sendResponse(res, false);
-        } else {
-            return Response.sendResponse(res, true);
-        }
+        return Response.sendResponse(res, check.allowed, check.allowed ? 'Allowed' : check.reason);
     } catch (error) {
-        console.log(error);
+        logger.error('sendMessagePermission error:', error);
         return Response.sendError(res, 500, 'Server error');
     }
 };

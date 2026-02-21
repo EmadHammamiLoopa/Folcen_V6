@@ -37,6 +37,8 @@ export class DisplayComponent implements OnInit, OnDestroy {
   myProfile: boolean;
   isFriend: boolean = false;
   notFriendOrMe: boolean = false;
+  private _isFriendReloadDone = false;
+  pendingRequestsCount = 0;
   userId: string;
   mainAvatar: string;
   imageLoading = false;
@@ -44,7 +46,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
   usedCached = false;
 
   private userSub: Subscription | null = null;
-  private socketSub: Subscription | null = null;
+  private subs: Subscription[] = [];
 
   constructor(
     private auth: AuthService, private userService: UserService, private requestService: RequestService,
@@ -70,7 +72,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
       const isMe = this.myProfile || !this.userId || this.userId === 'null' || (this.userId === updatedUser._id);
 
       if (isMe) {
-        console.log('DisplayComponent: Updating own profile from currentUser stream');
+        console.log('[PROFILE:userSub] currentUser stream fired — friends:', updatedUser.friends?.length, 'followers:', updatedUser.followers?.length, 'following:', updatedUser.following?.length, 'raw:', updatedUser);
         this.user = updatedUser;
         this.mainAvatar = this.user.mainAvatarPath;
         this.myProfile = true; // Ensure this is set
@@ -81,62 +83,185 @@ export class DisplayComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Subscribe to server profile update notifications to refresh follow counts in real-time
-    try {
-      this.socketSub = SocketService.userProfileUpdated$.subscribe((payload: any) => {
+    // Real-time: patch counts directly from socket payload statistics (no extra API call)
+    this.subs.push(
+      SocketService.userProfileUpdated$.subscribe((payload: any) => {
         try {
           const uid = payload?.userId;
-          if (!uid) return;
-          // If the viewed profile changed, reload it
-          if (this.user && (this.user._id === String(uid) || this.user.id === String(uid))) {
-            console.log('DisplayComponent: Socket update received for viewed user', uid);
-            this.userService.getUserProfile(this.user._id, { forceRefresh: true }).subscribe({
-              next: (u: any) => { if (u) { this.user = new User().initialize(u); this.changeDetectorRef.detectChanges(); } },
-              error: (err) => { this.handleUserDataError(err); }
+          if (!uid || !this.user) return;
+          if (this.user._id !== String(uid) && this.user.id !== String(uid)) return;
+          // Re-fetch only for non-count field changes (avatar, name, etc.)
+          this.userService.getUserProfile(this.user._id, { forceRefresh: true }).subscribe({
+            next: (u: any) => {
+              if (u) {
+                this.user = new User().initialize(u);
+                if (this.myProfile) {
+                  this.userService.setCurrentUser(this.user, { force: true });
+                } else {
+                  // Re-apply friend status after fresh API load (API may still return stale isFriend)
+                  this.checkIfFriend();
+                }
+                this.changeDetectorRef.detectChanges();
+              }
+            },
+            error: () => {}
+          });
+        } catch (e) {}
+      }),
+
+      SocketService.followUpdate$.subscribe((payload: any) => {
+        try {
+          console.log('[PROFILE:followUpdate$] received:', JSON.stringify(payload));
+          if (!this.user) { console.warn('[PROFILE:followUpdate$] no this.user yet, skipping'); return; }
+          const myId = String(this.user._id || this.user.id);
+          const followerId = String(payload.followerId || '');
+          const followedId = String(payload.followedId || '');
+          console.log('[PROFILE:followUpdate$] myId:', myId, 'followerId:', followerId, 'followedId:', followedId);
+          if (myId !== followerId && myId !== followedId) { console.log('[PROFILE:followUpdate$] not for me, skipping'); return; }
+
+          const isActor = myId === followerId;
+          const stats = isActor ? payload.actorStatistics : payload.targetStatistics;
+          const followBecameActive = payload.status === 'active';
+          // When viewing a peer's profile and this follow just became active (accepted),
+          // reload the full profile so the backend unlocks private content (aboutMe, interests, gallery).
+          if (!this.myProfile && followBecameActive && myId === String(followedId)) {
+            console.log('[PROFILE:followUpdate$] follow accepted for viewed user — refreshing profile for unlocked content');
+            this.user.isFollowing = true;
+            this.changeDetectorRef.detectChanges();
+            setTimeout(() => {
+              if (!this.userId) return;
+              this.userService.getUserProfile(this.userId, { forceRefresh: true }).subscribe({
+                next: (u: any) => {
+                  if (u && u._id) {
+                    this.user = new User().initialize(u);
+                    this.user.isFollowing = true;
+                    this.changeDetectorRef.detectChanges();
+                  }
+                },
+                error: () => {}
+              });
+            }, 800);
+          }
+          console.log('[PROFILE:followUpdate$] stats:', stats);
+          if (stats) {
+            // Stats included in payload — patch directly for instant UI update
+            if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
+            if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
+            if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
+            console.log('[PROFILE:followUpdate$] AFTER PATCH — friends:', this.user.friends?.length, 'followers:', this.user.followers?.length, 'following:', this.user.following?.length);
+            if (this.myProfile && stats.pendingFollowRequests !== undefined) {
+              this.pendingRequestsCount = stats.pendingFollowRequests;
+            }
+            if (this.myProfile) this.userService.setCurrentUser(this.user, { force: true });
+            this.changeDetectorRef.detectChanges();
+          } else {
+            // No stats in payload — fetch fresh profile from API as fallback
+            console.log('[PROFILE:followUpdate$] no stats in payload, fetching fresh profile from API');
+            this.userService.getUserProfile(myId, { forceRefresh: true }).subscribe({
+              next: (fresh) => {
+                if (fresh && fresh._id) {
+                  this.user = fresh;
+                  this.mainAvatar = this.user.mainAvatarPath;
+                  console.log('[PROFILE:followUpdate$] fresh API fetch done — friends:', this.user.friends?.length, 'followers:', this.user.followers?.length, 'following:', this.user.following?.length);
+                  if (this.myProfile) this.userService.setCurrentUser(this.user, { force: true });
+                  this.changeDetectorRef.detectChanges();
+                }
+              },
+              error: (err) => console.warn('[PROFILE:followUpdate$] fallback API fetch failed:', err)
             });
           }
-        } catch (e) { console.warn('Error handling profile update socket payload', e); }
-      });
-    } catch (e) { /* ignore socket subscription errors */ }
+        } catch (e) { console.error('[PROFILE:followUpdate$] error:', e); }
+      }),
 
-    // Subscribe to follow updates
-    try {
-      const followSub = SocketService.followUpdate$.subscribe((payload: any) => {
-        if (this.user && (this.user._id === payload.followedId || this.user._id === payload.followerId)) {
-          console.log('DisplayComponent: Follow update received, refreshing profile');
-          this.userService.getUserProfile(this.user._id, { forceRefresh: true }).subscribe({
-            next: (u: any) => { if (u) { this.user = new User().initialize(u); this.changeDetectorRef.detectChanges(); } },
-            error: (err) => { this.handleUserDataError(err); }
-          });
-        }
-      });
-      if (this.socketSub) {
-        // We can't easily add to socketSub if it's a single Subscription, 
-        // but we can use a composite subscription or just another field.
-        // For simplicity, I'll just add it to the existing socketSub if I can, 
-        // but socketSub is assigned above. I'll use a private subs array.
-      }
-    } catch (e) {}
+      SocketService.friendRequestsUpdated$.subscribe((payload: any) => {
+        try {
+          console.log('[PROFILE:friendRequestsUpdated$] received:', JSON.stringify(payload));
+          if (!this.user) { console.warn('[PROFILE:friendRequestsUpdated$] no this.user yet'); return; }
+          const stats = payload?.statistics;
 
-    // Subscribe to friend updates
-    try {
-      const friendSub = SocketService.friendRequestsUpdated$.subscribe((payload: any) => {
-        if (this.user) {
-          console.log('DisplayComponent: Friend update received, refreshing profile');
-          this.userService.getUserProfile(this.user._id, { forceRefresh: true }).subscribe({
-            next: (u: any) => { if (u) { this.user = new User().initialize(u); this.changeDetectorRef.detectChanges(); } },
-            error: (err) => { this.handleUserDataError(err); }
-          });
-        }
-      });
-    } catch (e) {}
+          if (this.myProfile) {
+            // ── Own profile ── statistics belong to the current user (= this.user)
+            if (stats) {
+              console.log('[PROFILE:friendRequestsUpdated$] own-profile stats:', stats);
+              if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
+              if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
+              if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
+              if (stats.pendingFollowRequests !== undefined) this.pendingRequestsCount = stats.pendingFollowRequests;
+              // Sync into central store so navigation doesn't lose these values
+              this.userService.setCurrentUser(this.user, { force: true });
+              console.log('[PROFILE:friendRequestsUpdated$] AFTER PATCH — friends:', this.user.friends?.length, 'followers:', this.user.followers?.length, 'following:', this.user.following?.length);
+              this.changeDetectorRef.detectChanges();
+            } else {
+              this.loadPendingRequestsCount();
+            }
+          } else {
+            // ── Peer profile ── the statistics in the payload are OUR OWN stats (sent by the
+            // backend to the current user), NOT the viewed user's stats.  Applying them to
+            // this.user would corrupt the viewed user's counters and cause the flicker.
+            // Only process relationship-type flags here.
+            if (payload?.userId) {
+              const viewedId = String(this.user._id || this.user.id || '');
+              const eventUid = String(payload.userId);
+              if (viewedId && viewedId === eventUid) {
+                if (payload.type === 'accepted') {
+                  this.user.isFriend = true;
+                  this.user.friend   = true;
+                  this.user.request  = null;
+                  this.isFriend      = true;
+                  this.userService.triggerFriendsRefresh();
+                  this.changeDetectorRef.detectChanges();
+                  // Fetch the full unlocked profile so aboutMe / interests / gallery
+                  // are replaced (backend returns locked placeholder until friendship confirmed).
+                  this._isFriendReloadDone = false;
+                  setTimeout(() => {
+                    if (!this.userId) return;
+                    this.userService.getUserProfile(this.userId, { forceRefresh: true }).subscribe({
+                      next: (u: any) => {
+                        if (u && u._id) {
+                          this.user = new User().initialize(u);
+                          this.user.isFriend = true;
+                          this.user.friend   = true;
+                          this.isFriend      = true;
+                          this._isFriendReloadDone = true;
+                          this.changeDetectorRef.detectChanges();
+                        }
+                      },
+                      error: () => {}
+                    });
+                  }, 800);
+                } else if (payload.type === 'declined' || payload.type === 'cancelled') {
+                  this.user.isFriend = false;
+                  this.user.friend   = false;
+                  this.user.request  = null;
+                  this.isFriend      = false;
+                  this.changeDetectorRef.detectChanges();
+                }
+              }
+            }
+          }
+        } catch (e) {}
+      }),
+
+      // Someone sent ME a request — if I'm currently viewing their profile, update state immediately
+      SocketService.newFriendRequest$.subscribe((payload: any) => {
+        try {
+          if (!this.user || this.myProfile) return;
+          const senderId  = String(payload?.from || payload?.fromId || '');
+          const viewedId  = String(this.user._id || this.user.id || '');
+          if (senderId && viewedId && senderId === viewedId) {
+            // The person whose profile I'm viewing just sent me a friend request
+            this.user.request = 'requesting';
+            this.changeDetectorRef.detectChanges();
+          }
+        } catch (e) {}
+      })
+    );
   }
 
   ngOnDestroy() {
-    if (this.userSub) {
-      this.userSub.unsubscribe();
-    }
-    try { if (this.socketSub) this.socketSub.unsubscribe(); } catch (e) {}
+    if (this.userSub) this.userSub.unsubscribe();
+    this.subs.forEach(s => { try { s.unsubscribe(); } catch (e) {} });
+    this.subs = [];
   }
 
   isArray(val: any): boolean {
@@ -145,9 +270,9 @@ export class DisplayComponent implements OnInit, OnDestroy {
 
   get isLocked(): boolean {
     if (!this.user || this.myProfile) return false;
-    // If profile is private, only ACTIVE followers or friends can see content
-    const isFollowingActive = this.user.isFollowing && this.user.followStatus === 'active';
-    return this.user.isPrivate && !isFollowingActive && !this.user.isFriend;
+    // Private profiles are accessible to confirmed friends AND active followers.
+    // Use component-level this.isFriend as a fallback so transient API resets don't re-lock the UI.
+    return this.user.isPrivate && !this.user.isFriend && !this.isFriend && !this.user.isFollowing;
   }
 
   get suggestedChannels(): any[] {
@@ -171,8 +296,10 @@ export class DisplayComponent implements OnInit, OnDestroy {
 
   getChannelImage(channel: any): string {
     if (!channel) return 'assets/images/channel-placeholder.png';
-    const img = channel.image || channel.photo;
+    let img = channel.image || channel.photo;
     if (!img) return 'assets/images/channel-placeholder.png';
+    if (typeof img !== 'string') img = String(img);
+    if (!img || img === '[object Object]') return 'assets/images/channel-placeholder.png';
     if (img.startsWith('http')) return img;
     return this.domaine + (img.startsWith('/') ? '' : '/') + img;
   }
@@ -188,6 +315,22 @@ export class DisplayComponent implements OnInit, OnDestroy {
     console.log("Entering view...");
     this.pageLoading = true;
     this.getUserId();
+    // Refresh own profile counts (friends/followers/following) from server
+    // every time the view is entered so stats are always up-to-date.
+    if (this.myProfile) {
+      this.userService.refreshCurrentUser().subscribe({
+        next: (fresh) => {
+          if (fresh) {
+            console.log('[PROFILE:ionViewWillEnter] refreshCurrentUser result — friends:', fresh.friends?.length, 'followers:', fresh.followers?.length, 'following:', fresh.following?.length, 'raw:', fresh);
+            this.user = fresh;
+            this.mainAvatar = this.user.mainAvatarPath;
+            this.pageLoading = false;
+            this.changeDetectorRef.detectChanges();
+          }
+        },
+        error: () => { /* non-critical, display already shows cached data */ }
+      });
+    }
   }
 
   getUserId() {
@@ -256,12 +399,18 @@ export class DisplayComponent implements OnInit, OnDestroy {
 
   loadUserData() {
     if (this.myProfile) {
-      this.userService.getUserProfile(this.userId).subscribe({
+      // forceRefresh: true skips both the in-memory short-circuit and the profile cache,
+      // so we always get live friends/followers/following arrays from the server.
+      this.userService.getUserProfile(this.userId, { forceRefresh: true }).subscribe({
         next: (user) => {
           if (user && user._id) {
               this.user = new User().initialize(user);
               this.mainAvatar = this.user.mainAvatarPath;
               this.pageLoading = false;
+              console.log('[PROFILE:loadUserData] API response — friends:', this.user.friends?.length, 'followers:', this.user.followers?.length, 'following:', this.user.following?.length, 'raw friends:', this.user.friends, 'raw followers:', this.user.followers);
+              // Push fresh data into the central store so userSub doesn't
+              // overwrite this with the stale localStorage copy.
+              this.userService.setCurrentUser(this.user, { force: true });
             console.log('Loaded user data for own profile:', this.user);
           } else {
             console.error('User data is undefined or missing _id for own profile:', user);
@@ -276,7 +425,11 @@ export class DisplayComponent implements OnInit, OnDestroy {
         }
       });
     } else {
-      this.userService.getUserProfile(this.userId).subscribe({
+      // Always force-refresh another user's profile to get live isFriend/friends count
+      // (cached version may be stale from before the friendship was established)
+      this._isFriendReloadDone = false; // reset one-shot reload guard for this profile view
+      this.isFriend = false;            // reset component friend flag; checkIfFriend() will re-evaluate
+      this.userService.getUserProfile(this.userId, { forceRefresh: true }).subscribe({
         next: (user) => {
           if (user && user._id) {
             this.user = new User().initialize(user);
@@ -290,10 +443,19 @@ export class DisplayComponent implements OnInit, OnDestroy {
             }
 
             this.mainAvatar = this.user.mainAvatarPath;
-            // Trust backend isFriend/friend status initially; 
-            // subscription to currentUser will handle real-time updates.
+            // If the component flag already knows we are friends (set by acceptRequest or a prior
+            // checkIfFriend call), propagate it immediately so isLocked stays closed even if the
+            // API response is momentarily stale.
+            if (this.isFriend) {
+              this.user.isFriend = true;
+              this.user.friend   = true;
+            }
+            console.log('[PROFILE:loadUserData] another user — isFriend:', this.user.isFriend, 'friends:', this.user.friends?.length, 'followers:', this.user.followers?.length);
+            // Also cross-check against local currentUser.friends as backend may not have
+            // the very latest state if a friend request was just accepted
+            this.checkIfFriend();
             this.pageLoading = false;
-            console.log('Loaded user data for another profile:', this.user);
+            this.changeDetectorRef.detectChanges();
           } else {
             console.error('User data is undefined or missing _id for another profile:', user);
             this.handleUserDataError();
@@ -430,11 +592,40 @@ export class DisplayComponent implements OnInit, OnDestroy {
       return String(friendId) === String(this.userId);
     });
 
-    // Update the user object
-    this.user.isFriend = isFriendLocally;
-    this.user.friend = isFriendLocally;
+    // Use OR: trust backend isFriend if already true, OR local check — whichever says true wins
+    // This avoids overwriting a correct backend value with a stale local cache
+    const backendSays  = this.user.isFriend;
+    const componentKnows = this.isFriend; // previously confirmed true (e.g. by acceptRequest)
+    const resolved = backendSays || isFriendLocally || componentKnows;
+    this.user.isFriend = resolved;
+    this.user.friend   = resolved;
+    this.isFriend      = resolved;
+    this.notFriendOrMe = !resolved && !this.myProfile;
 
-    console.log(`Is friend check for ${this.userId}: local=${isFriendLocally}`);
+    console.log(`[checkIfFriend] userId:${this.userId} backend:${backendSays} local:${isFriendLocally} component:${componentKnows} resolved:${resolved}`);
+
+    // If local/component knows we are friends but the backend API response was stale (isFriend:false),
+    // schedule a one-shot profile reload so we get the real bio/aboutMe instead of the locked placeholder text.
+    if (resolved && !backendSays && !this._isFriendReloadDone) {
+      this._isFriendReloadDone = true;
+      setTimeout(() => {
+        if (!this.user || !this.userId) return;
+        this.userService.getUserProfile(this.userId, { forceRefresh: true }).subscribe({
+          next: (u: any) => {
+            if (u && u._id) {
+              this.user = new User().initialize(u);
+              this.user.isFriend = true;
+              this.user.friend   = true;
+              this.isFriend      = true;
+              this.changeDetectorRef.detectChanges();
+            }
+          },
+          error: () => {}
+        });
+      }, 1200);
+    }
+
+    this.changeDetectorRef.detectChanges();
   }
 
   getAuthUser() {
@@ -448,6 +639,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
           this.pageLoading = false;
           console.log('Loaded authenticated user data:', this.user);
           this.loadUserData();
+          this.loadPendingRequestsCount();
         } else {
           console.error('Authenticated user data is undefined or missing _id:', user);
           this.handleUserDataError();
@@ -470,10 +662,15 @@ export class DisplayComponent implements OnInit, OnDestroy {
       if (storedUser._id === this.user._id) {
         this.user.loggedIn = true;
         this.myProfile = true;
-      } else if (storedUser.friends && storedUser.friends.includes(this.user._id)) {
+      } else if (storedUser.friends && storedUser.friends.some((f: any) => {
+          const fid = typeof f === 'string' ? f : (f._id || f.id || '');
+          return String(fid) === String(this.user._id);
+        })) {
+        // localStorage says we're friends — upgrade to true
         this.user.isFriend = true;
-      } else {
-        this.user.isFriend = false;
+        this.user.friend = true;
+        // NOTE: do NOT set isFriend = false from localStorage — it may be stale.
+        // The backend's fresh response (via forceRefresh) is the authority on false.
       }
     } else {
       this.user.loggedIn = false;
@@ -671,7 +868,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   request() {
-    if (this.user.friend) this.removeFriendShipConf();
+    if (this.user.isFriend || this.user.friend) this.removeFriendShipConf();
     else if (this.user.request === 'requesting') this.acceptRequest();
     else if (this.user.request === 'requested') this.cancelRequest();
     else this.requestFriendship();
@@ -684,9 +881,12 @@ export class DisplayComponent implements OnInit, OnDestroy {
   acceptRequest() {
     this.requestService.acceptRequest(this.user.requests[0]._id).then(
       () => {
-        this.user.friend = true;
+        this.user.friend   = true;
         this.user.isFriend = true;
+        this.user.request  = null;
+        this.isFriend      = true;
         this.userService.triggerFriendsRefresh();
+        this.changeDetectorRef.detectChanges();
       },
       err => this.handleError(err)
     );
@@ -712,8 +912,9 @@ export class DisplayComponent implements OnInit, OnDestroy {
   cancelRequest() {
     this.requestService.cancelRequest(this.user.requests[0]._id).then(
       () => {
-        this.user.request = null;
+        this.user.request  = null;
         this.user.requests = [];
+        this.changeDetectorRef.detectChanges();
       },
       err => this.handleError(err)
     );
@@ -723,9 +924,10 @@ export class DisplayComponent implements OnInit, OnDestroy {
     this.requestService.request(this.user._id).then(
       (resp: any) => {
         this.user.request = 'requested';
-        this.user.friend = false;
+        this.user.friend  = false;
         this.user.requests.push(new Request(resp.data.request));
         this.toastService.presentSuccessToastr(resp.message);
+        this.changeDetectorRef.detectChanges();
       },
       err => {
         err = JSON.parse(err);
@@ -762,10 +964,13 @@ export class DisplayComponent implements OnInit, OnDestroy {
     this.userService.removeFriendship(this.user._id).subscribe(
       (resp: any) => {
         this.toastService.presentSuccessToastr(resp.message);
-        if (resp.data) {
-          this.user.friend = false;
-          this.user.request = null;
-        }
+        // Update both flags immediately so the button switches to "Add Friend" without a refresh
+        this.user.friend   = false;
+        this.user.isFriend = false;
+        this.isFriend      = false;
+        this.user.request  = null;
+        this.userService.triggerFriendsRefresh();
+        this.changeDetectorRef.detectChanges();
       },
       err => {
         this.toastService.presentErrorToastr(err);
@@ -1137,7 +1342,22 @@ export class DisplayComponent implements OnInit, OnDestroy {
     this.location.back();
   }
 
-  async openFollowModal(type: 'followers' | 'following') {
+  doRefresh(event: any) {
+    this.refresh(event);
+    if (this.myProfile) this.loadPendingRequestsCount();
+  }
+
+  loadPendingRequestsCount() {
+    this.userService.getFollowRequests().subscribe({
+      next: (res: any) => {
+        this.pendingRequestsCount = (res.data || []).length;
+        this.changeDetectorRef.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
+  async openFollowModal(type: 'followers' | 'following' | 'friends') {
     const modal = await this.modalCtrl.create({
       component: FollowListModalComponent,
       componentProps: {
@@ -1146,7 +1366,11 @@ export class DisplayComponent implements OnInit, OnDestroy {
         isMyProfile: this.myProfile
       }
     });
-    return await modal.present();
+    await modal.present();
+    // Reload pending count after modal closes (requests may have been accepted/rejected)
+    modal.onDidDismiss().then(() => {
+      if (this.myProfile) this.loadPendingRequestsCount();
+    });
   }
 
   toggleFollow() {
@@ -1166,7 +1390,9 @@ export class DisplayComponent implements OnInit, OnDestroy {
     } else {
       this.userService.follow(this.user._id).subscribe({
         next: (res) => {
-          if (res.status === 'pending') {
+          // Backend wraps response as { success, data: { status }, message }
+          const status = res?.data?.status || res?.status;
+          if (status === 'pending') {
             this.user.followStatus = 'pending';
             this.toastService.presentSuccessToastr('Follow request sent');
           } else {
@@ -1174,6 +1400,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
             this.user.followStatus = 'active';
             this.toastService.presentSuccessToastr('Following successfully');
           }
+          this.changeDetectorRef.detectChanges();
         },
         error: (err) => {
           console.error('Error following:', err);

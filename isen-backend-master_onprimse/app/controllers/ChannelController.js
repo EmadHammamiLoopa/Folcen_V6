@@ -396,14 +396,25 @@ exports.followedChannels = async (req, res) => {
     try {
         // Default query params to safe values to avoid creating a '^undefined' regex
         const { search = '', page = 0, category = '' } = req.query || {};
-        const user = req.authUser;
+        
         // Ensure the request contains valid user data
-            if (!req.authUser) {
-                return Response.sendError(res, 400, 'User not authenticated');
-            }
-            if (!req.authUser.city) {
-                return Response.sendError(res, 400, 'User city information missing');
-            }
+        if (!req.authUser) {
+            return Response.sendError(res, 400, 'User not authenticated');
+        }
+        if (!req.authUser.city) {
+            return Response.sendError(res, 400, 'User city information missing');
+        }
+
+        // Fetch the full user document (not lean) so we can modify and save it
+        const user = await User.findById(req.authUser._id).select('_id city country followedChannels');
+        if (!user) {
+            return Response.sendError(res, 404, 'User not found');
+        }
+
+        // Initialize followedChannels if not present
+        if (!user.followedChannels) {
+            user.followedChannels = [];
+        }
 
         // Unfollow old city static channels if the user has changed their city
         const unfollowed = await unfollowOldCityStaticChannels(req, user);
@@ -569,17 +580,22 @@ const createStaticChannelsForCity = async (city, country, user) => {
         if (!channel) {
             // If the static channel doesn't exist, create it
             channel = new Channel(channelData);
+            // Ensure followers array is initialized
+            if (!channel.followers) {
+                channel.followers = [];
+            }
             channelModified = true;
         }
 
         // Ensure the user is following the static channel
-        if (!channel.followers.some(f => String(f) === String(user._id))) {
+        if (!channel.followers || !channel.followers.some(f => String(f) === String(user._id))) {
+            if (!channel.followers) channel.followers = [];
             channel.followers.push(user._id);  // Add user to channel's followers
             channelModified = true;
         }
 
         // Ensure the channel is in the user's followedChannels array
-        if (user && !user.followedChannels.some(c => String(c) === String(channel._id))) {
+        if (user && user.followedChannels && !user.followedChannels.some(c => String(c) === String(channel._id))) {
             user.followedChannels.push(channel._id);  // Add channel to user's followed channels
             userModified = true;
         }

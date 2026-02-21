@@ -37,8 +37,10 @@ exports.channelOwner = (req, res, next) => {
 exports.isFollowedChannel = (req, res, next) => {
     try{
         const channel = req.channel
-        const userId = req.auth._id
-        if(!channel.followers.includes(userId) && channel.user != req.auth._id){
+        const userId = req.auth._id.toString()
+        const isFollower = channel.followers.some(f => f.toString() === userId);
+        const isOwner = channel.user && channel.user.toString() === userId;
+        if(!isFollower && !isOwner){
             return Response.sendError(res, 400, 'access denied on this channel')
         }
         next()

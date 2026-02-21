@@ -311,6 +311,11 @@ ngOnDestroy() {
   }
 
   private markThreadRead() {
+    // Only clear badges when user is actively viewing this chat.
+    // If they navigated away (inSession=false), the socket listener is still
+    // alive but should not touch the tab badge — tabs.page.ts owns that.
+    if (!this.inSession) return;
+
     if (this.socket?.connected && this.user?.id) {
       this.socket.emit('mark-thread-read', { peerId: this.user.id });
     }
@@ -775,7 +780,18 @@ this.socket.on('new-message', (raw: any) => {
       if (typeof raw === 'string') raw = JSON.parse(raw);
       const msg = normalize(raw);
 
-      if (this.user && (msg.from === this.user.id || msg.to === this.user.id)) {
+      // ── Only process messages that belong to THIS conversation ──
+      // The backend emits new-message to ALL sockets of the recipient, so
+      // messages from other conversations may arrive here too.
+      const fromStr  = String(msg.from  || '');
+      const toStr    = String(msg.to    || '');
+      const peerId   = String(this.user?._id  || this.user?.id  || '');
+      const selfId   = String(this.authUser?._id || this.authUser?.id || '');
+      const relevant = (fromStr === peerId && toStr === selfId)
+                    || (fromStr === selfId && toStr === peerId);
+      if (!relevant) return;
+
+      if (this.user && relevant) {
         this.markThreadRead();
         // ✅ Clear REST cache for this thread since we just received a live update
         this.messageService.clearCacheForThread(this.user.id);
@@ -1137,6 +1153,21 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
   
   // ✅ Clear REST cache for this thread so subsequent loads (or re-entry) get the new message
   this.messageService.clearCacheForThread(this.user.id);
+
+  // Fallback: if `message-sent` never arrives (e.g. a transient socket disconnect
+  // races with delivery), optimistically resolve the message to 'sent' after 8s
+  // so the sender is never permanently stuck looking at the "sending" indicator.
+  const fallbackTempId = payload.tempId;
+  setTimeout(() => {
+    const i = this.messages.findIndex(
+      m => (m.tempId === fallbackTempId || m.id === fallbackTempId) && (m as any).state === 'sending'
+    );
+    if (i !== -1) {
+      (this.messages[i] as any).state = 'sent';
+      this.groupMessagesByDate();
+      try { this.changeDetection.detectChanges(); } catch (_) {}
+    }
+  }, 8000);
 
   return true;
 }

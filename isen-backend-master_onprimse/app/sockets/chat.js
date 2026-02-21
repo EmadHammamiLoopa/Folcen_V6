@@ -72,16 +72,19 @@ module.exports = (io, socket) => {
 // Video call request
 socket.on("video-call-request", async (data, ack) => {
   try {
+    const callerId = socket.userId; // use server-authoritative ID
+    if (!callerId) { if (ack) ack({ success: false, error: 'not_authenticated' }); return; }
+
     // Cancel any previous pending requests in this thread
     await Message.updateMany(
-      { from: { $in: [data.from, data.to] }, to: { $in: [data.from, data.to] }, type: "video-call-request", status: "pending" },
+      { from: { $in: [callerId, data.to] }, to: { $in: [callerId, data.to] }, type: "video-call-request", status: "pending" },
       { $set: { status: "cancelled" } }
     );
 
     const payload = {
-      from: data.from,
-      to: data.to,
       text: data.text,
+      from: new mongoose.Types.ObjectId(callerId),
+      to: new mongoose.Types.ObjectId(data.to),
       type: "video-call-request",
       status: "pending",
       state: "sent",
@@ -92,12 +95,23 @@ socket.on("video-call-request", async (data, ack) => {
     const saved = await message.save();
 
     await Promise.all([
-      User.findByIdAndUpdate(data.from, { $push: { messages: saved._id } }),
+      User.findByIdAndUpdate(callerId, { $push: { messages: saved._id } }),
       User.findByIdAndUpdate(data.to, { $push: { messages: saved._id } }),
     ]);
 
-    emitToUser(data.to, "new-message", saved);
-    emitToUser(data.from, "message-sent", { ...saved.toObject(), tempId: data.messageId });
+    const safeCallPayload = {
+      _id: String(saved._id),
+      text: saved.text,
+      from: String(saved.from),
+      to: String(saved.to),
+      type: saved.type,
+      status: saved.status,
+      state: saved.state,
+      createdAt: saved.createdAt
+    };
+
+    emitToUser(data.to,   "new-message",   safeCallPayload);
+    emitToUser(callerId,  "message-sent",  { ...safeCallPayload, tempId: data.messageId });
 
     if (ack) ack({ success: true, messageId: saved._id });
   } catch (err) {
@@ -362,23 +376,24 @@ socket.on("connect-user", async (user_id) => {
       // Record minimal send attempt event (no content stored)
       try { await recordMessageEvent({ messageId: savedMessage._id, from: senderId, to: msg.to, event: 'send_attempt' }); } catch (e) { console.warn('Failed to record message event', e); }
 
-      // Update user docs
+      // Update user docs (use server-side senderId, never trust msg.from)
       await Promise.all([
-        User.findByIdAndUpdate(msg.from, { $push: { messages: savedMessage._id } }),
+        User.findByIdAndUpdate(senderId, { $push: { messages: savedMessage._id } }),
         User.findByIdAndUpdate(msg.to,   { $push: { messages: savedMessage._id } }),
       ]);
       console.log("✅ Message added to users' message arrays");
 
       // Sanitize payload: only send minimal, intentional fields to clients.
+      // All ObjectIds MUST be converted to strings for clean cross-device comparison.
       const safePayload = {
-        _id: savedMessage._id,
+        _id: String(savedMessage._id),
         text: savedMessage.text,
-        from: savedMessage.from,
-        to: savedMessage.to,
+        from: String(savedMessage.from),
+        to: String(savedMessage.to),
         image: savedMessage.image || null,
         state: savedMessage.state || 'sent',
         type: savedMessage.type || 'friend',
-        productId: savedMessage.productId || null,
+        productId: savedMessage.productId ? String(savedMessage.productId) : null,
         createdAt: savedMessage.createdAt
       };
 
@@ -392,8 +407,9 @@ socket.on("connect-user", async (user_id) => {
         // Do NOT record message content; record delivery missing for diagnostics
       }
 
-      // Confirm to sender (ALL sockets), include tempId to reconcile optimistic UI
-      emitToUser(msg.from, "message-sent", { ...safePayload, tempId });
+      // Confirm to sender using server-authoritative senderId (not client-supplied msg.from).
+      // This ensures the confirmation always reaches the right socket even if msg.from encoding differs.
+      emitToUser(senderId, "message-sent", { ...safePayload, tempId });
 
       // (Optional) Emit a counter update event if you maintain per-tab badges:
       // emitToUser(msg.to, 'messages-updated', { delta: 1 });

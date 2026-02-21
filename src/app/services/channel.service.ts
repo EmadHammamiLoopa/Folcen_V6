@@ -136,11 +136,12 @@ export class ChannelService extends DataService {
         console.log("Data is not FormData:", data);
     }
 
-    // Send the request
+    // Send the request with serializer set to 'multipart' for FormData
     return this.sendRequest({
         method: 'post',
         url: '/' + id + '/post', // Make sure `id` is a valid postId
-        data
+        data,
+        serializer: 'multipart'  // This ensures proper FormData handling
     });
 
   }
@@ -201,7 +202,7 @@ export class ChannelService extends DataService {
   voteOnComment(id: string, vote: number){
     return this.sendRequest({
       method: 'post',
-      url: '/comment/' + id + '/vote',
+      url: '/' + id + '/vote',
       data: {vote}
     })
   }

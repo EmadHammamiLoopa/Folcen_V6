@@ -1,14 +1,17 @@
+import { devLogger } from "src/app/utils/dev-logger";
 import { Injectable, Inject, forwardRef } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { Observable, throwError, BehaviorSubject, of, firstValueFrom, Subject } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { catchError, finalize, map, shareReplay, tap, distinctUntilChanged } from 'rxjs/operators';
+import { catchError, finalize, map, shareReplay, tap, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { User } from '../models/User';
 import constants from '../helpers/constants';
 import { StorageService } from './storage.service';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { IdService } from './id.service';
 import { SocketService } from './socket.service';
+import { AppEventsService } from './app-events.service';
 
 @Injectable({
   providedIn: 'root'
@@ -23,6 +26,7 @@ export class UserService {
   private viewedUserSubject: BehaviorSubject<User>;
   public viewedUser: Observable<User>;
   private inflightCurrentUser$: Observable<User> | null = null;
+  private destroy$ = new Subject<void>();
 
   // Subject to notify components when friends list changes
   private friendsUpdatedSubject = new Subject<void>();
@@ -55,8 +59,10 @@ export class UserService {
   constructor(
     private http: HttpClient,
     private storageService: StorageService,
-    private nativeStorage: NativeStorage // ✅ Add clearly
-    , @Inject(forwardRef(() => IdService)) private idService: IdService
+    private nativeStorage: NativeStorage,
+    private appEvents: AppEventsService,
+    private router: Router,
+    @Inject(forwardRef(() => IdService)) private idService: IdService
   ) {
     UserService.instance = this;
     this.currentUserSubject = new BehaviorSubject<User>(null);
@@ -68,40 +74,63 @@ export class UserService {
     this.viewedUserSubject = new BehaviorSubject<User>(null);
     this.viewedUser = this.viewedUserSubject.asObservable();
   
-    this.initCurrentUser(); // ✅ initialize clearly
-    // Subscribe to profile update notifications from socket service
-    try {
-      SocketService.userProfileUpdated$.subscribe(payload => {
-        try {
-          if (payload && payload.userId) {
-            this.invalidateProfile(payload.userId);
-          }
-        } catch (e) { console.warn('Error handling userProfileUpdated payload', e); }
-      });
-    } catch (e) {
-      // graceful if socket service not initialized in some environments
+    this.initCurrentUser(); 
+    this.initializeRealtimeOrchestration();
+  }
+
+  private initializeRealtimeOrchestration() {
+    // 0. Keep canonical user model in sync — badges are owned by TabsPage, NOT here.
+    // Only patch the in-memory User object; do NOT call appEvents.set/inc from this service.
+    this.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(u => {
+      // intentionally empty — badge state is driven by tabs.page.ts
+    });
+
+    // 1. Social/Follow/Requests — patch canonical model only
+    SocketService.followUpdate$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
+      this.handleSocialRealtimeUpdate(payload);
+    });
+
+    SocketService.friendRequestsUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
+      this.handleSocialRealtimeUpdate(payload);
+    });
+
+    // 2. Profile cache invalidation only
+    SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
+      try {
+        if (payload && payload.userId) {
+          this.invalidateProfile(payload.userId);
+        }
+      } catch (e) { devLogger.warn('Error handling userProfileUpdated payload', e); }
+    });
+    // NOTE: newMessage$, newFeedPost$, newFriendRequest$, budgetUpdate$ badge increments
+    // are intentionally handled ONLY in tabs.page.ts to avoid double-counting.
+  }
+
+  private handleSocialRealtimeUpdate(payload: any) {
+    const myId = this.getCurrentUserId();
+    const current = this.currentUserSubject.value;
+    if (!myId || !current || !payload) return;
+
+    const isMeTarget = String(payload.targetId) === myId || String(payload.userId) === myId;
+    const isMeActor = String(payload.actorId) === myId;
+
+    if (isMeTarget || isMeActor) {
+      const stats = isMeTarget ? payload.targetStatistics : payload.actorStatistics;
+      if (stats) {
+        // IMMUTABLE PATCH OF CANONICAL MODEL
+        const updatedUser = new User().initialize({
+          ...current.toObject(),
+          followersCount: stats.followers !== undefined ? stats.followers : current.followersCount,
+          followingCount: stats.following !== undefined ? stats.following : current.followingCount,
+          friendsCount: stats.friends !== undefined ? stats.friends : current.friendsCount,
+          pendingFollowRequestsCount: stats.pendingFollowers !== undefined ? stats.pendingFollowers : current.pendingFollowRequestsCount,
+          pendingFriendRequestsCount: stats.pendingFriends !== undefined ? stats.pendingFriends : current.pendingFriendRequestsCount
+        });
+        this.currentUserSubject.next(updatedUser);
+        // NOTE: badge updates (friends, followers) are owned by tabs.page.ts \u2014 do NOT set here.
+      }
+      this.triggerFriendsRefresh();
     }
-    // Subscribe to follow-update events to refresh friends/follow lists
-    try {
-      SocketService.followUpdate$.subscribe(payload => {
-        try {
-          if (!payload) return;
-          const followerId = payload.followerId || payload.follower;
-          const followedId = payload.followedId || payload.followed;
-          // Invalidate caches for both involved users
-          if (followerId) this.invalidateProfile(String(followerId));
-          if (followedId) this.invalidateProfile(String(followedId));
-          // Trigger a debounced refresh so UI updates counts/lists
-          this.triggerFriendsRefresh();
-        } catch (e) { console.warn('Error handling follow-update payload', e); }
-      });
-    } catch (e) {}
-    // Also refresh when friend-requests-updated arrives (covers block/unblock flows)
-    try {
-      SocketService.friendRequestsUpdated$.subscribe(() => {
-        try { this.triggerFriendsRefresh(); } catch (e) {}
-      });
-    } catch (e) {}
   }
   
 
@@ -118,7 +147,24 @@ export class UserService {
 
       if (!user) {
         const localStorageUser = localStorage.getItem('currentUser') || localStorage.getItem('user');
-        user = localStorageUser ? JSON.parse(localStorageUser) : null;
+        if (localStorageUser && typeof localStorageUser === 'string') {
+          try {
+            if (localStorageUser === '[object Object]' || localStorageUser === 'null' || localStorageUser === 'undefined') {
+              devLogger.warn('localStorage user data is invalid string:', localStorageUser);
+              localStorage.removeItem('currentUser');
+              localStorage.removeItem('user');
+              user = null;
+            } else if (localStorageUser.startsWith('{') || localStorageUser.startsWith('[')) {
+              user = JSON.parse(localStorageUser);
+            } else {
+              devLogger.warn('localStorage user data is not valid JSON string:', localStorageUser);
+              user = null;
+            }
+          } catch (e) {
+            devLogger.warn('Failed to parse localStorage user data:', e);
+            user = null;
+          }
+        }
       }
 
       if (user) {
@@ -132,7 +178,7 @@ export class UserService {
             const nid2 = this.idService?.normalizeId ? this.idService.normalizeId(user.id) : null;
             if (nid2) user._id = nid2;
           }
-        } catch (e) { console.warn('Failed to normalize stored user id', e); }
+        } catch (e) { devLogger.warn('Failed to normalize stored user id', e); }
 
         // Validate the persisted user by fetching fresh server data. If validation
         // fails (token revoked/deleted), clear stored user data and force sign-in.
@@ -142,9 +188,9 @@ export class UserService {
           const fresh = await firstValueFrom(this.refreshCurrentUser({ forceRefresh: true }));
           // Apply server-fresh user and force overwrite of any in-memory user
           this.setCurrentUser(fresh, { force: true });
-          console.log('✅ Current user validated and refreshed from server:', fresh._id);
+          devLogger.log('✅ Current user validated and refreshed from server:', fresh._id);
         } catch (e) {
-          console.warn('Stored user validation failed; clearing persisted user and token', e);
+          devLogger.warn('Stored user validation failed; clearing persisted user and token', e);
           // clear persisted user and token from both storages to prevent auth loops
           try { 
             localStorage.removeItem('currentUser'); 
@@ -162,11 +208,11 @@ export class UserService {
           this.setCurrentUser(null);
         }
       } else {
-        console.warn('⚠️ No user found in any storage');
+        devLogger.warn('⚠️ No user found in any storage');
       }
 
     } catch (error) {
-      console.error('❌ Initialization error:', error);
+      devLogger.error('❌ Initialization error:', error);
     }
   }
   public get currentUserValue(): User {
@@ -228,6 +274,13 @@ export class UserService {
     }
 
     this.currentUserSubject.next(userObj);
+
+    // Seed the budget display from the profile so it's correct on first load
+    // and after any profile refresh, not only after a socket budget-update fires.
+    const budget = (userObj as any).missedCallBudget;
+    if (budget !== undefined && budget !== null) {
+      try { this.appEvents.setBudget(Number(budget) || 0); } catch (e) {}
+    }
   }
 
   setViewedUser(user: User) {
@@ -362,6 +415,7 @@ getCurrentUserId(): string | null {
       map((response: any) => {
         if (response && response.data) {
           const userData = response.data;
+          console.log('[UserService:refreshCurrentUser] raw API response — friends:', userData?.friends?.length, 'followers:', userData?.followers?.length, 'following:', userData?.following?.length, 'raw friends:', userData?.friends, 'raw followers:', userData?.followers);
           const fresh = new User().initialize(userData);
           // Merge with existing in-memory user to avoid overwriting transient fields
           const existing = this.currentUserSubject?.value;
@@ -380,9 +434,9 @@ getCurrentUserId(): string | null {
               };
               const merged = new User().initialize(mergedData);
               // prefer server-provided values but fall back to existing where empty
-              if ((!merged.followers || merged.followers.length === 0) && existing.followers) merged.followers = existing.followers;
-              if ((!merged.following || merged.following.length === 0) && existing.following) merged.following = existing.following;
-              if ((!merged.friends || merged.friends.length === 0) && existing.friends) merged.friends = existing.friends;
+              if ((!merged.followers || merged.followers.length === 0) && existing.followers && existing.followers.length > 0) merged.followers = existing.followers;
+              if ((!merged.following || merged.following.length === 0) && existing.following && existing.following.length > 0) merged.following = existing.following;
+              if ((!merged.friends || merged.friends.length === 0) && existing.friends && existing.friends.length > 0) merged.friends = existing.friends;
               if ((!merged.followedChannels || merged.followedChannels.length === 0) && existing.followedChannels && existing.followedChannels.length) merged.followedChannels = existing.followedChannels;
               if ((!merged.avatar || merged.avatar.length === 0) && existing.avatar) merged.avatar = existing.avatar || [];
               
@@ -392,6 +446,7 @@ getCurrentUserId(): string | null {
               // preserve missedCallBudget and peerId if not returned
               if ((merged as any).missedCallBudget === undefined && (existing as any).missedCallBudget !== undefined) (merged as any).missedCallBudget = (existing as any).missedCallBudget;
               if (!(merged as any).peerId && (existing as any).peerId) (merged as any).peerId = (existing as any).peerId;
+              console.log('[UserService:refreshCurrentUser] MERGED — friends:', merged.friends?.length, 'followers:', merged.followers?.length, 'following:', merged.following?.length);
               this.setCurrentUser(merged, { force: true });
               console.log('✅ Current user refreshed and merged from server:', merged);
               return merged;

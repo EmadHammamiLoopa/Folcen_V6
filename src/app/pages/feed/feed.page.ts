@@ -7,7 +7,9 @@ import { User } from 'src/app/models/User';
 import { Post } from 'src/app/models/Post';
 import { UserService } from 'src/app/services/user.service';
 import { AppEventsService } from 'src/app/services/app-events.service';
-import { Subscription } from 'rxjs';
+import { SocketService } from 'src/app/services/socket.service';
+import { Subject, Subscription } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import constants from 'src/app/helpers/constants';
 
 @Component({
@@ -15,12 +17,13 @@ import constants from 'src/app/helpers/constants';
   templateUrl: './feed.page.html',
   styleUrls: ['./feed.page.scss'],
 })
-export class FeedPage implements OnInit {
+export class FeedPage implements OnInit, OnDestroy {
   @ViewChild('infinitScroll') infinitScroll: IonInfiniteScroll;
 
   user: User = new User();
   budget = 0;
   private subs: Subscription[] = [];
+  private destroy$ = new Subject<void>();
   pageLoading = false;
   posts: any[] = [];
   page = 1;
@@ -40,6 +43,17 @@ export class FeedPage implements OnInit {
     this.subs.push(this.userService.currentUser.subscribe(u => { if (u) this.user = u; }));
     // react to budget changes
     this.subs.push(this.appEvents.budget$.subscribe(b => { this.budget = b || 0; }));
+
+    // ✅ Real-time: new post in feed from followed users/channels
+    SocketService.newFeedPost$.pipe(takeUntil(this.destroy$)).subscribe((post: any) => {
+      try {
+        if (!post || !post._id) return;
+        // Don't duplicate
+        if (this.posts.some((p: any) => String(p._id) === String(post._id))) return;
+        // Prepend to top of feed
+        this.posts = [post, ...this.posts];
+      } catch (e) { console.warn('newFeedPost$ error', e); }
+    });
   }
 
   ionViewWillEnter() {
@@ -72,6 +86,8 @@ export class FeedPage implements OnInit {
   }
 
   ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
     this.subs.forEach(s => { try { s.unsubscribe(); } catch(e){} });
   }
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { Router } from '@angular/router';
 import { RequestService } from 'src/app/services/request.service';
 import { UserService } from 'src/app/services/user.service';
@@ -8,9 +8,8 @@ import { User } from 'src/app/models/User';
 import { AlertController } from '@ionic/angular';
 import { AppEventsService } from 'src/app/services/app-events.service';
 import { SocketService } from 'src/app/services/socket.service';
-import { Socket } from 'socket.io-client';
-import { NgZone } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription, merge } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-requests',
@@ -22,7 +21,7 @@ export class RequestsComponent implements OnInit, OnDestroy {
   pageLoading = false;
   showSandglass = false;
   page: number = 0;
-  private socket: Socket | null = null;
+  private destroy$ = new Subject<void>();
   private badgeSubscription!: Subscription;
   private friendRequestCount = 0;
 
@@ -48,19 +47,18 @@ export class RequestsComponent implements OnInit, OnDestroy {
       this.updatePageTitle();
     });
 
-    // Ensure socket is properly initialized
-    try {
-      SocketService.bindToAuthUser();
-      await SocketService.initializeSocket();
-      await SocketService.ensureConnected();
-      this.socket = await SocketService.getSocket();
-      
-      // Listen for friend request events to update title
-      this.setupSocketListeners();
-    } catch (error) {
-      console.error('Socket initialization error in requests:', error);
-    }
-    
+    // Merge all friend-request-related socket events into one stream (reconnect-safe)
+    merge(
+      SocketService.newFriendRequest$,
+      SocketService.friendRequestsUpdated$
+    ).pipe(takeUntil(this.destroy$)).subscribe(() => {
+      this.zone.run(() => {
+        this.page = 0;
+        this.loadRequests();
+        this.updatePageTitle();
+      });
+    });
+
     this.loadRequests();
   }
 
@@ -76,65 +74,10 @@ export class RequestsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    // Clean up subscriptions
-    if (this.badgeSubscription) {
-      this.badgeSubscription.unsubscribe();
-    }
-    
-    // Remove socket listeners
-    if (this.socket) {
-      this.socket.off('new-friend-request');
-      this.socket.off('friend-requests-updated');
-      this.socket.off('friend-request-accepted');
-      this.socket.off('friend-request-declined');
-    }
-    
-    // Reset title when component is destroyed
+    this.destroy$.next();
+    this.destroy$.complete();
+    if (this.badgeSubscription) this.badgeSubscription.unsubscribe();
     this.resetPageTitle();
-  }
-
-  private setupSocketListeners() {
-    if (!this.socket) return;
-
-    // Listen for new friend requests
-    this.socket.on('new-friend-request', (data: any) => {
-      this.zone.run(() => {
-        console.log('New friend request received in RequestsComponent');
-        this.page = 0;
-        this.loadRequests();
-        this.updatePageTitle();
-      });
-    });
-
-    // Listen for friend request updates
-    this.socket.on('friend-requests-updated', (data: any) => {
-      this.zone.run(() => {
-        console.log('Friend requests updated in RequestsComponent');
-        this.page = 0;
-        this.loadRequests();
-        this.updatePageTitle();
-      });
-    });
-
-    // Listen for friend request acceptance
-    this.socket.on('friend-request-accepted', (data: any) => {
-      this.zone.run(() => {
-        console.log('Friend request accepted in RequestsComponent');
-        this.page = 0;
-        this.loadRequests();
-        this.updatePageTitle();
-      });
-    });
-
-    // Listen for friend request decline
-    this.socket.on('friend-request-declined', (data: any) => {
-      this.zone.run(() => {
-        console.log('Friend request declined in RequestsComponent');
-        this.page = 0;
-        this.loadRequests();
-        this.updatePageTitle();
-      });
-    });
   }
 
   private updatePageTitle() {

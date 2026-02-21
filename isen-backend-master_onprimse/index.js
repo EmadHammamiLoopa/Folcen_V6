@@ -362,6 +362,7 @@ app.use(`${routePrefix}/subscription`, subscriptionRoutes);
 app.use(`${routePrefix}/report`, reportRoutes);
 app.use(`${routePrefix}/follow`, followRoutes);
 app.use(`${routePrefix}/activity`, require('./routes/activity'));
+app.use(`${routePrefix}/notifications`, require('./routes/notification'));
 // GDPR / DSAR endpoints
 try {
   app.use(`${routePrefix}/gdpr`, require('./routes/gdpr'));
@@ -373,11 +374,11 @@ try {
 } catch (e) {
   console.warn('Admin routes failed to mount', e && e.message);
 }
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+// Serve uploads from the uploads directory (for post media, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/public/images/avatars', express.static(path.join(__dirname, 'public/images/avatars')));
 app.use('/channels', express.static(path.join(__dirname, 'public/channels')));
 app.use('/public', express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/upload_chat', express.static(path.join(__dirname, 'public/upload_chat')));
 
 

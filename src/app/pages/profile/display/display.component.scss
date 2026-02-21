@@ -242,6 +242,7 @@
   padding: 15px 25px;
   gap: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 1cm;
 
   :host-context(.light-theme) & {
     background: rgba(0, 0, 0, 0.03);
@@ -264,9 +265,23 @@
       font-size: 18px;
       font-weight: 700;
       color: #ffffff;
+      position: relative;
+      display: inline-block;
 
       :host-context(.light-theme) & {
         color: #1e293b;
+      }
+
+      .pending-badge {
+        position: absolute;
+        top: -8px;
+        right: -14px;
+        font-size: 9px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 3px;
+        border-radius: 8px;
+        line-height: 16px;
       }
     }
     

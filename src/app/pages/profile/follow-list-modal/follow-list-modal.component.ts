@@ -18,7 +18,7 @@ import { User } from 'src/app/models/User';
 export class FollowListModalComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   @Input() userId: string;
-  @Input() type: 'followers' | 'following';
+  @Input() type: 'followers' | 'following' | 'friends';
   @Input() isMyProfile: boolean;
 
   users: any[] = [];
@@ -49,6 +49,12 @@ export class FollowListModalComponent implements OnInit, OnDestroy {
       this.loadRequests();
     }
 
+    // Refresh friends list on friend-related socket events
+    try {
+      SocketService.friendRequestsUpdated$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+        if (this.type === 'friends') this.zone.run(() => this.loadFriends());
+      });
+    } catch (e) {}
     // Refresh entries when server notifies profile updates
     try {
       SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
@@ -131,6 +137,10 @@ export class FollowListModalComponent implements OnInit, OnDestroy {
   }
 
   loadUsers() {
+    if (this.type === 'friends') {
+      this.loadFriends();
+      return;
+    }
     if (!this.isMyProfile) {
       this.loading = false;
       this.users = [];
@@ -318,6 +328,57 @@ export class FollowListModalComponent implements OnInit, OnDestroy {
       error: (err) => {
         console.error('Error removing follower:', err);
         this.toastService.presentErrorToastr('Error removing follower');
+      }
+    });
+  }
+
+  loadFriends() {
+    this.loading = true;
+    this.userService.getFriends(0).subscribe({
+      next: (res: any) => {
+        // Backend returns { friends: [...], more: bool } — not wrapped in res.data
+        const docs = (res.friends && Array.isArray(res.friends)) ? res.friends
+          : (res.data && res.data.docs) ? res.data.docs
+          : (res.data && Array.isArray(res.data)) ? res.data
+          : (Array.isArray(res) ? res : []);
+        this.users = [];
+        this.filteredUsers = [];
+        if (!docs || docs.length === 0) { this.loading = false; return; }
+        let pending = docs.length;
+        docs.forEach((entry: any) => {
+          if (this.isFullUser(entry)) {
+            this.users.push(new User().initialize(entry));
+            this.filteredUsers = [...this.users];
+            pending -= 1;
+            if (pending === 0) this.loading = false;
+            return;
+          }
+          const id = this.extractIdFromBuffer(entry) || this.extractIdFromBuffer(entry?._id);
+          if (!id) { pending -= 1; if (pending === 0) this.loading = false; return; }
+          this.userService.getUserProfile(id).subscribe({
+            next: (u: any) => {
+              if (u && u._id) this.users.push(u);
+              this.filteredUsers = [...this.users];
+              pending -= 1; if (pending === 0) this.loading = false;
+            },
+            error: () => { pending -= 1; if (pending === 0) this.loading = false; }
+          });
+        });
+      },
+      error: () => { this.loading = false; this.toastService.presentErrorToastr('Error loading friends'); }
+    });
+  }
+
+  removeFriend(targetUserId: string) {
+    this.userService.removeFriendship(targetUserId).subscribe({
+      next: (resp: any) => {
+        this.users = this.users.filter(u => (u._id || u.id) !== targetUserId);
+        this.filterUsers();
+        this.toastService.presentSuccessToastr(resp.message || 'Friend removed');
+      },
+      error: (err) => {
+        console.error('Error removing friend:', err);
+        this.toastService.presentErrorToastr('Error removing friend');
       }
     });
   }

@@ -1,10 +1,12 @@
 import { Injectable, NgZone } from '@angular/core';
 import { Router } from '@angular/router';
-import { HTTP } from '@ionic-native/http/ngx';import { NativeStorage } from '@ionic-native/native-storage/ngx';
+import { HTTP } from '@ionic-native/http/ngx';
+import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { HttpClient } from '@angular/common/http';
 import { DataService } from './data.service';
 import { Platform } from '@ionic/angular';
 import { GooglePlus } from '@ionic-native/google-plus/ngx';
+import { FirebaseService } from './firebase.service';
 
 declare const gapi: any; // Declare gapi for TypeScript
 
@@ -20,7 +22,8 @@ export class AuthService extends DataService {
     router: Router, 
     platform: Platform,  
     private googlePlus: GooglePlus,
-    private ngZone: NgZone // Added NgZone
+    private ngZone: NgZone, // Added NgZone
+    private firebaseSvc: FirebaseService
   ) {
     super('auth/', nativeStorage, http, httpClient, router, platform);
   //  this.loadGoogleAuthLibrary(); // Load Google Auth Library
@@ -144,6 +147,96 @@ export class AuthService extends DataService {
         });
       });
     }
+  }
+
+  async firebaseSignup(email, password, profile) {
+    try {
+      const displayName = `${profile.firstName} ${profile.lastName}`;
+      const fbUser = await this.firebaseSvc.signUp(email, password, displayName);
+      const idToken = await fbUser.getIdToken();
+      return await this.sendRequest({
+        method: 'post',
+        url: 'firebase-login',
+        data: { idToken, profile }
+      });
+    } catch (err) {
+      throw this.handleAuthError(err);
+    }
+  }
+
+  async firebaseSignin(email, password) {
+    try {
+      console.log('[DEBUG] AuthService: firebaseSignin called for:', email);
+      const fbUser = await this.firebaseSvc.signIn(email, password);
+      console.log('[DEBUG] AuthService: Firebase sign-in success, UID:', fbUser.uid);
+      const idToken = await fbUser.getIdToken();
+      console.log('[DEBUG] AuthService: Firebase ID Token obtained (first 20 chars):', idToken.substring(0, 20));
+      return await this.sendRequest({
+        method: 'post',
+        url: 'firebase-login',
+        data: { idToken }
+      });
+    } catch (err) {
+      throw this.handleAuthError(err);
+    }
+  }
+
+  private handleAuthError(err: any) {
+    console.error('Auth error caught in AuthService:', err);
+    
+    // Handle Firebase specific error codes
+    if (err && err.code) {
+      switch (err.code) {
+        case 'auth/user-not-found':
+          return { message: 'No account found with this email. Please sign up first.' };
+        case 'auth/wrong-password':
+          return { message: 'Incorrect password. Please try again.' };
+        case 'auth/invalid-email':
+          return { message: 'The email address is badly formatted.' };
+        case 'auth/user-disabled':
+          return { message: 'This account has been disabled. Please contact support.' };
+        case 'auth/email-already-in-use':
+          return { message: 'An account already exists with this email address.' };
+        case 'auth/weak-password':
+          return { message: 'The password is too weak. Please use at least 8 characters.' };
+        case 'auth/network-request-failed':
+          return { message: 'Network error. Please check your internet connection.' };
+        case 'auth/too-many-requests':
+          return { message: 'Too many failed attempts. Please try again later.' };
+        case 'auth/invalid-login-credentials':
+          return { message: 'Invalid email or password. Please check your credentials.' };
+        default:
+          return { message: err.message || 'Authentication failed. Please try again.' };
+      }
+    }
+
+    // If it's already a formatted error from our backend
+    if (err && err.error && typeof err.error === 'string') {
+      return err;
+    }
+
+    return err;
+  }
+
+  async firebaseResetPassword(email) {
+    return this.firebaseSvc.resetPassword(email);
+  }
+
+  async resendVerification() {
+    return this.firebaseSvc.resendVerification();
+  }
+
+  async checkVerification() {
+    const fbUser = await this.firebaseSvc.reloadUser();
+    if (fbUser && fbUser.emailVerified) {
+      const idToken = await this.firebaseSvc.getIdToken(true); // Force refresh to get updated email_verified claim
+      return await this.sendRequest({
+        method: 'post',
+        url: 'firebase-login',
+        data: { idToken }
+      });
+    }
+    return null;
   }
 
   signin(data: any) {

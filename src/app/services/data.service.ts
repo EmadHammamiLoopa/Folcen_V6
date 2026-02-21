@@ -1,6 +1,8 @@
+import { devLogger } from "../utils/dev-logger";
 import { Injectable, Inject, Optional } from '@angular/core';
 import { Router } from '@angular/router';
-import { HTTP } from '@ionic-native/http/ngx';import { HttpClient } from '@angular/common/http';
+import { HTTP } from '@ionic-native/http/ngx';
+import { HttpClient } from '@angular/common/http';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { Platform } from '@ionic/angular';
 import { SessionStoreService } from './session-store.service';
@@ -45,18 +47,24 @@ export class DataService {
     return this.getToken().then((token: string) => {
       const base = this.url || '';
       const url = constants.DOMAIN_URL + (requestOptions.noApi ? '' : constants.API_V1) + base + requestOptions.url;
-      console.log('ssssssssssssssssssssssssssssss request to URL:', url); // Print the URL to the console
-
+      
       const headers = {
         ...(requestOptions.header || {}),
         VERSION: constants.VERSION,
         'Authorization': 'Bearer ' + token
       };
 
-      // Use browser (HttpClient) for multipart even on cordova, as native HTTP doesn't handle FormData well
+      // Ensure that data contains params for GET requests, 
+      // as both cordova and browser implementations use requestOptions.data for query params.
+      // IMPORTANT: Do NOT spread FormData - it does not work with object spread and all fields would be lost.
+      const requestData = (requestOptions.data instanceof FormData)
+        ? requestOptions.data
+        : { ...(requestOptions.data || {}), ...(requestOptions.params || {}) };
+      const updatedOptions = { ...requestOptions, data: requestData };
+
       return (this.platform.is('cordova') && requestOptions.serializer !== 'multipart')
-        ? this.cordovaHttpRequest(url, requestOptions, headers)
-        : this.browserHttpRequest(url, requestOptions, headers);
+        ? this.cordovaHttpRequest(url, updatedOptions, headers)
+        : this.browserHttpRequest(url, updatedOptions, headers);
     });
   }
 
@@ -75,12 +83,21 @@ export class DataService {
   }
 
   private browserHttpRequest(url: string, requestOptions: RequestOptions, headers: any) {
+    // For FormData, don't set Content-Type - let Angular HttpClient set it automatically with boundary
+    const isFormData = requestOptions.data instanceof FormData;
+    const httpHeaders = isFormData ? { ...headers } : headers;
+    
+    // Remove Content-Type for FormData to allow browser to set it with boundary
+    if (isFormData && httpHeaders['Content-Type']) {
+      delete httpHeaders['Content-Type'];
+    }
+
     let request;
     switch (requestOptions.method) {
-      case 'post': request = this.httpClient.post(url, requestOptions.data, { headers }); break;
-      case 'get': request = this.httpClient.get(url, { headers, params: requestOptions.data }); break;
-      case 'put': request = this.httpClient.put(url, requestOptions.data, { headers }); break;
-      case 'delete': request = this.httpClient.delete(url, { headers }); break;
+      case 'post': request = this.httpClient.post(url, requestOptions.data, { headers: httpHeaders }); break;
+      case 'get': request = this.httpClient.get(url, { headers: httpHeaders, params: requestOptions.data }); break;
+      case 'put': request = this.httpClient.put(url, requestOptions.data, { headers: httpHeaders }); break;
+      case 'delete': request = this.httpClient.delete(url, { headers: httpHeaders }); break;
       default: throw new Error('Unsupported HTTP method');
     }
 
@@ -88,7 +105,7 @@ export class DataService {
   }
 
   private handleError(err: any) {
-    console.error('HTTP error', err);
+    devLogger.error('HTTP error', err);
     if (err.status === 401) {
       // If we are already on the auth page, don't trigger a logout redirect loop,
       // but we still want to reject so the signin component can show "Invalid credentials".
@@ -102,24 +119,32 @@ export class DataService {
 
   async logout() {
     try {
-      console.log('Performing full logout and state reset...');
+      devLogger.log('Performing full logout and state reset...');
       
+      // Save theme preference before clearing storage
+      const theme = await this.getItem('theme_preference').catch(() => null);
+
       // 1. Clear all persistence
-      try { await this.nativeStorage.clear(); } catch (e) { console.warn('NativeStorage clear failed', e); }
-      try { localStorage.clear(); } catch (e) { console.warn('localStorage clear failed', e); }
-      try { sessionStorage.clear(); } catch (e) { console.warn('sessionStorage clear failed', e); }
+      try { await this.nativeStorage.clear(); } catch (e) { devLogger.warn('NativeStorage clear failed', e); }
+      try { localStorage.clear(); } catch (e) { devLogger.warn('localStorage clear failed', e); }
+      try { sessionStorage.clear(); } catch (e) { devLogger.warn('sessionStorage clear failed', e); }
       
+      // Restore theme preference
+      if (theme) {
+        await this.setItem('theme_preference', theme).catch(() => {});
+      }
+
       // 2. Clear cookies
       document.cookie = 'token=; Max-Age=0; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 
       // 3. Clear session store caches & observable state
-      try { this.sessionStore?.clear('logout'); } catch (e) { console.warn('SessionStore clear failed', e); }
+      try { this.sessionStore?.clear('logout'); } catch (e) { devLogger.warn('SessionStore clear failed', e); }
 
       // 4. Disconnect socket and reset socket static state
-      try { await SocketService.logout(); } catch (e) { console.warn('SocketService logout failed', e); }
+      try { await SocketService.logout(); } catch (e) { devLogger.warn('SocketService logout failed', e); }
 
       // 5. Clear user service state
-      try { UserService.clearUserState(); } catch (e) { console.warn('UserService clear failed', e); }
+      try { UserService.clearUserState(); } catch (e) { devLogger.warn('UserService clear failed', e); }
 
       // 6. Clear any other known caches (e.g. PeerJS)
       if ((window as any).peer) {
@@ -127,7 +152,7 @@ export class DataService {
       }
 
     } catch (err) {
-      console.error('Error during logout process:', err);
+      devLogger.error('Error during logout process:', err);
     } finally {
       // Always navigate to auth screen
       this.router.navigateByUrl('/auth', { replaceUrl: true });
