@@ -1,6 +1,9 @@
 :host {
   display: inline-block;
   vertical-align: middle;
+  // Avatar sizes default to responsive token; can be overridden by parent
+  width: var(--avatar-size, var(--r-avatar-md));
+  height: var(--avatar-size, var(--r-avatar-md));
 }
 
 .avatar-container {

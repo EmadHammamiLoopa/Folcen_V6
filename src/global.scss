@@ -1,6 +1,9 @@
 /* Core and Basic CSS */
 @import "~@ionic/angular/css/core.css";
 @import "~@ionic/angular/css/normalize.css";
+
+/* Fluid Responsive System — must come before component styles */
+@import "./theme/responsive";
 @import "~@ionic/angular/css/structure.css";
 @import "~@ionic/angular/css/typography.css";
 @import "~@ionic/angular/css/display.css";
@@ -25,10 +28,10 @@
   min-height: 100%;
   
   /* Ensure content doesn't get hidden behind the floating tab bar */
-  --padding-bottom: 110px;
+  --padding-bottom: var(--r-tabbar-bottom-pad);
 
   &::part(scroll) {
-    padding-bottom: 110px;
+    padding-bottom: var(--r-tabbar-bottom-pad);
   }
 
   .mesh-gradient {
@@ -190,35 +193,31 @@ ion-button.tertiary {
   color: white;
 }
 
-/* Titles */
+/* Titles — font sizes now come from _responsive.scss tokens */
 h1, .main-title {
-  font-size: 28px;
   color: var(--ion-color-dark);
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
 h2, .sub-title {
-  font-size: 24px;
   color: var(--ion-color-primary);
   font-weight: 700;
 }
 
 h3 {
-  font-size: 20px;
   color: var(--ion-color-dark);
   font-weight: 600;
 }
 
 h3, .neutral-title {
-  font-size: 20px;
   color: var(--ion-color-dark);
   font-weight: 500;
 }
 
 /* App Header Title */
 app-header ion-title {
-  font-size: 22px;
+  font-size: var(--r-font-xl);
   font-weight: bold;
   color: var(--ion-color-primary);
   text-align: center;
