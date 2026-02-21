@@ -1,14 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Platform } from '@ionic/angular';
+import { AlertController, ModalController, Platform } from '@ionic/angular';
 import { AuthService } from '../../../services/auth.service';
 import { ToastService } from '../../../services/toast.service';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { OneSignalService } from '../../../services/one-signal.service';
 import { UserService } from '../../../services/user.service';
+import { FirebaseService } from '../../../services/firebase.service';
 import { User } from '../../../models/User';
-import { ModalController } from '@ionic/angular';
 import { WelcomeAlertComponent } from '../welcome-alert/welcome-alert.component';
 import { SocketService } from 'src/app/services/socket.service';
 
@@ -31,9 +31,11 @@ export class SigninComponent implements OnInit {
     private nativeStorage: NativeStorage,
     private oneSignalService: OneSignalService,
     private modalCtrl: ModalController,
+    private alertCtrl: AlertController,
     private platform: Platform,
-    private socketService: SocketService,  // <-- Inject WebSocket Service here
-    private userService: UserService
+    private socketService: SocketService,
+    private userService: UserService,
+    private firebaseService: FirebaseService
   ) {}
 
   ngOnInit() {
@@ -182,6 +184,57 @@ export class SigninComponent implements OnInit {
         // swallow fallback errors
       }
     }
+  }
+
+  async forgotPassword() {
+    const alert = await this.alertCtrl.create({
+      header: 'Reset Password',
+      message: 'Enter your email address and we will send you a password reset link.',
+      cssClass: 'forgot-password-alert',
+      inputs: [
+        {
+          name: 'email',
+          type: 'email',
+          placeholder: 'Your email address',
+          value: this.form.get('email')?.value || '',
+        },
+      ],
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel',
+          cssClass: 'alert-cancel',
+        },
+        {
+          text: 'Send Reset Link',
+          cssClass: 'alert-confirm',
+          handler: async (data) => {
+            const email = (data.email || '').trim();
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+              this.toastService.presentErrorToastr('Please enter a valid email address.');
+              return false; // keep alert open
+            }
+            try {
+              await this.firebaseService.resetPassword(email);
+              this.toastService.presentSuccessToastr(
+                `Password reset email sent to ${email}. Check your inbox.`
+              );
+            } catch (err: any) {
+              let msg = 'Failed to send reset email. Please try again.';
+              if (err?.code === 'auth/user-not-found') {
+                msg = 'No account found with that email address.';
+              } else if (err?.code === 'auth/invalid-email') {
+                msg = 'Invalid email address.';
+              } else if (err?.code === 'auth/too-many-requests') {
+                msg = 'Too many requests. Please wait a moment and try again.';
+              }
+              this.toastService.presentErrorToastr(msg);
+            }
+          },
+        },
+      ],
+    });
+    await alert.present();
   }
 
   async showWelcomeAlert() {

@@ -1,3 +1,23 @@
+// ── Forgot password row ────────────────────────────────────
+.forgot-password-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px 0 4px;
+}
+
+.forgot-password-btn {
+  --color: var(--ion-color-primary);
+  --padding-start: 4px;
+  --padding-end: 4px;
+  font-size: var(--r-font-sm, 12px);
+  font-weight: 500;
+  opacity: 0.85;
+
+  &:hover, &:active {
+    opacity: 1;
+  }
+}
+
 .login-content {
   --background: radial-gradient(circle at top, #1e293b 0%, #020617 100%) !important;
   display: flex;

@@ -1,9 +1,6 @@
 /* Core and Basic CSS */
 @import "~@ionic/angular/css/core.css";
 @import "~@ionic/angular/css/normalize.css";
-
-/* Fluid Responsive System — must come before component styles */
-@import "./theme/responsive";
 @import "~@ionic/angular/css/structure.css";
 @import "~@ionic/angular/css/typography.css";
 @import "~@ionic/angular/css/display.css";
@@ -28,10 +25,10 @@
   min-height: 100%;
   
   /* Ensure content doesn't get hidden behind the floating tab bar */
-  --padding-bottom: var(--r-tabbar-bottom-pad);
+  --padding-bottom: 110px;
 
   &::part(scroll) {
-    padding-bottom: var(--r-tabbar-bottom-pad);
+    padding-bottom: 110px;
   }
 
   .mesh-gradient {
@@ -94,7 +91,55 @@ ion-header {
   -webkit-text-fill-color: transparent;
 }
 
-/* Alert Styling */
+/* ── Forgot Password Alert ─────────────────────────────────────── */
+.forgot-password-alert {
+  .alert-wrapper {
+    border-radius: 20px;
+    background: var(--ion-card-background, #1e293b);
+    border: 1px solid var(--loopa-glass-border, rgba(255,255,255,0.1));
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+  }
+
+  .alert-head .alert-title {
+    font-size: var(--r-font-lg, 18px);
+    font-weight: 700;
+    color: var(--ion-text-color);
+  }
+
+  .alert-message {
+    font-size: var(--r-font-sm, 13px);
+    color: var(--loopa-text-muted, #94a3b8);
+    line-height: 1.5;
+  }
+
+  .alert-input {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 10px !important;
+    color: var(--ion-text-color) !important;
+    padding: 10px 14px !important;
+    font-size: var(--r-font-base, 14px) !important;
+    margin-top: 8px;
+  }
+
+  .alert-button-group {
+    padding: 8px 16px 16px;
+    gap: 8px;
+  }
+
+  .alert-cancel {
+    color: var(--loopa-text-muted, #94a3b8) !important;
+    font-weight: 500;
+  }
+
+  .alert-confirm {
+    color: var(--ion-color-primary) !important;
+    font-weight: 700;
+  }
+}
+
+/* ── Alerts ─────────────────────────────────────────────────────── */
 .empty-alert {
   font-size: 18px;
   color: var(--ion-color-medium);
@@ -193,31 +238,35 @@ ion-button.tertiary {
   color: white;
 }
 
-/* Titles — font sizes now come from _responsive.scss tokens */
+/* Titles */
 h1, .main-title {
+  font-size: 28px;
   color: var(--ion-color-dark);
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
 h2, .sub-title {
+  font-size: 24px;
   color: var(--ion-color-primary);
   font-weight: 700;
 }
 
 h3 {
+  font-size: 20px;
   color: var(--ion-color-dark);
   font-weight: 600;
 }
 
 h3, .neutral-title {
+  font-size: 20px;
   color: var(--ion-color-dark);
   font-weight: 500;
 }
 
 /* App Header Title */
 app-header ion-title {
-  font-size: var(--r-font-xl);
+  font-size: 22px;
   font-weight: bold;
   color: var(--ion-color-primary);
   text-align: center;

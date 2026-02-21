@@ -30,6 +30,12 @@
           <span *ngFor="let error of validationErrors['password']">{{ error }}</span>
         </div>
 
+        <div class="forgot-password-row">
+          <ion-button fill="clear" size="small" class="forgot-password-btn" (click)="forgotPassword()">
+            Forgot password?
+          </ion-button>
+        </div>
+
         <ion-button
           type="submit"
           expand="block"
