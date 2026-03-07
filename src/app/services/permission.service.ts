@@ -39,7 +39,7 @@ export class PermissionService {
   async showPermissionAlert() {
     const alert = await this.alertCtrl.create({
       header: 'Permission',
-      message: 'Loopa doesn\'t have the permission to perform this action, please give us the permission from the application settings',
+      message: 'Folcen doesn\'t have the permission to perform this action, please give us the permission from the application settings',
       buttons: [
         {
           text: 'CANCEL',

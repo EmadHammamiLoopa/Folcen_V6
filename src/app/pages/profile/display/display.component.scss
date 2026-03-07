@@ -811,7 +811,7 @@
   
   ion-button {
     --color: var(--ion-text-color);
-    --border-color: var(--loopa-tabbar-border);
+    --border-color: var(--folcen-tabbar-border);
     font-weight: 600;
   }
 }
@@ -912,13 +912,13 @@
   }
 
   .about-bio {
-    color: var(--loopa-text-muted);
+    color: var(--folcen-text-muted);
   }
 
   .details-grid .grid-item {
-    background: var(--loopa-glass-bg);
-    border-color: var(--loopa-glass-border);
-    .grid-label { color: var(--loopa-text-muted); }
+    background: var(--folcen-glass-bg);
+    border-color: var(--folcen-glass-border);
+    .grid-label { color: var(--folcen-text-muted); }
     .grid-value { color: var(--ion-text-color); }
   }
   
@@ -932,10 +932,10 @@
   }
 
   .empty-state {
-    color: var(--loopa-text-muted);
+    color: var(--folcen-text-muted);
     .empty-circle {
       background: rgba(0, 0, 0, 0.03);
-      ion-icon { color: var(--loopa-text-muted); }
+      ion-icon { color: var(--folcen-text-muted); }
     }
   }
 }
@@ -1010,7 +1010,7 @@
 
   :host-context(.light-theme) & {
     h3 { color: var(--ion-text-color); }
-    p { color: var(--loopa-text-muted); }
+    p { color: var(--folcen-text-muted); }
   }
 }
 

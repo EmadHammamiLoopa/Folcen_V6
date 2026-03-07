@@ -11,10 +11,10 @@
       right: 0;
       bottom: 0;
       background: 
-        radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--loopa-mesh-opacity)) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-        radial-gradient(at 0% 100%, rgba(var(--ion-color-primary-rgb), var(--loopa-mesh-opacity)) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--folcen-mesh-opacity)) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(var(--ion-color-primary-rgb), var(--folcen-mesh-opacity)) 0px, transparent 50%);
       z-index: -1;
       pointer-events: none;
     }
@@ -28,9 +28,9 @@
 
   /* Image Upload Card */
   .image-upload-card {
-    background: var(--loopa-toolbar-background);
+    background: var(--folcen-toolbar-background);
     backdrop-filter: blur(16px);
-    border: 1px solid var(--loopa-tabbar-border);
+    border: 1px solid var(--folcen-tabbar-border);
     border-radius: 24px;
     padding: 20px;
     margin-bottom: 24px;
@@ -75,12 +75,12 @@
       .add-more-box {
         aspect-ratio: 1;
         border-radius: 16px;
-        border: 2px dashed var(--loopa-tabbar-border);
+        border: 2px dashed var(--folcen-tabbar-border);
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        color: var(--loopa-text-muted);
+        color: var(--folcen-text-muted);
         background: rgba(var(--ion-text-color-rgb), 0.05);
         transition: all 0.3s ease;
 
@@ -112,7 +112,7 @@
         .icon-circle {
           width: 64px;
           height: 64px;
-          background: var(--loopa-gradient-primary);
+          background: var(--folcen-gradient-primary);
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -131,7 +131,7 @@
         }
 
         p {
-          color: var(--loopa-text-muted);
+          color: var(--folcen-text-muted);
           font-size: 14px;
           margin: 0;
         }
@@ -141,9 +141,9 @@
 
   /* Form Cards */
   .form-card {
-    background: var(--loopa-toolbar-background);
+    background: var(--folcen-toolbar-background);
     backdrop-filter: blur(16px);
-    border: 1px solid var(--loopa-tabbar-border);
+    border: 1px solid var(--folcen-tabbar-border);
     border-radius: 24px;
     padding: 24px;
     margin-bottom: 20px;
@@ -155,11 +155,11 @@
       gap: 12px;
       margin-bottom: 24px;
       padding-bottom: 12px;
-      border-bottom: 1px solid var(--loopa-tabbar-border);
+      border-bottom: 1px solid var(--folcen-tabbar-border);
 
       i {
         font-size: 20px;
-        background: var(--loopa-gradient-primary);
+        background: var(--folcen-gradient-primary);
         background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -180,7 +180,7 @@
 
     label {
       display: block;
-      color: var(--loopa-text-muted);
+      color: var(--folcen-text-muted);
       font-size: 14px;
       font-weight: 500;
       margin-bottom: 8px;
@@ -194,8 +194,8 @@
     }
 
     .input-wrapper {
-      background: var(--loopa-tabbar-background);
-      border: 1px solid var(--loopa-tabbar-border);
+      background: var(--folcen-tabbar-background);
+      border: 1px solid var(--folcen-tabbar-border);
       border-radius: 16px;
       display: flex;
       align-items: center;
@@ -203,7 +203,7 @@
       transition: all 0.3s ease;
 
       i {
-        color: var(--loopa-text-muted);
+        color: var(--folcen-text-muted);
         margin-right: 12px;
         font-size: 16px;
       }
@@ -211,7 +211,7 @@
       ion-input, ion-select, ion-datetime {
         --padding-start: 0;
         --color: var(--ion-text-color);
-        --placeholder-color: var(--loopa-text-muted);
+        --placeholder-color: var(--folcen-text-muted);
         --placeholder-font-weight: 400;
         font-size: 15px;
         width: 100%;
@@ -226,7 +226,7 @@
           font-size: 15px;
 
           &.placeholder {
-            color: var(--loopa-text-muted);
+            color: var(--folcen-text-muted);
           }
         }
 
@@ -246,15 +246,15 @@
     }
 
     .textarea-wrapper {
-      background: var(--loopa-tabbar-background);
-      border: 1px solid var(--loopa-tabbar-border);
+      background: var(--folcen-tabbar-background);
+      border: 1px solid var(--folcen-tabbar-border);
       border-radius: 16px;
       padding: 12px 16px;
 
       ion-textarea {
         --padding-start: 0;
         --color: var(--ion-text-color);
-        --placeholder-color: var(--loopa-text-muted);
+        --placeholder-color: var(--folcen-text-muted);
         font-size: 15px;
       }
     }
@@ -267,7 +267,7 @@
     }
 
     .hint-text {
-      color: var(--loopa-text-muted);
+      color: var(--folcen-text-muted);
       font-size: 12px;
       margin-top: 6px;
       margin-left: 4px;
@@ -293,7 +293,7 @@
 
     .vibrant-submit-btn {
       width: 100%;
-      background: var(--loopa-gradient-primary);
+      background: var(--folcen-gradient-primary);
       color: white;
       border: none;
       border-radius: 18px;
@@ -314,7 +314,7 @@
 
       &:disabled {
         opacity: 0.7;
-        background: var(--loopa-text-muted);
+        background: var(--folcen-text-muted);
       }
     }
   }
@@ -336,29 +336,29 @@
           right: 0;
           bottom: 0;
           background: 
-            radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--loopa-mesh-opacity)) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(168, 85, 247, var(--loopa-mesh-opacity)) 0px, transparent 50%);
+            radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--folcen-mesh-opacity)) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(168, 85, 247, var(--folcen-mesh-opacity)) 0px, transparent 50%);
           pointer-events: none;
         }
       }
 
       ion-toolbar {
-        --background: var(--loopa-toolbar-background);
-        --border-color: var(--loopa-tabbar-border);
+        --background: var(--folcen-toolbar-background);
+        --border-color: var(--folcen-tabbar-border);
         --color: var(--ion-text-color);
       }
 
       ion-searchbar {
-        --background: var(--loopa-tabbar-background);
+        --background: var(--folcen-tabbar-background);
         --color: var(--ion-text-color);
-        --placeholder-color: var(--loopa-text-muted);
-        --icon-color: var(--loopa-text-muted);
+        --placeholder-color: var(--folcen-text-muted);
+        --icon-color: var(--folcen-text-muted);
       }
 
       ion-item {
         --background: transparent;
         --color: var(--ion-text-color);
-        --border-color: var(--loopa-tabbar-border);
+        --border-color: var(--folcen-tabbar-border);
         
         &:hover {
           --background: rgba(var(--ion-text-color-rgb), 0.05);

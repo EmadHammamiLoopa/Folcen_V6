@@ -1,6 +1,6 @@
 # Notification Test Scenarios
 
-> **System under test**: Loopa (Onprimse) — backend notification pipeline  
+> **System under test**: Folcen (Onprimse) — backend notification pipeline  
 > **Coverage**: N-01 through N-21 (all notification types)  
 > **Transports covered**: FCM push · Socket.IO emit · MongoDB record
 

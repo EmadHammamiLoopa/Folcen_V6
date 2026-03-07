@@ -1,4 +1,4 @@
-package com.Loopa.app;
+package com.folcen.app;
 
 import com.getcapacitor.BridgeActivity;
 

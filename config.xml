@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget id="com.Loopa.app" version="0.0.1" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-    <name>Loopa</name>
-    <description>Loopa is a new integrated social app, where user can find all he need in one app, with many functions and tools which simplify the connections between users..</description>
+<widget id="com.folcen.app" version="0.0.1" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>Folcen</name>
+    <description>Folcen is a new integrated social app, where user can find all he need in one app, with many functions and tools which simplify the connections between users.</description>
     <author email="emad.hammami@outlook.com" href="emad.hammami@outlook.com">Emad hammami</author>
     <content src="index.html" />
     <access origin="*" />

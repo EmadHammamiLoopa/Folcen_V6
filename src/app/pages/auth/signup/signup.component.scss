@@ -191,7 +191,7 @@ ion-item {
 .interest-card {
   background: var(--ion-item-background);
   border-radius: 20px;
-  border: 1px solid var(--loopa-tabbar-border);
+  border: 1px solid var(--folcen-tabbar-border);
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   margin: 4px;
   display: flex;
@@ -229,7 +229,7 @@ ion-item {
 }
 
 .back-btn {
-  --color: var(--loopa-text-muted);
+  --color: var(--folcen-text-muted);
 }
 
 ion-progress-bar {
@@ -260,7 +260,7 @@ ion-progress-bar {
     min-width: 100px;
     padding: 0 20px;
     border-radius: 16px;
-    border: 2px solid var(--loopa-tabbar-border);
+    border: 2px solid var(--folcen-tabbar-border);
     background: var(--ion-item-background);
     transition: all 0.3s ease;
     
@@ -297,7 +297,7 @@ ion-progress-bar {
     
     ion-label {
       font-size: 13px;
-      color: var(--loopa-text-muted);
+      color: var(--folcen-text-muted);
       margin: 0;
       
       .link {
@@ -355,7 +355,7 @@ ion-progress-bar {
 
 .step-subtitle {
   font-size: 14px;
-  color: var(--loopa-text-muted, #888);
+  color: var(--folcen-text-muted, #888);
   margin-top: -8px;
   margin-bottom: 20px;
   line-height: 1.5;
@@ -372,7 +372,7 @@ ion-progress-bar {
   border-radius: 16px;
   overflow: hidden;
   background: var(--ion-item-background);
-  border: 2px solid var(--loopa-tabbar-border, rgba(255,255,255,0.08));
+  border: 2px solid var(--folcen-tabbar-border, rgba(255,255,255,0.08));
   box-shadow: 0 4px 20px rgba(0,0,0,0.08);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -388,7 +388,7 @@ ion-progress-bar {
 
   .bday-icon {
     font-size: 28px;
-    color: var(--loopa-text-muted, #888);
+    color: var(--folcen-text-muted, #888);
     flex-shrink: 0;
     transition: color 0.2s;
   }
@@ -398,7 +398,7 @@ ion-progress-bar {
   }
   .bday-label {
     font-size: 16px;
-    color: var(--loopa-text-muted, #888);
+    color: var(--folcen-text-muted, #888);
   }
   .bday-date {
     font-size: 20px;
@@ -408,7 +408,7 @@ ion-progress-bar {
   }
   .bday-arrow {
     font-size: 20px;
-    color: var(--loopa-text-muted, #888);
+    color: var(--folcen-text-muted, #888);
     flex-shrink: 0;
   }
 
@@ -424,7 +424,7 @@ ion-progress-bar {
 
 .privacy-toggle-card {
   background: var(--ion-item-background);
-  border: 1.5px solid var(--loopa-tabbar-border, rgba(255,255,255,0.08));
+  border: 1.5px solid var(--folcen-tabbar-border, rgba(255,255,255,0.08));
   border-radius: 18px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0,0,0,0.06);
@@ -461,7 +461,7 @@ ion-progress-bar {
 }
 .toggle-desc {
   font-size: 12px;
-  color: var(--loopa-text-muted, #888);
+  color: var(--folcen-text-muted, #888);
   margin-top: 2px;
   line-height: 1.3;
   overflow: hidden;
@@ -471,7 +471,7 @@ ion-progress-bar {
 
 .privacy-divider {
   height: 1px;
-  background: var(--loopa-tabbar-border, rgba(255,255,255,0.06));
+  background: var(--folcen-tabbar-border, rgba(255,255,255,0.06));
   margin: 0 18px;
 }
 
@@ -495,7 +495,7 @@ ion-progress-bar {
 .verify-steps-card {
   background: var(--ion-item-background);
   border-radius: 16px;
-  border: 1.5px solid var(--loopa-tabbar-border, rgba(255,255,255,0.08));
+  border: 1.5px solid var(--folcen-tabbar-border, rgba(255,255,255,0.08));
   padding: 18px 20px;
   margin: 20px 0 12px;
   text-align: left;
@@ -534,7 +534,7 @@ ion-progress-bar {
   margin-top: 8px;
   font-size: 13px;
 }
-.resend-label { color: var(--loopa-text-muted, #888); }
+.resend-label { color: var(--folcen-text-muted, #888); }
 .resend-btn { --padding-start: 6px; --padding-end: 6px; font-weight: 600; }
 
 .adjust-email-row {
@@ -569,7 +569,7 @@ ion-progress-bar {
     padding: 8px 16px;
   }
   .birthday-picker .picker-confirm-btn { color: var(--ion-color-primary) !important; font-weight: 700; }
-  .birthday-picker .picker-cancel-btn  { color: var(--loopa-text-muted, #888) !important; }
+  .birthday-picker .picker-cancel-btn  { color: var(--folcen-text-muted, #888) !important; }
   .birthday-picker .picker-col { font-size: 18px; }
   .birthday-picker .picker-opt.picker-opt-selected { font-size: 22px; font-weight: 700; color: var(--ion-color-primary) !important; }
 }

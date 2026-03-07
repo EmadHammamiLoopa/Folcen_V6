@@ -191,7 +191,7 @@ import { ModalController } from '@ionic/angular';
       color: var(--ion-text-color);
     }
     ion-toolbar {
-      --background: var(--loopa-toolbar-background);
+      --background: var(--folcen-toolbar-background);
       --color: var(--ion-text-color);
     }
     .disclaimer-container {

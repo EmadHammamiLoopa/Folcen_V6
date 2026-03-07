@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           xmlns:tools="http://schemas.android.com/tools"
-          package="com.Loopa.app">
+          package="com.folcen.app">
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -66,7 +66,7 @@
             <intent-filter>
                 <action android:name="com.amazon.device.messaging.intent.RECEIVE" />
                 <action android:name="com.amazon.device.messaging.intent.REGISTRATION" />
-                <category android:name="com.Loopa.app" />
+                <category android:name="com.folcen.app" />
             </intent-filter>
         </receiver>
 

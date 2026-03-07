@@ -13,30 +13,30 @@
     right: 0;
     bottom: 0;
     background: 
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, rgba(59, 130, 246, var(--loopa-mesh-opacity)) 0px, transparent 50%);
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(59, 130, 246, var(--folcen-mesh-opacity)) 0px, transparent 50%);
     z-index: 0;
     pointer-events: none;
   }
 }
 
 .glass-header {
-  --background: var(--loopa-toolbar-background);
+  --background: var(--folcen-toolbar-background);
   backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid var(--loopa-tabbar-border);
+  border-bottom: 1px solid var(--folcen-tabbar-border);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 
   ion-toolbar {
     --background: transparent;
-    --color: var(--loopa-toolbar-color);
+    --color: var(--folcen-toolbar-color);
     --padding-top: 8px;
     --padding-bottom: 8px;
   }
 
   .back-button {
-    --color: var(--loopa-text-muted);
+    --color: var(--folcen-text-muted);
     font-size: 1.4rem;
     transition: transform 0.2s ease;
     &:active {
@@ -53,7 +53,7 @@
     transition: background 0.2s ease;
 
     &:active {
-      background: var(--loopa-glass-bg);
+      background: var(--folcen-glass-bg);
     }
 
     .avatar-wrapper {
@@ -66,7 +66,7 @@
         height: 100%;
         border-radius: 14px;
         object-fit: cover;
-        border: 2px solid var(--loopa-tabbar-border);
+        border: 2px solid var(--folcen-tabbar-border);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       }
 
@@ -85,7 +85,7 @@
 
     .user-text {
       .user-name {
-        color: var(--loopa-toolbar-color);
+        color: var(--folcen-toolbar-color);
         font-size: 1.05rem;
         font-weight: 700;
         letter-spacing: -0.01em;
@@ -96,7 +96,7 @@
         font-weight: 500;
         margin: 0;
         opacity: 0.9;
-        color: var(--loopa-text-muted);
+        color: var(--folcen-text-muted);
         .online { 
           color: #22c55e;
           display: flex;
@@ -152,9 +152,9 @@
 .product-glass-card {
   margin: 16px;
   padding: 12px;
-  background: var(--loopa-tabbar-background);
+  background: var(--folcen-tabbar-background);
   backdrop-filter: blur(10px);
-  border: 1px solid var(--loopa-tabbar-border);
+  border: 1px solid var(--folcen-tabbar-border);
   border-radius: 18px;
   display: flex;
   align-items: center;
@@ -187,7 +187,7 @@
   }
 
   .view-icon {
-    color: var(--loopa-text-muted);
+    color: var(--folcen-text-muted);
   }
 }
 
@@ -202,14 +202,14 @@
   position: relative;
 
   span {
-    background: var(--loopa-tabbar-background);
+    background: var(--folcen-tabbar-background);
     backdrop-filter: blur(4px);
     padding: 6px 16px;
     border-radius: 20px;
     font-size: 0.75rem;
-    color: var(--loopa-text-muted);
+    color: var(--folcen-text-muted);
     font-weight: 600;
-    border: 1px solid var(--loopa-tabbar-border);
+    border: 1px solid var(--folcen-tabbar-border);
   }
 }
 
@@ -251,12 +251,12 @@
     }
 
     &.their-message {
-      background: var(--loopa-tabbar-background);
+      background: var(--folcen-tabbar-background);
       backdrop-filter: blur(12px);
       color: var(--ion-text-color);
       margin-right: auto;
       border-bottom-left-radius: 4px;
-      border: 1px solid var(--loopa-tabbar-border);
+      border: 1px solid var(--folcen-tabbar-border);
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
 
@@ -288,11 +288,11 @@
   display: flex;
   flex-direction: column;
   padding: 20px;
-  background: var(--loopa-tabbar-background);
+  background: var(--folcen-tabbar-background);
   backdrop-filter: blur(20px);
   border-radius: 24px;
   margin: 16px 0;
-  border: 1px solid var(--loopa-tabbar-border);
+  border: 1px solid var(--folcen-tabbar-border);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   position: relative;
@@ -383,8 +383,8 @@
 }
 
 .message-input-footer {
-  --background: var(--loopa-toolbar-background);
-  border-top: 1px solid var(--loopa-tabbar-border);
+  --background: var(--folcen-toolbar-background);
+  border-top: 1px solid var(--folcen-tabbar-border);
   padding: 12px 16px;
 
   /* Pin footer to viewport bottom so input remains visible */
@@ -400,11 +400,11 @@
   }
 
   .input-container {
-    --background: var(--loopa-tabbar-background);
+    --background: var(--folcen-tabbar-background);
     --padding-start: 8px;
     --padding-end: 8px;
     border-radius: 24px;
-    border: 1px solid var(--loopa-tabbar-border);
+    border: 1px solid var(--folcen-tabbar-border);
     display: flex;
     align-items: center;
     transition: all 0.3s ease;
@@ -418,14 +418,14 @@
     .message-input {
       --padding-start: 12px;
       --color: var(--ion-text-color);
-      --placeholder-color: var(--loopa-text-muted);
+      --placeholder-color: var(--folcen-text-muted);
       --placeholder-opacity: 0.8;
       font-size: 0.95rem;
       font-weight: 500;
     }
 
     .camera-button {
-      --color: var(--loopa-text-muted);
+      --color: var(--folcen-text-muted);
       margin: 0;
     }
   }

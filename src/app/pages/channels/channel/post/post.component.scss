@@ -512,12 +512,12 @@
   border-radius:12px; box-shadow:0 14px 28px rgba(0,0,0,.18);
   z-index:1000; opacity:0; transform:translateY(-6px); visibility:hidden;
   transition:opacity .2s ease, transform .2s ease, visibility .2s ease;
-  border: 1px solid var(--loopa-glass-border);
+  border: 1px solid var(--folcen-glass-border);
 }
 .custom-popover.show{opacity:1;visibility:visible;transform:translateY(0)}
 .visibility-dropdown ion-item{
   --padding-start:12px;--padding-end:12px;--min-height:38px;font-size:14px;
-  border-bottom:1px solid var(--loopa-glass-border);
+  border-bottom:1px solid var(--folcen-glass-border);
 }
 .visibility-dropdown ion-item:last-child{border-bottom:none}
 

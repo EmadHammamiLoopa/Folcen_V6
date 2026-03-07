@@ -11,10 +11,10 @@
     right: 0;
     bottom: 0;
     background: 
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, rgba(79, 70, 229, var(--loopa-mesh-opacity)) 0px, transparent 50%);
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(79, 70, 229, var(--folcen-mesh-opacity)) 0px, transparent 50%);
     z-index: -1;
     pointer-events: none;
   }
@@ -29,7 +29,7 @@
     color: var(--ion-text-color);
     margin: 0;
     letter-spacing: -1px;
-    background: linear-gradient(135deg, var(--ion-text-color) 0%, var(--loopa-text-muted) 100%);
+    background: linear-gradient(135deg, var(--ion-text-color) 0%, var(--folcen-text-muted) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -65,9 +65,9 @@
 }
 
 .product-card {
-  background: var(--loopa-tabbar-background);
+  background: var(--folcen-tabbar-background);
   backdrop-filter: blur(16px);
-  border: 1px solid var(--loopa-tabbar-border);
+  border: 1px solid var(--folcen-tabbar-border);
   border-radius: 28px;
   overflow: hidden;
   margin: 8px;
@@ -75,7 +75,7 @@
   height: calc(100% - 16px);
   display: flex;
   flex-direction: column;
-  box-shadow: var(--loopa-tabbar-shadow);
+  box-shadow: var(--folcen-tabbar-shadow);
 
   &:active {
     transform: scale(0.96);

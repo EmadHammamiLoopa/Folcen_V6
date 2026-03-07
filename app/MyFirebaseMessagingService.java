@@ -1,4 +1,4 @@
-package com.Loopa.app;
+package com.folcen.app;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;

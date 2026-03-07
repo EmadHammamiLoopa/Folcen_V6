@@ -1,6 +1,6 @@
 Overview
 
-This document describes the Onprimse (Loopa-derived) mobile/web messaging and video-call application at a business level. It explains how the product works end-to-end, the responsibilities of frontend and backend systems, key user flows, realtime signaling, missed-call handling, and operational notes.
+This document describes the Onprimse (Folcen-derived) mobile/web messaging and video-call application at a business level. It explains how the product works end-to-end, the responsibilities of frontend and backend systems, key user flows, realtime signaling, missed-call handling, and operational notes.
 
 Audience and purpose
 

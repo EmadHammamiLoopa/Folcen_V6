@@ -9,10 +9,10 @@
     right: 0;
     bottom: 0;
     background: 
-      radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, rgba(var(--ion-color-primary-rgb), var(--loopa-mesh-opacity)) 0px, transparent 50%);
+      radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(var(--ion-color-primary-rgb), var(--folcen-mesh-opacity)) 0px, transparent 50%);
     z-index: -1;
   }
 }
@@ -24,9 +24,9 @@
   justify-content: center;
 
   .glass-toggle {
-    background: var(--loopa-tabbar-background);
+    background: var(--folcen-tabbar-background);
     backdrop-filter: blur(12px);
-    border: 1px solid var(--loopa-tabbar-border);
+    border: 1px solid var(--folcen-tabbar-border);
     border-radius: 16px;
     padding: 6px;
     display: flex;
@@ -40,7 +40,7 @@
       border: none;
       padding: 12px;
       border-radius: 12px;
-      color: var(--loopa-text-muted);
+      color: var(--folcen-text-muted);
       font-weight: 600;
       font-size: 0.9rem;
       display: flex;
@@ -54,7 +54,7 @@
       }
 
       &.active {
-        background: var(--loopa-gradient-primary);
+        background: var(--folcen-gradient-primary);
         color: white;
         box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
       }
@@ -81,15 +81,15 @@
 }
 
 .service-card {
-  background: var(--loopa-toolbar-background);
+  background: var(--folcen-toolbar-background);
   backdrop-filter: blur(16px);
-  border: 1px solid var(--loopa-tabbar-border);
+  border: 1px solid var(--folcen-tabbar-border);
   border-radius: 24px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--loopa-tabbar-shadow);
+  box-shadow: var(--folcen-tabbar-shadow);
 
   &:active {
     transform: scale(0.96);
@@ -120,7 +120,7 @@
       position: absolute;
       top: 12px;
       left: 12px;
-      background: var(--loopa-toolbar-background);
+      background: var(--folcen-toolbar-background);
       backdrop-filter: blur(8px);
       padding: 4px 10px;
       border-radius: 8px;
@@ -129,14 +129,14 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      border: 1px solid var(--loopa-tabbar-border);
+      border: 1px solid var(--folcen-tabbar-border);
     }
 
     .price-tag {
       position: absolute;
       bottom: 12px;
       right: 12px;
-      background: var(--loopa-gradient-primary);
+      background: var(--folcen-gradient-primary);
       padding: 4px 10px;
       border-radius: 8px;
       color: white;
@@ -187,7 +187,7 @@
       }
 
       .provider-name {
-        color: var(--loopa-text-muted);
+        color: var(--folcen-text-muted);
         font-size: 0.8rem;
         font-weight: 500;
         white-space: nowrap;
@@ -202,18 +202,18 @@
       flex-direction: column;
       gap: 6px;
       padding-top: 12px;
-      border-top: 1px solid var(--loopa-tabbar-border);
+      border-top: 1px solid var(--folcen-tabbar-border);
 
       .location, .time {
         display: flex;
         align-items: center;
         gap: 6px;
-        color: var(--loopa-text-muted);
+        color: var(--folcen-text-muted);
         font-size: 0.75rem;
 
         i {
           font-size: 0.7rem;
-          color: var(--loopa-text-muted);
+          color: var(--folcen-text-muted);
         }
       }
     }

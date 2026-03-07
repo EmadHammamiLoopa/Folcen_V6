@@ -59,7 +59,7 @@ import { MessageService } from 'src/app/services/message.service';
   `,
   styles: [`
     .vibrant-toolbar {
-      --background: var(--loopa-toolbar-background);
+      --background: var(--folcen-toolbar-background);
       --color: var(--ion-text-color);
       padding: 10px;
     }
@@ -75,7 +75,7 @@ import { MessageService } from 'src/app/services/message.service';
       background: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
                   radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
       z-index: -1;
-      opacity: var(--loopa-mesh-opacity);
+      opacity: var(--folcen-mesh-opacity);
     }
 
     .search-bar {

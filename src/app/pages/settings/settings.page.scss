@@ -4,10 +4,10 @@
   --border-width: 0;
 
   :host-context(body.light-theme) & {
-    --background: var(--loopa-toolbar-background);
-    --color: var(--loopa-toolbar-color);
+    --background: var(--folcen-toolbar-background);
+    --color: var(--folcen-toolbar-color);
     ion-back-button {
-      --color: var(--loopa-toolbar-color);
+      --color: var(--folcen-toolbar-color);
     }
   }
   

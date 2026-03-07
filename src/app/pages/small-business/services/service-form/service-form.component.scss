@@ -12,10 +12,10 @@
       right: 0;
       bottom: 0;
       background: 
-        radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--loopa-mesh-opacity)) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--loopa-mesh-opacity)) 0px, transparent 50%),
-        radial-gradient(at 0% 100%, rgba(var(--ion-color-primary-rgb), var(--loopa-mesh-opacity)) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(var(--ion-color-primary-rgb), var(--folcen-mesh-opacity)) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(168, 85, 247, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(236, 72, 153, var(--folcen-mesh-opacity)) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(var(--ion-color-primary-rgb), var(--folcen-mesh-opacity)) 0px, transparent 50%);
       z-index: -1;
     }
 
@@ -29,9 +29,9 @@
 
     /* Progress Section */
     .progress-section {
-      background: var(--loopa-toolbar-background);
+      background: var(--folcen-toolbar-background);
       backdrop-filter: blur(12px);
-      border: 1px solid var(--loopa-tabbar-border);
+      border: 1px solid var(--folcen-tabbar-border);
       border-radius: 20px;
       padding: 20px;
       margin-bottom: 24px;
@@ -43,7 +43,7 @@
         margin-bottom: 12px;
         
         span {
-          color: var(--loopa-text-muted);
+          color: var(--folcen-text-muted);
           font-size: 0.9rem;
           font-weight: 500;
         }
@@ -63,7 +63,7 @@
 
         .progress-bar-fill {
           height: 100%;
-          background: var(--loopa-gradient-primary);
+          background: var(--folcen-gradient-primary);
           transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
           box-shadow: 0 0 15px rgba(var(--ion-color-primary-rgb), 0.4);
         }
@@ -85,7 +85,7 @@
           height: 100px;
           border-radius: 16px;
           overflow: hidden;
-          border: 1px solid var(--loopa-tabbar-border);
+          border: 1px solid var(--folcen-tabbar-border);
 
           .preview-image {
             width: 100%;
@@ -131,7 +131,7 @@
 
       .image-dropzone {
         height: 220px;
-        background: var(--loopa-tabbar-background);
+        background: var(--folcen-tabbar-background);
         border: 2px dashed rgba(var(--ion-color-primary-rgb), 0.3);
         border-radius: 24px;
         display: flex;
@@ -181,7 +181,7 @@
           }
 
           p {
-            color: var(--loopa-text-muted);
+            color: var(--folcen-text-muted);
             font-size: 0.85rem;
             margin: 0;
           }
@@ -206,16 +206,16 @@
           display: flex;
           align-items: center;
           gap: 8px;
-          border: 1px solid var(--loopa-tabbar-border);
+          border: 1px solid var(--folcen-tabbar-border);
         }
       }
     }
 
     /* Form Cards */
     .form-card {
-      background: var(--loopa-toolbar-background);
+      background: var(--folcen-toolbar-background);
       backdrop-filter: blur(16px);
-      border: 1px solid var(--loopa-tabbar-border);
+      border: 1px solid var(--folcen-tabbar-border);
       border-radius: 24px;
       padding: 24px;
       margin-bottom: 20px;
@@ -226,7 +226,7 @@
         gap: 12px;
         margin-bottom: 20px;
         padding-bottom: 12px;
-        border-bottom: 1px solid var(--loopa-tabbar-border);
+        border-bottom: 1px solid var(--folcen-tabbar-border);
 
         i {
           color: var(--ion-color-primary);
@@ -248,7 +248,7 @@
 
       label {
         display: block;
-        color: var(--loopa-text-muted);
+        color: var(--folcen-text-muted);
         font-size: 0.85rem;
         font-weight: 500;
         margin-bottom: 8px;
@@ -264,8 +264,8 @@
       }
 
       .input-wrapper {
-        background: var(--loopa-tabbar-background);
-        border: 1px solid var(--loopa-tabbar-border);
+        background: var(--folcen-tabbar-background);
+        border: 1px solid var(--folcen-tabbar-border);
         border-radius: 16px;
         display: flex;
         align-items: center;
@@ -273,7 +273,7 @@
         transition: all 0.3s ease;
 
         i {
-          color: var(--loopa-text-muted);
+          color: var(--folcen-text-muted);
           font-size: 1rem;
           margin-right: 12px;
         }
@@ -281,7 +281,7 @@
         ion-input, ion-select, ion-datetime, ion-textarea {
           --padding-start: 0;
           --color: var(--ion-text-color);
-          --placeholder-color: var(--loopa-text-muted);
+          --placeholder-color: var(--folcen-text-muted);
           --placeholder-opacity: 1;
           flex: 1;
           font-size: 0.95rem;
@@ -302,7 +302,7 @@
             font-size: 0.95rem;
 
             &.placeholder {
-              color: var(--loopa-text-muted);
+              color: var(--folcen-text-muted);
             }
           }
 
@@ -314,8 +314,8 @@
       }
 
       .textarea-wrapper {
-        background: var(--loopa-tabbar-background);
-        border: 1px solid var(--loopa-tabbar-border);
+        background: var(--folcen-tabbar-background);
+        border: 1px solid var(--folcen-tabbar-border);
         border-radius: 16px;
         padding: 12px 16px;
         margin-top: 5px;
@@ -323,7 +323,7 @@
         ion-textarea {
           --padding-start: 0;
           --color: var(--ion-text-color);
-          --placeholder-color: var(--loopa-text-muted);
+          --placeholder-color: var(--folcen-text-muted);
           font-size: 0.95rem;
         }
 
@@ -351,7 +351,7 @@
 
       .vibrant-submit-btn {
         width: 100%;
-        background: var(--loopa-gradient-primary);
+        background: var(--folcen-gradient-primary);
         color: #fff;
         border: none;
         padding: 20px;
@@ -371,7 +371,7 @@
         }
 
         &:disabled {
-          background: var(--loopa-text-muted);
+          background: var(--folcen-text-muted);
           box-shadow: none;
           opacity: 0.7;
         }
@@ -380,7 +380,7 @@
   }
 }
 
-ion-select::part(icon) { color: var(--loopa-text-muted); font-size: 12px; }
+ion-select::part(icon) { color: var(--folcen-text-muted); font-size: 12px; }
 ion-datetime { --background: transparent; }
 
 .row {
@@ -400,7 +400,7 @@ ion-datetime { --background: transparent; }
 
   .vibrant-submit-btn {
     width: 100%;
-    background: var(--loopa-gradient-primary);
+    background: var(--folcen-gradient-primary);
     border: none;
     border-radius: 18px;
     padding: 18px;
@@ -420,7 +420,7 @@ ion-datetime { --background: transparent; }
     }
 
     &:disabled {
-      background: var(--loopa-text-muted);
+      background: var(--folcen-text-muted);
       box-shadow: none;
       opacity: 0.7;
     }
@@ -441,7 +441,7 @@ ion-datetime { --background: transparent; }
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: var(--loopa-gradient-primary);
+  background: var(--folcen-gradient-primary);
   border: none;
   border-radius: 50%;
   width: 56px;

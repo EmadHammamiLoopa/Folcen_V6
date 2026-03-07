@@ -2,13 +2,13 @@ ion-header {
   background: transparent;
   
   ion-toolbar {
-    --background: var(--loopa-toolbar-background);
-    --color: var(--loopa-toolbar-color);
+    --background: var(--folcen-toolbar-background);
+    --color: var(--folcen-toolbar-color);
     --padding-start: 0;
     --padding-end: 0;
     --inner-padding-end: 0;
     backdrop-filter: blur(16px) saturate(180%);
-    border-bottom: 1px solid var(--loopa-tabbar-border);
+    border-bottom: 1px solid var(--folcen-tabbar-border);
     position: relative;
     display: flex;
     align-items: center;
@@ -27,7 +27,7 @@ ion-header {
       font-weight: 800;
       font-size: 1.1rem;
       letter-spacing: -0.02em;
-      color: var(--loopa-toolbar-color);
+      color: var(--folcen-toolbar-color);
       position: absolute;
       left: 0;
       right: 0;
@@ -63,7 +63,7 @@ ion-header {
     }
 
     ion-button {
-      --color: var(--loopa-text-muted);
+      --color: var(--folcen-text-muted);
       font-size: 1.1rem;
     }
   }
@@ -79,10 +79,10 @@ ion-header {
 }
 
 ion-searchbar {
-  --background: var(--loopa-glass-bg);
+  --background: var(--folcen-glass-bg);
   --color: var(--ion-text-color);
-  --placeholder-color: var(--loopa-text-muted);
-  --icon-color: var(--loopa-text-muted);
+  --placeholder-color: var(--folcen-text-muted);
+  --icon-color: var(--folcen-text-muted);
   --border-radius: 16px;
   --box-shadow: none;
   padding: 8px 16px;

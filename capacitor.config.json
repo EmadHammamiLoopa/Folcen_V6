@@ -1,6 +1,6 @@
 {
-    "appId": "com.Loopa.app",
-    "appName": "Loopa",
+    "appId": "com.folcen.app",
+    "appName": "Folcen",
     "webDir": "www",
     "cordova": {
       "preferences": {

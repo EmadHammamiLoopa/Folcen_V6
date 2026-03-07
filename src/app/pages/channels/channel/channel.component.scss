@@ -5,7 +5,7 @@
   position: relative;
   width: 100%;
   overflow: hidden;
-  background: var(--loopa-deep-slate);
+  background: var(--folcen-deep-slate);
 
   .hero-bg {
     position: absolute;
@@ -85,7 +85,7 @@
       bottom: -4px;
       right: -4px;
       background: #3b82f6;
-      border: 2px solid var(--loopa-deep-slate);
+      border: 2px solid var(--folcen-deep-slate);
       border-radius: 50%;
       width: 20px;
       height: 20px;
@@ -184,7 +184,7 @@
     }
 
     .follow-btn {
-      --background: var(--loopa-gradient-primary, linear-gradient(135deg,#6366f1,#8b5cf6));
+      --background: var(--folcen-gradient-primary, linear-gradient(135deg,#6366f1,#8b5cf6));
       --color: white;
 
       &.followed {
@@ -209,7 +209,7 @@
 .posts-container {
   padding: 8px 0 env(safe-area-inset-bottom, 40px);
   padding-bottom: max(env(safe-area-inset-bottom), 40px);
-  background: var(--loopa-deep-slate);
+  background: var(--folcen-deep-slate);
   min-height: 50vh;
   width: 100%;
   box-sizing: border-box;
@@ -243,19 +243,19 @@
 
     i {
       font-size: 48px;
-      color: var(--loopa-rose);
+      color: var(--folcen-rose);
       margin-bottom: 20px;
     }
 
     h3 {
       font-weight: 800;
       margin-bottom: 12px;
-      color: white;
+      color: var(--ch-text-primary);
     }
 
     p {
       font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.7);
+      color: var(--ch-text-muted);
       line-height: 1.5;
       margin-bottom: 20px;
     }
@@ -279,32 +279,32 @@
     .icon-wrapper {
       width: clamp(64px, 18vw, 88px);
       height: clamp(64px, 18vw, 88px);
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--ch-surface-bg);
       border-radius: 30px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: clamp(26px, 7vw, 36px);
-      color: var(--loopa-indigo);
+      color: var(--folcen-indigo);
       margin: 0 auto 20px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--ch-surface-border);
     }
 
     h2 {
       font-weight: 800;
-      color: white;
+      color: var(--ch-text-primary);
       margin-bottom: 8px;
       font-size: clamp(1.15rem, 4vw, 1.4rem);
     }
 
     p {
-      color: rgba(255, 255, 255, 0.6);
+      color: var(--ch-text-muted);
       margin-bottom: 28px;
       font-size: clamp(0.85rem, 3vw, 0.95rem);
       line-height: 1.5;
       padding: 0 8px;
 
-      strong { color: rgba(255,255,255,0.9); }
+      strong { color: var(--ch-text-strong); }
     }
 
     .create-first-btn {
@@ -333,5 +333,5 @@
 }
 
 ion-content {
-  --background: var(--loopa-deep-slate);
+  --background: var(--folcen-deep-slate);
 }

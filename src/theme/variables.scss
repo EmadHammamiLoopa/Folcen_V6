@@ -52,8 +52,8 @@
   --ion-color-danger-tint: #f15757;
 
   /* Custom Gradients */
-  --loopa-gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  --loopa-gradient-vibrant: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%);
+  --folcen-gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --folcen-gradient-vibrant: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%);
 }
 
 /* Default Theme (Dark) - Applied to body by default or via .dark-theme class */
@@ -111,16 +111,28 @@ body, body.dark-theme {
   --ion-color-light-shade: #1a2434;
   --ion-color-light-tint: #353e4f;
 
-  /* Loopa Specific Theme Variables */
-  --loopa-toolbar-background: rgba(15, 23, 42, 0.8);
-  --loopa-toolbar-color: #ffffff;
-  --loopa-tabbar-background: rgba(15, 23, 42, 0.8);
-  --loopa-tabbar-border: rgba(255, 255, 255, 0.08);
-  --loopa-tabbar-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --loopa-text-muted: #94a3b8;
-  --loopa-glass-bg: rgba(255, 255, 255, 0.1);
-  --loopa-glass-border: rgba(255, 255, 255, 0.2);
-  --loopa-mesh-opacity: 0.15;
+  /* Folcen Specific Theme Variables */
+  --folcen-toolbar-background: rgba(15, 23, 42, 0.8);
+  --folcen-toolbar-color: #ffffff;
+  --folcen-tabbar-background: rgba(15, 23, 42, 0.8);
+  --folcen-tabbar-border: rgba(255, 255, 255, 0.08);
+  --folcen-tabbar-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --folcen-text-muted: #94a3b8;
+  --folcen-glass-bg: rgba(255, 255, 255, 0.1);
+  --folcen-glass-border: rgba(255, 255, 255, 0.2);
+  --folcen-mesh-opacity: 0.15;
+
+  /* Channel / Post page semantic tokens */
+  --folcen-deep-slate: #0f172a;
+  --folcen-indigo: #6366f1;
+  --folcen-rose: #f43f5e;
+  --ch-text-primary: #ffffff;
+  --ch-text-muted: rgba(255, 255, 255, 0.65);
+  --ch-text-strong: rgba(255, 255, 255, 0.9);
+  --ch-surface-bg: rgba(255, 255, 255, 0.05);
+  --ch-surface-border: rgba(255, 255, 255, 0.1);
+  --ch-btn-bg: rgba(255, 255, 255, 0.08);
+  --ch-btn-border: rgba(255, 255, 255, 0.18);
 }
 
 /* Light Theme Variant */
@@ -178,16 +190,28 @@ body.light-theme {
   --ion-color-light-shade: #daDce1;
   --ion-color-light-tint: #f9fbfe;
 
-  /* Loopa Specific Theme Variables */
-  --loopa-toolbar-background: rgba(226, 232, 240, 0.85);
-  --loopa-toolbar-color: #1e293b;
-  --loopa-tabbar-background: rgba(226, 232, 240, 0.9);
-  --loopa-tabbar-border: rgba(0, 0, 0, 0.06);
-  --loopa-tabbar-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --loopa-text-muted: #64748b;
-  --loopa-glass-bg: rgba(255, 255, 255, 0.4);
-  --loopa-glass-border: rgba(0, 0, 0, 0.05);
-  --loopa-mesh-opacity: 0.05;
+  /* Folcen Specific Theme Variables */
+  --folcen-toolbar-background: rgba(226, 232, 240, 0.85);
+  --folcen-toolbar-color: #1e293b;
+  --folcen-tabbar-background: rgba(226, 232, 240, 0.9);
+  --folcen-tabbar-border: rgba(0, 0, 0, 0.06);
+  --folcen-tabbar-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --folcen-text-muted: #64748b;
+  --folcen-glass-bg: rgba(255, 255, 255, 0.4);
+  --folcen-glass-border: rgba(0, 0, 0, 0.05);
+  --folcen-mesh-opacity: 0.05;
+
+  /* Channel / Post page semantic tokens */
+  --folcen-deep-slate: #E2E8F0;
+  --folcen-indigo: #6366f1;
+  --folcen-rose: #f43f5e;
+  --ch-text-primary: #1e293b;
+  --ch-text-muted: rgba(15, 23, 42, 0.6);
+  --ch-text-strong: rgba(15, 23, 42, 0.88);
+  --ch-surface-bg: rgba(0, 0, 0, 0.04);
+  --ch-surface-border: rgba(0, 0, 0, 0.08);
+  --ch-btn-bg: rgba(0, 0, 0, 0.06);
+  --ch-btn-border: rgba(0, 0, 0, 0.12);
 }
 
 /* Dark Mode Support (System Preference) */
@@ -228,23 +252,35 @@ body.light-theme {
     --ion-color-light-contrast: #ffffff;
     --ion-color-light-contrast-rgb: 255, 255, 255;
 
-    --loopa-toolbar-background: rgba(15, 23, 42, 0.8);
-    --loopa-toolbar-color: #ffffff;
-    --loopa-tabbar-background: rgba(15, 23, 42, 0.8);
-    --loopa-tabbar-border: rgba(255, 255, 255, 0.08);
-    --loopa-tabbar-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --loopa-text-muted: #94a3b8;
-    --loopa-glass-bg: rgba(255, 255, 255, 0.1);
-    --loopa-glass-border: rgba(255, 255, 255, 0.2);
+    --folcen-toolbar-background: rgba(15, 23, 42, 0.8);
+    --folcen-toolbar-color: #ffffff;
+    --folcen-tabbar-background: rgba(15, 23, 42, 0.8);
+    --folcen-tabbar-border: rgba(255, 255, 255, 0.08);
+    --folcen-tabbar-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --folcen-text-muted: #94a3b8;
+    --folcen-glass-bg: rgba(255, 255, 255, 0.1);
+    --folcen-glass-border: rgba(255, 255, 255, 0.2);
+
+    /* Channel / Post page semantic tokens */
+    --folcen-deep-slate: #0f172a;
+    --folcen-indigo: #6366f1;
+    --folcen-rose: #f43f5e;
+    --ch-text-primary: #ffffff;
+    --ch-text-muted: rgba(255, 255, 255, 0.65);
+    --ch-text-strong: rgba(255, 255, 255, 0.9);
+    --ch-surface-bg: rgba(255, 255, 255, 0.05);
+    --ch-surface-border: rgba(255, 255, 255, 0.1);
+    --ch-btn-bg: rgba(255, 255, 255, 0.08);
+    --ch-btn-border: rgba(255, 255, 255, 0.18);
   }
 }
 
 /* Global UI Clarity Overrides */
 ion-searchbar {
-  --background: var(--loopa-tabbar-background);
+  --background: var(--folcen-tabbar-background);
   --border-radius: 12px;
   --box-shadow: none;
-  border: 1px solid var(--loopa-tabbar-border);
+  border: 1px solid var(--folcen-tabbar-border);
   padding-left: 10px !important;
   padding-right: 10px !important;
 }

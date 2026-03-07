@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "224951885289",
-    "project_id": "loopa-b57f5",
-    "storage_bucket": "loopa-b57f5.appspot.com"
+    "project_number": "309126815402",
+    "project_id": "folcen-8fd1c",
+    "storage_bucket": "folcen-8fd1c.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:224951885289:android:0dda825fe0eaab006b3f78",
+        "mobilesdk_app_id": "1:309126815402:android:825e97660fdf00e09fbad3",
         "android_client_info": {
-          "package_name": "com.Loopa.app"
+          "package_name": "com.folcen.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAq4VMB5lRRNds72FxbjIazVNF7RB0pJAo"
+          "current_key": "AIzaSyCswx6wNkbKdJ9ZQlw7WyEjSIqaAR66y0g"
         }
       ],
       "services": {

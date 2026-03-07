@@ -58,7 +58,7 @@
 
   .subtitle {
     font-size: clamp(0.95rem, 2.6vw, 16px);
-    color: var(--loopa-text-muted);
+    color: var(--folcen-text-muted);
     margin-bottom: 40px;
   }
 }
@@ -88,16 +88,16 @@
 }
 
 .glass-card {
-  background: var(--loopa-toolbar-background);
+  background: var(--folcen-toolbar-background);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
-  border: 1px solid var(--loopa-tabbar-border);
+  border: 1px solid var(--folcen-tabbar-border);
   border-radius: 24px;
   padding: 30px 20px;
   text-align: center;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
-  box-shadow: var(--loopa-tabbar-shadow);
+  box-shadow: var(--folcen-tabbar-shadow);
 
   &:hover {
     transform: translateY(-10px);
@@ -142,7 +142,7 @@
 
 .glass-card p {
   font-size: 14px;
-  color: var(--loopa-text-muted);
+  color: var(--folcen-text-muted);
   margin: 0 0 20px 0;
   line-height: 1.5;
 }

@@ -1,9 +1,9 @@
-# Loopa (Onprimse) — Ionic / Angular mobile app
+# Folcen (Onprimse) — Ionic / Angular mobile app
 
-This repository contains the Ionic/Angular frontend for the Loopa (Onprimse) mobile application.
+This repository contains the Ionic/Angular frontend for the Folcen (Onprimse) mobile application.
 
 Backend
-- The backend for this project lives in a separate repository: https://github.com/EmadHammamiLoopa/Onprimse_backend.git
+- The backend for this project lives in a separate repository: https://github.com/EmadHammamiFolcen/Onprimse_backend.git
 
 Quickstart (Windows / PowerShell)
 1. Install dependencies

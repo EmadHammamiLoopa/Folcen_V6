@@ -17,14 +17,14 @@ ion-content {
 }
 
 .styled-list {
-  --ion-background-color: var(--loopa-toolbar-background);
+  --ion-background-color: var(--folcen-toolbar-background);
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 15px;
 }
 
 .styled-item {
-  --background: var(--loopa-tabbar-background);
+  --background: var(--folcen-tabbar-background);
   --padding-start: 10px;
   --padding-end: 10px;
   margin: 10px 0;
@@ -39,7 +39,7 @@ ion-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--loopa-tabbar-background);
+  background: var(--folcen-tabbar-background);
   border-radius: 20px;
   margin: 5px;
 }
