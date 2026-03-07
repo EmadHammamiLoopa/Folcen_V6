@@ -207,9 +207,23 @@
 
 
 .posts-container {
-  padding: 8px 0 40px;
+  padding: 8px 0 env(safe-area-inset-bottom, 40px);
+  padding-bottom: max(env(safe-area-inset-bottom), 40px);
   background: var(--loopa-deep-slate);
   min-height: 50vh;
+  width: 100%;
+  box-sizing: border-box;
+
+  @media (min-width: 600px) {
+    max-width: 680px;
+    margin: 0 auto;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  @media (min-width: 1024px) {
+    max-width: 780px;
+  }
 }
 
 /* Verification Alert */
@@ -250,21 +264,29 @@
 
 /* Empty State */
 .empty-state {
-  padding: 60px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100dvh - 220px);
+  padding: 24px clamp(16px, 5vw, 40px);
   text-align: center;
 
   .empty-content {
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
+
     .icon-wrapper {
-      width: 80px;
-      height: 80px;
+      width: clamp(64px, 18vw, 88px);
+      height: clamp(64px, 18vw, 88px);
       background: rgba(255, 255, 255, 0.05);
       border-radius: 30px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 32px;
+      font-size: clamp(26px, 7vw, 36px);
       color: var(--loopa-indigo);
-      margin: 0 auto 24px;
+      margin: 0 auto 20px;
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
@@ -272,24 +294,30 @@
       font-weight: 800;
       color: white;
       margin-bottom: 8px;
+      font-size: clamp(1.15rem, 4vw, 1.4rem);
     }
 
     p {
       color: rgba(255, 255, 255, 0.6);
-      margin-bottom: 32px;
-      font-size: 0.95rem;
+      margin-bottom: 28px;
+      font-size: clamp(0.85rem, 3vw, 0.95rem);
+      line-height: 1.5;
+      padding: 0 8px;
+
+      strong { color: rgba(255,255,255,0.9); }
     }
 
     .create-first-btn {
-      --background: var(--loopa-gradient-primary);
+      --background: linear-gradient(135deg, #6366f1, #a855f7);
       --color: white;
       --border-radius: 16px;
-      --box-shadow: none;
-      height: 50px;
+      --box-shadow: 0 8px 24px rgba(99,102,241,0.35);
+      height: clamp(44px, 12vw, 52px);
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      padding: 0 30px;
+      letter-spacing: 1.2px;
+      font-size: 0.8rem;
+      min-width: clamp(160px, 50vw, 220px);
     }
   }
 }

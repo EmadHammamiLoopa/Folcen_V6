@@ -2,13 +2,16 @@
   --ion-card-background: transparent;
   background: var(--post-bg);
   color: var(--post-fg);
-  border-radius: 24px;
-  padding: 14px 16px;
+  border-radius: clamp(16px, 4vw, 24px);
+  padding: clamp(10px, 3vw, 16px) clamp(12px, 4vw, 18px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  margin: 12px 16px;
+  margin: clamp(8px, 2vw, 12px) auto;
+  max-width: min(100%, 640px);
+  width: calc(100% - clamp(16px, 5vw, 32px));
   border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: visible;
   transition: transform 0.2s ease;
+  box-sizing: border-box;
 
   &:active {
     transform: scale(0.99);
@@ -57,7 +60,7 @@
     flex-direction: column;
 
     .name {
-      font-size: 1rem;
+      font-size: clamp(0.9rem, 3vw, 1rem);
       font-weight: 700;
       letter-spacing: -0.3px;
     }
@@ -66,7 +69,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 0.75rem;
+      font-size: clamp(0.7rem, 2.2vw, 0.75rem);
       opacity: 0.8;
       font-weight: 500;
 
@@ -99,9 +102,9 @@
 
 /* text */
 .jdl-text {
-  font-size: 1.1rem;
-  line-height: 1.4;
-  margin: 0 0 12px;
+  font-size: clamp(0.95rem, 3.5vw, 1.1rem);
+  line-height: 1.5;
+  margin: 0 0 clamp(8px, 2.5vw, 12px);
   word-wrap: break-word;
   font-weight: 500;
   letter-spacing: -0.2px;
@@ -150,7 +153,7 @@
     position: relative;
     width: 100%;
     display: flex;
-    max-height: 250px; // Compact height for feed
+    max-height: clamp(200px, 50vw, 320px); // Compact height for feed
     transition: max-height 0.3s ease;
 
     &.enlarged-container {
@@ -384,7 +387,7 @@
 .jdl-actions {
   display: flex;
   align-items: center;
-  padding-top: 16px;
+  padding-top: clamp(10px, 2.5vw, 16px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 
   .vote-controls {
