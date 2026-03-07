@@ -4,7 +4,7 @@ import { AuthService } from './../../../services/auth.service';
 import { Router } from '@angular/router';
 import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ModalController, Platform } from '@ionic/angular';
+import { AlertController, ModalController, PickerController, Platform } from '@ionic/angular';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { TermsOfServiceComponent } from '../../terms-of-service/terms-of-service.component';
 import { PrivacyPolicyComponent } from '../../privacy-policy/privacy-policy.component';
@@ -25,10 +25,13 @@ export class SignupComponent implements OnInit, OnDestroy {
   gender = "prefer not to say";
   step = 0;
   steps = ['email', 'name', 'password', 'birthDate', 'gender', 'location', 'school', 'education', 'profession', 'interests', 'languages', 'aboutMe', 'randomRequests', 'ageVisibility', 'verifyEmail', 'success'];
+  // Steps that render a step-icon illustration — logo is hidden on these
+  stepsWithIllustration = new Set(['email', 'name', 'password', 'birthDate', 'randomRequests', 'ageVisibility', 'verifyEmail']);
   isSubmitted = false;
   validationErrors: any = {};
   btnLoading = false;
   pageLoading = false;
+  birthDateDisplay = '';
   adjustingEmail = false;
   resendCooldown = 0;
   resendInterval: any;
@@ -64,6 +67,7 @@ export class SignupComponent implements OnInit, OnDestroy {
     private auth: AuthService,
     private formBuilder: FormBuilder,
     private modalCtrl: ModalController,
+    private alertCtrl: AlertController,
     private cdr: ChangeDetectorRef,
     private modalController: ModalController,
     private nativeStorage: NativeStorage,
@@ -71,7 +75,8 @@ export class SignupComponent implements OnInit, OnDestroy {
     private schoolService: SchoolService,
     private toastService: ToastService,
     private userService: UserService,
-    private platform: Platform
+    private platform: Platform,
+    private pickerCtrl: PickerController
   ) { }
 
   ionViewWillEnter() {
@@ -372,7 +377,24 @@ export class SignupComponent implements OnInit, OnDestroy {
     } catch (err) {
       this.pageLoading = false;
       devLogger.error('Signup error:', err);
-      
+
+      // Email already exists in Firebase (e.g. legacy account or ghost account from password reset)
+      if (err && err.code === 'email-already-in-use') {
+        const alert = await this.alertCtrl.create({
+          header: 'Account Already Exists',
+          message: 'An account with this email already exists. Would you like to sign in instead?',
+          buttons: [
+            { text: 'Cancel', role: 'cancel' },
+            {
+              text: 'Sign In',
+              handler: () => { this.router.navigate(['/auth/signin']); }
+            }
+          ]
+        });
+        await alert.present();
+        return;
+      }
+
       if (err && err.error && err.error.errors) {
         this.validationErrors = err.error.errors;
         this.backToError();
@@ -600,6 +622,64 @@ export class SignupComponent implements OnInit, OnDestroy {
     const currDate = new Date();
     currDate.setFullYear(currDate.getFullYear() - 18);
     return currDate.toJSON().slice(0, 10);
+  }
+
+  async openBirthdayPicker() {
+    const currentYear = new Date().getFullYear();
+    const maxYear = currentYear - 18;
+    const minYear = currentYear - 100;
+
+    const months = [
+      { text: 'January', value: '01' }, { text: 'February', value: '02' },
+      { text: 'March', value: '03' }, { text: 'April', value: '04' },
+      { text: 'May', value: '05' }, { text: 'June', value: '06' },
+      { text: 'July', value: '07' }, { text: 'August', value: '08' },
+      { text: 'September', value: '09' }, { text: 'October', value: '10' },
+      { text: 'November', value: '11' }, { text: 'December', value: '12' }
+    ];
+
+    const days = Array.from({ length: 31 }, (_, i) => ({
+      text: String(i + 1), value: String(i + 1).padStart(2, '0')
+    }));
+
+    const years: { text: string; value: string }[] = [];
+    for (let y = maxYear; y >= minYear; y--) {
+      years.push({ text: String(y), value: String(y) });
+    }
+
+    let defMonth = 0, defDay = 0, defYear = 0;
+    const current = this.form.get('birthDate')?.value;
+    if (current) {
+      const [y, m, d] = current.split('-');
+      defMonth = parseInt(m, 10) - 1;
+      defDay = parseInt(d, 10) - 1;
+      defYear = years.findIndex(yr => yr.value === y);
+    }
+
+    const picker = await this.pickerCtrl.create({
+      cssClass: 'birthday-picker',
+      columns: [
+        { name: 'month', options: months, selectedIndex: defMonth >= 0 ? defMonth : 0 },
+        { name: 'day', options: days, selectedIndex: defDay >= 0 ? defDay : 0 },
+        { name: 'year', options: years, selectedIndex: defYear >= 0 ? defYear : 0 }
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel', cssClass: 'picker-cancel-btn' },
+        {
+          text: 'Confirm',
+          cssClass: 'picker-confirm-btn',
+          handler: (value) => {
+            const dateStr = `${value.year.value}-${value.month.value}-${value.day.value}`;
+            this.form.get('birthDate')?.setValue(dateStr);
+            this.form.get('birthDate')?.markAsDirty();
+            this.birthDateDisplay = `${value.month.text} ${parseInt(value.day.value, 10)}, ${value.year.value}`;
+            this.cdr.detectChanges();
+          }
+        }
+      ]
+    });
+
+    await picker.present();
   }
 
   async openPrivacyPolicy() {

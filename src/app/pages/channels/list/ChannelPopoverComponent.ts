@@ -1,10 +1,16 @@
 import { Component, Input } from '@angular/core';
+import { ModalController } from '@ionic/angular';
 
 @Component({
   selector: 'app-channel-popover',
   template: `
     <div class="channel-info-card">
       <div class="card-glow"></div>
+
+      <!-- Close button -->
+      <button class="close-btn" (click)="close()">
+        <ion-icon name="close"></ion-icon>
+      </button>
       
       <div class="info-header">
         <div class="img-wrapper">
@@ -52,6 +58,30 @@ import { Component, Input } from '@angular/core';
       position: relative;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+      z-index: 10;
+    }
+
+    .close-btn:active {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
     }
 
     .card-glow {
@@ -162,6 +192,12 @@ import { Component, Input } from '@angular/core';
 })
 export class ChannelPopoverComponent {
   @Input() channel: any;
+
+  constructor(private modalCtrl: ModalController) {}
+
+  close() {
+    this.modalCtrl.dismiss();
+  }
 
   getEnhancedDescription(name: string): string {
     switch (name) {

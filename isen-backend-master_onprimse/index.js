@@ -4,6 +4,24 @@ try {
   console.warn('Optional dependency dotenv not found — continuing without .env');
 }
 
+// ── Firebase Admin — initialize once at startup ───────────────────────────────
+try {
+  const admin = require('firebase-admin');
+  if (admin.apps.length === 0) {
+    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
+      require('path').join(__dirname, 'config', 'firebase-service-account.json');
+    try {
+      const serviceAccount = require(serviceAccountPath);
+      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+      console.log('[Firebase Admin] Initialized for project:', serviceAccount.project_id);
+    } catch (e) {
+      console.warn('[Firebase Admin] Service account not found at', serviceAccountPath, '— Firebase Admin features disabled.');
+    }
+  }
+} catch (e) {
+  console.error('[Firebase Admin] Startup init failed:', e.message);
+}
+
 const express = require('express');
 const mongoose = require('mongoose');
 const helmet = require('helmet');
@@ -223,6 +241,23 @@ peerServer.on("connection", (client) => {
 
 schedule.scheduleJob('0 * * * *', removeExpiredMedia);  // Runs every hour
 
+// Purge unverified accounts older than 24 hours (runs daily at 03:00)
+async function purgeUnverifiedAccounts() {
+    try {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const result = await User.deleteMany({
+            emailVerified: false,
+            createdAt: { $lt: cutoff }
+        });
+        if (result.deletedCount > 0) {
+            console.log(`[Cleanup] Purged ${result.deletedCount} unverified account(s) older than 24h`);
+        }
+    } catch (err) {
+        console.error('[Cleanup] Failed to purge unverified accounts:', err.message);
+    }
+}
+schedule.scheduleJob('0 3 * * *', purgeUnverifiedAccounts);  // Runs daily at 03:00
+
 const port = process.env.PORT || 3300;
 http.listen(port, () => console.log("server connected at 127.0.0.1:" + port + " ..."));
 
@@ -251,10 +286,10 @@ app.use((req, res, next) => {
       if (req.path && req.path.includes('/auth/signin')) {
         try { console.log('DEBUG: original response body for signin:', JSON.stringify(body).slice(0,400)); } catch (e) { }
       }
-      // Allow signin/signup responses to include `token` (auth flow).
+      // Allow signin/signup/firebase-login responses to include `token` (auth flow).
       // Check multiple URL forms (`originalUrl` when mounted under `/api/v1`, and `path` fallback)
-      const allowToken = (req.originalUrl && (req.originalUrl.includes('/api/v1/auth/signin') || req.originalUrl.includes('/api/v1/auth/signup'))) ||
-                         (req.path && (req.path.includes('/auth/signin') || req.path.includes('/auth/signup')));
+      const allowToken = (req.originalUrl && (req.originalUrl.includes('/api/v1/auth/signin') || req.originalUrl.includes('/api/v1/auth/signup') || req.originalUrl.includes('/api/v1/auth/firebase-login'))) ||
+                         (req.path && (req.path.includes('/auth/signin') || req.path.includes('/auth/signup') || req.path.includes('/auth/firebase-login')));
       if (allowToken && body && typeof body === 'object') {
         // Support several possible nesting shapes for the token (generic + legacy):
         // - body.data.token
@@ -363,6 +398,7 @@ app.use(`${routePrefix}/report`, reportRoutes);
 app.use(`${routePrefix}/follow`, followRoutes);
 app.use(`${routePrefix}/activity`, require('./routes/activity'));
 app.use(`${routePrefix}/notifications`, require('./routes/notification'));
+app.use(`${routePrefix}/push`, require('./routes/push'));
 // GDPR / DSAR endpoints
 try {
   app.use(`${routePrefix}/gdpr`, require('./routes/gdpr'));

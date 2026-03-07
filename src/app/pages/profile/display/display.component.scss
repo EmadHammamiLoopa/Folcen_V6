@@ -6,6 +6,7 @@
   min-height: 100vh;
   --padding-top: 0;
   --padding-bottom: 0;
+  --overflow: auto;
 
   :host-context(.light-theme) & {
     --ion-background-color: #E2E8F0;
@@ -18,7 +19,9 @@
   background: #0f172a;
   color: #ffffff;
   display: block;
-  overflow: visible;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
 
   :host-context(.light-theme) & {
     background: transparent;
@@ -30,12 +33,14 @@
 .profile-hero {
   position: relative;
   padding-top: env(safe-area-inset-top);
-  padding-bottom: 20px;
+  padding-bottom: clamp(20px, 5vw, 36px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hero-overlay {
@@ -66,7 +71,9 @@
   width: 100%;
   display: flex;
   justify-content: space-between;
-  padding: 10px 20px;
+  align-items: center;
+  padding: clamp(8px, 2vw, 12px) clamp(12px, 4vw, 20px);
+  box-sizing: border-box;
   
   ion-button {
     --color: #ffffff;
@@ -88,18 +95,36 @@
   position: relative;
   z-index: 5;
   width: 100%;
+  max-width: 600px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 clamp(16px, 5vw, 32px);
+  box-sizing: border-box;
+  margin: 0 auto;
 }
 
 .avatar-wrapper {
   position: relative;
-  margin-bottom: 15px;
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
+  margin: 0 auto 15px;
+  display: block;
+  width: clamp(150px, 40vw, 200px);
+  height: clamp(150px, 40vw, 200px);
+
+  // Force the avatar component's internals to fill the wrapper exactly
+  ::ng-deep .avatar-container {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 50%;
+    overflow: hidden;
+
+    img,
+    .fallback {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  }
 
   .avatar-ring {
     position: absolute;
@@ -137,14 +162,15 @@
 }
 
 .main-avatar-img {
-  display: block;
-  width: 160px;
-  height: 160px;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
   border: 4px solid #1e293b;
   border-radius: 50%;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
   z-index: 2;
   overflow: hidden;
+  flex-shrink: 0;
 
   :host-context(.light-theme) & {
     border-color: #F1F5F9;
@@ -174,10 +200,12 @@
 }
 
 .edit-avatar-fab {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  margin: 0;
+  position: absolute !important;
+  bottom: 4px !important;
+  right: 4px !important;
+  left: auto !important;
+  top: auto !important;
+  margin: 0 !important;
   z-index: 10;
   
   ion-fab-button {
@@ -203,14 +231,18 @@
 }
 
 .user-identity {
-  margin-bottom: 15px;
+  margin-bottom: clamp(12px, 3vw, 18px);
+  width: 100%;
   
   .name {
-    font-size: 28px;
+    font-size: clamp(1.4rem, 6vw, 1.75rem);
     font-weight: 800;
     margin: 0 0 5px 0;
     letter-spacing: -0.5px;
     color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     
     .age {
       opacity: 0.6;
@@ -220,29 +252,37 @@
   }
   
   .location {
-    font-size: 14px;
+    font-size: clamp(0.8rem, 3vw, 0.9rem);
     color: #94a3b8;
     margin: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     
     ion-icon {
       color: var(--ion-color-secondary);
+      flex-shrink: 0;
     }
   }
 }
 
 .stats-bar {
   display: flex;
+  width: 100%;
+  max-width: 380px;
+  justify-content: center;
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border-radius: 20px;
-  padding: 15px 25px;
-  gap: 20px;
+  padding: clamp(10px, 3vw, 16px) clamp(16px, 5vw, 28px);
+  gap: clamp(12px, 4vw, 24px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 1cm;
+  margin-bottom: clamp(16px, 4vw, 24px);
+  box-sizing: border-box;
 
   :host-context(.light-theme) & {
     background: rgba(0, 0, 0, 0.03);
@@ -262,7 +302,7 @@
     }
     
     .value {
-      font-size: 18px;
+      font-size: clamp(15px, 4vw, 18px);
       font-weight: 700;
       color: #ffffff;
       position: relative;
@@ -315,11 +355,21 @@
   background: #1e293b;
   border-top-left-radius: 40px;
   border-top-right-radius: 40px;
-  padding: 20px 20px 100px 20px; /* Reduced top padding */
+  padding: clamp(16px, 4vw, 28px) clamp(14px, 4vw, 24px) 100px;
   margin-top: -20px;
   position: relative;
   z-index: 10;
   box-shadow: 0 -20px 40px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+
+  /* Centered inner content */
+  > * {
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 
   :host-context(.light-theme) & {
     background: var(--ion-item-background);
@@ -329,21 +379,26 @@
 
 .visitor-actions {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
   
   .primary-action {
     flex: 1;
-    height: 50px;
+    min-width: 120px;
+    height: clamp(44px, 10vw, 50px);
     --border-radius: 16px;
     font-weight: 700;
     margin: 0;
+    font-size: clamp(0.85rem, 3.5vw, 0.95rem);
     --box-shadow: 0 8px 20px rgba(var(--ion-color-primary-rgb), 0.3);
   }
   
   .secondary-action {
-    width: 50px;
-    height: 50px;
+    width: clamp(44px, 10vw, 50px);
+    height: clamp(44px, 10vw, 50px);
     --border-radius: 16px;
     margin: 0;
     --padding-start: 0;
@@ -395,8 +450,8 @@
 
 .details-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: clamp(10px, 3vw, 15px);
   
   .grid-item {
     background: rgba(255, 255, 255, 0.03);
@@ -560,8 +615,10 @@
   .modern-gallery-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    gap: clamp(8px, 2.5vw, 12px);
     padding: 4px 0;
+    width: 100%;
+    box-sizing: border-box;
 
     .gallery-item {
       position: relative;
@@ -989,4 +1046,40 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+// ─── Responsive Breakpoints ───────────────────────────────────────────────────
+@media (max-width: 360px) {
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-bar {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .visitor-actions .primary-action {
+    font-size: 0.8rem;
+  }
+}
+
+@media (min-width: 600px) {
+  .profile-body {
+    padding: clamp(24px, 5vw, 40px) clamp(24px, 5vw, 40px) 100px;
+  }
+  .modern-gallery-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+@media (min-width: 900px) {
+  .profile-hero {
+    padding-bottom: 48px;
+  }
+  .profile-body {
+    border-top-left-radius: 48px;
+    border-top-right-radius: 48px;
+  }
+  .modern-gallery-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
 }

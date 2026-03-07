@@ -1,0 +1,120 @@
+import { Injectable } from '@angular/core';
+import { Platform } from '@ionic/angular';
+import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { environment } from '../../environments/environment';
+
+/**
+ * FcmPushService
+ *
+ * Lightweight replacement for OneSignalService.
+ * – On a real Android/iOS device: registers with FCM via Capacitor's
+ *   PushNotifications plugin, then sends the token to the backend.
+ * – In browser/dev mode: skips registration silently.
+ *
+ * Call  open(userId)  after login.
+ * Call  close()       on logout (unregisters the current token).
+ */
+@Injectable({
+  providedIn: 'root'
+})
+export class FcmPushService {
+
+  private currentToken: string | null = null;
+  private readonly apiBase = environment.apiUrl || 'http://127.0.0.1:3300/api/v1';
+
+  constructor(
+    private platform: Platform,
+    private router: Router,
+    private http: HttpClient
+  ) {}
+
+  /** Call after a successful login. */
+  async open(userId: string): Promise<void> {
+    const isNative = typeof window !== 'undefined' && 'cordova' in window;
+    if (!isNative) {
+      console.log('[FcmPushService] Browser mode — skipping FCM registration');
+      return;
+    }
+    await this.registerFcm();
+  }
+
+  /** Call at logout to remove the token from the backend. */
+  async close(): Promise<void> {
+    if (!this.currentToken) return;
+    try {
+      await this.http
+        .post(`${this.apiBase}/push/unregister`, { token: this.currentToken })
+        .toPromise();
+      console.log('[FcmPushService] Token unregistered');
+    } catch (e) {
+      console.warn('[FcmPushService] Unregister failed (token already gone?)', e);
+    }
+    this.currentToken = null;
+  }
+
+  // ──────────────────────── private ────────────────────────────────
+
+  private async registerFcm(): Promise<void> {
+    try {
+      // 1. Request permission
+      let permStatus = await PushNotifications.checkPermissions();
+      if (permStatus.receive === 'prompt') {
+        permStatus = await PushNotifications.requestPermissions();
+      }
+      if (permStatus.receive !== 'granted') {
+        console.warn('[FcmPushService] Push permission denied');
+        return;
+      }
+
+      // 2. Register with FCM
+      await PushNotifications.register();
+
+      // 3. Listen for FCM registration token
+      PushNotifications.addListener('registration', async (tokenData) => {
+        const token = tokenData.value;
+        this.currentToken = token;
+        console.log('[FcmPushService] FCM token received');
+        await this.sendTokenToBackend(token);
+      });
+
+      PushNotifications.addListener('registrationError', (err) => {
+        console.error('[FcmPushService] FCM registration error:', err);
+      });
+
+      // 4. Handle foreground notifications
+      PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        console.log('[FcmPushService] Notification received in foreground:', notification.title);
+      });
+
+      // 5. Handle notification tap (background/closed)
+      PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        const data = action.notification?.data;
+        if (data?.link) {
+          this.platform.ready().then(() => {
+            setTimeout(() => this.router.navigateByUrl(data.link), 200);
+          });
+        }
+      });
+
+    } catch (err) {
+      console.error('[FcmPushService] registerFcm error:', err);
+    }
+  }
+
+  private async sendTokenToBackend(token: string): Promise<void> {
+    try {
+      await this.http
+        .post(`${this.apiBase}/push/register`, {
+          token,
+          platform: this.platform.is('ios') ? 'ios' : 'android',
+          deviceId: null
+        })
+        .toPromise();
+      console.log('[FcmPushService] Token registered on backend');
+    } catch (err) {
+      console.error('[FcmPushService] Failed to register token on backend:', err);
+    }
+  }
+}

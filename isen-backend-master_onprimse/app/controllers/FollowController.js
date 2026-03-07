@@ -1,7 +1,7 @@
 const Follow = require('../models/Follow');
 const User = require('../models/User');
 const Response = require('./Response');
-const { sendNotification } = require('../helpers');
+const { sendNotification, emitToUser } = require('../helpers');
 const mongoose = require('mongoose');
 
 /**
@@ -84,17 +84,14 @@ exports.followUser = async (req, res) => {
                     getUserStats(followedId)
                 ]);
                 console.log('[FollowController] followUser emitting stats — actor:', JSON.stringify(actorStats), 'target:', JSON.stringify(targetStats));
-                io.emit('follow-update', {
-                    followerId,
-                    followedId,
-                    status,
-                    at: new Date(),
-                    actorStatistics: actorStats,
-                    targetStatistics: targetStats
-                });
+                const followPayload = { followerId, followedId, status, at: new Date(), actorStatistics: actorStats, targetStatistics: targetStats };
+                emitToUser(String(followerId), 'follow-update', followPayload);
+                emitToUser(String(followedId), 'follow-update', followPayload);
             } catch (statsErr) {
                 console.error('[FollowController] getUserStats failed, emitting without stats:', statsErr);
-                io.emit('follow-update', { followerId, followedId, status, at: new Date() });
+                const fallbackPayload = { followerId, followedId, status, at: new Date() };
+                emitToUser(String(followerId), 'follow-update', fallbackPayload);
+                emitToUser(String(followedId), 'follow-update', fallbackPayload);
             }
         } else {
             console.error('[FollowController] io is null/undefined — socket event NOT sent');
@@ -146,14 +143,9 @@ exports.unfollowUser = async (req, res) => {
                     getUserStats(followerId),
                     getUserStats(followedId)
                 ]);
-                io.emit('follow-update', {
-                    followerId,
-                    followedId,
-                    status: 'unfollowed',
-                    at: new Date(),
-                    actorStatistics: actorStats,
-                    targetStatistics: targetStats
-                });
+                const unfollowPayload = { followerId, followedId, status: 'unfollowed', at: new Date(), actorStatistics: actorStats, targetStatistics: targetStats };
+                emitToUser(String(followerId), 'follow-update', unfollowPayload);
+                emitToUser(String(followedId), 'follow-update', unfollowPayload);
             }
         }
 
@@ -197,14 +189,9 @@ exports.handleFollowRequest = async (req, res) => {
                     getUserStats(followerId),
                     getUserStats(followedId)
                 ]);
-                io.emit('follow-update', {
-                    followerId,
-                    followedId,
-                    status: 'active',
-                    at: new Date(),
-                    actorStatistics: actorStats,
-                    targetStatistics: targetStats
-                });
+                const acceptPayload = { followerId, followedId, status: 'active', at: new Date(), actorStatistics: actorStats, targetStatistics: targetStats };
+                emitToUser(String(followerId), 'follow-update', acceptPayload);
+                emitToUser(String(followedId), 'follow-update', acceptPayload);
             }
 
             sendNotification(
@@ -247,14 +234,9 @@ exports.removeFollower = async (req, res) => {
                     getUserStats(followerId),
                     getUserStats(followedId)
                 ]);
-                io.emit('follow-update', {
-                    followerId,
-                    followedId,
-                    status: 'removed',
-                    at: new Date(),
-                    actorStatistics: actorStats,
-                    targetStatistics: targetStats
-                });
+                const removePayload = { followerId, followedId, status: 'removed', at: new Date(), actorStatistics: actorStats, targetStatistics: targetStats };
+                emitToUser(String(followerId), 'follow-update', removePayload);
+                emitToUser(String(followedId), 'follow-update', removePayload);
             }
         }
 
@@ -293,20 +275,14 @@ exports.blockUser = async (req, res) => {
         });
 
         // Emit socket event AFTER array updates so stats are accurate
-        const io = req.app.get('io');
-        if (io) {
+        {
             const [actorStats, targetStats] = await Promise.all([
                 getUserStats(blockerId),
                 getUserStats(blockedId)
             ]);
-            io.emit('follow-update', {
-                followerId: blockerId,
-                followedId: blockedId,
-                status: 'blocked',
-                at: new Date(),
-                actorStatistics: actorStats,
-                targetStatistics: targetStats
-            });
+            const blockPayload = { followerId: blockerId, followedId: blockedId, status: 'blocked', at: new Date(), actorStatistics: actorStats, targetStatistics: targetStats };
+            emitToUser(String(blockerId), 'follow-update', blockPayload);
+            emitToUser(String(blockedId), 'follow-update', blockPayload);
         }
 
         return Response.sendResponse(res, null, 'User blocked');

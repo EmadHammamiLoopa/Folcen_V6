@@ -330,10 +330,10 @@ exports.storeProduct = async (req, res) => {
                     recipients
                 );
 
-                // Emit socket event for real-time badges
+                // Emit socket event for real-time badges (targeted to recipients only)
                 try {
-                    const io = req.app && req.app.get('io');
-                    if (io) io.emit('new-buy-sell-update', { productId: product._id });
+                    const { emitToUser: _emit } = require('../helpers');
+                    recipients.forEach(uid => _emit(uid, 'new-buy-sell-update', { productId: product._id }));
                 } catch (e) {}
             }
         } catch (e) {

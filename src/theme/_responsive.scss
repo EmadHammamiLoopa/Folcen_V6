@@ -51,12 +51,12 @@
   --r-radius-pill: 999px;
 
   // ── Tab bar ──────────────────────────────────────────────────
-  --r-tabbar-height:       clamp(56px, 13vw, 72px);
-  --r-tabbar-margin-x:     clamp(10px, 3vw,  24px);
-  --r-tabbar-margin-b:     clamp(12px, 3vw,  24px);
+  --r-tabbar-height:       clamp(64px, 14vw, 78px);  // taller: icon + label
+  --r-tabbar-margin-x:     clamp(8px,  3vw,  24px);
+  --r-tabbar-margin-b:     clamp(10px, 3vw,  22px);
   --r-tabbar-radius:       clamp(18px, 4.5vw, 28px);
-  --r-tabbar-icon:         clamp(16px, 4vw,  22px);
-  --r-tabbar-bottom-pad:   clamp(80px, 20vw, 110px); // page content padding-bottom
+  --r-tabbar-icon:         clamp(15px, 4vw,  20px);
+  --r-tabbar-bottom-pad:   clamp(88px, 22vw, 118px); // page content padding-bottom
 
   // ── Header / Toolbar ─────────────────────────────────────────
   --r-toolbar-height:      clamp(48px, 12vw, 60px);
@@ -182,11 +182,11 @@
     --r-space-md:   10px;
     --r-space-lg:   14px;
 
-    --r-tabbar-height:    54px;
-    --r-tabbar-margin-x:  8px;
-    --r-tabbar-margin-b:  10px;
-    --r-tabbar-bottom-pad: 72px;
-    --r-tabbar-icon:  15px;
+    --r-tabbar-height:    60px;
+    --r-tabbar-margin-x:  6px;
+    --r-tabbar-margin-b:  8px;
+    --r-tabbar-bottom-pad: 80px;
+    --r-tabbar-icon:  14px;
 
     --r-btn-height:  36px;
   }

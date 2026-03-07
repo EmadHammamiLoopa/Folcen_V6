@@ -5,6 +5,8 @@ import { Router } from '@angular/router';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { IonInfiniteScroll, IonSlides, ModalController } from '@ionic/angular';
 import { UserService } from 'src/app/services/user.service';
+import { RequestService } from 'src/app/services/request.service';
+import { ToastService } from 'src/app/services/toast.service';
 import { SearchOptionsComponent } from './search-options/search-options.component';
 import { User } from './../../models/User';
 import { AdMobFeeService } from './../../services/admobfree.service';
@@ -48,10 +50,13 @@ export class NewFriendsPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   showSandglass: boolean = false;
 
+  /** Tracks users the current user has already acted on (requested / followed) this session */
+  connectState = new Map<string, 'requested' | 'following'>();
+
 
   constructor(private userService: UserService, private modalController: ModalController, private router: Router,
               private changeDetectorRef: ChangeDetectorRef, private nativeStorage: NativeStorage, private adMobFeeService: AdMobFeeService,
-              private idService: IdService) { }
+              private idService: IdService, private requestService: RequestService, private toastService: ToastService) { }
 
   async ngOnInit() {
     // Load saved filters first so initial fetch uses persisted filters
@@ -325,6 +330,45 @@ export class NewFriendsPage implements OnInit, OnDestroy {
 
   skipSlide(){
     this.slides.slideNext();
+  }
+
+  /**
+   * Connect button tap on a grid card.
+   * - Private profile  → send a follow request  (warm bell icon → check)
+   * - Public profile   → send a friend request  (user-plus icon → check)
+   */
+  connectAction(user: User, event: Event) {
+    event.stopPropagation();
+    const userId = user.id || (user as any)._id;
+    if (!userId || this.connectState.has(userId)) return;
+
+    if (user.isPrivate) {
+      this.connectState.set(userId, 'following');
+      this.userService.follow(userId).subscribe(
+        (resp: any) => {
+          this.toastService.presentSuccessToastr(resp?.message || 'Follow request sent!');
+          this.changeDetectorRef.detectChanges();
+        },
+        (err: any) => {
+          this.connectState.delete(userId);
+          this.toastService.presentErrorToastr(err?.error?.message || 'Could not send follow request.');
+          this.changeDetectorRef.detectChanges();
+        }
+      );
+    } else {
+      this.connectState.set(userId, 'requested');
+      this.requestService.request(userId).then(
+        (resp: any) => {
+          this.toastService.presentSuccessToastr(resp?.message || 'Friend request sent!');
+          this.changeDetectorRef.detectChanges();
+        },
+        (err: any) => {
+          this.connectState.delete(userId);
+          this.toastService.presentErrorToastr(err?.error?.message || 'Could not send friend request.');
+          this.changeDetectorRef.detectChanges();
+        }
+      );
+    }
   }
 
 }

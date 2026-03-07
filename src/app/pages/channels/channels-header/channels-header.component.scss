@@ -1,37 +1,57 @@
 #end-buttons {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding-right: 8px;
 
   .header-action-btn {
     background: rgba(var(--ion-color-primary-rgb), 0.1);
     color: var(--ion-color-primary);
     border: none;
-    width: 36px;
     height: 36px;
-    border-radius: 10px;
+    padding: 0 12px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.3rem;
+    font-size: 1.15rem;
     transition: all 0.2s ease;
     cursor: pointer;
     outline: none;
+    min-width: 36px;
+    gap: 5px;
 
-    &:active {
-      transform: scale(0.9);
-    }
+    &:active { transform: scale(0.9); }
 
-    ion-icon {
-      pointer-events: none;
-    }
+    ion-icon { pointer-events: none; }
   }
 
   .create-btn {
     background: var(--ion-color-primary);
     color: #fff;
-    box-shadow: 0 4px 10px rgba(var(--ion-color-primary-rgb), 0.2);
+    box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.35);
+    border-radius: 12px;
+    min-width: 80px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    gap: 5px;
+  }
+
+  .explore-btn {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.35);
+    border-radius: 12px;
+    min-width: 80px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    gap: 5px;
+
+    &::before {
+      content: 'Explore';
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
   }
 }
 
@@ -53,11 +73,11 @@
   .glass-tabs-inner {
     background: var(--folcen-tabbar-background);
     backdrop-filter: blur(12px);
-    border: none;
-    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
     display: flex;
-    padding: 3px;
-    gap: 3px;
+    padding: 4px;
+    gap: 4px;
     box-shadow: none !important;
 
     .tab-item {
@@ -65,30 +85,27 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: clamp(4px, 1.5vw, 6px);
-      padding: clamp(6px, 2vw, 8px);
-      border-radius: 9px;
+      gap: clamp(5px, 1.5vw, 7px);
+      padding: clamp(7px, 2vw, 10px);
+      border-radius: 10px;
       color: var(--folcen-text-muted);
-      font-size: clamp(0.7rem, 2.8vw, 0.8rem);
+      font-size: clamp(0.72rem, 2.9vw, 0.82rem);
       font-weight: 600;
-      transition: all 0.3s ease;
+      transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
       min-width: 0;
       white-space: nowrap;
 
-      i {
-        font-size: 0.9rem;
-      }
+      i { font-size: 0.88rem; }
 
       &.active {
-        background: rgba(var(--ion-color-primary-rgb), 0.15);
-        color: var(--ion-color-primary);
-        box-shadow: none !important;
+        background: var(--ion-color-primary);
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(var(--ion-color-primary-rgb), 0.38);
+        font-weight: 700;
       }
 
-      &:active {
-        transform: scale(0.95);
-      }
+      &:active { transform: scale(0.95); }
     }
   }
 }

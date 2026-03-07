@@ -1019,10 +1019,8 @@ export class DisplayComponent implements OnInit, OnDestroy {
           this.user = new User().initialize(resp.user);
         } else {
           this.user.mainAvatar = avatar;
-          // If we're setting a photo as main, we should clear the customized style locally too
-          if (!avatar.includes('dicebear.com')) {
-            this.user.avatarStyle = '';
-          }
+          // Do NOT clear avatarStyle here — keep the customization as fallback
+          // so if this photo is later removed, the customized avatar is restored.
         }
         
         this.mainAvatar = this.user.mainAvatarPath;

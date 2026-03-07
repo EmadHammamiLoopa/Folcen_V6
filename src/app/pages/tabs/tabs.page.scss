@@ -1,111 +1,130 @@
+// ─── Tab bar ─────────────────────────────────────────────────────
 ion-tab-bar {
   --background: var(--loopa-tabbar-background);
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(200%);
+  -webkit-backdrop-filter: blur(22px) saturate(200%);
   border: 1px solid var(--loopa-tabbar-border);
-  border-radius: var(--r-tabbar-radius);
-  margin: 0 var(--r-tabbar-margin-x) var(--r-tabbar-margin-b);
-  height: var(--r-tabbar-height);
+  border-radius: clamp(18px, 4vw, 26px);
+  height: clamp(56px, 11vw, 66px);
+  margin: 0 clamp(8px, 3.5vw, 24px) clamp(10px, 2.5vw, 18px);
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.28),
+    0 2px 8px  rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  // Do NOT clip — overflow:hidden causes labels to wrap/hide on small screens
+  overflow: visible;
 
   &::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-      180deg,
-      var(--loopa-glass-bg) 0%,
-      transparent 100%
-    );
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
     pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
   }
 }
 
+// ─── Individual tab buttons ───────────────────────────────────────
 ion-tab-button {
-  --color: var(--loopa-text-muted);
-  --color-selected: var(--ion-color-primary);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --color:          var(--loopa-text-muted);
+  --color-selected: #6366f1;
+  // Ionic intrinsic CSS vars — pin them so the framework can't override our values
+  --padding-top:    4px;
+  --padding-bottom: 4px;
+  --padding-start:  0px;
+  --padding-end:    0px;
+  position: relative;
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  padding: 6px 0 4px;
 
-  .icon {
-    font-size: var(--r-tabbar-icon);
-    transition: transform 0.3s ease;
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    width: 52px;
+    height: 52px;
+    background: rgba(99, 102, 241, 0.12);
+    border-radius: 50%;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
   }
 
   &.tab-selected {
+    --color: #6366f1;
+
+    &::after { transform: translate(-50%, -50%) scale(1); }
+
     .icon {
-      transform: translateY(-4px) scale(1.2);
-      filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
+      transform: translateY(-2px) scale(1.18);
+      filter: drop-shadow(0 0 7px rgba(99, 102, 241, 0.65));
+      color: #6366f1;
     }
-    
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: 8px;
-      width: 4px;
-      height: 4px;
-      background: #6366f1;
-      border-radius: 50%;
-      box-shadow: 0 0 10px #6366f1;
-    }
+
+
   }
 }
 
-.budget-indicator {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-  color: white;
-  font-size: 9px;
-  font-weight: 800;
+// ─── Icon ─────────────────────────────────────────────────────────
+.icon {
+  font-size: clamp(14px, 4.5vw, 19px);
+  color: inherit;
+  display: block;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.28s ease, color 0.28s ease;
+}
+
+// ─── Badge ───────────────────────────────────────────────────────
+ion-badge {
+  --background: #ef4444;
+  --color: white;
+  font-size: clamp(8px, 2vw, 10px);
+  font-weight: 700;
+  border: 2px solid var(--ion-background-color);
+  border-radius: 50%;
+  padding: 3px;
   min-width: 16px;
   height: 16px;
+  position: absolute;
+  top: clamp(8px, 2vw, 12px);
+  right: clamp(14%, 4vw, 22%);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  z-index: 10;
+}
+
+// ─── Budget / missed-call indicator ──────────────────────────────
+.budget-indicator {
+  position: absolute;
+  top: clamp(8px, 2vw, 10px);
+  right: clamp(8px, 3vw, 14px);
+  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  color: white;
+  font-size: clamp(7px, 2vw, 9px);
+  font-weight: 800;
+  min-width: 15px;
+  height: 15px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border: 1.5px solid rgba(255,255,255,0.2);
   z-index: 10;
   pointer-events: none;
   animation: budget-pulse 2s infinite ease-in-out;
 }
 
 @keyframes budget-pulse {
-  0% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); opacity: 0.9; }
-}
-
-ion-badge {
-  --background: #ef4444;
-  --color: white;
-  font-size: 10px;
-  font-weight: 700;
-  border: 2px solid var(--ion-background-color);
-  border-radius: 50%;
-  padding: 4px;
-  min-width: 18px;
-  height: 18px;
-  position: absolute;
-  top: 12px;
-  right: 20%;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
-}
-
-.icon {
-  font-size: var(--r-tabbar-icon);
-  color: inherit;
-}
-
-.tab-selected > * {
-  --color: #6366f1;
-  color: #6366f1;
+  0%   { transform: scale(1);    opacity: 0.9; }
+  50%  { transform: scale(1.15); opacity: 1;   }
+  100% { transform: scale(1);    opacity: 0.9; }
 }

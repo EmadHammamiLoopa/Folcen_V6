@@ -24,15 +24,20 @@
 
     <div class="flex-grow-1 d-flex flex-column justify-content-center ion-padding">
       <div class="text-center">
-          <div *ngIf="steps[step] != 'success'" class="logo-container" [ngClass]="{'shrunk': step > 0}">
+          <div *ngIf="steps[step] != 'success' && !stepsWithIllustration.has(steps[step])" class="logo-container shrunk">
             <img src="assets/images/logo.png" class="infinity-logo" alt="Folcen Logo">
-            <div class="logo-text">Folcen</div>
           </div>
           
           <div class="form-group" *ngIf="steps[step] == 'email'">
+            <div class="step-icon-wrap">
+              <div class="step-icon-ring">
+                <ion-icon name="mail" class="step-icon"></ion-icon>
+              </div>
+            </div>
             <h2>What's your email?</h2>
+            <p class="step-subtitle">We'll send a verification link to confirm your account.</p>
             <ion-item class="w-100">
-              <ion-input formControlName="email" type="text" placeholder="E-mail"></ion-input>
+              <ion-input formControlName="email" type="email" placeholder="Enter your email"></ion-input>
             </ion-item>
             <div class="w-100 text-center mt-4" *ngIf="(form.get('email')?.invalid && (form.get('email')?.dirty || form.get('email')?.touched)) || validationErrors['email']">
               <span class="d-block text-danger" *ngIf="form.get('email')?.hasError('required')">Email is required.</span>
@@ -42,7 +47,13 @@
           </div>
 
           <div class="form-group" *ngIf="steps[step] == 'name'">
+            <div class="step-icon-wrap">
+              <div class="step-icon-ring">
+                <ion-icon name="person" class="step-icon"></ion-icon>
+              </div>
+            </div>
             <h2>What's your Name?</h2>
+            <p class="step-subtitle">This is how others will see you on Folcen.</p>
             <ion-item class="w-100">
               <ion-input formControlName="firstName" type="text" placeholder="First Name"></ion-input>
             </ion-item>
@@ -67,7 +78,13 @@
           </div>
 
           <div class="form-group" *ngIf="steps[step] == 'password'">
+            <div class="step-icon-wrap">
+              <div class="step-icon-ring">
+                <ion-icon name="lock-closed" class="step-icon"></ion-icon>
+              </div>
+            </div>
             <h2>Set Password</h2>
+            <p class="step-subtitle">Use letters, numbers and special characters to keep your account secure.</p>
             <ion-item class="w-100">
               <ion-input formControlName="password" type="password" placeholder="Password"></ion-input>
             </ion-item>
@@ -91,13 +108,28 @@
             </div>
           </div>
 
-          <div class="form-group" *ngIf="steps[step] == 'birthDate'">
+          <div class="form-group birthday-step" *ngIf="steps[step] == 'birthDate'">
+            <div class="step-icon-wrap">
+              <div class="step-icon-ring">
+                <ion-icon name="calendar" class="step-icon"></ion-icon>
+              </div>
+            </div>
             <h2>When's your Birthday?</h2>
-            <ion-item class="w-100">
-              <ion-input formControlName="birthDate" type="date" [max]="getMaxDate()"></ion-input>
-            </ion-item>
-            <div class="w-100 text-center mt-4" *ngIf="(form.get('birthDate')?.invalid && (form.get('birthDate')?.dirty || form.get('birthDate')?.touched)) || validationErrors['birthDate']">
-              <span class="d-block text-danger" *ngIf="form.get('birthDate')?.hasError('required')">Birth date is required.</span>
+            <p class="step-subtitle">You must be at least 18 years old to join.</p>
+
+            <div class="bday-picker-card" (click)="openBirthdayPicker()">
+              <div class="bday-picker-inner" [class.has-date]="birthDateDisplay">
+                <ion-icon name="calendar-outline" class="bday-icon"></ion-icon>
+                <div class="bday-value">
+                  <span class="bday-label" *ngIf="!birthDateDisplay">Select your birthday</span>
+                  <span class="bday-date" *ngIf="birthDateDisplay">{{ birthDateDisplay }}</span>
+                </div>
+                <ion-icon name="chevron-forward" class="bday-arrow"></ion-icon>
+              </div>
+            </div>
+
+            <div class="w-100 text-center mt-3" *ngIf="(form.get('birthDate')?.invalid && form.get('birthDate')?.dirty) || validationErrors['birthDate']">
+              <span class="d-block text-danger" *ngIf="form.get('birthDate')?.hasError('required')">Please select your birth date.</span>
               <span class="d-block text-danger" *ngFor="let error of validationErrors['birthDate']">{{ error }}</span>
             </div>
           </div>
@@ -274,46 +306,133 @@
             </ion-item>
           </div>
 
-          <div *ngIf="steps[step] == 'randomRequests'">
-            <h2>Do you want to receive random video and chat requests?</h2>
-            <p>By enabling this, you allow others to randomly video call or chat with you. You can disable this anytime in your profile settings.</p>
-            <ion-item class="w-100 mt-3">
-              <ion-checkbox formControlName="receiveRandomRequests"></ion-checkbox>
-              <label class="ml-2">Yes, I want to receive random requests</label>
-            </ion-item>
-          </div>
-
-          <div *ngIf="steps[step] == 'ageVisibility'">
-            <h2>Privacy Settings</h2>
-            <p>Choose what information you want to share with other users.</p>
-            
-            <ion-item class="w-100 mt-3">
-              <ion-checkbox formControlName="showAge"></ion-checkbox>
-              <label class="ml-2">Show my age to others</label>
-            </ion-item>
-
-            <ion-item class="w-100 mt-3">
-              <ion-checkbox formControlName="genderVisible"></ion-checkbox>
-              <label class="ml-2">Show my gender to others</label>
-            </ion-item>
-          </div>
-
-          <div class="w-100 text-center" *ngIf="steps[step] == 'success'">
-            <div class="d-flex justify-content-center">
-              <div class="check-container">
-                <ion-icon name="checkmark-circle" color="success" style="font-size: 100px;"></ion-icon>
+          <div *ngIf="steps[step] == 'randomRequests'" class="privacy-step">
+            <div class="step-icon-wrap">
+              <div class="step-icon-ring">
+                <ion-icon name="videocam" class="step-icon"></ion-icon>
               </div>
             </div>
-            <h1 class="text-success congrats-text mt-4">Congratulations!</h1>
-            <p class="desc-text mt-2">Your <b>Folcen</b> account has been created successfully.</p>
+            <h2>Random Requests</h2>
+            <p class="step-subtitle">Allow others to randomly video call or chat with you. You can change this anytime in settings.</p>
+
+            <div class="privacy-toggle-card">
+              <div class="privacy-toggle-row">
+                <div class="privacy-toggle-info">
+                  <ion-icon name="people-outline" class="toggle-icon"></ion-icon>
+                  <div>
+                    <div class="toggle-title">Receive random requests</div>
+                    <div class="toggle-desc">Let strangers video call or chat with you</div>
+                  </div>
+                </div>
+                <ion-toggle formControlName="receiveRandomRequests" color="primary"></ion-toggle>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="steps[step] == 'ageVisibility'" class="privacy-step">
+            <div class="step-icon-wrap">
+              <div class="step-icon-ring">
+                <ion-icon name="shield-checkmark" class="step-icon"></ion-icon>
+              </div>
+            </div>
+            <h2>Privacy Settings</h2>
+            <p class="step-subtitle">Choose what information you want to share with other users. You can always change this later.</p>
+
+            <div class="privacy-toggle-card">
+              <div class="privacy-toggle-row">
+                <div class="privacy-toggle-info">
+                  <ion-icon name="person-outline" class="toggle-icon"></ion-icon>
+                  <div>
+                    <div class="toggle-title">Show my age</div>
+                    <div class="toggle-desc">Others can see your age on your profile</div>
+                  </div>
+                </div>
+                <ion-toggle formControlName="showAge" color="primary"></ion-toggle>
+              </div>
+
+              <div class="privacy-divider"></div>
+
+              <div class="privacy-toggle-row">
+                <div class="privacy-toggle-info">
+                  <ion-icon name="male-female-outline" class="toggle-icon"></ion-icon>
+                  <div>
+                    <div class="toggle-title">Show my gender</div>
+                    <div class="toggle-desc">Others can see your gender on your profile</div>
+                  </div>
+                </div>
+                <ion-toggle formControlName="genderVisible" color="primary"></ion-toggle>
+              </div>
+            </div>
+          </div>
+
+          <!-- Verify Email Step -->
+          <div class="verify-email-step" *ngIf="steps[step] == 'verifyEmail'">
+            <div class="step-icon-wrap">
+              <div class="step-icon-ring verify-ring">
+                <ion-icon name="mail-open" class="step-icon"></ion-icon>
+              </div>
+            </div>
+            <h2>Verify your Email</h2>
+            <p class="step-subtitle">
+              We sent a verification link to<br>
+              <strong class="verify-email-addr">{{ form.get('email')?.value }}</strong>
+            </p>
+
+            <div class="verify-steps-card">
+              <div class="verify-step-row">
+                <div class="verify-num">1</div>
+                <span>Open your email inbox</span>
+              </div>
+              <div class="verify-step-row">
+                <div class="verify-num">2</div>
+                <span>Click the verification link</span>
+              </div>
+              <div class="verify-step-row">
+                <div class="verify-num">3</div>
+                <span>Come back and tap <strong>Continue</strong></span>
+              </div>
+            </div>
+
+            <div class="resend-section">
+              <span class="resend-label">Didn't receive it?</span>
+              <ion-button
+                fill="clear"
+                color="primary"
+                size="small"
+                class="resend-btn"
+                [disabled]="resendCooldown > 0 || btnLoading"
+                (click)="resendEmail()"
+              >
+                {{ resendCooldown > 0 ? 'Resend in ' + resendCooldown + 's' : 'Resend Email' }}
+              </ion-button>
+            </div>
+
+            <div class="adjust-email-row">
+              <ion-button fill="clear" color="medium" size="small" (click)="adjustEmail()">
+                <ion-icon name="pencil-outline" slot="start"></ion-icon>
+                Change email address
+              </ion-button>
+            </div>
+          </div>
+
+          <!-- Success Step -->
+          <div class="w-100 text-center success-step" *ngIf="steps[step] == 'success'">
+            <div class="d-flex justify-content-center">
+              <div class="check-container success-ring">
+                <ion-icon name="checkmark-circle" color="success" class="success-icon"></ion-icon>
+              </div>
+            </div>
+            <h1 class="text-success congrats-text mt-4">All Set!</h1>
+            <p class="desc-text mt-2">Your <b>Folcen</b> account has been created successfully. Welcome aboard!</p>
           </div>
       </div>
     </div>
   </div>
 </ion-content>
 
-<ion-footer class="ion-no-border ion-padding">
-  <div class="terms-acceptance-container" *ngIf="step == steps.length - 2">
+<ion-footer class="ion-no-border signup-footer">
+  <div class="footer-inner">
+    <div class="terms-acceptance-container" *ngIf="steps[step] === 'ageVisibility'">
     <ion-item lines="none" class="checkbox-item">
       <ion-checkbox slot="start" formControlName="acceptedTerms"></ion-checkbox>
       <ion-label class="ion-text-wrap">
@@ -333,7 +452,7 @@
     *ngIf="steps[step] != 'success'"
   >
     <ion-spinner *ngIf="btnLoading" name="crescent"></ion-spinner>
-    <span *ngIf="!btnLoading">{{ step == steps.length - 2 ? 'Create Account' : 'Continue' }}</span>
+    <span *ngIf="!btnLoading">{{ steps[step] === 'ageVisibility' ? 'Create Account' : 'Continue' }}</span>
   </ion-button>
 
   <ion-button
@@ -343,7 +462,8 @@
     class="continue-btn"
     *ngIf="steps[step] == 'success'"
   >
-    Login Now
+    Start Exploring
   </ion-button>
+  </div><!-- /.footer-inner -->
 </ion-footer>
 </form>

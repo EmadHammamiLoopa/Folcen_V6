@@ -34,10 +34,10 @@
 
       <div class="hero-main-content">
         <div class="avatar-wrapper">
-          <app-avatar [profile]="user" [size]="160" class="main-avatar-img" (click)="viewPhoto(mainAvatar)"></app-avatar>
+          <app-avatar [profile]="user" [size]="200" class="main-avatar-img" (click)="viewPhoto(mainAvatar)"></app-avatar>
           <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
           
-          <ion-fab *ngIf="myProfile" class="edit-avatar-fab">
+          <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end">
             <ion-fab-button size="small">
               <ion-icon name="camera"></ion-icon>
             </ion-fab-button>
@@ -183,29 +183,8 @@
           </div>
         </section>
 
-        <!-- Suggested Channels — hidden for friends of private profiles -->
-        <section class="info-section suggested-channels-section" *ngIf="(myProfile || !user.isPrivate || user.isFriend || isFriend) && suggestedChannels.length > 0">
-          <h3 class="section-header">Channels {{ user.fullName }} Follows</h3>
-          <div class="channels-horizontal-scroll">
-            <div class="channel-suggestion-card animate__animated animate__fadeInRight" *ngFor="let channel of suggestedChannels; let i = index" 
-                 [style.animation-delay]="(i * 0.1) + 's'"
-                 (click)="joinChannel(channel)">
-              <div class="channel-avatar-mini">
-                <img [src]="getChannelImage(channel)" alt="Channel">
-              </div>
-              <div class="channel-info-mini">
-                <span class="channel-name">{{ channel.name || channel.title }}</span>
-                <span class="channel-meta">{{ channel.subscribers?.length || 0 }} members</span>
-              </div>
-              <ion-button fill="clear" size="small" class="join-btn">
-                <ion-icon name="chevron-forward-outline"></ion-icon>
-              </ion-button>
-            </div>
-          </div>
-        </section>
-
-        <!-- Photo Gallery — friends of private profiles only -->
-        <section class="info-section" *ngIf="myProfile || !user.isPrivate || user.isFriend || isFriend">
+        <!-- Photo Gallery — always for my profile; for others only if they have photos -->
+        <section class="info-section" *ngIf="myProfile || ((!user.isPrivate || user.isFriend || isFriend) && user?.avatars?.length > 0)">
           <div class="section-header-row">
             <h3 class="section-header">Gallery</h3>
             <span class="photo-count">{{ user?.avatars?.length || 0 }} photos</span>

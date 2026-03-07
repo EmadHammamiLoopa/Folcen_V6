@@ -141,8 +141,8 @@ exports.removeAvatar = async (req, res) => {
         user.avatar = user.avatar.filter(url => path.basename(url) !== avatarUrl);
 
         // Ensure the mainAvatar is updated if necessary
-        if (path.basename(user.mainAvatar) === avatarUrl) {
-            user.mainAvatar = user.avatar.length > 0 ? user.avatar[0] : null; // Set to another avatar or null
+        if (path.basename(user.mainAvatar || '') === avatarUrl) {
+            user.mainAvatar = user.avatar.length > 0 ? user.avatar[0] : null;
         }
 
         // Log cleaned avatars for consistency (async checks)
@@ -161,22 +161,19 @@ exports.removeAvatar = async (req, res) => {
 
         // Update mainAvatar if necessary
         if (user.mainAvatar === avatarUrl) {
-            if (user.avatar.length > 0) {
-                user.mainAvatar = user.avatar[0];
-            } else {
-                // Set to default avatar
-                user.mainAvatar = user.getDefaultAvatar();
-            }
+            user.mainAvatar = user.avatar.length > 0 ? user.avatar[0] : null;
         }
 
         // Update mainAvatar if it no longer exists in the cleaned avatars
-        if (!cleanedAvatars.includes(user.mainAvatar)) {
+        if (user.mainAvatar && !cleanedAvatars.includes(user.mainAvatar)) {
             user.mainAvatar = cleanedAvatars.length > 0 ? cleanedAvatars[0] : null;
         }
 
-        // If there are no user avatars left, set the default avatar as mainAvatar
+        // If there are no user avatars left, clear mainAvatar so the frontend
+        // falls back to the user's customized avatar (avatarStyle/avatarSeed/
+        // avatarOverrides) rather than generating a brand-new default.
         if (cleanedAvatars.length === 0) {
-            user.mainAvatar = user.getDefaultAvatar();
+            user.mainAvatar = null;
         }
 
         await user.save();
@@ -1178,8 +1175,9 @@ exports.updateMainAvatar = async (req, res) => {
       }
   
             // ✅ Update and persist
+            // NOTE: intentionally keep avatarStyle/avatarSeed/avatarOverrides intact so
+            // the customized avatar can be restored if this photo is later removed.
             user.mainAvatar = relativeAvatarUrl;
-            user.avatarStyle = ''; // Clear customized style when setting a photo as main
             await user.save();
 
             // Emit socket event for real-time updates

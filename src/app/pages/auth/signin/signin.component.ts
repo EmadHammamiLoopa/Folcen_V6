@@ -228,19 +228,30 @@ export class SigninComponent implements OnInit {
   }
 
   private async _sendPasswordReset(email: string) {
+    // Step 1 — backend pre-flight: ensures a Firebase Auth account exists for
+    // legacy MongoDB-only users. Run in the background and never block the
+    // Firebase email send — if it fails the account may already exist anyway.
+    try {
+      await this.auth.sendRequest({ method: 'post', url: 'forgot-password', data: { email } });
+    } catch (_ignored) {
+      // Backend unavailable or user not in DB — still attempt Firebase below.
+    }
+
+    // Step 2 — Firebase sends the reset email via its own infrastructure.
     try {
       await this.firebaseService.resetPassword(email);
       this.toastService.presentSuccessToastr(
-        `Password reset email sent to ${email}. Check your inbox.`
+        `Reset email sent to ${email}. Check your inbox and spam folder.\n\nAlways use the latest email — earlier links expire once a new one is sent.`
       );
     } catch (err: any) {
-      let msg = 'Failed to send reset email. Please try again.';
-      if (err?.code === 'auth/user-not-found') {
-        msg = 'No account found with that email address.';
-      } else if (err?.code === 'auth/invalid-email') {
+      let msg = 'Failed to send reset email. Please try again in a few minutes.';
+      if (err?.code === 'auth/invalid-email') {
         msg = 'Invalid email address.';
       } else if (err?.code === 'auth/too-many-requests') {
-        msg = 'Too many requests. Please wait a moment and try again.';
+        msg = 'Too many attempts. Please wait a few minutes and try again.';
+      } else if (err?.code === 'auth/user-not-found') {
+        // Still show generic message — don't reveal if address exists
+        msg = 'If that email is registered, a reset link will be sent.';
       }
       this.toastService.presentErrorToastr(msg);
     }

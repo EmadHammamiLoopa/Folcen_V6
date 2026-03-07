@@ -281,10 +281,10 @@ console.log("userrrrrrrrrrrrrid",job.user);
                 recipients
             );
 
-            // Emit socket event for real-time badges
+            // Emit socket event for real-time badges (targeted to recipients only)
             try {
-                const io = req.app && req.app.get('io');
-                if (io) io.emit('new-business-post', { jobId: job._id });
+                const { emitToUser: _emit } = require('../helpers');
+                recipients.forEach(uid => _emit(uid, 'new-business-post', { jobId: job._id }));
             } catch (e) {}
         }
 

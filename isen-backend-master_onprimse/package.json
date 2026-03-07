@@ -30,6 +30,7 @@
     "express-rate-limit": "^8.2.1",
     "express-session": "^1.18.0",
     "express-validator": "^6.10.0",
+    "firebase-admin": "^13.7.0",
     "formidable": "^1.2.2",
     "geoip-lite": "^1.4.10",
     "helmet": "^7.1.0",

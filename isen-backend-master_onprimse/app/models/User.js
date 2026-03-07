@@ -110,6 +110,8 @@ const userSchema = new mongoose.Schema({
     isPrivate: { type: Boolean, default: false }, // GDPR: Privacy by design
     deletedAt: { type: Date, default: null },
     googleId: { type: String, unique: true, sparse: true },
+    firebaseUid: { type: String, unique: true, sparse: true },
+    emailVerified: { type: Boolean, default: false },
     acceptedTerms: { type: Boolean, default: false },
     acceptedTermsAt: { type: Date, default: null }
 }, { timestamps: true,     toJSON: { virtuals: true }, 
@@ -126,18 +128,28 @@ userSchema.pre('save', function(next) {
                p.includes('dicebear.com/6.x/bottts');
     };
     
-    // If mainAvatar is missing or an old default, replace with DiceBear
+    // If mainAvatar is missing or an old default, replace with DiceBear —
+    // BUT only when the user has no saved customization (avatarStyle).
+    // When avatarStyle is set the frontend's fallback chain recovers the
+    // customized avatar from avatarSeed/avatarOverrides, so we must NOT
+    // overwrite mainAvatar with a generic seed-based default here.
     if (!this.mainAvatar || isOldDefault(this.mainAvatar)) {
-        this.mainAvatar = this.getDefaultAvatar();
+        if (!this.avatarStyle || this.avatarStyle !== 'avataaars') {
+            // No customization saved — set a generic DiceBear default
+            this.mainAvatar = this.getDefaultAvatar();
+        }
+        // else: leave mainAvatar null/falsy; the frontend getter falls back
+        // to avatarStyle → avatarSeed → avatarOverrides (the customized avatar)
     }
     
-    // Clean up avatar array: remove old defaults and ensure mainAvatar is included if not empty
+    // Clean up avatar array: remove old defaults and ensure mainAvatar is
+    // included only when it's a real uploaded path (not a DiceBear fallback).
     if (this.avatar && Array.isArray(this.avatar)) {
         this.avatar = this.avatar.filter(a => a && typeof a === 'string' && !isOldDefault(a));
-        if (this.mainAvatar && !this.avatar.includes(this.mainAvatar)) {
+        if (this.mainAvatar && !this.mainAvatar.includes('dicebear.com') && !this.avatar.includes(this.mainAvatar)) {
             this.avatar.unshift(this.mainAvatar);
         }
-    } else if (this.mainAvatar) {
+    } else if (this.mainAvatar && !this.mainAvatar.includes('dicebear.com')) {
         this.avatar = [this.mainAvatar];
     } else {
         this.avatar = [];

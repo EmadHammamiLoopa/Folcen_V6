@@ -106,79 +106,72 @@
     <div class="channels-grid" *ngIf="channels && channels.length">
       <div
         *ngFor="let channel of channels; let i = index"
-        class="glass-card channel-card animate__animated animate__fadeInUp"
+        class="channel-card animate__animated animate__fadeInUp"
         [style.animation-delay]="(i * 0.05) + 's'"
         (click)="showChannel(channel)"
         data-testid="channel-card"
       >
-        <div class="card-header">
-          <div class="avatar-wrapper">
-            <img
-              *ngIf="channel.photo"
-              [src]="channel.photo"
-              class="channel-photo"
-              (error)="onChannelImgError($event, channel)"
-            />
-            <div class="channel-initials" *ngIf="!channel.photo"
-              [style.background]="'hsl(' + ((channel.name?.charCodeAt(0) || 65) * 137) % 360 + ', 55%, 38%)'">
-              {{ channel.name?.charAt(0)?.toUpperCase() }}
-            </div>
-            <div class="verified-badge" *ngIf="channel.approved">
-              <ion-icon name="checkmark-circle"></ion-icon>
-            </div>
-          </div>
-          <div class="header-actions">
-            <button
-              class="glass-action-btn"
-              (click)="presentPopover($event, channel); $event.stopPropagation()"
-              *ngIf="getTypechannel(channel) === 'static'||getTypechannel(channel) === 'static_events'||getTypechannel(channel) === 'static_dating'"
-            >
-              <ion-icon name="information-circle-outline"></ion-icon>
-            </button>
-          </div>
-        </div>
+        <!-- Banner cover area -->
+        <div class="card-cover"
+             [style.background]="!channel.photo ? 'hsl(' + ((channel.name?.charCodeAt(0) || 65) * 137) % 360 + ', 46%, 28%)' : null">
+          <img *ngIf="channel.photo" [src]="channel.photo" class="cover-img"
+               (error)="onChannelImgError($event, channel)" />
+          <div class="cover-gradient"></div>
 
-      <div class="card-body">
-        <div class="category-tag" *ngIf="channel.category && channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">{{ channel.category }}</div>
-        <h3 class="channel-title">{{ channel.name }}</h3>
-        <p class="channel-desc">{{ channel.description }}</p>
-      </div>
-
-      <div class="card-footer">
-        <div class="stats">
-          <div class="stat-item">
-            <i class="fas fa-users"></i>
-            <span>{{ channel.followers.length }}</span>
-          </div>
-        </div>
-
-        <div class="actions">
-          <!-- User's own channel status (owner can delete non-system channels) -->
-          <div *ngIf="user && isOwner(channel)" class="owner-actions">
-            <span class="status-tag" [class.approved]="channel.approved">
-              {{ channel.approved ? 'Live' : 'Pending' }}
-            </span>
-            <button
-              class="delete-btn"
-              (click)="deleteChannel(channel, $event); $event.stopPropagation()"
-              *ngIf="channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">
-              <ion-icon name="trash-outline"></ion-icon>
-            </button>
-          </div>
-
-          <!-- Follow/Unfollow for others (including static channels). Static channels are now followable and will be shown by default in Followed view. -->
-          <button
-            *ngIf="user && !isOwner(channel)"
-            class="follow-btn"
-            [class.followed]="channel.followedBy(authUserId)"
-            (click)="follow(channel); $event.stopPropagation()"
-          >
-            {{ !channel.followedBy(authUserId) ? 'Follow' : 'Unfollow' }}
+          <!-- Info button (static channels) -->
+          <button class="info-btn"
+            *ngIf="getTypechannel(channel) === 'static' || getTypechannel(channel) === 'static_events' || getTypechannel(channel) === 'static_dating'"
+            (click)="presentPopover($event, channel); $event.stopPropagation()">
+            <ion-icon name="information-circle-outline"></ion-icon>
           </button>
+
+          <!-- Name + verified on the banner -->
+          <div class="cover-meta">
+            <div class="cover-title-row">
+              <h3 class="cover-name">{{ channel.name }}</h3>
+              <ion-icon name="checkmark-circle" class="verified-icon" *ngIf="channel.approved"></ion-icon>
+            </div>
+            <span class="cover-category" *ngIf="channel.category && channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">
+              {{ channel.category }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Card body -->
+        <div class="card-body">
+          <p class="channel-desc">{{ channel.description }}</p>
+
+          <div class="card-footer">
+            <div class="stat-item">
+              <i class="fas fa-users"></i>
+              <span>{{ channel.followers.length }}</span>
+            </div>
+
+            <!-- Owner actions -->
+            <div *ngIf="user && isOwner(channel)" class="owner-actions">
+              <span class="status-tag" [class.approved]="channel.approved">
+                {{ channel.approved ? 'Live' : 'Pending' }}
+              </span>
+              <button class="delete-btn"
+                (click)="deleteChannel(channel, $event); $event.stopPropagation()"
+                *ngIf="channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">
+                <ion-icon name="trash-outline"></ion-icon>
+              </button>
+            </div>
+
+            <!-- Follow / Unfollow -->
+            <button
+              *ngIf="user && !isOwner(channel)"
+              class="follow-btn"
+              [class.followed]="channel.followedBy(authUserId)"
+              (click)="follow(channel); $event.stopPropagation()">
+              <i class="fas" [class.fa-heart]="!channel.followedBy(authUserId)" [class.fa-heart-broken]="channel.followedBy(authUserId)"></i>
+              {{ !channel.followedBy(authUserId) ? 'Follow' : 'Unfollow' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
   <ion-infinite-scroll threshold="100px" (ionInfinite)="getChannels($event)">
     <ion-infinite-scroll-content loadingSpinner="bubbles" loadingText="Loading more channels...">

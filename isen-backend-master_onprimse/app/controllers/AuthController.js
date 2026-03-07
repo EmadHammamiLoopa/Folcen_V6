@@ -15,6 +15,8 @@ const peerStore = require('../utils/peerStorage');
 const logger = require('../utils/logger');
 
 
+
+
 const autoFollowStaticChannels = async (authUser) => {
     try {
         // Fetch the predefined static channels that match the authenticated user's city and include the new type 'static_events'
@@ -484,16 +486,8 @@ exports.firebaseLogin = async (req, res) => {
 
         // Ensure Firebase Admin is initialized
         if (admin.apps.length === 0) {
-            logger.warn('[firebaseLogin] Firebase Admin not initialized, attempting manual init');
-            try {
-                const serviceAccount = require('../../config/firebase-service-account.json');
-                admin.initializeApp({
-                    credential: admin.credential.cert(serviceAccount)
-                });
-            } catch (initErr) {
-                logger.error('[firebaseLogin] Manual Firebase Admin init failed:', initErr.message);
-                return Response.sendError(res, 500, 'Firebase configuration error');
-            }
+            logger.error('[firebaseLogin] Firebase Admin not initialized. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in .env and restart.');
+            return Response.sendError(res, 503, 'Firebase Admin not configured on this server. Contact the administrator.');
         }
 
         // Verify Firebase ID Token
@@ -559,8 +553,12 @@ exports.firebaseLogin = async (req, res) => {
             // Update firebaseUid if it was found via email
             if (!user.firebaseUid) {
                 user.firebaseUid = uid;
-                await user.save();
             }
+            // Always sync emailVerified from Firebase (covers legacy users and re-logins)
+            if (email_verified && !user.emailVerified) {
+                user.emailVerified = true;
+            }
+            await user.save();
         }
 
         // Banned check
@@ -594,4 +592,57 @@ exports.firebaseProfile = async (req, res) => {
         return Response.sendResponse(res, req.authUser.publicInfo());
     }
     return Response.sendError(res, 401, 'Unauthorized');
+};
+
+// ── Forgot Password ──────────────────────────────────────────────────────────
+// Backend only ensures a Firebase Auth account exists for legacy MongoDB-only users.
+// The frontend then calls Firebase's sendPasswordResetEmail() which uses Firebase's
+// own email infrastructure — no SMTP config needed.
+exports.forgotPassword = async (req, res) => {
+    const { email } = req.body;
+    if (!email) return Response.sendError(res, 400, 'Email is required');
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Generic response to prevent user-enumeration
+    const genericOk = () =>
+        Response.sendResponse(res, { message: 'If that email is registered, a reset link has been sent.' });
+
+    try {
+        // 1. Verify the user exists in our database
+        const user = await User.findOne({ email: normalizedEmail });
+        if (!user) return genericOk();
+
+        // 2. Ensure a Firebase Auth account exists (legacy MongoDB-only users won't have one)
+        try {
+            await admin.auth().getUserByEmail(normalizedEmail);
+            // User already exists in Firebase — nothing to do
+        } catch (e) {
+            if (e.code === 'auth/user-not-found') {
+                // Create a Firebase Auth entry so sendPasswordResetEmail works
+                try {
+                    await admin.auth().createUser({ email: normalizedEmail, emailVerified: false });
+                    logger.info(`[forgotPassword] Created Firebase Auth record for legacy user: ${normalizedEmail}`);
+                } catch (createErr) {
+                    if (createErr.code === 'auth/email-already-exists') {
+                        // Race condition: another request already created it between our get and create calls.
+                        // This is fine — the account exists, continue.
+                        logger.info(`[forgotPassword] Firebase user already exists (race condition) for: ${normalizedEmail}`);
+                    } else {
+                        throw createErr;
+                    }
+                }
+            } else {
+                throw e;
+            }
+        }
+
+        // 3. Tell the frontend it's safe to call Firebase sendPasswordResetEmail()
+        //    Firebase will send the email using its own infrastructure.
+        return genericOk();
+
+    } catch (err) {
+        logger.error('[forgotPassword] Error:', err);
+        return Response.sendError(res, 500, 'Failed to process request. Please try again later.');
+    }
 };

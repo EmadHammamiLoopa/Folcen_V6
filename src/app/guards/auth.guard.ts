@@ -44,6 +44,11 @@ export class AuthGuard implements CanActivate {
     }
 
     if (token && user) {
+      // Block unverified users — redirect to the verify-email step in signup
+      if (user.emailVerified === false) {
+        this.router.navigate(['/auth/signup']);
+        return false;
+      }
       return true;
     } else {
       if (token && !user) {

@@ -10,19 +10,15 @@ mongoose.connect(db, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB Connected'))
   .catch(err => console.log(err));
 
-// Remove all existing users
-const removeAllUsers = async () => {
-  try {
-    await User.deleteMany({});
-    console.log('All users removed successfully');
-  } catch (error) {
-    console.error('Error removing users:', error.message);
-  }
-};
-
-// Create a user
+// Upsert a user: update if email exists, create if not (preserves existing accounts)
 const createUser = async (userData) => {
   try {
+    const { password, ...rest } = userData;
+    const existing = await User.findOne({ email: rest.email });
+    if (existing) {
+      console.log(`User ${userData.email} already exists, skipping`);
+      return;
+    }
     const user = new User(userData);
     await user.save();
     console.log(`User ${userData.email} created successfully`);
@@ -91,9 +87,8 @@ userPromises.push(createUser({
   mongoose.connection.close();
 };
 
-// Reset database and create new users
+// Create seed users (skips any that already exist)
 const resetAndCreateUsers = async () => {
-  await removeAllUsers();
   await createUsers();
 };
 

@@ -410,7 +410,7 @@ exports.voteOnComment = async (req, res) => {
 
         const post = await Post.findOne({ _id: comment.post });
 
-        if (userVoteInd && comment.user != req.auth._id) {
+        if (userVoteInd !== -1 && comment.user != req.auth._id) {
             const channel = await Channel.findOne({ _id: post.channel });
             sendNotification(
                 { en: channel.name },

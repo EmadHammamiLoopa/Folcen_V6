@@ -1,96 +1,102 @@
 <app-header title="Friends Chat" [back]="true">
 </app-header>
 
-  <ion-buttons slot="end">
-    <div class="header-bell-wrap">
-      <button class="fancy-bell" (click)="showMissedCalls()" aria-label="Missed calls">
-        <ion-icon name="notifications-outline"></ion-icon>
-        <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
-          <span *ngIf="(missedCalls?.length || 0) > 0" class="fancy-badge">
-            {{ missedCalls.length > 99 ? '99+' : missedCalls.length }}
-          </span>
-        </ng-container>
-      </button>
-    </div>
-  </ion-buttons>
+<ion-buttons slot="end">
+  <div class="header-bell-wrap">
+    <button class="fancy-bell" (click)="showMissedCalls()" aria-label="Missed calls">
+      <ion-icon name="notifications-outline"></ion-icon>
+      <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
+        <span *ngIf="(missedCalls?.length || 0) > 0" class="fancy-badge">
+          {{ missedCalls.length > 99 ? '99+' : missedCalls.length }}
+        </span>
+      </ng-container>
+    </button>
+  </div>
+</ion-buttons>
 
+<ion-content class="list-content">
+  <div class="mesh-bg"></div>
 
-<ion-content>
   <app-loader *ngIf="pageLoading"></app-loader>
 
-  <ion-refresher slot="fixed" pullFactor="0.5" pullMin="100" pullMax="200" (ionRefresh)="getUsersMessages($event, true)">
-    <ion-refresher-content></ion-refresher-content>
+  <ion-refresher slot="fixed" pullFactor="0.5" pullMin="100" pullMax="200"
+    (ionRefresh)="getUsersMessages($event, true)">
+    <ion-refresher-content pullingIcon="chevron-down-outline" refreshingSpinner="crescent">
+    </ion-refresher-content>
   </ion-refresher>
 
-  <div class="h-100 w-100 d-flex flex-column py-2 text-center empty-state" *ngIf="(!users || !users.length) && !pageLoading">
-    <div class="flex-grow-1 d-flex align-items-center justify-content-center">
-      <div class="empty-text">
-        <h3 class="empty-alert">No messages yet</h3>
-        <p class="empty-sub">You haven't started any conversations. Open a profile or find friends to begin.</p>
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="(!users || !users.length) && !pageLoading">
+    <div class="empty-card">
+      <div class="empty-icon-wrap">
+        <ion-icon name="chatbubbles-outline"></ion-icon>
       </div>
+      <h3 class="empty-title">No messages yet</h3>
+      <p class="empty-sub">Start a conversation by finding friends or opening a profile.</p>
     </div>
   </div>
 
-  <ion-list class="p-0" *ngIf="users && users.length">
-    <ion-item-sliding *ngFor="let user of users; trackBy: trackByUserId">
-      <ion-item
-        class="my-2"
-        lines="none"
-        (click)="openThread(user)"
-        [ngClass]="{
-          'product-card': user.messages?.length && user.messages[0]?.type === 'product',
-          'new-thread': user.hasUnread
-        }"
-      >
-        <div class="avatar-wrapper ml-2 position-relative">
-          <app-avatar [profile]="user" [size]="48"></app-avatar>
-          <span *ngIf="user.online && !isAdmin(user)" class="online-status"></span>
-          <!-- compact per-thread missed badge -->
-          <span class="friends-missed-pill" *ngIf="getMissedCountFor(user) as mc; mc">
-            {{ mc > 99 ? '99+' : mc }}
-          </span>
-        </div>
-  
-        <ion-label class="ml-3">
-          <span class="mb-0 title d-block font-weight-bold">
-            {{ isAdmin(user) ? 'System' : user.fullName }}
-            <ion-badge *ngIf="user.hasUnread" color="primary" class="ml-1">New</ion-badge>
-            <!-- optional inline missed indicator next to name -->
-            <ion-badge *ngIf="getMissedCountFor(user) as mc; mc" color="medium" class="ml-1">Missed {{ mc }}</ion-badge>
-            <span
-              *ngIf="user.messages?.length && user.messages[0]?.type === 'product'"
-              class="product-label"
-              >Product</span
-            >
-          </span>
-  
-          <span *ngIf="user.messages?.length">
-            <span *ngIf="user.messages[0]?.image" class="text-secondary">
-              <i class="fas fa-image mr-1"></i> Photo
+  <!-- Conversation List -->
+  <div class="conversations-container" *ngIf="users && users.length">
+    <ion-list lines="none" class="conv-list">
+      <ion-item-sliding *ngFor="let user of users; trackBy: trackByUserId">
+
+        <!-- bare ion-item: no internal padding, we control everything inside the card div -->
+        <ion-item
+          lines="none"
+          button
+          detail="false"
+          (click)="openThread(user)"
+          class="bare-item"
+        >
+          <div class="conv-card"
+               [class.unread]="user.hasUnread"
+               [class.product-card]="user.messages?.length && user.messages[0]?.type === 'product'">
+
+            <!-- unread accent stripe -->
+            <div class="unread-stripe" *ngIf="user.hasUnread"></div>
+
+            <!-- avatar -->
+            <div class="av-wrap">
+              <app-avatar [profile]="user" [size]="50"></app-avatar>
+              <span class="online-dot" *ngIf="user.online && !isAdmin(user)"></span>
+              <span class="missed-pill" *ngIf="getMissedCountFor(user) as mc; mc">
+                {{ mc > 99 ? '99+' : mc }}
+              </span>
+            </div>
+
+            <!-- text body -->
+            <div class="conv-body">
+              <div class="conv-row">
+                <span class="conv-name">{{ isAdmin(user) ? 'System' : user.fullName }}</span>
+                <span class="badge-new" *ngIf="user.hasUnread">New</span>
+                <span class="badge-product" *ngIf="user.messages?.length && user.messages[0]?.type === 'product'">Product</span>
+              </div>
+              <div class="conv-preview">
+                <ion-icon name="image-outline" class="preview-ico" *ngIf="user.messages?.[0]?.image"></ion-icon>
+                <span class="preview-txt">{{ user.messages?.[0]?.text }}</span>
+              </div>
+            </div>
+
+            <!-- timestamp -->
+            <span class="conv-time" *ngIf="user.messages?.length">
+              {{ (getMessageDate(user.messages[0]) | extractDiffTime) || formatShortTime(getMessageDate(user.messages[0])) }}
             </span>
-            {{ user.messages[0]?.text }}
-          </span>
-        </ion-label>
-  
-        <span class="text-center" *ngIf="user.messages?.length">
-          <small class="mr-2">{{ (getMessageDate(user.messages[0]) | extractDiffTime) || formatShortTime(getMessageDate(user.messages[0])) }}</small>
-        </span>
-      </ion-item>
-  
-      <ion-item-options side="end">
-        <ion-item-option color="danger" (click)="removeUser(user)">
-          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-        </ion-item-option>
-      </ion-item-options>
-    </ion-item-sliding>
-  </ion-list>
-  
-  
+          </div>
+        </ion-item>
+
+        <ion-item-options side="end">
+          <ion-item-option color="danger" expandable (click)="removeUser(user)">
+            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+          </ion-item-option>
+        </ion-item-options>
+
+      </ion-item-sliding>
+    </ion-list>
+  </div>
 
   <ion-infinite-scroll position="top" (ionInfinite)="getUsersMessages($event)">
-    <ion-infinite-scroll-content
-      loadingSpinner="crescent"
-      loadingText="Loading more messages ...">
+    <ion-infinite-scroll-content loadingSpinner="crescent" loadingText="Loading…">
     </ion-infinite-scroll-content>
   </ion-infinite-scroll>
 </ion-content>

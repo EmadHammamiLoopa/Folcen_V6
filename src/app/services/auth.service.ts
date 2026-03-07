@@ -196,7 +196,7 @@ export class AuthService extends DataService {
         case 'auth/user-disabled':
           return { message: 'This account has been disabled. Please contact support.' };
         case 'auth/email-already-in-use':
-          return { message: 'An account already exists with this email address.' };
+          return { message: 'An account with this email already exists. Please sign in instead.', code: 'email-already-in-use' };
         case 'auth/weak-password':
           return { message: 'The password is too weak. Please use at least 8 characters.' };
         case 'auth/network-request-failed':

@@ -129,7 +129,7 @@ exports.sendAdminMessage = async (req, res) => {
         messages.push(msg);
         
         // Emit via socket if user is online
-        emitToUsers([userId], 'new_message', msg);
+        emitToUsers([userId], 'new-message', msg);
       } catch (saveErr) {
         console.error(`Failed to save message for user ${userId}:`, saveErr.message || saveErr);
         if (saveErr.errors) {

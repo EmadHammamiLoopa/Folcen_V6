@@ -211,10 +211,15 @@ exports.withAuthUser = async (req, res, next) => {
             return Response.sendError(res, 403, 'Account is deactivated. Please restore it to continue.');
         }
 
-        // Global check: if email is not verified, block access (strict GDPR/Security enforcement)
-        if (user.emailVerified === false) {
-            logger.warn(`withAuthUser: User ${user._id} attempted to access ${req.originalUrl} without email verification`);
-            return Response.sendError(res, 403, 'Please verify your email to access this feature.');
+        // Block access if the user has not verified their email yet.
+        // The frontend catches this error code and redirects to the verify-email step.
+        if (!user.emailVerified) {
+            return Response.sendError(
+                res,
+                403,
+                'Please verify your email address to access the app.',
+                'EMAIL_NOT_VERIFIED'
+            );
         }
 
         // Update lastSeen and record daily activity (lightweight)

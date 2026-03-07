@@ -6,7 +6,7 @@ const Response = require('./controllers/Response');
 const Report   = require('./models/Report');
 const mongoose = require('mongoose');
 const { recordAudit } = require('./utils/audit');
-const pushSvc  = require('.././app/utils/pushService');          // OneSignal / FCM wrapper
+const pushSvc  = require('.././app/utils/pushService');          // FCM push shim (via app/utils/pushService → services/fcmPushService)
 const socketManager = require('.././app/utils/socketManager');
 
 /*────────────────────────── CONSTANTS ──────────────────────────*/
@@ -365,8 +365,19 @@ async function createNotification({ recipientId, senderId, type, title, body, da
     // Notify user via socket immediately if online (NotificationService listens)
     emitToUser(recipientId, 'notification-received', notification);
 
-    // Trigger push via existing helper
-    sendNotification([recipientId], body, title, senderId).catch(() => {});
+    // Trigger push — use 5-arg path when data.link is set so the FCM deep-link
+    // points to the actual content (post/comment) not a chat thread.
+    if (data && data.link) {
+      sendNotification(
+        { en: title },
+        { en: body },
+        { type: type || 'message', link: data.link },
+        [],
+        [String(recipientId)]
+      ).catch(() => {});
+    } else {
+      sendNotification([recipientId], body, title, senderId).catch(() => {});
+    }
 
     return notification;
   } catch (err) {
@@ -385,7 +396,7 @@ const realtime = {
 
   /** Chat: Notify recipient of a new message (persistent) */
   emitNewMessage: (senderId, recipientId, messageData) => {
-    emitToUser(recipientId, 'new_message', messageData, { persistIfOffline: true });
+    emitToUser(recipientId, 'new-message', messageData, { persistIfOffline: true });
   },
 
   /** Chat: Confirm to sender that message was sent */
@@ -485,6 +496,17 @@ const realtime = {
     recipients.forEach(recipientId => {
       const rid = String(recipientId);
       emitToUser(rid, 'new_feed_post', normalizedPost, { persistIfOffline: true });
+    });
+  },
+
+  /** Post/Comment: Notify post/comment owner of an interaction (vote, comment, etc.) */
+  emitPostInteraction: (postId, ownerId, actorId, type, payload = {}) => {
+    if (!ownerId) return;
+    emitToUser(String(ownerId), 'post-interaction', {
+      postId: String(postId),
+      actorId: String(actorId),
+      type,
+      ...payload
     });
   }
 };
@@ -747,24 +769,27 @@ const adminCheck = (req) => {
   return role === 'ADMIN' || role === 'SUPER ADMIN';
 };
 
-/*────────────────────── Push / OneSignal helper ───────────────*/
+/*────────────────────── Push / FCM helper ─────────────────────*/
 async function sendNotification(userIds, message, senderName, fromUserId, recipientsOverride) {
   // Handle the 5-argument signature used by some controllers:
   // sendNotification(headings, contents, data, buttons, recipients)
-  let headings, contents, data, recipientIds;
+  let title, body, data, recipientIds;
 
   if (typeof userIds === 'object' && userIds.en && typeof message === 'object' && message.en) {
     // 5-argument signature
-    headings = userIds;
-    contents = message;
-    data = senderName || {}; // 3rd arg is data
+    title = userIds.en;
+    body  = message.en;
+    data  = senderName || {}; // 3rd arg is data
     recipientIds = recipientsOverride || [];
   } else {
     // Original 4-argument signature
     recipientIds = Array.isArray(userIds) ? userIds : [userIds];
-    headings = { en: String(senderName) || 'New Message' };
-    contents = { en: String(message)    || 'You have a new message' };
-    
+    // Normalize senderName: accept { en: '...' } objects (prevents "[object Object]" title)
+    title = (senderName && typeof senderName === 'object' && senderName.en)
+        ? String(senderName.en)
+        : (senderName ? String(senderName) : 'New Message');
+    body  = String(message)    || 'You have a new message';
+
     const chatId = [fromUserId, recipientIds[0]].sort().join('-');
     data = { type: 'message', link: `/messages/chat/${chatId}` };
   }
@@ -777,27 +802,15 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
     return console.error('❌ No valid user IDs for notification.');
   }
 
-  const payload = {
-    app_id  : '3b993591-823b-4f45-94b0-c2d0f7d0f6d8',
-    headings: headings,
-    contents: contents,
-    include_external_user_ids: recipientIds,
-    data    : data
-  };
+  const { sendPushToUser } = require('./services/fcmPushService');
 
-  try {
-    const res = await fetch('https://onesignal.com/api/v1/notifications', {
-      method : 'POST',
-      headers: {
-        'Content-Type' : 'application/json',
-        'Authorization': 'Basic os_v2_app_homtlemchnhulffqylippuhw3auw4vp7fmtu4xfrujbvrgzb536ngtne6z7hsyjy6r7yjvqpvx26bmpi42pvgguhvzdycwvca6ik3bi'
-      },
-      body: JSON.stringify(payload)
-    });
-    console.log('✅ Notification response:', await res.json());
-  } catch (err) {
-    console.error('❌ Error sending notification:', err);
-  }
+  await Promise.all(
+    recipientIds.map(uid =>
+      sendPushToUser(uid, { title, body, data }).catch(err =>
+        console.error('❌ FCM push error for', uid, err.message)
+      )
+    )
+  );
 }
 
 /*──────────────────────── Module exports ───────────────────────*/

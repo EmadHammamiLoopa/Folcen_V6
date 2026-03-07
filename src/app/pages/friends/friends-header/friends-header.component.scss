@@ -32,8 +32,11 @@
 }
 
 .social-tabs-container {
-  padding: 10px 20px;
+  padding: 8px clamp(12px, 4vw, 20px);
   background: var(--ion-background-color);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 
   .glass-tabs {
     display: flex;
