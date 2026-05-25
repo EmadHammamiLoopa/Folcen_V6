@@ -24,6 +24,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
 }
 
 repositories {
@@ -48,7 +52,7 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
 
     // Firebase BoM (Bill of Materials)
-    implementation platform('com.google.firebase:firebase-bom:33.4.0')  // Import Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:32.8.1')  // Import Firebase BoM
 
     // Firebase dependencies
     implementation 'com.google.firebase:firebase-analytics'  // Add other Firebase dependencies here as needed
