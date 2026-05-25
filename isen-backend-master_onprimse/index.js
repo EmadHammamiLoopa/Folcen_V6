@@ -357,12 +357,17 @@ app.use(morgan('tiny'));
 app.use(cookieParser());
 app.use('/peerjs', peerServer);
 
-mongoose.connect('mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0', {
-  socketTimeoutMS: 600000,    // 60 seconds for socket timeout
-  connectTimeoutMS: 600000,   // 60 seconds for connection timeout
-  serverSelectionTimeoutMS: 600000, // Increase server selection timeout
-  maxPoolSize: 10,           // Set max pool size for better connection handling (updated option for poolSize)
-  retryWrites: true          // Enable retrying writes
+if (!process.env.MONGODB_URL) {
+  console.error('FATAL: MONGODB_URL environment variable is not set. Exiting.');
+  process.exit(1);
+}
+
+mongoose.connect(process.env.MONGODB_URL, {
+  socketTimeoutMS: 600000,
+  connectTimeoutMS: 600000,
+  serverSelectionTimeoutMS: 600000,
+  maxPoolSize: 10,
+  retryWrites: true,
 })
 .then(async () => {
   console.log("Database connected successfully...");
