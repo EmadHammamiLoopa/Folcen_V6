@@ -143,14 +143,32 @@ exports.signup = async (req, res) => {
         const systemUserId = '66c7ba8cb077a84040bd9ee6';
         let systemUser = await User.findById(systemUserId);
         if (!systemUser) {
-          systemUser = await User.findOne({ email: 'Folcen_support@gmail.com' });
+          systemUser = await User.findOne({ email: 'folcenteam@gmail.com' });
         }
+        // Auto-create the Folcen Team account if it still doesn't exist.
+        // Without a real User document the 'from' field populates as null in
+        // the chat UI, making the welcome conversation appear broken.
         if (!systemUser) {
-          systemUser = await User.findOne({ firstName: 'System' });
+          try {
+            systemUser = new User({
+              firstName: 'Folcen',
+              lastName:  'Team',
+              email:     'folcenteam@gmail.com',
+              password:  crypto.randomBytes(32).toString('hex'), // unguessable; login not intended
+              emailVerified: true,
+              mainAvatar: othersAvatarPath,
+            });
+            await systemUser.save();
+            console.log('\u2705 Folcen Team system user auto-created:', systemUser._id);
+          } catch (createErr) {
+            // Race condition: another signup may have just created it.
+            systemUser = await User.findOne({ email: 'folcenteam@gmail.com' });
+            if (!systemUser) throw createErr;
+          }
         }
         
-        const senderId = systemUser ? systemUser._id : systemUserId;
-        const senderName = systemUser ? systemUser.firstName : "System";
+        const senderId   = systemUser._id;
+        const senderName = `${systemUser.firstName} ${systemUser.lastName}`.trim();
 
         const welcomeText = `Welcome to Folcen 👋
 
@@ -158,7 +176,7 @@ We’re excited to have you join our community!
 Folcen is built to help you connect, share, and stay focused in a clean and meaningful way.
 
 If you have any suggestions, feedback, or run into any issues, we’d love to hear from you.
-📩 Contact us anytime at: Folcen_support@gmail.com
+📩 Contact us anytime at: folcenteam@gmail.com
 
 Enjoy exploring Folcen — and thank you for being part of it!`;
 
@@ -166,7 +184,7 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
           from: senderId,
           to: user._id,
           text: welcomeText,
-          type: 'text',
+          type: 'friend',  // standard chat message type
           state: 'sent',
           createdAt: new Date()
         });
@@ -557,6 +575,15 @@ exports.firebaseLogin = async (req, res) => {
             // Always sync emailVerified from Firebase (covers legacy users and re-logins)
             if (email_verified && !user.emailVerified) {
                 user.emailVerified = true;
+            }
+            // If rawPassword is provided (MongoDB-fallback signin path) the caller has
+            // already authenticated with Firebase, so we trust this password is correct.
+            // Re-hash it and store it in MongoDB so future MongoDB-only logins work.
+            const { rawPassword } = req.body;
+            if (rawPassword && typeof rawPassword === 'string' && rawPassword.length >= 6) {
+                const bcrypt = require('bcryptjs');
+                user.hashed_password = await bcrypt.hash(rawPassword, 12);
+                logger.info(`[firebaseLogin] MongoDB password hash synced for user: ${user._id}`);
             }
             await user.save();
         }

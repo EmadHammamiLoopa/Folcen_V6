@@ -1,0 +1,87 @@
+<div class="audit-page">
+
+  <div class="comp-header">
+    <h2 class="comp-title">GDPR Audit Log</h2>
+    <p class="comp-sub">All admin GDPR actions are recorded here for accountability &mdash; GDPR Art. 30. Retained 3 years.</p>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <input
+      class="filter-input wide"
+      placeholder="Filter by Subject User ID…"
+      [(ngModel)]="filterUserId"
+      (input)="onUserIdInput(filterUserId)"
+      maxlength="24"
+    />
+    <input
+      class="filter-input"
+      placeholder="Filter by action…"
+      [(ngModel)]="filterAction"
+      (input)="onActionInput(filterAction)"
+    />
+    <button class="btn-icon" (click)="clearFilters()" title="Clear filters"><i class="fas fa-times"></i></button>
+    <button class="btn-icon" (click)="load()" title="Reload"><i class="fas fa-sync-alt" [class.fa-spin]="loading"></i></button>
+    <span class="results-count" *ngIf="!loading">{{ total | number }} entries</span>
+  </div>
+
+  <div *ngIf="error" class="error-banner"><i class="fas fa-exclamation-triangle"></i> {{ error }}</div>
+
+  <div *ngIf="loading" class="loading-center">
+    <i class="fas fa-spinner fa-spin"></i>&nbsp; Loading logs…
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap" *ngIf="!loading">
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Action</th>
+          <th>Subject (User)</th>
+          <th>Actor (Admin)</th>
+          <th style="width:40px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let log of logs">
+          <!-- Data row -->
+          <tr class="data-row" [class.expanded]="isExpanded(rowId(log))" (click)="toggleRow(rowId(log))">
+            <td class="ts-cell">{{ log.timestamp || log.createdAt | date:'dd/MM/yy HH:mm' }}</td>
+            <td><span class="action-badge">{{ log.action }}</span></td>
+            <td class="mono-cell" [title]="log.targetUserId || log.userId">{{ (log.targetUserId || log.userId | slice:0:14) || '—' }}</td>
+            <td class="mono-cell">{{ log.actorId?.email || log.actorId?.firstName || log.actorId || log.performedBy || '—' }}</td>
+            <td>
+              <button class="expand-btn" [title]="isExpanded(rowId(log)) ? 'Collapse' : 'Expand'">
+                <i class="fas fa-chevron-right" [class.rotated]="isExpanded(rowId(log))"></i>
+              </button>
+            </td>
+          </tr>
+          <!-- Expand row (meta detail) -->
+          <tr class="expand-row" *ngIf="isExpanded(rowId(log))">
+            <td colspan="5">
+              <pre class="meta-pre">{{ log.meta | json }}</pre>
+            </td>
+          </tr>
+        </ng-container>
+        <tr *ngIf="logs.length === 0" class="empty-row">
+          <td colspan="5"><i class="fas fa-inbox"></i> No audit log entries found.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" *ngIf="!loading">
+    <span class="page-info">Page {{ page }} of {{ totalPages }} &bull; {{ total | number }} total</span>
+    <div class="page-btns">
+      <button (click)="prevPage()" [disabled]="page === 1" class="btn-page">
+        <i class="fas fa-chevron-left"></i> Prev
+      </button>
+      <button (click)="nextPage()" [disabled]="page >= totalPages" class="btn-page">
+        Next <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
+</div>

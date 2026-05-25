@@ -115,6 +115,26 @@ exports.portability = async (req, res) => {
       const services = await Service.find({ user: userId }).skip(skip).limit(limit).lean();
       const channels = await Channel.find({ user: userId }).skip(skip).limit(limit).lean();
 
+      // GDPR: notifications, consent record, and analytics event summary (no raw events)
+      const Notification = require('../models/Notification');
+      const notifications = await Notification.find({ recipient: userId }).select('type message createdAt').skip(skip).limit(limit).lean();
+
+      let consentRecord = null;
+      try {
+        const UserConsent = require('../models/UserConsent');
+        consentRecord = await UserConsent.findOne({ userId }).select('-_id analytics_optin personalization createdAt updatedAt history').lean();
+      } catch (e) {}
+
+      let analyticsEventSummary = null;
+      try {
+        const AnalyticsEvent = require('../models/AnalyticsEvent');
+        const evtAgg = await AnalyticsEvent.aggregate([
+          { $match: { userId } },
+          { $group: { _id: '$eventType', count: { $sum: 1 } } }
+        ]);
+        analyticsEventSummary = { note: 'Aggregate counts only; raw events are pseudonymous and auto-purged after ' + (process.env.ANALYTICS_EVENT_RETENTION_DAYS || 30) + ' days.', counts: Object.fromEntries(evtAgg.map(e => [e._id, e.count])) };
+      } catch (e) {}
+
     const exportObj = {
       user: sanitizeUserForDsar(target),
       posts,
@@ -122,14 +142,17 @@ exports.portability = async (req, res) => {
       messages,
       followers,
       following,
-      callEvents, // minimal technical metadata about call lifecycle
-      messageEvents, // minimal delivery/abuse signals
+      callEvents,
+      messageEvents,
       activities,
       reports,
       products,
       jobs,
       services,
       channels,
+      notifications,
+      consentRecord,
+      analyticsEventSummary,
       page,
       limit
     };
@@ -166,7 +189,7 @@ exports.portability = async (req, res) => {
       console.warn('Failed to include legal acceptances in portability export', e && e.message);
     }
 
-    await recordAudit({ actorId: actor._id, actorRole: actor.role, action: 'EXPORT', targetUserId: target._id, details: { reason: 'GDPR Data Portability Export', counts: { posts: posts.length, comments: comments.length, messages: messages.length } }, ip: req.ip, userAgent: req.get('User-Agent') });
+    await recordAudit({ actorId: actor._id, actorRole: actor.role, action: 'EXPORT', targetUserId: target._id, details: { reason: 'GDPR Data Portability Export', counts: { posts: posts.length, comments: comments.length, messages: messages.length, notifications: notifications.length } }, ip: req.ip, userAgent: req.get('User-Agent') });
     return Response.sendResponse(res, exportObj);
   } catch (e) {
     console.error('GDPR portability error', e);
@@ -325,22 +348,30 @@ exports.consentHistory = async (req, res) => {
 exports.auditLogs = async (req, res) => {
   try {
     const actor = req.authUser;
-    const qUserId = req.query.userId;
-    if (!qUserId) return Response.sendError(res, 400, 'userId required');
+    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
+    if (!isAdmin) return Response.sendError(res, 403, 'Access forbidden');
+
+    const qUserId = req.query.userId || null;
+    const qAction = req.query.action || null;
 
     const AuditLog = require('../models/AuditLog');
-    const page = parseInt(req.query.page || '1');
-    const limit = parseInt(req.query.limit || '50');
+    const page = Math.max(1, parseInt(req.query.page || '1'));
+    const limit = Math.min(200, parseInt(req.query.limit || '50'));
     const skip = (page - 1) * limit;
 
-    const logs = await AuditLog.find({ targetUserId: qUserId })
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate('actorId', 'firstName lastName email role')
-      .lean();
+    const filter = {};
+    if (qUserId) filter.targetUserId = qUserId;
+    if (qAction) filter.action = { $regex: qAction, $options: 'i' };
 
-    const total = await AuditLog.countDocuments({ targetUserId: qUserId });
+    const [logs, total] = await Promise.all([
+      AuditLog.find(filter)
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('actorId', 'firstName lastName email role')
+        .lean(),
+      AuditLog.countDocuments(filter),
+    ]);
 
     return Response.sendResponse(res, {
       docs: logs,
@@ -351,6 +382,152 @@ exports.auditLogs = async (req, res) => {
     });
   } catch (e) {
     console.error('GDPR auditLogs error', e);
+    return Response.sendError(res, 500, 'Server error');
+  }
+};
+
+// ─────────────────── Dry-run erasure preview ───────────────────
+exports.erasePreview = async (req, res) => {
+  try {
+    const actor = req.authUser;
+    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
+    if (!isAdmin) return Response.sendError(res, 403, 'Access forbidden');
+
+    const targetId = req.query.userId || req.body.userId;
+    if (!targetId) return Response.sendError(res, 400, 'userId required');
+
+    const target = await User.findById(targetId).select('_id firstName lastName email').lean();
+    if (!target) return Response.sendResponse(res, {}, 'User not found');
+
+    const userId = target._id;
+
+    const [
+      posts, comments, messages, notifications, activities,
+      pushTokens, follows, dailyActivity, analyticsEvents
+    ] = await Promise.all([
+      require('../models/Post').countDocuments({ user: userId }),
+      require('../models/Comment').countDocuments({ user: userId }),
+      require('../models/Message').countDocuments({ $or: [{ from: userId }, { to: userId }] }),
+      require('../models/Notification').countDocuments({ $or: [{ recipient: userId }, { sender: userId }] }),
+      require('../models/Activity').countDocuments({ actor: userId }),
+      require('../models/PushToken').countDocuments({ userId }),
+      require('../models/Follow').countDocuments({ $or: [{ follower: userId }, { followed: userId }] }),
+      require('../models/UserActivityDaily').countDocuments({ userId }),
+      (async () => { try { return await require('../models/AnalyticsEvent').countDocuments({ userId }); } catch (e) { return 0; } })(),
+    ]);
+
+    let interestProfile = false;
+    let consents = false;
+    try { interestProfile = !!(await require('../models/UserInterestProfile').findOne({ userId }).select('_id').lean()); } catch (e) {}
+    try { consents = !!(await require('../models/UserConsent').findOne({ userId }).select('_id').lean()); } catch (e) {}
+
+    await recordAudit({ actorId: actor._id, actorRole: actor.role, action: 'ERASURE_PREVIEW', targetUserId: userId, details: { dry_run: true }, ip: req.ip, userAgent: req.get('User-Agent') });
+
+    return Response.sendResponse(res, {
+      userId: target._id,
+      name: `${target.firstName || ''} ${target.lastName || ''}`.trim(),
+      email: target.email,
+      wouldDelete: { posts, comments, messages, notifications, activities, pushTokens, follows, dailyActivity, analyticsEvents, interestProfile, consents }
+    });
+  } catch (e) {
+    console.error('GDPR erasePreview error', e);
+    return Response.sendError(res, 500, 'Server error');
+  }
+};
+
+// ─────────────────── Anonymize all posts/comments by user ──────
+const ANON_PLACEHOLDER_ID = '000000000000000000000000';
+exports.anonymizeAuthor = async (req, res) => {
+  try {
+    const actor = req.authUser;
+    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
+    if (!isAdmin) return Response.sendError(res, 403, 'Access forbidden');
+
+    const targetId = req.body.userId;
+    if (!targetId) return Response.sendError(res, 400, 'userId required');
+    const reason = req.body.reason || 'GDPR anonymization request';
+
+    const Post = require('../models/Post');
+    const Comment = require('../models/Comment');
+    const mongoose = require('mongoose');
+    const anonId = new mongoose.Types.ObjectId(ANON_PLACEHOLDER_ID);
+
+    const [postRes, commentRes] = await Promise.all([
+      Post.updateMany({ user: targetId }, { $set: { user: anonId, anonyme: true } }),
+      Comment.updateMany({ user: targetId }, { $set: { user: anonId, anonyme: true } }),
+    ]);
+
+    await recordAudit({ actorId: actor._id, actorRole: actor.role, action: 'ANONYMIZE_AUTHOR', targetUserId: targetId, details: { reason, posts: postRes.modifiedCount, comments: commentRes.modifiedCount }, ip: req.ip, userAgent: req.get('User-Agent') });
+
+    return Response.sendResponse(res, { posts: postRes.modifiedCount, comments: commentRes.modifiedCount }, 'Author anonymized');
+  } catch (e) {
+    console.error('GDPR anonymizeAuthor error', e);
+    return Response.sendError(res, 500, 'Server error');
+  }
+};
+
+// ─────────────────── Consent management ────────────────────────
+exports.consentStatus = async (req, res) => {
+  try {
+    const actor = req.authUser;
+    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
+    let targetId = actor._id;
+    if (req.query.userId) {
+      if (!isAdmin) return Response.sendError(res, 403, 'Access forbidden');
+      targetId = req.query.userId;
+    }
+
+    const UserConsent = require('../models/UserConsent');
+    const consent = await UserConsent.findOne({ userId: targetId }).lean();
+    return Response.sendResponse(res, {
+      userId: targetId,
+      analytics_optin: consent ? consent.analytics_optin : false,
+      personalization: consent ? consent.personalization : false,
+      updatedAt: consent ? consent.updatedAt : null,
+    });
+  } catch (e) {
+    console.error('GDPR consentStatus error', e);
+    return Response.sendError(res, 500, 'Server error');
+  }
+};
+
+const ALLOWED_CONSENT_KEYS = ['analytics_optin', 'personalization'];
+exports.updateConsent = async (req, res) => {
+  try {
+    const actor = req.authUser;
+    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
+    let targetId = actor._id;
+    if (req.body.userId && String(req.body.userId) !== String(actor._id)) {
+      if (!isAdmin) return Response.sendError(res, 403, 'Access forbidden');
+      targetId = req.body.userId;
+    }
+
+    const { key, value } = req.body;
+    if (!ALLOWED_CONSENT_KEYS.includes(key)) return Response.sendError(res, 400, 'Invalid consent key');
+    if (typeof value !== 'boolean') return Response.sendError(res, 400, 'value must be boolean');
+
+    const UserConsent = require('../models/UserConsent');
+    const existing = await UserConsent.findOne({ userId: targetId });
+    const oldValue = existing ? existing[key] : false;
+
+    const historyEntry = { key, oldValue, newValue: value, changedAt: new Date(), changedBy: actor._id, source: isAdmin && String(targetId) !== String(actor._id) ? 'admin' : 'self' };
+
+    const updated = await UserConsent.findOneAndUpdate(
+      { userId: targetId },
+      { $set: { [key]: value, updatedAt: new Date() }, $push: { history: historyEntry } },
+      { upsert: true, new: true }
+    );
+
+    // If user opts out of analytics, delete their interest profile
+    if (key === 'analytics_optin' && value === false) {
+      try { await require('../models/UserInterestProfile').deleteOne({ userId: targetId }); } catch (e) {}
+    }
+
+    await recordAudit({ actorId: actor._id, actorRole: actor.role, action: 'CONSENT_CHANGE', targetUserId: targetId, details: { key, oldValue, newValue: value }, ip: req.ip, userAgent: req.get('User-Agent') });
+
+    return Response.sendResponse(res, { userId: targetId, [key]: updated[key] }, 'Consent updated');
+  } catch (e) {
+    console.error('GDPR updateConsent error', e);
     return Response.sendError(res, 500, 'Server error');
   }
 };

@@ -1,0 +1,94 @@
+<div class="erase-page">
+
+  <!-- Header -->
+  <div class="comp-header">
+    <h2 class="comp-title">Erase User</h2>
+    <p class="comp-sub">Permanently delete a user and all their data &mdash; GDPR Art. 17 Right to Erasure.</p>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="step-bar">
+    <div class="step-item" [class.active]="step === 'input'" [class.done]="step !== 'input'">
+      <span class="step-num">1</span><span class="step-lbl">Identify</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item" [class.active]="step === 'confirm'" [class.done]="step === 'done'">
+      <span class="step-num">2</span><span class="step-lbl">Preview &amp; Confirm</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item" [class.active]="step === 'done'">
+      <span class="step-num">3</span><span class="step-lbl">Done</span>
+    </div>
+  </div>
+
+  <!-- ── Step 1: Input ── -->
+  <div *ngIf="step === 'input'" class="step-body">
+    <div class="card">
+      <label class="field-label">User ID <span class="field-hint">(24-char MongoDB ObjectId)</span></label>
+      <input [(ngModel)]="userId" placeholder="e.g. 64a1b2c3d4e5f6a7b8c9d0e1"
+        class="id-input" maxlength="24" (keyup.enter)="runPreview()" />
+      <p *ngIf="error" class="field-error"><i class="fas fa-exclamation-circle"></i> {{ error }}</p>
+      <div class="card-actions">
+        <button (click)="runPreview()" [disabled]="loading || userId.length !== 24" class="btn-preview">
+          <i class="fas" [class.fa-search]="!loading" [class.fa-spinner]="loading" [class.fa-spin]="loading"></i>
+          {{ loading ? 'Loading preview…' : 'Preview Deletion' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Confirm ── -->
+  <div *ngIf="step === 'confirm'" class="step-body">
+
+    <!-- Preview counts -->
+    <div class="warning-card">
+      <div class="warning-title">
+        <i class="fas fa-exclamation-triangle"></i>
+        Dry-run preview &mdash; the following will be <strong>permanently deleted</strong>:
+      </div>
+      <div class="counts-grid">
+        <div class="count-item" *ngFor="let k of previewKeys">
+          <i [class]="k.icon + ' count-icon'"></i>
+          <span class="count-label">{{ k.label }}</span>
+          <span class="count-val">{{ countsSource[k.key] !== undefined && countsSource[k.key] !== null ? countsSource[k.key] : '—' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reason + Typed confirmation -->
+    <div class="card confirm-form">
+      <label class="field-label">Reason <span class="field-hint">(required for audit log)</span></label>
+      <input [(ngModel)]="reason" placeholder="e.g. User requested erasure via support ticket #1234"
+        class="id-input reason-input" />
+
+      <label class="field-label mt-confirm">
+        Type the User ID to confirm: <code class="confirm-hint">{{ userId }}</code>
+      </label>
+      <input [(ngModel)]="confirmText" placeholder="Re-type user ID exactly"
+        class="id-input" [class.match]="confirmValid" maxlength="24" />
+      <p class="confirm-note" *ngIf="confirmText && !confirmValid">Text does not match user ID.</p>
+
+      <p *ngIf="error" class="field-error"><i class="fas fa-exclamation-circle"></i> {{ error }}</p>
+
+      <div class="card-actions">
+        <button (click)="reset()" class="btn-cancel">Cancel</button>
+        <button (click)="confirmErase()" [disabled]="!confirmValid || loading" class="btn-erase">
+          <i class="fas" [class.fa-trash]="!loading" [class.fa-spinner]="loading" [class.fa-spin]="loading"></i>
+          {{ loading ? 'Erasing…' : 'Permanently Erase User' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 3: Done ── -->
+  <div *ngIf="step === 'done'" class="step-body">
+    <div class="done-card">
+      <div class="done-icon"><i class="fas fa-check-circle"></i></div>
+      <h3 class="done-title">User erased successfully</h3>
+      <p class="done-sub">All personal data has been permanently deleted from the platform.</p>
+      <pre class="json-preview">{{ result | json }}</pre>
+      <button (click)="reset()" class="btn-new">Start New Erasure</button>
+    </div>
+  </div>
+
+</div>

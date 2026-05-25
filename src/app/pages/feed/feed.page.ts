@@ -186,8 +186,24 @@ export class FeedPage implements OnInit, OnDestroy {
   }
 
   goToActivity(activity: any) {
-    if (activity.targetLink) {
-      this.router.navigateByUrl(activity.targetLink);
+    let link: string | null = activity.targetLink || null;
+
+    // Client-side fallback: build the link from activityType + _id
+    if (!link) {
+      const id = activity._id;
+      switch (activity.activityType) {
+        case 'post':    link = `/tabs/channels/post/${id}`; break;
+        case 'product': link = `/tabs/buy-and-sell/product/${id}`; break;
+        case 'job':     link = `/tabs/small-business/jobs/job/${id}`; break;
+        case 'service': link = `/tabs/small-business/services/service/${id}`; break;
+        case 'comment':
+          // activity._id is the comment; post is the parent
+          const postId = activity.post?._id || activity.post;
+          if (postId) link = `/tabs/channels/post/${postId}?commentId=${id}`;
+          break;
+      }
     }
+
+    if (link) this.router.navigateByUrl(link);
   }
 }

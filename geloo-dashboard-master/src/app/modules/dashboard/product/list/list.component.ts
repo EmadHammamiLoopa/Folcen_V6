@@ -10,7 +10,7 @@ import { Header } from 'src/app/models/Header';
 export class ListComponent implements OnInit {
   headers: { title: string; name: string; type: string; values?: string[]; maxLength?: number; sort?: boolean; align?: string; reverseBooleanColors?: boolean }[] = [
     {
-      name: "photo",
+      name: "photos",
       title: "",
       type: "avatar",
       sort: false,

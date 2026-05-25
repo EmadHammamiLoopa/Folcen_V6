@@ -1,5 +1,5 @@
 const express = require('express')
-const { storeRequest, requests, acceptRequest, rejectRequest, cancelRequest} = require('../app/controllers/RequestController')
+const { storeRequest, requests, acceptRequest, rejectRequest, cancelRequest, cancelRequestByUser} = require('../app/controllers/RequestController')
 const { requireSignin, withAuthUser } = require('../app/middlewares/auth')
 const { userById, isNotFriend, isNotBlocked } = require('../app/middlewares/user')
 const { requestById, requestSender, requestReceiver, requestNotExist, sendRequestPermission } = require('../app/middlewares/request')
@@ -24,6 +24,7 @@ router.param('userId', userById);  // Apply requireSignin first
 router.post('/accept/:requestId', [requireSignin, requestReceiver, isNotBlocked, withAuthUser], acceptRequest)
 router.post('/reject/:requestId', [requireSignin, requestReceiver, isNotBlocked], rejectRequest)
 router.post('/cancel/:requestId', [requireSignin, withAuthUser, requestSender, isNotBlocked], cancelRequest);
+router.post('/cancel-by-user/:userId', [requireSignin, withAuthUser, userById, isNotBlocked], cancelRequestByUser);
 // Add a quick inline logger in the middleware chain to trace execution order
 router.post('/:userId', [
 	requireSignin,

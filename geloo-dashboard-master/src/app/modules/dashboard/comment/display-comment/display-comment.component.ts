@@ -13,7 +13,7 @@ export class DisplayCommentComponent implements OnInit {
   comment: any;
   loading = true;
   activeTab = 'details';
-  apiUrl = environment.apiUrl;
+  apiUrl = environment.apiUrl.replace(/\/api\/v1\/?$/, ''); // backend root for static files
 
   constructor(
     private route: ActivatedRoute,

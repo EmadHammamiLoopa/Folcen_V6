@@ -8,7 +8,9 @@ const AnnouncementSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     expiresAt: { type: Date },
-    seenBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] // Track who saw it
+    seenBy: [{ type: String }] // stored as string IDs for consistent comparison across ObjectId / string contexts
 }, { timestamps: true });
+
+AnnouncementSchema.index({ isActive: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Announcement', AnnouncementSchema);

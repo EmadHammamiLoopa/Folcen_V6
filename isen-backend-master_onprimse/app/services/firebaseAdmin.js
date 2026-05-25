@@ -2,16 +2,15 @@
  * app/services/firebaseAdmin.js
  * -------------------------------------------------------------------
  * Initialises Firebase Admin SDK once and exports the admin instance.
- * Looks for config/firebase-service-account.json (relative to repo
- * root), or override with FIREBASE_SERVICE_ACCOUNT_PATH env var.
+ * The service-account JSON path is read from the environment variable
+ * FIREBASE_SERVICE_ACCOUNT_PATH so credentials are never hard-coded.
  *********************************************************************/
 
 const admin = require('firebase-admin');
-const path = require('path');
 
 const SERVICE_ACCOUNT_PATH =
   process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(__dirname, '..', '..', 'config', 'firebase-service-account.json');
+  '/mnt/data/folcen-8fd1c-firebase-adminsdk-fbsvc-e88bb05c4c.json';
 
 if (!admin.apps.length) {
   try {

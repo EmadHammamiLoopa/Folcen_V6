@@ -164,17 +164,23 @@ export class AuthService extends DataService {
     }
   }
 
-  async firebaseSignin(email, password) {
+  async firebaseSignin(email, password, syncMongoPassword = false) {
     try {
       console.log('[DEBUG] AuthService: firebaseSignin called for:', email);
       const fbUser = await this.firebaseSvc.signIn(email, password);
       console.log('[DEBUG] AuthService: Firebase sign-in success, UID:', fbUser.uid);
       const idToken = await fbUser.getIdToken();
       console.log('[DEBUG] AuthService: Firebase ID Token obtained (first 20 chars):', idToken.substring(0, 20));
+      const body: any = { idToken };
+      if (syncMongoPassword) {
+        // Ask the backend to re-hash and store this password in MongoDB so that
+        // future logins via the standard signin route work without needing Firebase.
+        body.rawPassword = password;
+      }
       return await this.sendRequest({
         method: 'post',
         url: 'firebase-login',
-        data: { idToken }
+        data: body
       });
     } catch (err) {
       throw this.handleAuthError(err);

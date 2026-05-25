@@ -145,6 +145,14 @@ export class NewFriendsPage implements OnInit, OnDestroy {
               this.users.push({ isDivider: true, scope: user.scope });
             } else {
               const initializedUser = new User().initialize(user);
+              const userId = (initializedUser as any).id || (initializedUser as any)._id;
+              if (userId && !this.connectState.has(userId)) {
+                if (user.followRequestSent) {
+                  this.connectState.set(userId, 'following');
+                } else if (user.requestSent) {
+                  this.connectState.set(userId, 'requested');
+                }
+              }
               console.log('Initialized User:', initializedUser);
               this.users.push(initializedUser);
             }
@@ -340,7 +348,41 @@ export class NewFriendsPage implements OnInit, OnDestroy {
   connectAction(user: User, event: Event) {
     event.stopPropagation();
     const userId = user.id || (user as any)._id;
-    if (!userId || this.connectState.has(userId)) return;
+    if (!userId) return;
+
+    // If already sent — tap again to cancel
+    if (this.connectState.has(userId)) {
+      const currentState = this.connectState.get(userId);
+      this.connectState.delete(userId);
+      this.changeDetectorRef.detectChanges();
+
+      if (currentState === 'following') {
+        this.userService.unfollow(userId).subscribe(
+          (resp: any) => {
+            this.toastService.presentSuccessToastr(resp?.message || 'Follow request cancelled.');
+            this.changeDetectorRef.detectChanges();
+          },
+          (err: any) => {
+            this.connectState.set(userId, 'following');
+            this.toastService.presentErrorToastr(err?.error?.message || 'Could not cancel follow request.');
+            this.changeDetectorRef.detectChanges();
+          }
+        );
+      } else {
+        this.requestService.cancelRequestByUser(userId).then(
+          (resp: any) => {
+            this.toastService.presentSuccessToastr(resp?.message || 'Friend request cancelled.');
+            this.changeDetectorRef.detectChanges();
+          },
+          (err: any) => {
+            this.connectState.set(userId, 'requested');
+            this.toastService.presentErrorToastr(err?.error?.message || 'Could not cancel request.');
+            this.changeDetectorRef.detectChanges();
+          }
+        );
+      }
+      return;
+    }
 
     if (user.isPrivate) {
       this.connectState.set(userId, 'following');

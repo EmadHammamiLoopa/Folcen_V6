@@ -3,7 +3,7 @@
   <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
     <div class="flex flex-col md:flex-row items-center gap-6">
       <div class="relative">
-        <img [src]="(product.photos && product.photos.length > 0) ? (product.photos[0].startsWith('http') ? product.photos[0] : apiUrl + '/' + product.photos[0]) : 'assets/img/default-product.png'" 
+        <img [src]="(product.photos && product.photos.length > 0) ? (product.photos[0].path?.startsWith('http') ? product.photos[0].path : apiUrl + (product.photos[0].path?.startsWith('/') ? '' : '/') + product.photos[0].path) : 'assets/img/default-product.png'" 
              class="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-md">
         <span [class]="product.deletedAt ? 'bg-red-500' : 'bg-green-500'" 
               class="absolute bottom-2 right-2 w-5 h-5 rounded-full border-2 border-white"></span>
@@ -142,7 +142,7 @@
     <div *ngSwitchCase="'photos'" class="animate-fadeIn">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div *ngFor="let photo of product.photos" class="aspect-square rounded-xl overflow-hidden border border-gray-100 shadow-sm group relative">
-          <img [src]="photo.startsWith('http') ? photo : apiUrl + '/' + photo" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110">
+          <img [src]="photo.path?.startsWith('http') ? photo.path : apiUrl + (photo.path?.startsWith('/') ? '' : '/') + photo.path" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110">
           <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity flex items-center justify-center">
             <i class="fas fa-search-plus text-white opacity-0 group-hover:opacity-100 text-2xl"></i>
           </div>
@@ -203,8 +203,8 @@
     <div *ngSwitchCase="'creator'" class="animate-fadeIn">
       <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto text-center">
         <div class="mb-6">
-          <img [src]="product.user?.mainAvatar ? (product.user.mainAvatar.startsWith('http') ? product.user.mainAvatar : apiUrl + '/' + product.user.mainAvatar) : 'assets/img/default-avatar.png'" 
-               class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg">
+          <img [src]="product.user?.mainAvatar ? (product.user.mainAvatar.startsWith('http') ? product.user.mainAvatar : apiUrl + (product.user.mainAvatar.startsWith('/') ? '' : '/') + product.user.mainAvatar) : 'assets/user.jpeg'" 
+               class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg" (error)="$any($event.target).src='assets/user.jpeg'">
         </div>
         <h3 class="text-xl font-bold text-gray-800 mb-1">{{product.user?.firstName}} {{product.user?.lastName}}</h3>
         <p class="text-gray-500 mb-6">{{product.user?.email}}</p>

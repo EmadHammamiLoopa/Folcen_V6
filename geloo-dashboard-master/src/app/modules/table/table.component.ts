@@ -131,22 +131,48 @@ export class TableComponent implements OnInit {
   }
 
   getAvatar(row: any, name: string): string {
-    // compute backend root
     const backendRoot = environment.apiUrl ? environment.apiUrl.replace(/\/api\/v1\/?$/i, '') : '';
 
-    // Use the centralized AvatarUrlUtil for consistent avatar rendering
-    let url = AvatarUrlUtil.getAvatarUrl(row, backendRoot);
+    // For non-user rows (photo/photos fields), use the named field value directly
+    if (name !== 'mainAvatar') {
+      const fieldVal = row[name];
+      if (fieldVal) {
+        // Direct string path (channel, job, service photos)
+        if (typeof fieldVal === 'string') {
+          const url = fieldVal.startsWith('http') ? fieldVal : backendRoot + (fieldVal.startsWith('/') ? '' : '/') + fieldVal;
+          return this.addCacheBust(url, row);
+        }
+        // Array of photo objects (products)
+        if (Array.isArray(fieldVal) && fieldVal.length > 0) {
+          const first = fieldVal[0];
+          const p = typeof first === 'string' ? first : (first.path || first.url || first.src);
+          if (p) {
+            const url = p.startsWith('http') ? p : backendRoot + (p.startsWith('/') ? '' : '/') + p;
+            return this.addCacheBust(url, row);
+          }
+        }
+        // Single photo object with path/url
+        if (typeof fieldVal === 'object' && (fieldVal.path || fieldVal.url)) {
+          const p = fieldVal.path || fieldVal.url;
+          const url = p.startsWith('http') ? p : backendRoot + (p.startsWith('/') ? '' : '/') + p;
+          return this.addCacheBust(url, row);
+        }
+      }
+    }
 
+    // User-style avatars (mainAvatar, avatarStyle, avatarSeed, etc.)
+    let url = AvatarUrlUtil.getAvatarUrl(row, backendRoot);
     if (!url) {
       return backendRoot + '/public/images/avatars/other.webp';
     }
-    
-    // Add cache-busting timestamp if updatedAt exists and it's a local file
+    return this.addCacheBust(url, row);
+  }
+
+  private addCacheBust(url: string, row: any): string {
     if (row.updatedAt && !url.includes('dicebear.com')) {
       const timestamp = new Date(row.updatedAt).getTime();
       url += (url.includes('?') ? '&' : '?') + 't=' + timestamp;
     }
-    
     return url;
   }
 

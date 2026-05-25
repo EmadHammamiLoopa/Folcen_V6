@@ -395,7 +395,7 @@ exports.getFeed = async (req, res) => {
                 ...p.toObject(),
                 activityType: 'product',
                 summary: `${name} listed a new product: ${p.label}`,
-                targetLink: `/tabs/products/details/${p._id}`,
+                targetLink: `/tabs/buy-and-sell/product/${p._id}`,
                 text: makeExcerpt(p.description, 150)
             });
         });
@@ -406,7 +406,7 @@ exports.getFeed = async (req, res) => {
                 ...j.toObject(),
                 activityType: 'job',
                 summary: `${name} posted a new job: ${j.title}`,
-                targetLink: `/tabs/jobs/details/${j._id}`,
+                targetLink: `/tabs/small-business/jobs/job/${j._id}`,
                 text: makeExcerpt(j.description, 150)
             });
         });
@@ -417,7 +417,7 @@ exports.getFeed = async (req, res) => {
                 ...s.toObject(),
                 activityType: 'service',
                 summary: `${name} offered a new service: ${s.title}`,
-                targetLink: `/tabs/services/details/${s._id}`,
+                targetLink: `/tabs/small-business/services/service/${s._id}`,
                 text: makeExcerpt(s.description, 150)
             });
         });

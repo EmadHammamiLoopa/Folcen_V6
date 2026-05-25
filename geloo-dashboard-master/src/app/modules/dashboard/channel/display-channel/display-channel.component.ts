@@ -15,7 +15,7 @@ export class DisplayChannelComponent implements OnInit {
   counts: any = {};
   loading = true;
   tab = 'info';
-  apiUrl = environment.apiUrl; // Use environment API URL
+  apiUrl = environment.apiUrl.replace(/\/api\/v1\/?$/, ''); // backend root for static files
 
   constructor(
     private route: ActivatedRoute,

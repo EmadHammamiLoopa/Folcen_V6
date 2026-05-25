@@ -1,0 +1,34 @@
+<div class="gdpr-shell">
+
+  <!-- ══ Left Subnav ══ -->
+  <aside class="gdpr-subnav">
+    <div class="subnav-brand">
+      <i class="fas fa-shield-alt"></i>
+      <span class="brand-text">GDPR Centre</span>
+    </div>
+
+    <nav class="subnav-links">
+      <a
+        *ngFor="let tab of tabs"
+        [routerLink]="tab.path"
+        routerLinkActive="active"
+        class="subnav-item">
+        <i [class]="tab.icon + ' subnav-icon'"></i>
+        <div class="subnav-text">
+          <span class="subnav-label">{{ tab.label }}</span>
+          <span class="subnav-desc">{{ tab.desc }}</span>
+        </div>
+      </a>
+    </nav>
+
+    <div class="subnav-footer">
+      <span class="subnav-footer-text">Loopa v1 · GDPR Compliant</span>
+    </div>
+  </aside>
+
+  <!-- ══ Main Panel ══ -->
+  <main class="gdpr-main">
+    <router-outlet></router-outlet>
+  </main>
+
+</div>

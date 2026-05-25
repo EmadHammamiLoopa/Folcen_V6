@@ -358,6 +358,7 @@ userSchema.methods.publicInfo = function(isLoggedInUser = false) {
         avatarOverrides: this.avatarOverrides,
         profileCreated: this.profileCreated,
         enabled: this.enabled,
+        emailVerified: this.emailVerified,
         is2FAEnabled: this.is2FAEnabled,
         banned: this.banned,
         banUntil: this.banUntil,

@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const { recordAcceptance, getAcceptancesForUser } = require('../app/utils/legalAccept');
 const { recordAudit } = require('../app/utils/audit');
 const { requireLatestTermsPrivacy } = require('../app/middlewares/legal');
+const logger = require('../app/utils/logger');
 
 // Get current versions of legal documents
 router.get('/versions', (req, res) => {
@@ -146,26 +147,33 @@ router.get('/events', requireSignin, withAuthUser, isAdmin, rateLimit({ windowMs
 	}
 });
 
-// Record a new acceptance
-router.post('/accept', [requireSignin, withAuthUser, dsarLimiter], GdprController.accept);
+// Record a new acceptance (delegates to the /acceptance POST route above)
+// Note: GdprController.accept is not defined; use /acceptance instead.
 
 // Right of access (self or admin query)
 router.get('/access', [requireSignin, withAuthUser, requireLatestTermsPrivacy, dsarLimiter], GdprController.access);
 
-// Portability (self or admin query)
-router.get('/portability', [requireSignin, withAuthUser, requireLatestTermsPrivacy, dsarLimiter], GdprController.portability);
+// Portability / data export (admin or self with latest terms agreed)
+router.get('/portability', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.portability);
 
 // Right to be forgotten (soft-delete + redact)
-router.post('/erase', [requireSignin, withAuthUser, requireLatestTermsPrivacy, dsarLimiter], GdprController.erase);
+router.post('/erase', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.erase);
 
-// Portability / export
-router.get('/portability', requireSignin, withAuthUser, dsarLimiter, GdprController.portability);
+// Erase preview (admin only — counts data before erasure)
+router.get('/erase-preview', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.erasePreview);
 
-// Rectification (self or admin)
+// Rectification — accept both POST (legacy) and PUT (dashboard)
 router.post('/rectify', [requireSignin, withAuthUser, rectifySchema, dsarLimiter], GdprController.rectify);
+router.put('/rectify/:userId', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.rectify);
 
-// Erasure: soft-delete + revoke; admin may operate on other users
-router.post('/erase', requireSignin, withAuthUser, dsarLimiter, GdprController.erase);
+// Anonymize author (admin only)
+router.post('/anonymize-author', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.anonymizeAuthor);
+
+// Consent status (admin lookup)
+router.get('/consent-status', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.consentStatus);
+
+// Update consent flag (admin)
+router.put('/consent', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.updateConsent);
 
 // Consent history
 router.get('/consents', requireSignin, withAuthUser, dsarLimiter, GdprController.consentHistory);

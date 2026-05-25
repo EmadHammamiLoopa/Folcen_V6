@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+const NOTIFICATION_TTL_SECONDS = Number(process.env.NOTIFICATION_RETENTION_DAYS || 90) * 24 * 3600;
+
 const notificationSchema = new mongoose.Schema({
   recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   sender:    { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -13,5 +15,7 @@ const notificationSchema = new mongoose.Schema({
 
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 notificationSchema.index({ recipient: 1, read: 1 });
+// GDPR: TTL — notifications expire after NOTIFICATION_RETENTION_DAYS (default 90d)
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: NOTIFICATION_TTL_SECONDS });
 
 module.exports = mongoose.model('Notification', notificationSchema);

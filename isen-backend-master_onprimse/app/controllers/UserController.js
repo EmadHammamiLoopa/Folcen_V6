@@ -428,9 +428,10 @@ exports.getMyAnnouncements = async (req, res) => {
         try {
             const now = new Date();
             // Filter: active, not seen by user, not expired, AND created on/after user joined
+            const userIdStr = String(userId);
             announcements = await Announcement.find({ 
                 isActive: true, 
-                seenBy: { $ne: String(userId) },
+                seenBy: { $nin: [userIdStr] },
                 createdAt: { $gte: user.createdAt },
                 $or: [
                     { expiresAt: { $exists: false } },
@@ -465,7 +466,7 @@ exports.markAnnouncementSeen = async (req, res) => {
         if (!userId) return Response.sendError(res, 401, 'Unauthorized');
 
         await Announcement.updateOne(
-            { _id: req.params.id },
+            { _id: req.params.id, seenBy: { $nin: [String(userId)] } }, // idempotent: no-op if already seen
             { $addToSet: { seenBy: String(userId) } }
         );
         return Response.sendResponse(res, null, 'Marked as seen');
@@ -480,14 +481,27 @@ exports.markAnnouncementSeen = async (req, res) => {
 
 exports.storeUser = async (req, res) => {
     try {
-        let user = await User.findOne({ email: req.fields.email });
+        const fields = req.fields || req.body;
+
+        // Strip empty-string fields and fields that don't belong on a new User document
+        const STRIP_KEYS = ['id', 'createdAt', 'lastSeen', 'avatar', 'password_confirmation'];
+        const cleanFields = Object.fromEntries(
+            Object.entries(fields).filter(([k, v]) => !STRIP_KEYS.includes(k) && v !== '' && v != null)
+        );
+
+        // Normalize email to lowercase to match signin behavior
+        if (cleanFields.email && typeof cleanFields.email === 'string') {
+            cleanFields.email = cleanFields.email.trim().toLowerCase();
+        }
+
+        let user = await User.findOne({ email: cleanFields.email });
         if (user) return Response.sendError(res, 400, 'email already used in another account');
 
-        const fields = _.omit(req.fields, ['avatar']);
-        user = new User(fields);
+        user = new User(cleanFields);
 
-        if (req.files.avatar) {
-            await this.storeAvatar(req.files.avatar, user);
+        const files = req.files || {};
+        if (files.avatar) {
+            await this.storeAvatar(files.avatar, user);
         } else {
             const avatarPath = user.getDefaultAvatar();
             user.mainAvatar = avatarPath;
@@ -2028,6 +2042,7 @@ function getUserSelectFields(req) {
         messagedUsers: 1,
         randomVisible: 1,
         ageVisible: 1,
+        isPrivate: 1,
         loggedIn: 1,
         online: 1,
         visitProfile: 1,
@@ -2214,6 +2229,15 @@ exports.getUserProfile = async (req, res) => {
       relationshipStatus.followStatus = followRecord ? followRecord.status : null;
       relationshipStatus.isFollowing = !!(followRecord && followRecord.status === 'active');
       relationshipStatus.isFollower = !!(isFollowerRecord && isFollowerRecord.status === 'active');
+
+      // Friend request status: 'requested' = auth user sent request, 'requesting' = profile owner sent request to auth user
+      if (!isFriendResult && !isMe) {
+        const outgoingRequest = await Request.findOne({ from: authUserId, to: userId, accepted: false });
+        const incomingRequest = await Request.findOne({ from: userId, to: authUserId, accepted: false });
+        if (outgoingRequest) relationshipStatus.request = 'requested';
+        else if (incomingRequest) relationshipStatus.request = 'requesting';
+        else relationshipStatus.request = null;
+      }
 
       // If profile is private and not a friend/self, restrict exposed data.
       // - Active followers can see aboutMe only (bio revealed, rest stays hidden).

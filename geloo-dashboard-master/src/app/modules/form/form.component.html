@@ -29,8 +29,8 @@
               <div class="relative">
                 <div class="w-32 h-32 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-white">
                   <img class="w-full h-full object-cover"
-                       [src]="imagesUrl[header.name] ? imagesUrl[header.name] : (header.type == 'avatar' ? 'assets/img/default-avatar.png' : 'assets/img/default-img.png')"
-                       alt="Preview">
+                       [src]="imagesUrl[header.name] ? imagesUrl[header.name] : (header.type == 'avatar' ? 'assets/user.jpeg' : 'assets/default-img.png')"
+                       alt="Preview" (error)="$any($event.target).src=(header.type == 'avatar' ? 'assets/user.jpeg' : 'assets/default-img.png')">
                 </div>
                 <label [for]="header.name" 
                        class="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-indigo-700 transition-colors">

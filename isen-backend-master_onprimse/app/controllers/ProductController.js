@@ -325,7 +325,7 @@ exports.storeProduct = async (req, res) => {
                 sendNotification(
                     { en: notificationTitle },
                     { en: notificationBody },
-                    { type: 'followed_user_created_product', link: `/tabs/products/details/${product._id}` },
+                    { type: 'followed_user_created_product', link: `/tabs/buy-and-sell/product/${product._id}` },
                     [],
                     recipients
                 );

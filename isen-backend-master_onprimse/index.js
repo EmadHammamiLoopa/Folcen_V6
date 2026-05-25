@@ -405,6 +405,12 @@ try {
 } catch (e) {
   console.warn('GDPR routes failed to mount', e && e.message);
 }
+// Interest analytics endpoints (GDPR-consented)
+try {
+  app.use(`${routePrefix}/analytics`, require('./routes/analytics-interests'));
+} catch (e) {
+  console.warn('Analytics-interests routes failed to mount', e && e.message);
+}
 try {
   app.use(`${routePrefix}/admin`, require('./routes/admin'));
 } catch (e) {

@@ -197,8 +197,8 @@
     <div *ngSwitchCase="'creator'" class="animate-fadeIn">
       <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto text-center">
         <div class="mb-6">
-          <img [src]="channel.user?.mainAvatar ? (channel.user.mainAvatar.startsWith('http') ? channel.user.mainAvatar : apiUrl + '/' + channel.user.mainAvatar) : 'assets/img/default-avatar.png'" 
-               class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg">
+          <img [src]="channel.user?.mainAvatar ? (channel.user.mainAvatar.startsWith('http') ? channel.user.mainAvatar : apiUrl + (channel.user.mainAvatar.startsWith('/') ? '' : '/') + channel.user.mainAvatar) : 'assets/user.jpeg'" 
+               class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg" (error)="$any($event.target).src='assets/user.jpeg'">
         </div>
         <h3 class="text-xl font-bold text-gray-800 mb-1">{{channel.user?.firstName}} {{channel.user?.lastName}}</h3>
         <p class="text-gray-500 mb-6">{{channel.user?.email}}</p>

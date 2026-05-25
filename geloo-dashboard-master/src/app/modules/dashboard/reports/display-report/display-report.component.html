@@ -85,7 +85,7 @@
           <p class="text-sm font-medium text-gray-500">Evidence / Reported Images:</p>
           <div class="grid grid-cols-2 gap-2">
             <div *ngFor="let img of report.evidence" class="rounded-lg overflow-hidden border bg-gray-100">
-              <img [src]="getEvidenceUrl(img)" class="w-full h-48 object-cover hover:scale-105 transition-transform cursor-pointer" (click)="openImage(img)">
+              <img [src]="getEvidenceUrl(img)" class="w-full h-48 object-cover hover:scale-105 transition-transform cursor-pointer" (click)="openImage(img)" (error)="$any($event.target).src='assets/default-img.png'">
             </div>
           </div>
         </div>
@@ -93,13 +93,13 @@
         <!-- Media Preview Section -->
         <div *ngIf="getMediaUrl() && report.entityModel !== 'User'" class="mb-4 rounded-lg overflow-hidden border bg-black flex items-center justify-center min-h-[200px]">
           <video *ngIf="isMediaVideo()" [src]="getMediaUrl()" controls class="max-h-[400px] w-full"></video>
-          <img *ngIf="!isMediaVideo()" [src]="getMediaUrl()" class="max-h-[400px] object-contain" alt="Reported Media">
+          <img *ngIf="!isMediaVideo()" [src]="getMediaUrl()" class="max-h-[400px] object-contain" alt="Reported Media" (error)="$any($event.target).src='assets/default-img.png'">
         </div>
 
         <!-- User Profile Report (No full image needed) -->
         <div *ngIf="report.entityModel === 'User' || report.entityModel === 'Photo'" class="mb-4 p-6 bg-gray-50 rounded-lg border flex items-center gap-4">
-          <img [src]="report.entity?.mainAvatar ? (report.entity.mainAvatar.startsWith('http') ? report.entity.mainAvatar : getEvidenceUrl(report.entity.mainAvatar)) : 'assets/img/default-avatar.png'" 
-               class="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm">
+          <img [src]="report.entity?.mainAvatar ? (report.entity.mainAvatar.startsWith('http') ? report.entity.mainAvatar : getEvidenceUrl(report.entity.mainAvatar)) : 'assets/user.jpeg'" 
+               class="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" (error)="$any($event.target).src='assets/user.jpeg'">
           <div>
             <p class="font-bold text-gray-800">{{ report.entityModel === 'Photo' ? 'Photo Owner' : 'User Profile Report' }}</p>
             <p class="text-sm text-gray-500">Reporting {{ report.entityModel === 'Photo' ? 'a photo from' : 'the account of' }} {{ report.entity ? report.entity.firstName : '' }} {{ report.entity ? report.entity.lastName : '' }}</p>

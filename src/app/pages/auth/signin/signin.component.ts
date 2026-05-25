@@ -93,62 +93,82 @@ export class SigninComponent implements OnInit {
       return;
     }
   
-    try {
-      const resp = await this.auth.signin({
-        email: this.form.value.email,
-        password: this.form.value.password,
-      });
-    
-      console.log('Sign-in response:', resp);
-      this.user = new User().initialize(resp.data.user);
-    
-      await this.storeUserData(resp.data.token, resp.data.user);
-    
-      // ✅ Initialize Socket (idempotent)
-      try {
-        await SocketService.initializeSocket();
-        SocketService.bindToAuthUser();
-        console.log('✅ WebSocket initialized and bound');
-      } catch (error) {
-        console.error('❌ WebSocket initialization failed:', error);
-      }
-    
-      this.pageLoading = false;
+    const { email, password } = this.form.value;
 
-      if (!this.user.loggedIn) {
-        console.log('User not logged in according to flag, showing welcome alert');
-        await this.showWelcomeAlert();
+    try {
+      // Primary path: MongoDB-based signin
+      const resp = await this.auth.signin({ email, password });
+      await this._handleSigninSuccess(resp);
+    } catch (firstErr) {
+      // If the backend returns 401, the user's MongoDB password may be stale
+      // after a Firebase password reset (Firebase reset email updates Firebase
+      // only — MongoDB hash is not changed). Fall back to Firebase signin so
+      // that users who reset their password can still log in.
+      const status = firstErr?.status ?? firstErr?.error?.status;
+      if (status === 401) {
+        try {
+          // Pass syncMongoPassword=true so the backend re-hashes and stores
+          // this password in MongoDB, fixing future MongoDB-only logins.
+          const fbResp = await this.auth.firebaseSignin(email, password, true);
+          await this._handleSigninSuccess(fbResp);
+          return;
+        } catch (fbErr) {
+          // Firebase also failed — fall through and show the original error
+          console.warn('Firebase fallback signin also failed:', fbErr);
+        }
       }
-    
-      console.log('Navigating to /tabs/new-friends');
-      await this.router.navigate(['/tabs/new-friends']);
-    }  catch (err) {
+
       this.pageLoading = false;
-      console.error('Sign-in error:', err);
+      console.error('Sign-in error:', firstErr);
 
       let message = 'An unexpected error occurred.';
-      if (err && err.error) {
-        if (typeof err.error === 'string') {
-          message = err.error;
-        } else if (err.error.message) {
-          message = err.error.message;
-        } else if (err.error.error) {
-          message = err.error.error;
+      if (firstErr && firstErr.error) {
+        if (typeof firstErr.error === 'string') {
+          message = firstErr.error;
+        } else if (firstErr.error.message) {
+          message = firstErr.error.message;
+        } else if (firstErr.error.error) {
+          message = firstErr.error.error;
         }
-      } else if (err && err.message) {
-        message = err.message;
-      } else if (typeof err === 'string') {
-        message = err;
+      } else if (firstErr && firstErr.message) {
+        message = firstErr.message;
+      } else if (typeof firstErr === 'string') {
+        message = firstErr;
       }
 
-      if (err && err.errors) {
-        this.validationErrors = err.errors;
-      } else if (err && err.error && err.error.errors && typeof err.error.errors === 'object') {
-        this.validationErrors = err.error.errors;
+      if (firstErr && firstErr.errors) {
+        this.validationErrors = firstErr.errors;
+      } else if (firstErr && firstErr.error && firstErr.error.errors && typeof firstErr.error.errors === 'object') {
+        this.validationErrors = firstErr.error.errors;
       } else {
         this.toastService.presentErrorToastr(message);
       }
     }
+  }
+
+  private async _handleSigninSuccess(resp: any) {
+    console.log('Sign-in response:', resp);
+    this.user = new User().initialize(resp.data.user);
+
+    await this.storeUserData(resp.data.token, resp.data.user);
+
+    try {
+      await SocketService.initializeSocket();
+      SocketService.bindToAuthUser();
+      console.log('✅ WebSocket initialized and bound');
+    } catch (error) {
+      console.error('❌ WebSocket initialization failed:', error);
+    }
+
+    this.pageLoading = false;
+
+    if (!this.user.loggedIn) {
+      console.log('User not logged in according to flag, showing welcome alert');
+      await this.showWelcomeAlert();
+    }
+
+    console.log('Navigating to /tabs/new-friends');
+    await this.router.navigate(['/tabs/new-friends']);
   }
   
 

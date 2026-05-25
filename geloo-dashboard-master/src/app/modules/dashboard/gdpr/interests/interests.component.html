@@ -1,0 +1,199 @@
+<div class="interests-page">
+
+  <!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2 class="page-title">Interest Analytics</h2>
+      <p class="page-sub">GDPR-safe aggregated view — individual profiles only shown with explicit consent</p>
+    </div>
+    <div class="header-right">
+      <div class="date-filters">
+        <input type="date" [(ngModel)]="fromDate" class="date-input" title="From date">
+        <span class="date-sep">→</span>
+        <input type="date" [(ngModel)]="toDate" class="date-input" title="To date">
+        <button class="btn-apply" (click)="loadAggregates()">Apply</button>
+        <button class="btn-icon" (click)="refresh()" title="Refresh — busts cache">
+          <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ ERROR BANNER ════════════════════════ -->
+  <div *ngIf="error" class="error-banner">
+    <i class="fas fa-exclamation-triangle"></i> {{ error }}
+  </div>
+
+  <!-- ═══════════════════════════════ SKELETON ════════════════════════════ -->
+  <ng-container *ngIf="loading && !stats">
+    <div class="skeleton-grid">
+      <div class="skeleton-card" *ngFor="let i of [1,2,3,4]"></div>
+    </div>
+    <div class="skeleton-row"></div>
+    <div class="skeleton-row short"></div>
+  </ng-container>
+
+  <!-- ═══════════════════════════════ CONSENT STATS BANNER ════════════════ -->
+  <div class="stats-banner" *ngIf="stats">
+    <div class="stat-card green">
+      <div class="stat-value">{{ stats.optedIn }}</div>
+      <div class="stat-label">Opted In</div>
+      <div class="stat-pct">{{ consentPct(stats.optedIn) }}%</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-value">{{ stats.optedOut }}</div>
+      <div class="stat-label">Opted Out</div>
+      <div class="stat-pct">{{ consentPct(stats.optedOut) }}%</div>
+    </div>
+    <div class="stat-card gray">
+      <div class="stat-value">{{ stats.neverResponded }}</div>
+      <div class="stat-label">No Response</div>
+      <div class="stat-pct">{{ consentPct(stats.neverResponded) }}%</div>
+    </div>
+    <div class="stat-card total">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Total Users</div>
+      <div class="stat-pct">Opt-out rate {{ stats.optOutRate }}</div>
+    </div>
+    <div class="period-badge" *ngIf="period">
+      <i class="fas fa-calendar-alt"></i>
+      {{ period.from | date:'dd MMM yyyy' }} → {{ period.to | date:'dd MMM yyyy' }}
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ MAIN GRID ════════════════════════════ -->
+  <div class="analytics-grid" *ngIf="!loading || stats">
+
+    <!-- TOP CATEGORIES -->
+    <section class="panel panel-categories">
+      <h3 class="panel-title"><i class="fas fa-tags"></i> Top Categories</h3>
+      <div *ngIf="!topCategories.length" class="empty-state">No category data yet.</div>
+      <div class="category-list">
+        <div class="category-row" *ngFor="let cat of topCategories; let i = index">
+          <span class="cat-rank">#{{ i + 1 }}</span>
+          <span class="cat-name">{{ cat._id || '(unknown)' }}</span>
+          <div class="bar-track">
+            <div class="bar-fill" [style.width.%]="(cat.count / (topCategories[0]?.count || 1)) * 100"></div>
+          </div>
+          <span class="cat-count">{{ cat.count }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOP CHANNELS -->
+    <section class="panel panel-channels">
+      <h3 class="panel-title"><i class="fas fa-broadcast-tower"></i> Top Channels</h3>
+      <div *ngIf="!topChannels.length" class="empty-state">No channel data yet.</div>
+      <table class="channel-table" *ngIf="topChannels.length">
+        <thead>
+          <tr><th>#</th><th>Channel ID</th><th>Events</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let ch of topChannels; let i = index">
+            <td class="rank-cell">{{ i + 1 }}</td>
+            <td class="id-cell">{{ ch._id | slice:0:20 }}…</td>
+            <td><span class="badge">{{ ch.count }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- EVENT TYPE BREAKDOWN -->
+    <section class="panel panel-events">
+      <h3 class="panel-title"><i class="fas fa-bolt"></i> Event Type Breakdown</h3>
+      <div *ngIf="!eventBreakdown.length" class="empty-state">No events recorded yet.</div>
+      <div class="event-chips" *ngIf="eventBreakdown.length">
+        <div class="event-chip" *ngFor="let ev of eventBreakdown">
+          <span class="chip-name">{{ ev._id }}</span>
+          <span class="chip-count">{{ ev.count }}</span>
+          <span class="chip-pct">{{ eventPct(ev.count) }}%</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ═══════════════════════════════ USER EXPLAINER ══════════════════════════ -->
+  <section class="explainer-section">
+    <div class="explainer-header">
+      <h3 class="panel-title"><i class="fas fa-user-circle"></i> Per-User Interest Explainer</h3>
+      <p class="explainer-note">Lookup requires the user to have opted-in to analytics. Only available to Data Controllers.</p>
+    </div>
+    <div class="explainer-input-row">
+      <input
+        type="text"
+        class="explainer-id-input"
+        placeholder="Enter 24-char MongoDB user ID…"
+        [(ngModel)]="explainUserId"
+        (input)="onExplainInput(explainUserId)"
+        maxlength="24"
+      >
+      <button class="btn-lookup" [disabled]="explainUserId.length !== 24 || explainLoading" (click)="runExplainer(explainUserId)">
+        <i class="fas fa-search" [class.fa-spin]="explainLoading"></i>
+        {{ explainLoading ? 'Loading…' : 'Look Up' }}
+      </button>
+    </div>
+
+    <!-- Error -->
+    <div *ngIf="explainError" class="explain-error">
+      <i class="fas fa-ban"></i> {{ explainError }}
+    </div>
+
+    <!-- Result -->
+    <div class="explain-result" *ngIf="explainResult">
+
+      <!-- Consent Gate -->
+      <div *ngIf="explainResult.consentStatus === 'opted_out'" class="consent-gate opted-out">
+        <i class="fas fa-lock"></i>
+        <span>This user has <strong>opted out</strong> of analytics. Interest profile is not available.</span>
+      </div>
+      <div *ngIf="explainResult.consentStatus === 'not_set'" class="consent-gate no-consent">
+        <i class="fas fa-question-circle"></i>
+        <span>This user has <strong>not yet responded</strong> to analytics consent. Profile data may be limited.</span>
+      </div>
+
+      <!-- Profile data (only when opted in) -->
+      <ng-container *ngIf="explainResult.consentStatus !== 'opted_out'">
+        <div class="explain-grid">
+          <div class="explain-meta">
+            <div class="meta-row"><span class="meta-key">User ID</span><code>{{ explainResult.userId }}</code></div>
+            <div class="meta-row"><span class="meta-key">Profile computed</span><span>{{ explainResult.computedAt | date:'dd MMM yyyy, HH:mm' }}</span></div>
+            <div class="meta-row"><span class="meta-key">Consent status</span>
+              <span class="status-badge" [class.green]="explainResult.consentStatus === 'opted_in'" [class.gray]="explainResult.consentStatus === 'not_set'">
+                {{ explainResult.consentStatus }}
+              </span>
+            </div>
+          </div>
+
+          <div class="explain-categories" *ngIf="explainResult.topCategories?.length">
+            <h4>Top Categories</h4>
+            <div class="explain-cat-row" *ngFor="let cat of explainResult.topCategories">
+              <span class="cat-name">{{ cat.category }}</span>
+              <div class="bar-track"><div class="bar-fill" [style.width.%]="cat.score * 10"></div></div>
+              <span class="cat-score">{{ cat.score | number:'1.0-1' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="explain-evidence" *ngIf="explainResult.evidence?.length">
+          <h4>Evidence Events <span class="badge-sm">{{ explainResult.evidence.length }}</span></h4>
+          <div class="evidence-table-wrap">
+            <table class="evidence-table">
+              <thead><tr><th>Type</th><th>Category</th><th>Channel</th><th>Time</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let ev of explainResult.evidence | slice:0:20">
+                  <td>{{ ev.eventType }}</td>
+                  <td>{{ ev.category || '—' }}</td>
+                  <td>{{ ev.channelId ? (ev.channelId | slice:0:12) + '…' : '—' }}</td>
+                  <td>{{ ev.timestamp | date:'dd MMM HH:mm' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="evidence-note" *ngIf="explainResult.evidence.length > 20">Showing 20 of {{ explainResult.evidence.length }} events.</p>
+        </div>
+      </ng-container>
+    </div>
+  </section>
+
+</div>

@@ -57,7 +57,7 @@ const createUsers = async () => {
 userPromises.push(createUser({
   firstName: 'System',
   lastName: 'User',
-  email: 'Folcen_support@gmail.com', // Use this email for the system user
+  email: 'folcenteam@gmail.com', // Use this email for the system user
   password: 'system123', // Set a password or leave empty if not needed
   gender: 'male',
   role: 'ADMIN', // You can set this to 'ADMIN' or any other appropriate role

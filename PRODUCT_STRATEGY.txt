@@ -1,0 +1,402 @@
+================================================================================
+  FOLCEN — PRODUCT STRATEGY, VERSIONING & MARKETING PLAN
+  Written: 25 May 2026
+================================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTION 1 — THE CORE STRATEGY (WHY PEOPLE STAY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The single biggest mistake social apps make is trying to compete with Instagram,
+WhatsApp, or LinkedIn on day one. Folcen wins by being FOCUSED.
+
+Your positioning: "The clean, community-first app for people who are tired of
+noise. Discover people near you, talk, share, and grow — no algorithm games."
+
+Three pillars that drive retention:
+
+  1. IDENTITY — Users must feel Folcen is "their" space. Personalised avatar,
+     profile, interests. People protect what they own.
+
+  2. COMMUNITY — Channels, posts, activity feed. Give people a reason to open
+     the app every day (new content, new replies, new connections).
+
+  3. UTILITY — Jobs, services, buy & sell. Once someone lands a job or sells
+     something through Folcen, they will NEVER delete it. Utility = stickiness.
+
+Growth loops to build from day one:
+  - Social invite loop: "Invite a friend → both get a badge / early-access perk"
+  - Content loop: Every post / channel gets a shareable public link that drives
+    installs from non-users who click it.
+  - Local loop: Geo-based discovery ("People near you") creates natural clusters
+    that grow themselves (one person invites their friend group).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTION 2 — USER ACQUISITION CHANNELS (RANKED BY COST-EFFECTIVENESS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TIER A — Free / Organic (do first, always)
+-------------------------------------------
+  1. TikTok & Instagram Reels
+     - Short-form videos showing real use: "I found a job in 2 days on Folcen",
+       "I sold my laptop in 3 hours", "This app actually lets me meet people."
+     - Authenticity beats polish. Record on a real phone, real UI.
+     - Post 3–5x per week. Minimum 60 days before judging results.
+
+  2. Reddit
+     - Post in: r/SocialMedia, r/startups, r/entrepreneur, r/Apps, local city
+       subreddits, r/forhire, r/jobsearch.
+     - Do NOT spam. Give value first — share the story, ask for feedback.
+     - One honest post in the right subreddit can generate 5,000 installs.
+
+  3. Facebook Groups
+     - Join local community groups, job-seeking groups, small business groups.
+     - Announce Folcen as a free tool. Offer to answer questions personally.
+
+  4. LinkedIn (for the small-business angle)
+     - "We built a free app where small businesses can post jobs and services.
+       No fees, no middleman." → This gets shares in professional networks.
+
+  5. Product Hunt launch
+     - Time it with v1.0 release. A top-5 Product Hunt day can drive 10k+ visits.
+     - Prepare: hunter with followers, good screenshots, 2-min demo video.
+
+TIER B — Low-Cost Paid
+------------------------
+  6. TikTok Spark Ads (boost your own organic posts that already perform well)
+     - Budget: $5–$15/day per boosted post. Only boost posts with >3% engagement.
+
+  7. Meta Ads (Facebook / Instagram)
+     - Interest targeting: "community apps", "networking", "local services",
+       "job seeking", "small business owners" — age 18–40.
+     - Start with $10/day. Test 3 creatives, kill losers in 5 days.
+
+  8. Google Play / App Store search ads
+     - Keywords: "meet new people", "local community app", "job board app",
+       "social networking", "chat with locals".
+     - These convert because intent is high (user is actively searching).
+
+TIER C — Partnerships (medium term)
+-------------------------------------
+  9. Micro-influencers (10k–100k followers)
+     - Niche: community builders, career coaches, small business coaches.
+     - Offer free premium access or a flat fee ($100–$300 per post).
+     - Authentic niche beats big generic celebrity every time.
+
+  10. University / campus ambassador program
+      - Pay students with credits or small stipend to spread Folcen on campus.
+      - College students are the fastest social spreaders.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTION 3 — VERSION ROADMAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Philosophy:
+  - Each version solves ONE problem perfectly before adding the next.
+  - Features that are not ready are HIDDEN (feature flags), not shown broken.
+  - Monetisation only after you have 1,000+ daily active users — charging too
+    early kills word-of-mouth growth.
+
+
+────────────────────────────────────────────────────────────────────────────────
+  v0.9 — CLOSED BETA / FRIENDS & FAMILY
+  Target release: 15 June 2026  (≈ 3 weeks from now)
+────────────────────────────────────────────────────────────────────────────────
+
+Purpose: Find and fix crashes before real users see them. Collect raw feedback.
+Audience: 50–200 invited testers (people you know personally).
+
+WHAT IS INCLUDED:
+  - Signup / login (email + Firebase reset)        ✅ working
+  - Profile creation (name, avatar, interests)     ✅ working
+  - Direct messaging / chat                        ✅ working
+  - Channels — create, follow, post, comment       ✅ working
+  - Activity feed (notifications)                  ✅ working
+  - Basic discover / new-friends screen            ✅ working
+  - Push notifications (FCM)                       ✅ working
+  - Welcome message from Folcen Team               ✅ fixed
+
+WHAT IS HIDDEN (not shown in UI, back-end exists but disabled):
+  - Buy & Sell / marketplace listings
+  - Jobs board
+  - Services board
+  - Video / audio calls (WebRTC — keep behind flag until stable)
+  - Subscription / premium tiers
+  - Public shareable post links
+  - Referral / invite reward system
+
+SUCCESS CRITERIA TO MOVE TO v1.0:
+  - Zero crash-on-launch reports
+  - Login / signup success rate > 95%
+  - At least 30 testers send ≥ 1 message
+  - Crash-free sessions > 90% (Firebase Crashlytics)
+
+
+────────────────────────────────────────────────────────────────────────────────
+  v1.0 — PUBLIC LAUNCH (FREE TIER)
+  Target release: 20 July 2026  (≈ 8 weeks from now)
+────────────────────────────────────────────────────────────────────────────────
+
+Purpose: Get real users. This is what you market publicly on TikTok, Reddit,
+Product Hunt. Everything in this version must feel COMPLETE and POLISHED.
+
+WHAT IS INCLUDED (on top of v0.9):
+  - Smooth onboarding flow (progress bar, skip option, interest picker)
+  - Discover people — geo-based + interest-based matching
+  - Channels — explore page, trending posts
+  - Direct messaging — read receipts, online indicator
+  - Push notifications — all scenarios (chat, comment, vote, friend request)
+  - Password reset via email (Firebase) — fully working
+  - Public shareable links for posts / channels (drives organic installs)
+  - Invite a friend — generates personal invite link
+  - Basic reporting / block user
+  - App Store + Google Play listing with screenshots and demo video
+  - Privacy policy + Terms of Service pages inside app
+  - "Folcen Team" support account visible in messages for new users
+
+WHAT IS STILL HIDDEN:
+  - Buy & Sell / marketplace
+  - Jobs board
+  - Services board
+  - Video / audio calls
+  - Any paid feature / subscription
+  - Admin / moderation dashboard (internal tool, not user-facing)
+  - Advanced analytics for channels
+
+MARKETING PUSH FOR v1.0:
+  - Product Hunt launch on release day
+  - TikTok/Instagram campaign starting 2 weeks before launch (teasers)
+  - Reddit announcement posts in relevant subreddits
+  - Personal outreach to 50+ micro-influencers
+  - Press release to tech blogs (TechCrunch, The Next Web, Mashable)
+
+SUCCESS CRITERIA TO MOVE TO v1.1:
+  - 500 registered users within 2 weeks of launch
+  - D7 retention ≥ 25% (25% of users return on day 7)
+  - App Store rating ≥ 4.0
+  - < 1 critical bug report per 100 users per day
+
+
+────────────────────────────────────────────────────────────────────────────────
+  v1.1 — COMMUNITY GROWTH UPDATE
+  Target release: 15 September 2026  (≈ 4 months from now)
+────────────────────────────────────────────────────────────────────────────────
+
+Purpose: Deepen engagement. Make Folcen the daily habit.
+
+WHAT IS ADDED:
+  - Video / audio calls (1-to-1 — WebRTC, already built, now stable & visible)
+  - Channel analytics for creators (views, followers growth, engagement rate)
+  - Trending / explore page improvements (algorithmic feed for channels)
+  - Reaction emojis on posts and comments (beyond just vote)
+  - Story / status update (24h disappearing content — optional, test with users)
+  - Enhanced notifications centre (grouped, swipeable)
+  - Channel moderation tools (pin posts, slow mode, remove members)
+  - Follower / following lists public
+  - "Verified" badge for well-known accounts / creators (manual, no cost yet)
+
+WHAT IS STILL HIDDEN:
+  - Marketplace / Buy & Sell
+  - Jobs board
+  - Services board
+  - Paid subscription
+  - Group video calls
+
+MARKETING FOR v1.1:
+  - "Version 1.1 is here — now with video calls" announcement
+  - Creator spotlight: feature 5–10 active channel creators publicly
+  - Push notification to all existing users about new features
+  - Referral campaign: "Invite 3 friends, get verified badge early access"
+
+
+────────────────────────────────────────────────────────────────────────────────
+  v1.2 — SMALL BUSINESS & MARKETPLACE
+  Target release: 01 December 2026  (≈ 6 months from now)
+────────────────────────────────────────────────────────────────────────────────
+
+Purpose: Add the utility layer. This is the feature that makes Folcen
+irreplaceable — people use it to earn money, find work, sell things.
+
+WHAT IS ADDED:
+  - Buy & Sell / marketplace (post items, browse, contact seller via chat)
+  - Jobs board (post jobs, apply, employer messaging)
+  - Services board (freelancers / small businesses advertise services)
+  - Location filter for marketplace, jobs, services
+  - "Business Profile" option (replaces personal profile for companies)
+  - In-app notifications for "new job posted in your area / field"
+  - Save / bookmark listings
+  - Share listings externally (WhatsApp, link, etc.)
+
+WHAT IS STILL HIDDEN:
+  - Payment processing / in-app transactions (legal + technical complexity)
+  - Premium listing boost (paid)
+  - Group video calls
+  - Paid subscription tier
+
+MARKETING FOR v1.2:
+  - Focus entirely on the small-business / job-seeker angle now
+  - LinkedIn + Facebook ads targeting freelancers, SME owners, job seekers
+  - "Post your first job for free" campaign
+  - Partnerships with local chambers of commerce, business associations
+  - Press angle: "The free LinkedIn alternative for local communities"
+
+
+────────────────────────────────────────────────────────────────────────────────
+  v2.0 — MONETISATION LAUNCH
+  Target release: 01 March 2027  (≈ 10 months from now)
+────────────────────────────────────────────────────────────────────────────────
+
+Purpose: Start generating revenue WITHOUT hurting free-user experience.
+Rule: Free tier must always feel complete. Premium only adds power.
+
+WHAT IS ADDED — FREE TIER (no change to existing):
+  - Everything from v1.2 remains free
+
+WHAT IS ADDED — PREMIUM TIER ($4.99 / month or $39.99 / year):
+  - "Boost" a listing (job / service / product) — shown first in search
+  - See who viewed your profile
+  - Unlimited message history (free: last 500 messages)
+  - Priority customer support
+  - Custom channel theme / colours
+  - "Pro" badge on profile
+  - Advanced channel analytics (demographics, peak times)
+  - Verified badge (auto, no manual review needed at scale)
+  - Group video calls (up to 8 people)
+  - Ad-free experience (if ads are introduced in free tier)
+
+WHAT IS ADDED — BUSINESS TIER ($19.99 / month):
+  - Everything in Premium
+  - Up to 5 team members on one business account
+  - Sponsored posts / promoted channels (pay-per-click)
+  - Applicant tracking for jobs (manage applications in-app)
+  - API access for integration with their own tools
+
+MONETISATION SAFETY RULES:
+  - Do NOT put core communication features behind paywall
+  - Do NOT show ads in chat — ever
+  - Do NOT limit free messaging — that destroys the network effect
+  - If a free user has a bad experience, they leave. Lose the user, lose the
+    potential future subscriber.
+
+MARKETING FOR v2.0:
+  - "We're keeping Folcen free. Premium is just for those who want more."
+  - Offer 3-month free Premium trial to all users who joined before v2.0
+    (reward early adopters, create upgrade habit)
+  - Influencer partnerships where they show Premium features in use
+
+
+────────────────────────────────────────────────────────────────────────────────
+  v2.1+ — FUTURE FEATURES (BEYOND MARCH 2027)
+────────────────────────────────────────────────────────────────────────────────
+
+  - In-app payment / escrow for marketplace transactions
+  - AI-powered job / people matching
+  - Live streaming in channels
+  - Web version (browser access, not just mobile)
+  - API for third-party integrations
+  - White-label version for enterprises / universities
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTION 4 — RELEASE TIMELINE SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Version   |  Date              |  Key milestone
+  ----------|--------------------|------------------------------------------------
+  v0.9      |  15 Jun 2026       |  Closed beta — 50–200 trusted testers
+  v1.0      |  20 Jul 2026       |  Public launch — chat, feed, discovery, invite
+  v1.1      |  15 Sep 2026       |  Video calls, creator tools, stories
+  v1.2      |  01 Dec 2026       |  Marketplace, jobs, services board
+  v2.0      |  01 Mar 2027       |  Paid premium tier — full monetisation
+  v2.1+     |  Q2 2027+          |  Payments, AI matching, web, live stream
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTION 5 — THE 90-DAY MARKETING SPRINT (25 May → 20 Aug 2026)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+These are the specific actions for the next 90 days before and after v1.0.
+
+WEEKS 1–3 (25 May – 14 Jun) — BUILD THE MACHINE
+  □ Set up TikTok, Instagram, Twitter/X, LinkedIn pages for Folcen
+  □ Create a simple landing page (folcen.com or folcenapp.com) with email
+    waitlist sign-up — even 500 waitlist signups is social proof
+  □ Start posting behind-the-scenes content: "Building Folcen" series
+  □ Recruit 50–100 beta testers from your personal network
+  □ Launch v0.9 closed beta on 15 Jun
+
+WEEKS 4–7 (15 Jun – 14 Jul) — LISTEN & FIX
+  □ Collect feedback from beta testers via simple Google Form or Typeform
+  □ Fix every bug that causes drop-off in onboarding
+  □ Record demo videos showing real use of the app (not screen recordings —
+    actual hands using the phone, authentic)
+  □ Draft App Store and Google Play listings, screenshots, description
+  □ Prepare Product Hunt launch page (do NOT submit yet)
+  □ Begin teaser posts on social media: "Coming 20 July"
+
+WEEKS 8–9 (15 Jul – 20 Jul) — LAUNCH WEEK
+  □ Submit to App Store + Google Play (allow 3–7 days for review)
+  □ Publish Product Hunt page on launch day (20 Jul)
+  □ Send email to entire waitlist
+  □ Post launch announcements on all social channels simultaneously
+  □ Personally message 200+ people asking them to download and share
+  □ Post in 10+ relevant Reddit communities
+  □ Do a Twitter/X Space or Instagram Live: "We just launched, ask us anything"
+
+WEEKS 10–13 (21 Jul – 20 Aug) — AMPLIFY
+  □ Track what's working: which posts drive most installs?
+  □ Double down on the top 1–2 channels that work
+  □ Reach out to 3–5 micro-influencers who fit your audience
+  □ Respond personally to every App Store / Play Store review (it shows you care)
+  □ Start a "Folcen user spotlight" — feature real users, post with their consent
+  □ Begin planning v1.1 based on real user feedback
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTION 6 — KEY METRICS TO WATCH (THE ONLY NUMBERS THAT MATTER)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. D1 Retention  — % of new users who come back the next day. Target: > 40%
+  2. D7 Retention  — % of new users who come back on day 7.  Target: > 25%
+  3. D30 Retention — % of new users still active after 30 days. Target: > 15%
+  4. Messages sent per DAU — are people actually talking? Target: > 3 per user
+  5. Invite rate  — % of users who invite someone. Target: > 15%
+  6. Crash-free sessions — measured by Firebase Crashlytics. Target: > 99%
+  7. Onboarding completion rate — % who finish signup + profile. Target: > 70%
+
+  If D7 retention is below 15%, stop acquiring users and fix retention FIRST.
+  Pouring water into a leaky bucket is a waste of money.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTION 7 — BIGGEST MISTAKES TO AVOID
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✗  Launching with too many half-finished features. Cut ruthlessly. One thing
+     that works perfectly beats ten things that work poorly.
+
+  ✗  Waiting until everything is "perfect" to launch. Ship v0.9 now. Real users
+     find problems no tester ever will.
+
+  ✗  Spending money on ads before you know D7 retention is > 20%. You will just
+     pay to acquire users who leave.
+
+  ✗  Copying everything from other apps. Folcen's advantage is being focused
+     and clean. Adding every feature Instagram has = losing your identity.
+
+  ✗  Ignoring reviews. Every 1-star review is someone telling you exactly what
+     to fix. Read them all. Reply to them all.
+
+  ✗  Charging too early. One paid feature that annoys a free user costs you all
+     the word-of-mouth that user would have generated.
+
+  ✗  Building in silence. Post updates, share progress, be human. People root
+     for founders they can see. Build in public.
+
+
+================================================================================
+  END OF DOCUMENT — FOLCEN PRODUCT STRATEGY v1.0 — 25 May 2026
+================================================================================

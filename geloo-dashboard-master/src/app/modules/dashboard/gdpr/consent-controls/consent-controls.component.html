@@ -1,0 +1,101 @@
+<div class="consent-page">
+
+  <div class="comp-header">
+    <h2 class="comp-title">Consent Controls</h2>
+    <p class="comp-sub">View and update a user's GDPR consent flags &mdash; GDPR Art. 7. Changes are audit-logged.</p>
+  </div>
+
+  <div class="page-body">
+
+    <!-- Left: Lookup -->
+    <div class="lookup-col">
+      <label class="field-label">User ID <span class="field-hint">(24-char ObjectId)</span></label>
+      <input [(ngModel)]="userId" placeholder="e.g. 64a1b2c3d4e5f6a7b8c9d0e1"
+        class="id-input" maxlength="24" (keyup.enter)="load()" />
+      <button (click)="load()" [disabled]="loading || userId.length !== 24" class="btn-load">
+        <i class="fas" [class.fa-search]="!loading" [class.fa-spinner]="loading" [class.fa-spin]="loading"></i>
+        {{ loading ? 'Loading…' : 'Load Consent' }}
+      </button>
+      <p *ngIf="error"  class="field-error">{{ error }}</p>
+      <p *ngIf="info"   class="info-msg"><i class="fas fa-check-circle"></i> {{ info }}</p>
+    </div>
+
+    <!-- Right: Consent flags -->
+    <div class="consent-col">
+
+      <!-- Skeleton -->
+      <ng-container *ngIf="loading">
+        <div class="skeleton-flag"></div>
+        <div class="skeleton-flag"></div>
+      </ng-container>
+
+      <ng-container *ngIf="consent && !loading">
+
+        <!-- Metadata (createdAt / updatedAt) -->
+        <div class="consent-meta">
+          <div class="meta-item">
+            <span class="meta-key">First collected (Art. 7)</span>
+            <span class="meta-val">
+              {{ consent.createdAt | date:'dd MMM yyyy, HH:mm (z)' }}
+              <span class="immutable-badge">immutable</span>
+            </span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-key">Last updated</span>
+            <span class="meta-val">{{ consent.updatedAt | date:'dd MMM yyyy, HH:mm' }}</span>
+          </div>
+        </div>
+
+        <!-- Flag cards -->
+        <div class="flag-card" *ngFor="let item of consentKeys">
+          <div class="flag-info">
+            <p class="flag-name">{{ item.label }}</p>
+            <p class="flag-desc">{{ item.description }}</p>
+            <p class="flag-last" *ngIf="lastChange(item.key)">{{ lastChange(item.key) }}</p>
+            <p class="flag-desc" *ngIf="!consent[item.key]" style="color:#f59e0b;margin-top:4px">
+              <i class="fas fa-info-circle" style="margin-right:4px"></i>{{ item.optOutNote }}
+            </p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <button
+              class="toggle-btn"
+              [class.on]="consent[item.key] === true"
+              [class.off]="consent[item.key] !== true"
+              [disabled]="saving"
+              (click)="toggle(item.key)"
+              [title]="consent[item.key] ? 'Click to disable' : 'Click to enable'"
+            ></button>
+            <span class="toggle-label" [class.on]="consent[item.key] === true" [class.off]="consent[item.key] !== true">
+              {{ consent[item.key] === true ? 'Enabled' : 'Disabled' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- History accordion -->
+        <div class="history-card" *ngIf="historyItems.length">
+          <div class="history-title" (click)="showHistory = !showHistory">
+            <span><i class="fas fa-history" style="margin-right:6px"></i> Change History ({{ historyItems.length }})</span>
+            <i class="fas fa-chevron-down" [class.open]="showHistory"></i>
+          </div>
+          <div *ngIf="showHistory">
+            <table class="history-table">
+              <thead><tr><th>Field</th><th>Old</th><th>New</th><th>Changed by</th><th>When</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let h of historyItems">
+                  <td>{{ h.key }}</td>
+                  <td class="hist-old">{{ h.oldValue }}</td>
+                  <td class="hist-new">{{ h.newValue }}</td>
+                  <td>{{ h.changedBy || 'n/a' }}</td>
+                  <td>{{ h.changedAt | date:'dd/MM/yy HH:mm' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </ng-container>
+    </div>
+
+  </div>
+
+</div>

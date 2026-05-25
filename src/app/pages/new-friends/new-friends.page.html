@@ -75,13 +75,12 @@
                     <button class="connect-btn" *ngIf="!isAdmin(user)"
                             [class.is-private]="user.isPrivate && !connectState.has(user.id || user._id)"
                             [class.sent]="connectState.has(user.id || user._id)"
-                            [disabled]="connectState.has(user.id || user._id)"
                             [title]="connectState.has(user.id || user._id)
-                              ? (user.isPrivate ? 'Follow request sent' : 'Request sent')
+                              ? (user.isPrivate ? 'Tap to cancel follow request' : 'Tap to cancel request')
                               : (user.isPrivate ? 'Follow' : 'Add Friend')"
                             (click)="connectAction(user, $event)">
                       <i [class]="connectState.has(user.id || user._id)
-                        ? 'fas fa-check'
+                        ? 'fas fa-times-circle'
                         : (user.isPrivate ? 'fas fa-user-lock' : 'fas fa-user-plus')"></i>
                     </button>
                   </div>

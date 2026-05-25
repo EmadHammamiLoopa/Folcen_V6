@@ -276,7 +276,7 @@ console.log("userrrrrrrrrrrrrid",job.user);
             sendNotification(
                 { en: notificationTitle },
                 { en: notificationBody },
-                { type: 'followed_user_created_job', link: `/tabs/jobs/details/${job._id}` },
+                { type: 'followed_user_created_job', link: `/tabs/small-business/jobs/job/${job._id}` },
                 [],
                 recipients
             );

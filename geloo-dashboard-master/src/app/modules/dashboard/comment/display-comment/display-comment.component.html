@@ -125,8 +125,8 @@
     <div *ngSwitchCase="'creator'" class="animate-fadeIn">
       <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto text-center">
         <div class="mb-6">
-          <img [src]="comment.user?.mainAvatar ? (comment.user.mainAvatar.startsWith('http') ? comment.user.mainAvatar : apiUrl + '/' + comment.user.mainAvatar) : 'assets/img/default-avatar.png'" 
-               class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg">
+          <img [src]="comment.user?.mainAvatar ? (comment.user.mainAvatar.startsWith('http') ? comment.user.mainAvatar : apiUrl + (comment.user.mainAvatar.startsWith('/') ? '' : '/') + comment.user.mainAvatar) : 'assets/user.jpeg'" 
+               class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg" (error)="$any($event.target).src='assets/user.jpeg'">
         </div>
         <h3 class="text-xl font-bold text-gray-800 mb-1">{{comment.user?.firstName}} {{comment.user?.lastName}}</h3>
         <p class="text-gray-500 mb-6">{{comment.user?.email}}</p>

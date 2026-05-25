@@ -211,8 +211,18 @@ export class TabsPage implements OnInit, OnDestroy {
     }
 
     if (activeTab === 'channels') {
-      // Force navigation to the 'followed' list whenever the channels tab is clicked
-      this.router.navigate(['/tabs/channels/list/followed']);
+      // Only force the list view when the user taps the channels tab button directly.
+      // When code programmatically navigates to a specific post/channel sub-page, the
+      // router will have an ongoing navigation whose destination includes that sub-path —
+      // in that case we must NOT override it, or the target page never loads.
+      const nav = this.router.getCurrentNavigation();
+      const destStr = nav?.extractedUrl?.toString() || this.router.url || '';
+      const isDeepLink = /\/tabs\/channels\/(post|channel)\//.test(destStr)
+                      || destStr.includes('/tabs/channels/post/')
+                      || destStr.includes('/tabs/channels/channel/');
+      if (!isDeepLink) {
+        this.router.navigate(['/tabs/channels/list/followed']);
+      }
     }
   }
 

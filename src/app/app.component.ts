@@ -198,6 +198,16 @@ export class AppComponent implements OnDestroy {
         this.changeDetectorRef.detectChanges();
       } catch (e) {}
     });
+
+    // Real-time announcement: admin broadcast while user is online
+    SocketService.newAnnouncement$.pipe(takeUntil(this.destroy$)).subscribe((announcement: any) => {
+      try {
+        if (!this.user || !announcement?._id) return;
+        if (!this.shownAnnouncements.has(announcement._id)) {
+          this.showAnnouncement(announcement);
+        }
+      } catch (e) {}
+    });
   }
 
   
@@ -213,8 +223,9 @@ export class AppComponent implements OnDestroy {
     
     this.userService.getAnnouncements().subscribe((resp: any) => {
       if (resp && resp.data && resp.data.length > 0) {
-        const announcement = resp.data[0];
-        if (!this.shownAnnouncements.has(announcement._id)) {
+        // Show only the first unseen; after it's dismissed+marked-seen we come back for the next
+        const announcement = resp.data.find((a: any) => !this.shownAnnouncements.has(a._id));
+        if (announcement) {
           this.showAnnouncement(announcement);
         }
       }
@@ -231,9 +242,12 @@ export class AppComponent implements OnDestroy {
     });
     
     modal.onDidDismiss().then(() => {
-      // Mark as seen in backend
+      // Mark as seen in backend, then check if there are more unseen announcements
       this.userService.markAnnouncementSeen(announcement._id).subscribe({
-        next: () => console.log('Announcement marked as seen'),
+        next: () => {
+          console.log('Announcement marked as seen');
+          this.checkAnnouncements(); // Show next unread announcement if any
+        },
         error: (err) => {
           console.error('Failed to mark announcement as seen', err);
           this.shownAnnouncements.delete(announcement._id); // Allow retry if failed

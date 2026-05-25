@@ -93,6 +93,7 @@ export class SignupComponent implements OnInit, OnDestroy {
         if (user.email) {
           this.form.patchValue({ email: user.email });
         }
+        this.toastService.presentErrorToastr('Your email address is not verified. Please check your inbox and click the verification link to access the app.');
       }
     }
   }

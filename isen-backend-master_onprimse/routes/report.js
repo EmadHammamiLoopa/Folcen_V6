@@ -20,7 +20,7 @@ router.param('reportId', reportById);
 router.get('/all', [requireSignin, isAdmin], allReports);
 router.get('/:reportId', [requireSignin, isAdmin], showReport);
 
-router.post('/report/:reportId/action', [requireSignin, isAdmin], takeActionOnReport);
+router.post('/:reportId/action', [requireSignin, isAdmin], takeActionOnReport);
 
 // Reporting routes
 router.post('/report/user', [requireSignin], reportUser); // Endpoint for users to report another user

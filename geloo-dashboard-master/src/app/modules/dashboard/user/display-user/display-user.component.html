@@ -302,7 +302,7 @@
         </div>
         <div class="divide-y divide-gray-50">
           <div *ngFor="let item of related.products" class="p-4 hover:bg-gray-50 transition-colors">
-            <h4 class="text-sm font-bold text-gray-800 mb-1">{{item.name}}</h4>
+            <h4 class="text-sm font-bold text-gray-800 mb-1">{{item.label}}</h4>
             <p class="text-xs text-gray-500 mb-2">{{item.price}} {{item.currency}}</p>
             <a [routerLink]="['/dashboard/Products/display', itemId(item)]" class="text-xs text-indigo-600 font-bold">View Product</a>
           </div>
@@ -318,8 +318,8 @@
         </div>
         <div class="divide-y divide-gray-50">
           <div *ngFor="let item of related.services" class="p-4 hover:bg-gray-50 transition-colors">
-            <h4 class="text-sm font-bold text-gray-800 mb-1">{{item.name}}</h4>
-            <p class="text-xs text-gray-500 mb-2">{{item.price}} {{item.currency}}</p>
+            <h4 class="text-sm font-bold text-gray-800 mb-1">{{item.title}}</h4>
+            <p class="text-xs text-gray-500 mb-2">{{item.serviceRate}}</p>
             <a [routerLink]="['/dashboard/Services/display', itemId(item)]" class="text-xs text-indigo-600 font-bold">View Service</a>
           </div>
           <div *ngIf="!related.services || related.services.length === 0" class="p-8 text-center text-gray-400 italic text-sm">No services.</div>
@@ -335,7 +335,7 @@
         <div class="divide-y divide-gray-50">
           <div *ngFor="let item of related.jobs" class="p-4 hover:bg-gray-50 transition-colors">
             <h4 class="text-sm font-bold text-gray-800 mb-1">{{item.title}}</h4>
-            <p class="text-xs text-gray-500 mb-2">{{item.salary}} {{item.currency}}</p>
+            <p class="text-xs text-gray-500 mb-2">{{item.minSalary && item.maxSalary ? (item.minSalary + ' - ' + item.maxSalary) : (item.minSalary || item.maxSalary || 'N/A')}}</p>
             <a [routerLink]="['/dashboard/Jobs/display', itemId(item)]" class="text-xs text-indigo-600 font-bold">View Job</a>
           </div>
           <div *ngIf="!related.jobs || related.jobs.length === 0" class="p-8 text-center text-gray-400 italic text-sm">No jobs.</div>

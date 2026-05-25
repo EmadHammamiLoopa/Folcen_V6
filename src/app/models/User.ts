@@ -841,6 +841,7 @@ set peerId(peerId: string | null) {
     this._followStatus = user.followStatus || null;
     this._isPrivate = !!user.isPrivate;
     this._request = user.request || null;
+    (this as any).outgoingRequestId = (user as any).outgoingRequestId || null;
     this._requests = Array.isArray(user.requests) ? user.requests.map((req: any) => new Request().initialize(req)) : [];
     this._online = !!user.online;
     this._messages = Array.isArray(user.messages) ? user.messages.map((msg: any) => new Message().initialize(msg)) : [];

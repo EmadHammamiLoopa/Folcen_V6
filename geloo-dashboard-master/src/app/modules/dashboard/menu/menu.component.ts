@@ -14,7 +14,7 @@ export class MenuComponent implements OnInit {
     {
       name: "users",
       icon: "fas fa-users",
-      path: "/dashboard/Users/"
+      path: "/dashboard/Users"
     },
     {
       name: "Users Analytics",
@@ -24,32 +24,32 @@ export class MenuComponent implements OnInit {
     {
       name: "Channels",
       icon: "fas fa-project-diagram",
-      path: "/dashboard/Channels/"
+      path: "/dashboard/Channels"
     },
     {
       name: "posts",
       icon: "fas fa-clone",
-      path: "/dashboard/Posts/"
+      path: "/dashboard/Posts"
     },
     {
       name: "comments",
       icon: "fas fa-comments",
-      path: "/dashboard/Comments/"
+      path: "/dashboard/Comments"
     },
     {
       name: "products",
       icon: "fas fa-box",
-      path: "/dashboard/Products/"
+      path: "/dashboard/Products"
     },
     {
       name: "services",
       icon: "fas fa-cogs",
-      path: "/dashboard/Services/"
+      path: "/dashboard/Services"
     },
     {
       name: "jobs",
       icon: "fas fa-business-time",
-      path: "/dashboard/Jobs/"
+      path: "/dashboard/Jobs"
     },
     {
       name: "reports",
@@ -70,7 +70,12 @@ export class MenuComponent implements OnInit {
       this.menuItems.push({
         name: "subscriptions",
         icon: "fas fa-money-check-alt",
-        path: "/dashboard/subscriptions/"
+        path: "/dashboard/subscriptions"
+      });
+      this.menuItems.push({
+        name: "GDPR Centre",
+        icon: "fas fa-shield-alt",
+        path: "/dashboard/GDPR"
       });
     }
   }
@@ -80,11 +85,19 @@ export class MenuComponent implements OnInit {
     .subscribe(
       resp => {
         window.localStorage.removeItem('token');
-        this.router.navigateByUrl('/auth')
-        console.log();
+        this.router.navigateByUrl('/auth');
       },
       err => {
-
+        // 401 means the token was already revoked — treat as success
+        if (err && err.status === 401) {
+          window.localStorage.removeItem('token');
+          this.router.navigateByUrl('/auth');
+          return;
+        }
+        console.error('Signout failed:', err);
+        // Still clear local state so user can re-authenticate
+        window.localStorage.removeItem('token');
+        this.router.navigateByUrl('/auth');
       }
     )
   }

@@ -414,7 +414,7 @@ exports.voteOnComment = async (req, res) => {
             const channel = await Channel.findOne({ _id: post.channel });
             sendNotification(
                 { en: channel.name },
-                { en: (comment.anonyme ? 'Anonym' : req.authUser.firstName + ' ' + req.authUser.lastName) + ' has voted on your post' },
+                { en: (comment.anonyme ? 'Anonym' : req.authUser.firstName + ' ' + req.authUser.lastName) + ' has voted on your comment' },
                 { type: 'vote-channel-post', link: '/tabs/channels/post/' + post._id + '?commentId=' + comment._id },
                 [],
                 [comment.user]
@@ -533,6 +533,17 @@ exports.destroyComment = async (res, commentId, callback) => {
     } catch (err) {
         console.log(err);
         return Response.sendError(res, 500, 'Server error');
+    }
+};
+
+exports.clearCommentReports = async (req, res) => {
+    try {
+        const commentId = req.comment._id;
+        await Report.deleteMany({ 'entity.id': commentId, 'entity.name': 'comment' });
+        return Response.sendResponse(res, null, 'reports cleaned');
+    } catch (err) {
+        console.log(err);
+        return Response.sendError(res, 400, 'Failed to clear reports');
     }
 };
 

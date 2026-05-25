@@ -38,6 +38,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
   isFriend: boolean = false;
   notFriendOrMe: boolean = false;
   private _isFriendReloadDone = false;
+  outgoingRequestId: string | null = null;
   pendingRequestsCount = 0;
   userId: string;
   mainAvatar: string;
@@ -433,6 +434,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
         next: (user) => {
           if (user && user._id) {
             this.user = new User().initialize(user);
+            this.outgoingRequestId = (this.user as any).outgoingRequestId || null;
             
             // 🚫 Guard: Do not allow viewing Admin profiles as regular users
             const role = (this.user.role || '').toUpperCase();
@@ -910,10 +912,16 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   cancelRequest() {
-    this.requestService.cancelRequest(this.user.requests[0]._id).then(
+    const requestId = (this.user.requests && this.user.requests[0]?._id) || this.outgoingRequestId;
+    if (!requestId) {
+      this.toastService.presentErrorToastr('Could not find request to cancel');
+      return;
+    }
+    this.requestService.cancelRequest(requestId).then(
       () => {
         this.user.request  = null;
         this.user.requests = [];
+        this.outgoingRequestId = null;
         this.changeDetectorRef.detectChanges();
       },
       err => this.handleError(err)
@@ -925,8 +933,11 @@ export class DisplayComponent implements OnInit, OnDestroy {
       (resp: any) => {
         this.user.request = 'requested';
         this.user.friend  = false;
-        this.user.requests.push(new Request(resp.data.request));
-        this.toastService.presentSuccessToastr(resp.message);
+        if (resp?.data?.request && typeof resp.data.request === 'object') {
+          this.user.requests.push(new Request(resp.data.request));
+          this.outgoingRequestId = resp.data.request._id || resp.data.request.id || null;
+        }
+        this.toastService.presentSuccessToastr(resp?.message || 'Friend request sent!');
         this.changeDetectorRef.detectChanges();
       },
       err => {

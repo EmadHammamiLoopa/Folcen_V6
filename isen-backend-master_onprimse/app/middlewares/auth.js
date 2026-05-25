@@ -212,8 +212,10 @@ exports.withAuthUser = async (req, res, next) => {
         }
 
         // Block access if the user has not verified their email yet.
+        // Admins and super admins bypass this — they are trusted platform users.
         // The frontend catches this error code and redirects to the verify-email step.
-        if (!user.emailVerified) {
+        const isAdminRole = user.role === 'ADMIN' || user.role === 'SUPER ADMIN';
+        if (!user.emailVerified && !isAdminRole) {
             return Response.sendError(
                 res,
                 403,

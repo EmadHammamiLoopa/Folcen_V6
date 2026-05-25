@@ -65,6 +65,10 @@ export class SocketService {
   private static newFeedPostSubject = new Subject<any>();
   static newFeedPost$ = SocketService.newFeedPostSubject.asObservable();
 
+  // Emits when admin broadcasts a new announcement to all connected clients
+  private static newAnnouncementSubject = new Subject<any>();
+  static newAnnouncement$ = SocketService.newAnnouncementSubject.asObservable();
+
   /** Base64url-safe decoder (for JWT payload). */
   private static base64UrlDecode(b64url: string): string {
     const pad = (s: string) => s + '==='.slice((s.length + 3) % 4);
@@ -387,6 +391,13 @@ export class SocketService {
         try {
           SocketService.newFeedPostSubject.next(payload);
         } catch (e) { console.warn('Error handling new_feed_post payload', e); }
+      });
+
+      // Admin broadcast: new announcement for all users
+      SocketService.socketInstance.on('new_announcement', (payload: any) => {
+        try {
+          SocketService.newAnnouncementSubject.next(payload);
+        } catch (e) { console.warn('Error handling new_announcement payload', e); }
       });
 
       // Server-initiated forced logout (e.g. account deleted or token revoked)

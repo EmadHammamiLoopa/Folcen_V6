@@ -283,7 +283,7 @@ exports.storeService = async (req, res) => {
             sendNotification(
                 { en: notificationTitle },
                 { en: notificationBody },
-                { type: 'followed_user_created_service', link: `/tabs/services/details/${service._id}` },
+                { type: 'followed_user_created_service', link: `/tabs/small-business/services/service/${service._id}` },
                 [],
                 recipients
             );

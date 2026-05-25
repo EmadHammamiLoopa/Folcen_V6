@@ -94,13 +94,13 @@ exports.requestNotExist = async (req, res, next) => {
         // Check if the auth user already sent a request
         const existingRequest = await Request.findOne({ from: req.auth._id, to: user._id });
         if (existingRequest) {
-            return Response.sendResponse(res, { request: 'requesting' });
+            return Response.sendResponse(res, { request: 'requesting' }, 'Friend request already sent');
         }
 
         // Check if the auth user has received a request from the other user
         const incomingRequest = await Request.findOne({ from: user._id, to: req.auth._id });
         if (incomingRequest) {
-            return Response.sendResponse(res, { request: 'requested' });
+            return Response.sendResponse(res, { request: 'requested' }, 'This user already sent you a request');
         }
 
         // If no request exists, move to the next middleware

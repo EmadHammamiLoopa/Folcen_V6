@@ -88,8 +88,8 @@
       <div class="animate-fadeIn" *ngIf="subscription.userId">
         <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto text-center">
           <div class="mb-6">
-            <img [src]="subscription.userId.mainAvatar ? (subscription.userId.mainAvatar.startsWith('http') ? subscription.userId.mainAvatar : apiUrl + '/' + subscription.userId.mainAvatar) : 'assets/img/default-avatar.png'" 
-                 class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg">
+            <img [src]="subscription.userId.mainAvatar ? (subscription.userId.mainAvatar.startsWith('http') ? subscription.userId.mainAvatar : apiUrl + (subscription.userId.mainAvatar.startsWith('/') ? '' : '/') + subscription.userId.mainAvatar) : 'assets/user.jpeg'" 
+                 class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg" (error)="$any($event.target).src='assets/user.jpeg'">
           </div>
           <h3 class="text-xl font-bold text-gray-800 mb-1">{{subscription.userId.firstName}} {{subscription.userId.lastName}}</h3>
           <p class="text-gray-500 mb-6">{{subscription.userId.email}}</p>

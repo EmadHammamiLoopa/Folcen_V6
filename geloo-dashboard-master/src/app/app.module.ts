@@ -5,6 +5,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { SanitizeInterceptor } from './interceptors/sanitize.interceptor';
 import { LegalInterceptor } from './interceptors/legal.interceptor';
+import { AuthInterceptor } from './interceptors/auth.interceptor';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -25,10 +26,11 @@ import { AppComponent } from './app.component';
       tapToDismiss: true,
       autoDismiss: true,
       maxOpened: 4,
-      timeOut: 1000
+      timeOut: 4000
     })
   ],
   providers: [
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
     { provide: HTTP_INTERCEPTORS, useClass: SanitizeInterceptor, multi: true },
     { provide: HTTP_INTERCEPTORS, useClass: LegalInterceptor, multi: true }
   ],

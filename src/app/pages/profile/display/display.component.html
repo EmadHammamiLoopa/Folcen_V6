@@ -88,7 +88,7 @@
         <!-- Add Friend / Unfriend — hidden on private profiles for non-friends (followers use Follow button only) -->
         <ion-button class="primary-action" (click)="request()" [color]="user.isFriend ? 'light' : 'primary'"
             *ngIf="!user.isPrivate || user.isFriend">
-          <ion-icon [name]="user.isFriend ? 'person-remove' : 'person-add'" slot="start"></ion-icon>
+          <ion-icon [name]="user.isFriend ? 'person-remove' : (user.request === 'requesting' ? 'checkmark-circle' : (user.request === 'requested' ? 'paper-plane' : 'person-add'))" slot="start"></ion-icon>
           {{ user.isFriend ? 'Unfriend' : (user.request === 'requesting' ? 'Accept' : (user.request === 'requested' ? 'Cancel Request' : 'Add Friend')) }}
         </ion-button>
 

@@ -405,6 +405,15 @@ socket.on("connect-user", async (user_id) => {
       } else {
         console.warn(`⚠️ User ${msg.to} offline - message saved but not delivered`);
         // Do NOT record message content; record delivery missing for diagnostics
+        // Send FCM push so the recipient is notified on their device
+        try {
+          const { sendNotification } = require('../helpers');
+          const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'New message';
+          const messagePreview = msg.text ? String(msg.text).substring(0, 100) : '📷 Image';
+          sendNotification([msg.to], messagePreview, senderName, senderId).catch(() => {});
+        } catch (pushErr) {
+          console.warn('[chat] FCM push failed for offline user:', pushErr.message);
+        }
       }
 
       // Confirm to sender using server-authoritative senderId (not client-supplied msg.from).

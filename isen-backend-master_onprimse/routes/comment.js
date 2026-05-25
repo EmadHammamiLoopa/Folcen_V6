@@ -12,7 +12,8 @@ const {
     showCommentEditDash,
     updateComment,
     postComments,
-    getAllCommentsForAdmin
+    getAllCommentsForAdmin,
+    clearCommentReports
 } = require('../app/controllers/CommentController');
 
 const { requireSignin, withAuthUser, isAdmin } = require('../app/middlewares/auth');
@@ -37,6 +38,7 @@ router.get('/post/:postId/comment', [requireSignin, withAuthUser], getComments)
 router.delete('/:commentId', [requireSignin, commentOwner], deleteComment)
 router.post('/:commentId/vote', [requireSignin, withAuthUser], voteOnComment)
 router.post('/:commentId/report', [requireSignin], reportComment)
+router.post('/:commentId/clearReports', [requireSignin, isAdmin], clearCommentReports)
 
 
 

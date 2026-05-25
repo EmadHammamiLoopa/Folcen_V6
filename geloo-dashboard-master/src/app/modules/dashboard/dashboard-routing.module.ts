@@ -48,6 +48,10 @@ const routes: Routes = [
       {
         path: 'subscriptions',
         loadChildren: () => import('./subscription/subscription.module').then(m => m.SubscriptionModule),
+      },
+      {
+        path: 'GDPR',
+        loadChildren: () => import('./gdpr/gdpr.module').then(m => m.GdprModule)
       }
     ]
   }

@@ -38,7 +38,7 @@ const ReportSchema = new mongoose.Schema({
 
   // Status / resolution fields
   status: { type: String, enum: ['open','under_review','resolved','dismissed'], default: 'open', index: true },
-  resolutionAction: { type: String, enum: ['Content Removed','User Banned','No Action'], default: 'No Action' },
+  resolutionAction: { type: String, enum: ['Content Removed','User Banned','User Deleted (GDPR)','Resolved','No Action'], default: 'No Action' },
   moderatorNotes: { type: String, default: null },
 
   // Link to non-content event logs (call/message) for investigations

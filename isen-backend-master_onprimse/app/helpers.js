@@ -536,6 +536,14 @@ async function purgeUser(userId) {
   const Activity = require('./models/Activity');
   const Channel = require('./models/Channel');
   const Request = require('./models/Request');
+  const Notification = require('./models/Notification');
+  const PushToken = require('./models/PushToken');
+  const UserActivityDaily = require('./models/UserActivityDaily');
+  // new GDPR models — safe to skip if not yet migrated
+  let UserInterestProfile, UserConsent, AnalyticsEvent;
+  try { UserInterestProfile = require('./models/UserInterestProfile'); } catch (e) {}
+  try { UserConsent = require('./models/UserConsent'); } catch (e) {}
+  try { AnalyticsEvent = require('./models/AnalyticsEvent'); } catch (e) {}
   const fs = require('fs').promises;
   const path = require('path');
 
@@ -626,7 +634,15 @@ async function purgeUser(userId) {
     Report.deleteMany({ $or: [{ reporter: userId }, { entity: userId, entityModel: 'User' }] }),
 
     // Delete channels owned by the user
-    Channel.deleteMany({ user: userId })
+    Channel.deleteMany({ user: userId }),
+
+    // GDPR: push tokens, notifications, daily activity, interest profile, consents, analytics events
+    PushToken.deleteMany({ userId }),
+    Notification.deleteMany({ $or: [{ recipient: userId }, { sender: userId }] }),
+    UserActivityDaily.deleteMany({ userId }),
+    ...(UserInterestProfile ? [UserInterestProfile.deleteOne({ userId })] : []),
+    ...(UserConsent ? [UserConsent.deleteOne({ userId })] : []),
+    ...(AnalyticsEvent ? [AnalyticsEvent.deleteMany({ userId })] : []),
   ]);
 
   // 2. Cleanup references in other models (e.g., removing user from follower arrays)

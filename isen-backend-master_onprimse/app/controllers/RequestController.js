@@ -265,3 +265,30 @@ exports.cancelRequest = async (req, res) => {
     return Response.sendError(res, 500, "Server error while canceling the request");
   }
 };
+
+exports.cancelRequestByUser = async (req, res) => {
+  try {
+    const fromId = String(req.auth._id);
+    const toId   = String(req.params.userId);
+
+    const reqDoc = await Request.findOne({ from: fromId, to: toId, accepted: false });
+    if (!reqDoc) {
+      return Response.sendResponse(res, true, 'No pending request found');
+    }
+
+    const id = reqDoc._id;
+    await Promise.all([
+      Request.deleteOne({ _id: id }),
+      User.updateOne({ _id: fromId }, { $pull: { requests: id } }),
+      User.updateOne({ _id: toId   }, { $pull: { requests: id } }),
+    ]);
+
+    emitFriendRequestsUpdated(fromId, toId);
+    emitFriendRequestDeclined(fromId, toId);
+
+    return Response.sendResponse(res, true, 'Request cancelled successfully');
+  } catch (err) {
+    console.error('cancelRequestByUser error:', err);
+    return Response.sendError(res, 500, 'Server error while cancelling the request');
+  }
+};

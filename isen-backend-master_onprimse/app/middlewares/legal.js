@@ -14,7 +14,7 @@ exports.requireLegalAcceptance = (requirements) => {
             }
 
             // Bypass for admins (often seeded or system users)
-            if (req.auth && (req.auth.role === 'ADMIN' || req.auth.role === 'SUPER_ADMIN')) {
+            if (req.auth && (req.auth.role === 'ADMIN' || req.auth.role === 'SUPER ADMIN' || req.auth.role === 'SUPER_ADMIN')) {
                 return next();
             }
 

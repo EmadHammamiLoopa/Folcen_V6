@@ -1,0 +1,55 @@
+<div class="dsar-page">
+
+  <!-- Header -->
+  <div class="comp-header">
+    <h2 class="comp-title">Data Subject Access Request</h2>
+    <p class="comp-sub">Generate a full portable copy of a user's data &mdash; GDPR Art. 15 &amp; 20.</p>
+  </div>
+
+  <!-- Sections legend -->
+  <div class="sections-grid">
+    <div class="section-chip"
+         *ngFor="let s of sections"
+         [class.has-data]="sectionHasData(s.key)"
+         [class.no-data]="exportData && !sectionHasData(s.key)">
+      <i [class]="s.icon"></i>
+      <span>{{ s.label }}</span>
+      <i class="fas fa-check chip-check" *ngIf="sectionHasData(s.key)"></i>
+    </div>
+  </div>
+
+  <!-- Lookup Form -->
+  <div class="lookup-card">
+    <label class="field-label">User ID <span class="field-hint">(MongoDB 24-char ObjectId)</span></label>
+    <div class="input-row">
+      <input [(ngModel)]="userId" placeholder="e.g. 64a1b2c3d4e5f6a7b8c9d0e1"
+        class="id-input" (keyup.enter)="export()" maxlength="24" />
+      <button (click)="export()" [disabled]="loading || userId.length !== 24"
+        class="btn-export">
+        <i class="fas" [class.fa-download]="!loading" [class.fa-spinner]="loading" [class.fa-spin]="loading"></i>
+        {{ loading ? 'Generating…' : 'Generate Export' }}
+      </button>
+      <button *ngIf="exportData" (click)="reset()" class="btn-clear">Clear</button>
+    </div>
+    <p *ngIf="error" class="field-error"><i class="fas fa-exclamation-circle"></i> {{ error }}</p>
+  </div>
+
+  <!-- Skeleton -->
+  <div *ngIf="loading" class="skeleton-wrap">
+    <div class="sk-line"></div>
+    <div class="sk-line short"></div>
+    <div class="sk-block"></div>
+  </div>
+
+  <!-- Result -->
+  <div *ngIf="exportData && !loading" class="result-panel">
+    <div class="result-toolbar">
+      <span class="result-ready"><i class="fas fa-check-circle"></i> Export ready &mdash; {{ userId }}</span>
+      <button (click)="downloadJson()" class="btn-download">
+        <i class="fas fa-file-download"></i> Download JSON
+      </button>
+    </div>
+    <pre class="json-preview">{{ exportData | json }}</pre>
+  </div>
+
+</div>

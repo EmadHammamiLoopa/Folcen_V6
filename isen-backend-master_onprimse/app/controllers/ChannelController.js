@@ -134,7 +134,7 @@ exports.toggleChannelApprovement = async (req, res) => {
 exports.showChannel = async (req, res) => {
     try {
         const channel = await Channel.findOne({ _id: req.channel._id })
-            .populate({ path: 'user', select: 'name email avatar' })
+            .populate({ path: 'user', select: 'firstName lastName email mainAvatar avatarStyle avatarSeed avatarOverrides role' })
             .populate({ path: 'reports', model: 'Report' });
 
         if (!channel) {

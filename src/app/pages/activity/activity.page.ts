@@ -116,17 +116,29 @@ export class ActivityPage implements OnInit {
         } else if (a.channel && typeof a.channel === 'object') {
           targetLink = { path: '/tabs/channels/channel', queryParams: { channel: JSON.stringify(a.channel) } };
         } else if (a.channel) {
-          // If only id is available, pass minimal object and allow ChannelComponent to fetch
           targetLink = { path: '/tabs/channels/channel', queryParams: { channel: JSON.stringify({ id: a.channel }) } };
         }
-      } else if (a.type === 'comment' || a.type === 'like') {
+      } else if (a.type === 'comment') {
+        // targetId = the post ID; meta.commentId = the specific comment
         if (a.targetId) {
           const queryParams: any = {};
-          if (a.meta && a.meta.commentId) {
-            queryParams.commentId = a.meta.commentId;
-          }
+          if (a.meta && a.meta.commentId) queryParams.commentId = a.meta.commentId;
           targetLink = { path: '/tabs/channels/post/' + a.targetId, queryParams };
         }
+      } else if (a.type === 'like') {
+        if (a.targetType === 'comment' && a.meta && a.meta.postId) {
+          // liked a comment → go to the parent post, highlight the comment
+          targetLink = { path: '/tabs/channels/post/' + a.meta.postId, queryParams: { commentId: a.targetId } };
+        } else if (a.targetId) {
+          // liked a post directly
+          targetLink = { path: '/tabs/channels/post/' + a.targetId };
+        }
+      } else if (a.type === 'product') {
+        if (a.targetId) targetLink = { path: '/tabs/buy-and-sell/product/' + a.targetId };
+      } else if (a.type === 'job') {
+        if (a.targetId) targetLink = { path: '/tabs/small-business/jobs/job/' + a.targetId };
+      } else if (a.type === 'service') {
+        if (a.targetId) targetLink = { path: '/tabs/small-business/services/service/' + a.targetId };
       }
     }
 

@@ -83,6 +83,17 @@ export class RequestService extends DataService {
     });
   }
 
+  cancelRequestByUser(userId: string) {
+    if (!userId) {
+      return Promise.reject('Invalid user ID');
+    }
+    this.invalidateRequestsCache();
+    return this.sendRequest({
+      method: 'post',
+      url: '/cancel-by-user/' + userId
+    });
+  }
+
 
   rejectRequest(id: string){
     this.invalidateRequestsCache();
