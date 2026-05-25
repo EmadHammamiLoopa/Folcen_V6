@@ -1,18 +1,19 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          xmlns:tools="http://schemas.android.com/tools">
-
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" /> <!-- Required for foreground services -->
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Required for foreground services -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Firebase-specific permissions -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" /> <!-- Keeps device awake when receiving notifications -->
-    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" /> <!-- Required for receiving FCM messages -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Keeps device awake when receiving notifications -->
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+    <!-- Required for receiving FCM messages -->
     <!-- Required for showing notifications on Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -24,7 +25,6 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:networkSecurityConfig="@xml/network_security_config">
-
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:name=".MainActivity"
@@ -45,13 +45,12 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="androidx.core.content.FILE_PROVIDER_PATHS"
-                android:resource="@xml/camera_provider_paths" />
+                android:resource="@xml/camera_provider_paths"
+            />
         </provider>
 
         <!-- Firebase Cloud Messaging Service -->
-        <service
-            android:name=".MyFirebaseMessagingService"
-            android:exported="false">
+        <service android:name=".MyFirebaseMessagingService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
@@ -70,9 +69,7 @@
         </receiver>
 
         <!-- Firebase Instance ID Service (optional but recommended) -->
-        <service
-            android:name="com.google.firebase.iid.FirebaseInstanceIdService"
-            android:exported="false">
+        <service android:name="com.google.firebase.iid.FirebaseInstanceIdService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
             </intent-filter>
@@ -82,8 +79,7 @@
             android:name="de.appplant.cordova.plugin.background.ForegroundService"
             android:exported="false"
             android:permission="android.permission.FOREGROUND_SERVICE"
-            android:foregroundServiceType="mediaPlayback" />
-        
+            android:foregroundServiceType="mediaPlayback"
+        />
     </application>
-
 </manifest>
