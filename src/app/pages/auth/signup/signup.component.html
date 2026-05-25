@@ -306,6 +306,7 @@
             </ion-item>
           </div>
 
+          <!-- TODO v2: Re-enable randomRequests step when random feature is activated
           <div *ngIf="steps[step] == 'randomRequests'" class="privacy-step">
             <div class="step-icon-wrap">
               <div class="step-icon-ring">
@@ -328,8 +329,9 @@
               </div>
             </div>
           </div>
+          -->
 
-          <div *ngIf="steps[step] == 'ageVisibility'" class="privacy-step">
+          <div *ngIf="steps[step] == 'ageVisibility'" class="privacy-step">>
             <div class="step-icon-wrap">
               <div class="step-icon-ring">
                 <ion-icon name="shield-checkmark" class="step-icon"></ion-icon>

@@ -162,6 +162,15 @@ export class SigninComponent implements OnInit {
 
     this.pageLoading = false;
 
+    // Email not yet verified — send user to the verification step instead of
+    // showing the main app (auth guard would redirect anyway, but doing it here
+    // gives an explicit message rather than looking like "unauthorized").
+    if (this.user.emailVerified === false) {
+      this.toastService.presentErrorToastr('Please verify your email address. Check your inbox and click the verification link, then sign in again.');
+      await this.router.navigate(['/auth/signup']);
+      return;
+    }
+
     if (!this.user.loggedIn) {
       console.log('User not logged in according to flag, showing welcome alert');
       await this.showWelcomeAlert();

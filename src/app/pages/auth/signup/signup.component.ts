@@ -24,9 +24,12 @@ export class SignupComponent implements OnInit, OnDestroy {
 
   gender = "prefer not to say";
   step = 0;
-  steps = ['email', 'name', 'password', 'birthDate', 'gender', 'location', 'school', 'education', 'profession', 'interests', 'languages', 'aboutMe', 'randomRequests', 'ageVisibility', 'verifyEmail', 'success'];
+  steps = ['email', 'name', 'password', 'birthDate', 'gender', 'location', 'school', 'education', 'profession', 'interests', 'languages', 'aboutMe',
+    // 'randomRequests', // TODO v2: re-enable when random feature is activated
+    'ageVisibility', 'verifyEmail', 'success'];
   // Steps that render a step-icon illustration — logo is hidden on these
-  stepsWithIllustration = new Set(['email', 'name', 'password', 'birthDate', 'randomRequests', 'ageVisibility', 'verifyEmail']);
+  // 'randomRequests' excluded here until random feature is re-enabled in v2
+  stepsWithIllustration = new Set(['email', 'name', 'password', 'birthDate', /* 'randomRequests', */ 'ageVisibility', 'verifyEmail']);
   isSubmitted = false;
   validationErrors: any = {};
   btnLoading = false;
@@ -507,6 +510,7 @@ export class SignupComponent implements OnInit, OnDestroy {
     } else if (this.steps[this.step] == 'location') {
       return this.selectedCountry && this.selectedCity;
     } else if (this.steps[this.step] == 'randomRequests') {
+      // TODO v2: re-enable when random feature is activated
       return true;
     } else if (this.steps[this.step] == 'ageVisibility') {
       // Last step before submit: require terms acceptance

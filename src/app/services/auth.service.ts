@@ -152,7 +152,27 @@ export class AuthService extends DataService {
   async firebaseSignup(email, password, profile) {
     try {
       const displayName = `${profile.firstName} ${profile.lastName}`;
-      const fbUser = await this.firebaseSvc.signUp(email, password, displayName);
+      let fbUser;
+      try {
+        fbUser = await this.firebaseSvc.signUp(email, password, displayName);
+      } catch (fbSignupErr: any) {
+        // Firebase account already exists (e.g. a previous signup attempt that
+        // created the Firebase account but failed to persist the MongoDB record).
+        // Sign in with the same credentials so we can call firebase-login with
+        // the profile and let the backend create the missing MongoDB user.
+        if (fbSignupErr.code === 'auth/email-already-in-use') {
+          try {
+            fbUser = await this.firebaseSvc.signIn(email, password);
+          } catch (fbSigninErr: any) {
+            // Wrong password for the existing Firebase account — cannot recover.
+            // Surface the original "email already in use" error so the UI can
+            // show the "Account Already Exists — sign in?" dialog.
+            throw fbSignupErr;
+          }
+        } else {
+          throw fbSignupErr;
+        }
+      }
       const idToken = await fbUser.getIdToken();
       return await this.sendRequest({
         method: 'post',

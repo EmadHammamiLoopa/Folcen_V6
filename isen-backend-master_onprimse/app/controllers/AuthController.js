@@ -544,10 +544,35 @@ exports.firebaseLogin = async (req, res) => {
                     user.mainAvatar = user.getDefaultAvatar();
                 }
 
-                await autoFollowStaticChannels(user);
-                await addLocalChannels(user);
-                await addFreeSubscription(user);
-                await user.save();
+                // Save the user FIRST so they exist in MongoDB even if the optional
+                // setup steps below fail (channels, subscription, etc.).
+                try {
+                    await user.save();
+                } catch (saveErr) {
+                    // Duplicate key: a MongoDB record already exists for this email/firebaseUid
+                    // (e.g. created by a parallel request or a previous partial signup).
+                    // Recover by loading the existing record so we can still return a token.
+                    if (saveErr.code === 11000) {
+                        logger.warn('[firebaseLogin] Duplicate key on new user save — recovering existing record', saveErr.keyValue);
+                        user = await User.findOne({
+                            $or: [{ firebaseUid: uid }, { email: email.toLowerCase() }]
+                        });
+                        if (!user) {
+                            return Response.sendError(res, 409, 'Account already exists. Please sign in.');
+                        }
+                        if (!user.firebaseUid) {
+                            user.firebaseUid = uid;
+                            await user.save().catch(e => logger.warn('[firebaseLogin] Could not update firebaseUid on recovered user', e));
+                        }
+                    } else {
+                        throw saveErr;
+                    }
+                }
+
+                // Optional setup — errors here do not prevent user creation
+                try { await autoFollowStaticChannels(user); } catch (e) { logger.warn('[firebaseLogin] autoFollowStaticChannels failed', e.message); }
+                try { await addLocalChannels(user); } catch (e) { logger.warn('[firebaseLogin] addLocalChannels failed', e.message); }
+                try { await addFreeSubscription(user); await user.save(); } catch (e) { logger.warn('[firebaseLogin] addFreeSubscription failed', e.message); }
                 
                 // Record legal acceptance if provided in profile
                 if (profile.acceptedTerms) {
