@@ -2,28 +2,46 @@
  * app/services/firebaseAdmin.js
  * -------------------------------------------------------------------
  * Initialises Firebase Admin SDK once and exports the admin instance.
- * The service-account JSON path is read from the environment variable
- * FIREBASE_SERVICE_ACCOUNT_PATH so credentials are never hard-coded.
+ *
+ * Credential resolution order:
+ *  1. FIREBASE_SERVICE_ACCOUNT_PATH — path to a service-account JSON file
+ *  2. FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY
+ *     — individual env vars (used on Railway / cloud deployments where
+ *       uploading a JSON file is not possible)
  *********************************************************************/
 
 const admin = require('firebase-admin');
 
-const SERVICE_ACCOUNT_PATH =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  '/mnt/data/folcen-8fd1c-firebase-adminsdk-fbsvc-e88bb05c4c.json';
-
 if (!admin.apps.length) {
   try {
-    const serviceAccount = require(SERVICE_ACCOUNT_PATH);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    let credential;
+
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+      // Local dev: load from JSON file
+      const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+      credential = admin.credential.cert(serviceAccount);
+    } else if (
+      process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY
+    ) {
+      // Cloud deployment: use individual env vars
+      // Railway stores the private key with literal \n — replace them
+      credential = admin.credential.cert({
+        projectId:   process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey:  process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      });
+    } else {
+      throw new Error('No Firebase credentials found. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY.');
+    }
+
+    admin.initializeApp({ credential });
     console.log('[firebaseAdmin] Firebase Admin SDK initialised successfully.');
   } catch (err) {
     // Non-fatal: push notifications will be silently skipped if Admin fails to init.
     console.error(
-      '[firebaseAdmin] Failed to initialize Firebase Admin SDK.',
-      'Set FIREBASE_SERVICE_ACCOUNT_PATH to the correct JSON path.',
+      '[firebaseAdmin] Failed to initialize Firebase Admin SDK:',
       err.message
     );
   }
@@ -38,3 +56,4 @@ function getAdmin() {
 }
 
 module.exports = { admin, getAdmin };
+
