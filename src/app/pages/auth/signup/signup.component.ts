@@ -38,7 +38,7 @@ export class SignupComponent implements OnInit, OnDestroy {
   adjustingEmail = false;
   resendCooldown = 0;
   resendInterval: any;
-  form: FormGroup;
+  form!: FormGroup;
 
   countriesObject: any;
   countries: string[] = [];
@@ -378,7 +378,7 @@ export class SignupComponent implements OnInit, OnDestroy {
       }
       this.pageLoading = false;
       this.step++;
-    } catch (err) {
+    } catch (err: any) {
       this.pageLoading = false;
       devLogger.error('Signup error:', err);
 

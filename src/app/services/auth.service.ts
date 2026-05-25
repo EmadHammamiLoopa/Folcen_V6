@@ -149,7 +149,7 @@ export class AuthService extends DataService {
     }
   }
 
-  async firebaseSignup(email, password, profile) {
+  async firebaseSignup(email: string, password: string, profile: any) {
     try {
       const displayName = `${profile.firstName} ${profile.lastName}`;
       let fbUser;
@@ -184,7 +184,7 @@ export class AuthService extends DataService {
     }
   }
 
-  async firebaseSignin(email, password, syncMongoPassword = false) {
+  async firebaseSignin(email: string, password: string, syncMongoPassword = false) {
     try {
       console.log('[DEBUG] AuthService: firebaseSignin called for:', email);
       const fbUser = await this.firebaseSvc.signIn(email, password);
@@ -244,7 +244,7 @@ export class AuthService extends DataService {
     return err;
   }
 
-  async firebaseResetPassword(email) {
+  async firebaseResetPassword(email: string) {
     return this.firebaseSvc.resetPassword(email);
   }
 
@@ -294,7 +294,7 @@ export class AuthService extends DataService {
     });
   }
 
-  getUserId(): string {
+  getUserId(): string | null {
     try {
       const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
       const user = raw ? JSON.parse(raw) : null;
