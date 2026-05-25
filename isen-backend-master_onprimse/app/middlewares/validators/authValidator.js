@@ -41,8 +41,10 @@ exports.signinValidator = [
     check('email')
         .trim()  // Remove extra spaces
         .isEmail().withMessage('Invalid email format. Please provide a valid email address.')
-        .not().isEmpty().withMessage('Email is required.')
-        .normalizeEmail(),  // Normalize the email
+        .not().isEmpty().withMessage('Email is required.'),
+        // NOTE: do NOT call .normalizeEmail() here — it strips dots from Gmail addresses
+        // (emad.hmammy@gmail.com → emadhmammy@gmail.com), breaking lookups.
+        // The AuthController already normalizes via .toLowerCase().
 
     // Check password validity
     check('password')
