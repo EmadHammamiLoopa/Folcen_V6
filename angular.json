@@ -74,8 +74,8 @@
               ],
               "optimization": {
                 "scripts": true,
-                "styles": true,
-                "fonts": true
+                "styles": false,
+                "fonts": false
               },
               "outputHashing": "all",
               "sourceMap": false,
