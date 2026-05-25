@@ -380,7 +380,7 @@ const agenda = new Agenda({ db: { address: process.env.MONGODB_URL } });
 require('./app/jobs')(agenda);
 
 const routePrefix = '/api/v1';
-app.get('/', (req, res) => res.json({ status: 'ok', service: 'Folcen API', version: process.env.npm_package_version || '1.0.0' }));
+app.get('/', (req, res) => res.json({ status: 'ok', service: 'Folcen API', version: process.env.npm_package_version || '1.0.0', db: mongoose.connection.db ? mongoose.connection.db.databaseName : 'not-connected' }));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use(checkVersion);
