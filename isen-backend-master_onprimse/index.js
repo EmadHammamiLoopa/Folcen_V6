@@ -8,14 +8,27 @@ try {
 try {
   const admin = require('firebase-admin');
   if (admin.apps.length === 0) {
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-      require('path').join(__dirname, 'config', 'firebase-service-account.json');
-    try {
-      const serviceAccount = require(serviceAccountPath);
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-      console.log('[Firebase Admin] Initialized for project:', serviceAccount.project_id);
-    } catch (e) {
-      console.warn('[Firebase Admin] Service account not found at', serviceAccountPath, '— Firebase Admin features disabled.');
+    let credential;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+      const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+      credential = admin.credential.cert(serviceAccount);
+      console.log('[Firebase Admin] Initialized from service account file.');
+    } else if (
+      process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY
+    ) {
+      credential = admin.credential.cert({
+        projectId:   process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey:  process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      });
+      console.log('[Firebase Admin] Initialized from environment variables (project:', process.env.FIREBASE_PROJECT_ID + ').');
+    } else {
+      console.warn('[Firebase Admin] No credentials found — Firebase Admin features disabled. Set FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY.');
+    }
+    if (credential) {
+      admin.initializeApp({ credential });
     }
   }
 } catch (e) {
