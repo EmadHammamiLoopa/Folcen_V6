@@ -12,6 +12,7 @@ import { ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
 import { IonContent, IonInfiniteScroll, Platform, AlertController, ModalController } from '@ionic/angular';
 import { SocketService } from 'src/app/services/socket.service';
 import { ProductService } from 'src/app/services/product.service';
+import { environment } from 'src/environments/environment';
 import { Product } from 'src/app/models/Product';
 import { from, Subject, Observable } from 'rxjs';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
@@ -47,6 +48,7 @@ const waitUntil = (cond: () => boolean, step = 100) =>
 
 
 export class ChatComponent implements OnInit {
+  readonly features = environment.features;
   private destroy$ = new Subject<void>();
   videoCallDeclined = false;
 

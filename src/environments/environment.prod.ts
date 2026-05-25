@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
   apiUrl: 'https://folcenv6-production.up.railway.app/api/v1',  // ⚠️ CHANGE THIS TO YOUR DEPLOYED BACKEND URL
-  socketUrl: 'https://your-backend-url.com',
+  socketUrl: 'https://folcenv6-production.up.railway.app',
   socketPath: '/socket.io',
   SELLER_DISCLAIMER_VERSION: 'v1.0',
 
