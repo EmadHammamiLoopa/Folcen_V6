@@ -7,7 +7,7 @@ type RequestEnum = 'requesting' | 'requested';
 
 interface UserSubscription {
   id: string;
-  expireDate: Date;
+  expireDate: Date | null;
 }
 
 
@@ -26,13 +26,13 @@ export class User {
   private _gender: string;
   private _address: string;
   private _aboutMe: string;
-  private _avatar: string[];
+  private _avatar: string[] = [];
   private _mainAvatar: string;
   private _isFriend: boolean;
-  private _isFollowing: boolean;
-  private _isFollower: boolean;
-  private _followStatus: string | null;
-  private _isPrivate: boolean;
+  private _isFollowing: boolean = false;
+  private _isFollower: boolean = false;
+  private _followStatus: string | null = null;
+  private _isPrivate: boolean = false;
   private _status: string;
   private _education: string;
   private _profession: string;
@@ -74,7 +74,7 @@ export class User {
   private _lastSeen: Date | null;  // <-- New property added here
   private _peerId: string | null;  // ✅ Add peerId property
   public _lastSeenText: string | null;
-  private _missedCallBudget: number; // ✅ Add budget property
+  private _missedCallBudget: number = 0; // ✅ Add budget property
   private _avatarStyle: string;
   private _avatarSeed: string;
   private _avatarVariant: string;
@@ -313,7 +313,7 @@ export class User {
 
   get mainAvatar(): string {
     const timestamp = this._updatedAt ? this._updatedAt.getTime() : Date.now();
-    
+
     // 1. Prioritize real uploaded photo (mainAvatar) if it's not a DiceBear/Default URL
     if (this._mainAvatar && !this.isDefaultAvatar(this._mainAvatar)) {
       const url = this.constructAvatarUrl(this._mainAvatar);
@@ -339,12 +339,12 @@ export class User {
   public isDefaultAvatar(avatarUrl: string): boolean {
     if (!avatarUrl) return true;
     const urlStr = String(avatarUrl);
-    return this.isOldDefaultAvatar(urlStr) || 
-           urlStr.includes('dicebear.com') || 
+    return this.isOldDefaultAvatar(urlStr) ||
+           urlStr.includes('dicebear.com') ||
            urlStr.includes('default-avatar.png') ||
            urlStr.includes('avatar-placeholder');
   }
-  
+
   get avatarStyle(): string { return this._avatarStyle; }
   get avatarSeed(): string { return this._avatarSeed; }
   get avatarVariant(): string { return this._avatarVariant; }
@@ -409,25 +409,25 @@ export class User {
 
   get lastSeenText(): string | null { return this._lastSeenText; }
   set lastSeenText(lastSeenText: string | null) { this._lastSeenText = lastSeenText; }
-  
+
   get missedCallBudget(): number { return this._missedCallBudget; }
   set missedCallBudget(value: number) { this._missedCallBudget = value; }
-  
+
   get followersCount(): number { return this._followersCount; }
   set followersCount(value: number) { this._followersCount = value; }
-  
+
   get followingCount(): number { return this._followingCount; }
   set followingCount(value: number) { this._followingCount = value; }
-  
+
   get friendsCount(): number { return this._friendsCount; }
   set friendsCount(value: number) { this._friendsCount = value; }
-  
+
   get pendingFollowRequestsCount(): number { return this._pendingFollowRequestsCount; }
   set pendingFollowRequestsCount(value: number) { this._pendingFollowRequestsCount = value; }
-  
+
   get pendingFriendRequestsCount(): number { return this._pendingFriendRequestsCount; }
   set pendingFriendRequestsCount(value: number) { this._pendingFriendRequestsCount = value; }
-  
+
   public getPeerId(): string | null {
     return this._peerId;
 }
@@ -544,9 +544,9 @@ set peerId(peerId: string | null) {
       '/public/images/avatars/male.webp',
       '/public/images/avatars/female.webp',
       '/public/images/avatars/other.webp',
-      'http://127.0.0.1:3300/public/images/avatars/male.webp',
-      'http://127.0.0.1:3300/public/images/avatars/female.webp',
-      'http://127.0.0.1:3300/public/images/avatars/other.webp',
+      constants.defaultMaleAvatarUrl,
+      constants.defaultFemaleAvatarUrl,
+      constants.defaultOtherAvatarUrl,
       'dicebear.com/9.x/bottts', // Old monster/robot style
       'dicebear.com/7.x/bottts',
       'dicebear.com/6.x/bottts'
@@ -558,7 +558,7 @@ set peerId(peerId: string | null) {
     return this._id;
   }
 
-  
+
 
   public getAge(isLoggedInUser: boolean): number | null {
   //  console.log('loggedIn:', isLoggedInUser);
@@ -587,8 +587,8 @@ set peerId(peerId: string | null) {
     return age;
 }
 
-  
-  
+
+
   private isValidUserData(user: any): boolean {
     const requiredFields = [
       '_id', 'firstName', 'lastName', 'email', 'birthDate', 'gender'
@@ -629,8 +629,8 @@ set peerId(peerId: string | null) {
     const tryExtractBytes = (obj: any): number[] | null => {
       if (!obj) return null;
       if (Array.isArray(obj)) return obj.map(n => Number(n));
-      if (obj.data && Array.isArray(obj.data)) return obj.data.map(n => Number(n));
-      if (obj.buffer && Array.isArray(obj.buffer.data)) return obj.buffer.data.map(n => Number(n));
+      if (obj.data && Array.isArray(obj.data)) return obj.data.map((n: any) => Number(n));
+      if (obj.buffer && Array.isArray(obj.buffer.data)) return obj.buffer.data.map((n: any) => Number(n));
       // numeric-indexed object { '0': 105, '1': 73, ... }
       const keys = Object.keys(obj).filter(k => !isNaN(Number(k))).sort((a, b) => Number(a) - Number(b));
       if (keys.length) return keys.map(k => Number(obj[k]));
@@ -754,7 +754,7 @@ set peerId(peerId: string | null) {
     console.log('⚠️ Received raw user data from backend:', user);
     console.log('🔍 DEBUG interests type:', typeof user.interests, 'value:', user.interests);
     console.log('🔍 DEBUG languages type:', typeof user.languages, 'value:', user.languages);
-    
+
     // Performance monitoring
     if (typeof (window as any).__perfMonitor !== 'undefined') {
       console.log('📍 User normalize caller stack:', new Error().stack);
@@ -777,7 +777,7 @@ set peerId(peerId: string | null) {
     this._address = user.address || '';
     this._aboutMe = user.aboutMe || '';
     this.avatar = Array.isArray(user.avatar) ? this.filterCustomAvatars(user.avatar, user.gender) : [];
-    
+
     let mainAv = user.mainAvatar;
     if (!mainAv || this.isOldDefaultAvatar(mainAv)) {
       this._mainAvatar = this.getDefaultAvatar(this._gender);
@@ -789,7 +789,7 @@ set peerId(peerId: string | null) {
     this._education = (user.education === 'undefined' || !user.education) ? 'Undefined' : user.education;
     this._profession = (user.profession === 'undefined' || !user.profession) ? 'Undefined' : user.profession;
     this._school = (user.school === 'undefined' || !user.school) ? '' : user.school;
-    
+
     // Handle interests - ensure it's always an array
     if (Array.isArray(user.interests)) {
       if (user.interests.length === 1 && typeof user.interests[0] === 'string') {
@@ -804,13 +804,13 @@ set peerId(peerId: string | null) {
       if (decodedList && decodedList.length) {
         this._interests = decodedList;
       } else {
-        this._interests = user.interests.split(',').map(i => i.trim()).filter(Boolean);
+        this._interests = user.interests.split(',').map((i: string) => i.trim()).filter(Boolean);
         if (!this._interests.length) this._interests = ['No Interests'];
       }
     } else {
       this._interests = ['No Interests'];
     }
-    
+
     // Handle languages - ensure it's always an array
     if (Array.isArray(user.languages)) {
       if (user.languages.length === 1 && typeof user.languages[0] === 'string') {
@@ -825,12 +825,12 @@ set peerId(peerId: string | null) {
       if (decodedLanguages && decodedLanguages.length) {
         this._languages = decodedLanguages;
       } else {
-        this._languages = user.languages.split(',').map(l => l.trim()).filter(Boolean);
+        this._languages = user.languages.split(',').map((l: string) => l.trim()).filter(Boolean);
       }
     } else {
       this._languages = [];
     }
-    
+
     this._country = user.country ? String(user.country).trim() : '-';
     this._city = user.city ? String(user.city).trim() : '-';
     this._followed = !!user.followed;
@@ -861,7 +861,7 @@ set peerId(peerId: string | null) {
     this._role = user.role || 'USER';
     this._banned = !!user.banned;
     this._reports = Array.isArray(user.reports) ? user.reports : [];
-    
+
     // Normalize ID arrays to ensure they contain strings, not Buffer-like objects
     const normalizeIdArray = (arr: any[]) => {
       if (!Array.isArray(arr)) return [];
@@ -879,9 +879,9 @@ set peerId(peerId: string | null) {
     this._following = normalizeIdArray(user.following);
     this._friends = normalizeIdArray(user.friends);
     this._blockedUsers = normalizeIdArray(user.blockedUsers);
-    
+
     // Handle followedChannels - allow populated objects
-    this._followedChannels = Array.isArray(user.followedChannels) ? user.followedChannels.map(c => {
+    this._followedChannels = Array.isArray(user.followedChannels) ? user.followedChannels.map((c: any) => {
       if (c && typeof c === 'object' && (c._id || c.id)) return c;
       return normalizeIdArray([c])[0];
     }) : [];
@@ -930,12 +930,12 @@ set peerId(peerId: string | null) {
   private filterCustomAvatars(avatars: string[], gender: string): string[] {
     return avatars.filter(avatar => !this.isDefaultAvatar(avatar));
   }
-  
-  
-  
+
+
+
   private normalizeAvatarPath(avatarPath: string): string {
     console.log("avatarpath in normalizeAvatarPath:", avatarPath);
-  
+
     // Normalize the path by removing the domain and any '/public' prefix
     try {
       const url = new URL(avatarPath);
@@ -943,18 +943,18 @@ set peerId(peerId: string | null) {
     } catch (e) {
       // If it's not a full URL, assume it's already a relative path
     }
-  
+
     // Remove the '/public' prefix if it exists to standardize paths
     if (avatarPath.startsWith('/public')) {
       avatarPath = avatarPath.replace('/public', '');
     }
-  
+
     return avatarPath;
   }
-  
-  
-  
-  
+
+
+
+
   private sortInterests(): void {
     this._interests.sort((a, b) => a.length - b.length);
   }

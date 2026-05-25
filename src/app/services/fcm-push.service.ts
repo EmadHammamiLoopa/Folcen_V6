@@ -22,7 +22,7 @@ import { environment } from '../../environments/environment';
 export class FcmPushService {
 
   private currentToken: string | null = null;
-  private readonly apiBase = environment.apiUrl || 'http://127.0.0.1:3300/api/v1';
+  private readonly apiBase = environment.apiUrl;
 
   constructor(
     private platform: Platform,

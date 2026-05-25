@@ -1,3 +1,4 @@
+import { environment } from 'src/environments/environment';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
@@ -17,14 +18,14 @@ import { Channel } from 'src/app/models/Channel';
 })
 export class PostComponent implements OnInit, OnChanges {
 
-  @ViewChild('dropdown', { static: false }) dropdown: ElementRef;
-  private clickListener: () => void;
-  
+  @ViewChild('dropdown', { static: false }) dropdown!: ElementRef;
+  private clickListener: (() => void) | null = null;
+
   @Output() removePost = new EventEmitter();
-  @Input() post: Post;
-  @Input() user: User;
+  @Input() post!: Post;
+  @Input() user!: User;
   @Input() showCommentsBtn = true;
-  @Input() channel: Channel;
+  @Input() channel!: Channel;
 
   isImageEnlarged: boolean = false;
   isMediaExpired: boolean = false;
@@ -34,17 +35,17 @@ export class PostComponent implements OnInit, OnChanges {
   previousExpiryDate: string | null = null;
 
   visibilityOptionsOpen = false;
-  postId: string;
+  postId!: string;
 
   deleteLoading = false;
 
   constructor(
-    private alertCtrl: AlertController, 
+    private alertCtrl: AlertController,
     private cdr: ChangeDetectorRef,
-    private channelService: ChannelService, 
+    private channelService: ChannelService,
     private toastService: ToastService,
-    private modalCtrl: ModalController, 
-    private router: Router, 
+    private modalCtrl: ModalController,
+    private router: Router,
     private popoverController: PopoverController,
     private renderer: Renderer2,
     private activatedRoute: ActivatedRoute // Inject ActivatedRoute
@@ -92,7 +93,7 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     if (!post) return '';
     if (post.anonymName) return post.anonymName;
     if (this.isAdminPost()) return 'System';
-    const u = post.user || {} as any;
+    const u: any = post.user || {};
     const first = u.firstName || u.name || '';
     const last = u.lastName || '';
     return (first + ' ' + last).trim() || '';
@@ -107,11 +108,11 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     this.mediaUrl = this.getMediaUrl(this.post);
   }
 
-  
+
   getMediaUrl(post: Post): string {
     if (!post || !post.media) return '';
     if (post.media && post.media.url) {
-      const baseUrl = 'http://127.0.0.1:3300/';
+      const baseUrl = environment.socketUrl + '/';
       const mediaUrl = baseUrl + post.media.url.replace(/\\/g, '/');
       console.log("Generated Media URL:", mediaUrl);
       return mediaUrl;
@@ -122,15 +123,15 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
   isImageMedia(url?: string): boolean {
     if (!url) return false;
     const lowerUrl = url.toLowerCase();
-    return lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || 
-           lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif') || 
+    return lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') ||
+           lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif') ||
            lowerUrl.endsWith('.webp');
   }
 
   isVideoMedia(url?: string): boolean {
     if (!url) return false;
     const lowerUrl = url.toLowerCase();
-    return lowerUrl.endsWith('.mp4') || lowerUrl.endsWith('.webm') || 
+    return lowerUrl.endsWith('.mp4') || lowerUrl.endsWith('.webm') ||
            lowerUrl.endsWith('.ogg');
   }
 
@@ -195,13 +196,13 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     const expiryTime = dateObj.getTime();
     const currentTime = Date.now();
     const remainingTime = Math.max(expiryTime - currentTime, 0); // Ensure remainingTime is never negative
-  
+
     const minutes = Math.floor(remainingTime / (1000 * 60)) % 60;
     const hours = Math.floor(remainingTime / (1000 * 60 * 60));
-  
+
     return hours > 0 ? `${hours}h` : `${minutes}m`;
   }
-  
+
 
   checkAndRemoveExpiredMedia() {
     const expiryDate = this.post && this.post.media ? this.post.media.expiryDate : null;
@@ -220,7 +221,7 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     }
   }
 
-  
+
 
   voteOnPost(vote: number) {
     this.channelService.voteOnPost(this.post.id, vote).then(
@@ -267,7 +268,7 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
 
   changeVisibility(option: string) {
     if (!this.post || !this.post.id) return;
-    
+
     this.channelService.updatePostVisibility(this.post.id, option).then(
       (res: any) => {
         this.post.visibility = option;
@@ -301,7 +302,7 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
       this.toggleImageSize();
     }
   }
-  
+
 
   showUserProfile(id: string) {
     if (id && !this.post.anonyme && !this.isAdminPost()) {

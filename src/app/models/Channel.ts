@@ -7,19 +7,19 @@ interface PhotoObject {
 }
 
 export class Channel {
-  private _id: string;
-  private _name: string;
-  private _description: string;
-  private _approved: boolean;
-  private _photo: string;
-  private _createdAt: Date;
-  private _user: User;
-  private _followers: string[];
-  private _category: string;
+  private _id!: string;
+  private _name!: string;
+  private _description!: string;
+  private _approved!: boolean;
+  private _photo!: string;
+  private _createdAt!: Date;
+  private _user!: User;
+  private _followers!: string[];
+  private _category!: string;
   private _city?: string;
   private _country?: string;
-  private _tags: string[];
-  
+  private _tags!: string[];
+
   // Optional properties for static channels
   private _icon?: string;
   private _type?: 'static' | 'user' | 'static_events' |'static_dating';
@@ -27,14 +27,15 @@ export class Channel {
   constructor() {}
 
   initialize(channel: Partial<Channel>) {
-    const baseUrl = constants.DOMAIN_URL || 'http://127.0.0.1:3300';
-    this._id = channel.id ?? channel['_id'] ?? '';
-    this._name = channel.name ?? '';
-    this._description = channel.description ?? '';
+    const c = channel as any;
+    const baseUrl = constants.DOMAIN_URL;
+    this._id = c.id ?? c['_id'] ?? '';
+    this._name = c.name ?? '';
+    this._description = c.description ?? '';
     this._approved = true;
 
     // Handle photo normalization in initialize as well
-    const photoData = channel['photo'] || channel['image'] || channel['avatar'] || channel['cover'] || channel['picture'] || channel['_photo'];
+    const photoData = c['photo'] || c['image'] || c['avatar'] || c['cover'] || c['picture'] || c['_photo'];
     if (typeof photoData === 'string' && photoData.length > 0) {
       this._photo = (photoData.startsWith('http') || photoData.startsWith('assets/'))
         ? photoData
@@ -47,9 +48,9 @@ export class Channel {
     }
 
     // Normalize user: accept string id, populated object, or empty -> try fallbacks
-    const uInit = (channel as any).user;
+    const uInit = c.user;
     if (!uInit || (typeof uInit === 'object' && Object.keys(uInit).length === 0)) {
-      const uidInit = (channel as any).userId || (channel as any).user_id || (channel as any).createdBy || (channel as any).ownerId;
+      const uidInit = c.userId || c.user_id || c.createdBy || c.ownerId;
       if (uidInit) {
         this._user = new User();
         this._user.id = String(uidInit);
@@ -66,27 +67,28 @@ export class Channel {
     } else {
       this._user = new User();
     }
-    this._createdAt = channel.createdAt ? new Date(channel.createdAt) : new Date();
-    this._category = channel.category ?? '';
-    this._followers = channel.followers ?? [];
-    this._tags = channel.tags ?? [];
-    this._icon = channel.icon;
-    this._type = channel.type;
-    this._city = channel.city;
-    this._country = channel.country;
+    this._createdAt = c.createdAt ? new Date(c.createdAt) : new Date();
+    this._category = c.category ?? '';
+    this._followers = c.followers ?? [];
+    this._tags = c.tags ?? [];
+    this._icon = c.icon;
+    this._type = c.type;
+    this._city = c.city;
+    this._country = c.country;
     return this;
   }
 
   static createFromData(data: Partial<Channel>): Channel {
     const channel = new Channel();
-    const baseUrl = constants.DOMAIN_URL || 'http://127.0.0.1:3300';
-  
-    channel._id = data.id ?? data['_id'] ?? '';
-    channel._name = data.name || '';
-    channel._description = data.description || '';
-    channel._approved = data.approved ?? true;
+    const d = data as any;
+    const baseUrl = constants.DOMAIN_URL;
 
-    const photoData = data['photo'] || data['image'] || data['avatar'] || data['cover'] || data['picture'] || data['_photo'];
+    channel._id = d.id ?? d['_id'] ?? '';
+    channel._name = d.name || '';
+    channel._description = d.description || '';
+    channel._approved = d.approved ?? true;
+
+    const photoData = d['photo'] || d['image'] || d['avatar'] || d['cover'] || d['picture'] || d['_photo'];
     if (typeof photoData === 'string' && photoData.length > 0) {
       channel._photo = (photoData.startsWith('http') || photoData.startsWith('assets/'))
         ? photoData
@@ -100,12 +102,12 @@ export class Channel {
       channel._photo = 'assets/images/default-channel.png'; // Fallback image
     }
 
-    channel._createdAt = data.createdAt ? new Date(data.createdAt) : new Date();
+    channel._createdAt = d.createdAt ? new Date(d.createdAt) : new Date();
     // Normalize user: can be string (id), populated object, or empty
-    const u = data.user;
+    const u = d.user;
     if (!u) {
       // try common fallback fields
-      const uid = (data as any).userId || (data as any).user_id || (data as any).createdBy || (data as any).ownerId;
+      const uid = d.userId || d.user_id || d.createdBy || d.ownerId;
       if (uid) {
         channel._user = new User();
         channel._user.id = String(uid);
@@ -127,13 +129,13 @@ export class Channel {
     } else {
       channel._user = new User();
     }
-    channel._followers = data.followers || [];
-    channel._category = data.category || '';
-    channel._tags = data.tags || [];
-    channel._icon = data.icon;
-    channel._type = data.type;
-    channel._city = data.city;
-    channel._country = data.country;
+    channel._followers = d.followers || [];
+    channel._category = d.category || '';
+    channel._tags = d.tags || [];
+    channel._icon = d.icon;
+    channel._type = d.type;
+    channel._city = d.city;
+    channel._country = d.country;
 
     return channel;
   }
@@ -171,7 +173,7 @@ export class Channel {
       return false;
     }
   }
-  
+
 
   get id(): string { return this._id; }
   get name(): string { return this._name; }
@@ -187,8 +189,8 @@ export class Channel {
   get tags(): string[] { return this._tags; }
 
   get icon(): string | undefined { return this._icon; }
-  get type(): 'static' | 'user' | 'static_events' |'static_dating'| undefined { 
-    return this._type; 
+  get type(): 'static' | 'user' | 'static_events' |'static_dating'| undefined {
+    return this._type;
 }
   set id(id: string) { this._id = id; }
   set name(name: string) { this._name = name; }
@@ -209,7 +211,7 @@ export class Channel {
       this._photo = 'assets/images/default-channel.png';
       return;
     }
-    const baseUrl = constants.DOMAIN_URL || 'http://127.0.0.1:3300';
+    const baseUrl = constants.DOMAIN_URL;
     this._photo = (photo.startsWith('http') || photo.startsWith('assets/'))
       ? photo
       : `${baseUrl}${photo.startsWith('/') ? '' : '/'}${photo}`;
@@ -222,8 +224,8 @@ export class Channel {
   set tags(tags: string[]) { this._tags = tags; }
 
   set icon(icon: string | undefined) { this._icon = icon; }
-  set type(type: 'static' | 'user' | 'static_events' |'static_dating'| undefined) { 
-    this._type = type; 
+  set type(type: 'static' | 'user' | 'static_events' |'static_dating'| undefined) {
+    this._type = type;
 }
 
   toObject() {

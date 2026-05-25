@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { environment } from 'src/environments/environment';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Camera } from '@ionic-native/camera/ngx';
 import { Platform } from '@ionic/angular';
@@ -26,19 +27,19 @@ import { takeUntil } from 'rxjs/operators';
 })
 export class ProductFormComponent implements OnInit, OnDestroy {
 
-  @ViewChild('fileInput', { static: false }) fileInput: ElementRef;
+  @ViewChild('fileInput', { static: false }) fileInput!: ElementRef;
   pageLoading = false;
   loading = false;
   productImages: { url: string, file: any, name: string }[] = [];
   validatorErrors = {};
-  form: FormGroup;
+  form!: FormGroup;
   imageLoading = false;
-  currencies = [];
-  categories = [];
+  currencies: string[] = [];
+  categories: string[] = [];
   selectedCurrency: string = '';
   user: User = new User();
   isEditMode = false;
-  productId: string;
+  productId!: string;
   completionPercentage = 0;
   acceptedTerms = false;
   private destroy$ = new Subject<void>();
@@ -71,10 +72,10 @@ export class ProductFormComponent implements OnInit, OnDestroy {
         console.log('User updated in ProductFormComponent:', this.user);
       }
     });
-  
+
     this.route.paramMap.subscribe(params => {
       console.log("paaaaaaaaaaaaaaa",params);
-      this.productId = params.get('id');
+      this.productId = params.get('id') || '';
       if (this.productId) {
         this.isEditMode = true;
         this.getProductDetails(this.productId);
@@ -82,7 +83,7 @@ export class ProductFormComponent implements OnInit, OnDestroy {
         this.initializeNewProduct();
       }
     });
-  
+
     this.fetchCategories();
   }
 
@@ -90,7 +91,7 @@ export class ProductFormComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
   }
-  
+
   initializeNewProduct() {
     const newProduct = new Product();
     this.setFormValues(newProduct);
@@ -111,7 +112,7 @@ export class ProductFormComponent implements OnInit, OnDestroy {
 
     this.completionPercentage = Math.round((filledFields / totalFields) * 100);
   }
-  
+
   setFormValues(product: Product) {
     this.form.patchValue({
       label: product.label,
@@ -130,39 +131,39 @@ export class ProductFormComponent implements OnInit, OnDestroy {
       },
       tags: product.tags?.length ? product.tags.join(', ') : ''  // Fallback if tags are undefined
     });
-  
+
     this.productImages = product.photos?.length
       ? product.photos.map(photo => ({
-        url: 'http://127.0.0.1:3300/public' + photo.path,
+        url: environment.socketUrl + '/public' + photo.path,
         file: new Blob(),  // Dummy blob, to be updated with correct file
-          name: photo.path.split('/').pop()
+        name: photo.path.split('/').pop() || ''
         }))
       : [];  // Fallback to an empty array if photos are undefined
-  
+
     this.selectedCurrency = product.currency;
   }
-  
-  
-  
+
+
+
 
   get label() {
     return this.form.get('label');
   }
-  
+
   get price() {
     return this.form.get('price');
   }
-  
+
   get category() {
     return this.form.get('category');
   }
-  
+
   get description() {
     return this.form.get('description');
   }
 
-  
-  
+
+
   initializeCordova() {
     // Any Cordova-specific initialization
   }
@@ -189,7 +190,7 @@ export class ProductFormComponent implements OnInit, OnDestroy {
     });
 
     this.nativeStorage.getItem('currencies').then(resp => {
-      this.currencies = Object.keys(JSON.parse(resp));
+      this.currencies = Object.keys(JSON.parse(resp)) as string[];
     }).catch(err => {
       console.warn('NativeStorage not available, using fallback');
     });
@@ -247,50 +248,50 @@ export class ProductFormComponent implements OnInit, OnDestroy {
       });
     }
   }
-  
-  
+
+
 
   removeImage(index: number) {
     this.productImages.splice(index, 1);
   }
   getProductForm() {
     const form: FormData = new FormData();
-    form.append('label', this.form.get('label').value);
-    form.append('price', this.form.get('price').value);
+    form.append('label', this.form.get('label')!.value);
+    form.append('price', this.form.get('price')!.value);
     form.append('currency', this.selectedCurrency);
-    form.append('description', this.form.get('description').value);
+    form.append('description', this.form.get('description')!.value);
     form.append('userId', this.user._id);
-    form.append('category', this.form.get('category').value);
-    form.append('stock', this.form.get('stock').value);
-    form.append('brand', this.form.get('brand').value);
-    form.append('condition', this.form.get('condition').value);
-    form.append('weight', this.form.get('weight').value);
+    form.append('category', this.form.get('category')!.value);
+    form.append('stock', this.form.get('stock')!.value);
+    form.append('brand', this.form.get('brand')!.value);
+    form.append('condition', this.form.get('condition')!.value);
+    form.append('weight', this.form.get('weight')!.value);
     form.append('country', this.user.country);
     form.append('city', this.user.city);
-    
+
     // Append dimensions as individual fields
-    const dimensions = this.form.get('dimensions').value;
+    const dimensions = this.form.get('dimensions')!.value;
     form.append('dimensions.length', dimensions.length);
     form.append('dimensions.width', dimensions.width);
     form.append('dimensions.height', dimensions.height);
-  
+
     // Ensure tags are formatted as an array of strings
-    const tagsArray = this.form.get('tags').value.split(',').map(tag => tag.trim());
-    tagsArray.forEach((tag, index) => {
+    const tagsArray = (this.form.get('tags')!.value as string).split(',').map((tag: string) => tag.trim());
+    tagsArray.forEach((tag: string, index: number) => {
       form.append(`tags[${index}]`, tag);
     });
-  
+
     // Append multiple images
     this.productImages.forEach((image, index) => {
       if (image.file) {
         form.append(`photos[${index}]`, image.file, image.name);
       }
     });
-  
+
     return form;
   }
-  
-  
+
+
 
   clearProductForm() {
     this.form.reset();
@@ -322,7 +323,7 @@ export class ProductFormComponent implements OnInit, OnDestroy {
     this.loading = true;
 
     const formData = this.getProductForm();
-    
+
     // Log form data to verify
     formData.forEach((value, key) => {
       console.log(key, value);
@@ -373,21 +374,21 @@ export class ProductFormComponent implements OnInit, OnDestroy {
       );
     }
   }
-  
-  
+
+
 
   async presentCurrenciesModal() {
     const result = await this.presentSearchListModal(this.currencies, 'Currencies');
     if (result) {
       this.selectedCurrency = result;
-      this.form.get('currency').setValue(result);
+      this.form.get('currency')!.setValue(result);
     }
   }
 
   async presentCategoriesModal() {
     const result = await this.presentSearchListModal(this.categories, 'Categories');
     if (result) {
-      this.form.get('category').setValue(result);
+      this.form.get('category')!.setValue(result);
     }
   }
 
@@ -416,8 +417,8 @@ export class ProductFormComponent implements OnInit, OnDestroy {
       }
     );
   }
-  
-  
+
+
 
   fetchCategories() {
     this.categoryService.getCategories().subscribe(
@@ -430,5 +431,5 @@ export class ProductFormComponent implements OnInit, OnDestroy {
       }
     );
   }
-  
+
 }

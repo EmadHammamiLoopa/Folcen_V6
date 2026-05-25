@@ -1,3 +1,4 @@
+import { environment } from 'src/environments/environment';
 import { devLogger } from "../../../utils/dev-logger";
 import { User } from './../../../models/User';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
@@ -23,23 +24,23 @@ import { takeUntil } from 'rxjs/operators';
 export class ProductComponent implements OnInit, OnDestroy {
 
   pageLoading = false;
-  product: Product;
-  productId: string;
+  product!: Product;
+  productId!: string;
   domain = constants.DOMAIN_URL;
   page: number = 1;
-  user: User;
+  user!: User;
   isSeller: boolean = false;
   isBuyer: boolean = false;
-  poster: User; // Add poster variable
+  poster!: User; // Add poster variable
   private destroy$ = new Subject<void>();
 
   constructor(
-    private productService: ProductService, 
+    private productService: ProductService,
     private userService: UserService, // Inject UserService
-    private route: ActivatedRoute, 
+    private route: ActivatedRoute,
     private popoverController: PopoverController,
-    private toastService: ToastService, 
-    private alertCtrl: AlertController, 
+    private toastService: ToastService,
+    private alertCtrl: AlertController,
     private router: Router,
     private nativeStorage: NativeStorage,
     private modalController: ModalController
@@ -68,11 +69,11 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   getProductId() {
     this.route.paramMap.subscribe(params => {
-      this.productId = params.get('id');
+      this.productId = params.get('id') || '';
     });
   }
 
-  getProduct(event?) {
+  getProduct(event?: any) {
     if (!event) this.pageLoading = true;
     this.productService.get(this.productId).then(
       (resp: any) => {
@@ -81,7 +82,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.product = new Product(resp.data);
         this.product.photos = this.product.photos.map(photo => ({
           ...photo,
-          url: `http://127.0.0.1:3300/public${photo.path}` // Construct the full URL for each photo
+          url: `${environment.socketUrl}/public${photo.path}` // Construct the full URL for each photo
         }));
         devLogger.log(this.product);
         this.page++;
@@ -253,5 +254,5 @@ export class ProductComponent implements OnInit, OnDestroy {
   editProduct() {
     this.router.navigate(['/tabs/buy-and-sell/product/form', { id: this.product.id }]);
   }
-  
+
 }

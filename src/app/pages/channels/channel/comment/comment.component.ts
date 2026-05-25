@@ -1,3 +1,4 @@
+import { environment } from 'src/environments/environment';
 import { Router } from '@angular/router';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
@@ -23,7 +24,7 @@ export class CommentComponent implements OnInit, OnChanges {
   @Input() backgroundColor: string;
   @Input() color: string;
   @Input() user: User;
-  @Input() userName: string; 
+  @Input() userName: string;
   deleteLoading = false;
   isImageEnlarged: boolean = false;
   mediaUrl: string = '';
@@ -46,7 +47,7 @@ export class CommentComponent implements OnInit, OnChanges {
       this.updateMediaUrl();
     }
   }
-  
+
 
   updateMediaUrl() {
     this.mediaUrl = this.getMediaUrl(this.comment);
@@ -61,12 +62,12 @@ export class CommentComponent implements OnInit, OnChanges {
     const role = (this.comment?.user?.role || '').toUpperCase();
     return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';
   }
-  
+
 
   getMediaUrl(comment: Comment): string {
     if (!comment || !comment.media) return '';
     if (comment.media && comment.media.url) {
-      const baseUrl = 'http://127.0.0.1:3300/';
+      const baseUrl = environment.socketUrl + '/';
       const mediaUrl = baseUrl + comment.media.url.replace(/\\/g, '/');
       console.log("Generated Media URL:", mediaUrl);
       return mediaUrl;

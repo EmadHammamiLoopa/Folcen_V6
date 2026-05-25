@@ -17,20 +17,20 @@
   <div class="mesh-gradient"></div>
 
   <div *ngIf="product" class="product-detail-container animate__animated animate__fadeIn">
-    
+
     <!-- Image Gallery Section -->
     <div class="gallery-section">
       <ion-slides pager="true" [options]="{ speed: 400 }">
         <ion-slide *ngFor="let photo of product.photos">
           <div class="slide-image-wrapper">
-            <img [src]="'http://127.0.0.1:3300' + photo.path" class="main-product-image" alt="Product Image">
+            <img [src]="domain + photo.path" class="main-product-image" alt="Product Image">
             <div class="sold-overlay" *ngIf="product.sold">
               <div class="sold-badge">SOLD</div>
             </div>
           </div>
         </ion-slide>
       </ion-slides>
-      
+
       <div class="photo-counter" *ngIf="product.photos?.length > 1">
         <i class="fas fa-camera"></i>
         <span>{{ product.photos.length }} Photos</span>
@@ -43,9 +43,9 @@
         <div class="category-tag">{{ product.category }}</div>
         <div class="condition-tag" [class.new]="product.condition === 'New'">{{ product.condition }}</div>
       </div>
-      
+
       <h1 class="product-title">{{ product.label }}</h1>
-      
+
       <div class="price-row">
         <div class="price-tag">
           <span class="amount">{{ product.price }}</span>

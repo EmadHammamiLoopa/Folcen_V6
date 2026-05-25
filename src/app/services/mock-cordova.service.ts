@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { environment } from 'src/environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -69,9 +70,9 @@ export class MockCordovaService {
   }
 
   uploadAvatar(userId: string, formData: FormData): Observable<any> {
-    const url = `http://127.0.0.1:3300/api/v1/user/${userId}/avatar`;
+    const url = `${environment.apiUrl}/user/${userId}/avatar`;
     console.log('Uploading avatar to URL:', url);
-  
+
     return this.http.put(url, formData).pipe(
       catchError(error => {
         console.error('Upload error:', error);
