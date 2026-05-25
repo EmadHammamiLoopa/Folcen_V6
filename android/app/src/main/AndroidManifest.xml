@@ -56,25 +56,6 @@
             </intent-filter>
         </service>
 
-        <!-- Adding android:exported to receivers as required by Android 12+ -->
-        <receiver
-            android:name="com.onesignal.ADMMessageHandler$Receiver"
-            android:permission="com.amazon.device.messaging.permission.RECEIVE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.amazon.device.messaging.intent.RECEIVE" />
-                <action android:name="com.amazon.device.messaging.intent.REGISTRATION" />
-                <category android:name="com.folcen.app" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Firebase Instance ID Service (optional but recommended) -->
-        <service android:name="com.google.firebase.iid.FirebaseInstanceIdService" android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
-            </intent-filter>
-        </service>
-
         <service
             android:name="de.appplant.cordova.plugin.background.ForegroundService"
             android:exported="false"
