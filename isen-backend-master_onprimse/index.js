@@ -108,8 +108,13 @@ try {
 }
 const app = express();
 app.set('trust proxy', true);
-// Security: restrict CORS in production to explicit origins
-const allowedOrigin = process.env.CORS_ORIGIN || '*';
+// Security: restrict CORS in production to explicit origins.
+// CORS_ORIGIN env var: set to '*' (allow-all) or comma-separated list of origins.
+// e.g. CORS_ORIGIN=https://folcen-dashboard.pages.dev,https://8cd4a0ac.folcen-dashboard.pages.dev
+const _corsOriginEnv = process.env.CORS_ORIGIN || '*';
+// Parse into an array; '*' means allow-all wildcard.
+const _corsOrigins = _corsOriginEnv.split(',').map(s => s.trim()).filter(Boolean);
+
 // Explicit CORS config: allow local dashboard origins and support credentials
 const allowedOrigins = [
   'http://localhost:4200',
@@ -118,18 +123,19 @@ const allowedOrigins = [
   'http://127.0.0.1:8100',
   'http://localhost:2302'
 ];
+
+function _isOriginAllowed(origin) {
+  if (!origin) return true; // native / curl / server-side
+  if (_corsOrigins.includes('*')) return true; // wildcard allow-all
+  if (_corsOrigins.includes(origin)) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  return false;
+}
+
 app.use(cors({ origin: (origin, cb) => {
-  // Allow non-browser (curl, server-side) requests when origin is undefined
-  if (!origin) return cb(null, true);
-  if (process.env.NODE_ENV === 'production') {
-    if (origin === allowedOrigin) return cb(null, true);
-    return cb(new Error('Origin not allowed'), false);
-  }
-  // In development only allow explicit local origins for safety
-  if (allowedOrigins.includes(origin)) return cb(null, true);
-  // Fallback: allow but log unexpected origin for debugging
-  console.warn('CORS origin not in allowlist, permitting for now:', origin);
-  return cb(null, true);
+  if (_isOriginAllowed(origin)) return cb(null, true);
+  console.warn('[CORS] Blocked origin:', origin);
+  return cb(new Error('Origin not allowed by CORS policy'), false);
 }, credentials: true }));
 app.use(allowAccess);
 
@@ -172,13 +178,9 @@ const io = require('socket.io')(http, {
   path: '/socket.io',
   cors: {
     origin: (origin, cb) => {
-      // allow empty origin (native clients) and local dev origins
-      if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      // In production respect explicit env var
-      if (process.env.NODE_ENV === 'production' && origin === allowedOrigin) return cb(null, true);
-      console.warn('Socket.IO connection from unexpected origin:', origin);
-      return cb(null, true);
+      if (_isOriginAllowed(origin)) return cb(null, true);
+      console.warn('[CORS/Socket.IO] Blocked origin:', origin);
+      return cb(new Error('Origin not allowed by CORS policy'), false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
