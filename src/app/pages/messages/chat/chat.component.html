@@ -24,7 +24,7 @@
       </div>
     </div>
 
-    <ion-buttons slot="end" *ngIf="!isAdminChat()">
+    <ion-buttons slot="end" *ngIf="!isAdminChat() && features.friendVideoCall">
       <ion-button *ngIf="!user?.isFriend && canRequestVideoCall()"
                   (click)="onVideoButtonPressed()"
                   shape="round" fill="clear" class="video-btn">

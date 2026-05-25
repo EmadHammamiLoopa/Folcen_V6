@@ -8,6 +8,7 @@ import { RequestService } from 'src/app/services/request.service';
 import { AppEventsService, TabKey } from 'src/app/services/app-events.service';
 import { SocketService } from 'src/app/services/socket.service';
 import { UserService } from 'src/app/services/user.service';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'app-tabs',
@@ -33,8 +34,8 @@ export class TabsPage implements OnInit, OnDestroy {
     { url: 'new-friends',    icon: 'fas fa-search',       notificationEvent: 'friend-suggestion' },
     { url: 'channels',       icon: 'fas fa-object-group', notificationEvent: 'new-channel-activity' },
     { url: 'feed',           icon: 'fas fa-newspaper' },
-    { url: 'buy-and-sell',   icon: 'fas fa-store',        notificationEvent: 'new-buy-sell-update' },
-    { url: 'small-business', icon: 'fas fa-briefcase',    notificationEvent: 'new-business-post' },
+    ...(environment.features.marketplace    ? [{ url: 'buy-and-sell'   as TabKey, icon: 'fas fa-store',     notificationEvent: 'new-buy-sell-update' }] : []),
+    ...(environment.features.jobsBoard || environment.features.servicesBoard ? [{ url: 'small-business' as TabKey, icon: 'fas fa-briefcase', notificationEvent: 'new-business-post'   }] : []),
   ];
 
   constructor(
