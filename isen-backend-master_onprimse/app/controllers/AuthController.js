@@ -589,6 +589,29 @@ exports.firebaseLogin = async (req, res) => {
                         console.warn('Failed to record legal acceptance during firebase signup', e);
                     }
                 }
+
+                // Send welcome message from the Folcen Team system account
+                try {
+                    const systemUserId = '66c7ba8cb077a84040bd9ee6';
+                    let systemUser = await User.findById(systemUserId);
+                    if (!systemUser) systemUser = await User.findOne({ email: 'folcenteam@gmail.com' });
+                    if (!systemUser) {
+                        systemUser = new User({
+                            firstName: 'Folcen', lastName: 'Team',
+                            email: 'folcenteam@gmail.com',
+                            password: crypto.randomBytes(32).toString('hex'),
+                            emailVerified: true,
+                        });
+                        await systemUser.save();
+                    }
+                    const welcomeText = `Welcome to Folcen 👋\n\nWe're excited to have you join our community!\nFolcen is built to help you connect, share, and stay focused in a clean and meaningful way.\n\nIf you have any suggestions, feedback, or run into any issues, we'd love to hear from you.\n📩 Contact us anytime at: folcenteam@gmail.com\n\nEnjoy exploring Folcen — and thank you for being part of it!`;
+                    const welcomeMsg = new Message({ from: systemUser._id, to: user._id, text: welcomeText, type: 'friend', state: 'sent', createdAt: new Date() });
+                    await welcomeMsg.save();
+                    helpers.sendNotification(String(user._id), 'Welcome to Folcen 👋', `${systemUser.firstName} ${systemUser.lastName}`.trim(), String(systemUser._id)).catch(() => {});
+                    logger.info(`[firebaseLogin] Welcome message sent to new user ${user._id}`);
+                } catch (welcomeErr) {
+                    logger.warn('[firebaseLogin] Failed to send welcome message:', welcomeErr.message);
+                }
             } else {
                 return Response.sendError(res, 404, 'User not found. Please sign up first.');
             }
@@ -656,42 +679,46 @@ exports.forgotPassword = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Generic response to prevent user-enumeration
-    const genericOk = () =>
-        Response.sendResponse(res, { message: 'If that email is registered, a reset link has been sent.' });
-
     try {
-        // 1. Verify the user exists in our database
+        // 1. Verify the user exists in MongoDB — this is the source of truth.
         const user = await User.findOne({ email: normalizedEmail });
-        if (!user) return genericOk();
 
-        // 2. Ensure a Firebase Auth account exists (legacy MongoDB-only users won't have one)
+        if (!user) {
+            // User not in MongoDB. Clean up any orphaned Firebase account to
+            // enforce consistency: if not in MongoDB → must not be in Firebase.
+            try {
+                const fbRecord = await admin.auth().getUserByEmail(normalizedEmail);
+                await admin.auth().deleteUser(fbRecord.uid);
+                logger.info(`[forgotPassword] Deleted orphaned Firebase account for ${normalizedEmail} (not in MongoDB)`);
+            } catch (fbErr) {
+                if (fbErr.code !== 'auth/user-not-found') {
+                    logger.warn(`[forgotPassword] Could not check/clean Firebase for ${normalizedEmail}:`, fbErr.message);
+                }
+                // auth/user-not-found is fine — nothing to clean up
+            }
+            // Return 404 so the frontend knows to block the Firebase reset email.
+            return Response.sendError(res, 404, 'No account found with this email address.');
+        }
+
+        // 2. User IS in MongoDB. Ensure Firebase account exists too (legacy users).
         try {
             await admin.auth().getUserByEmail(normalizedEmail);
-            // User already exists in Firebase — nothing to do
         } catch (e) {
             if (e.code === 'auth/user-not-found') {
-                // Create a Firebase Auth entry so sendPasswordResetEmail works
                 try {
                     await admin.auth().createUser({ email: normalizedEmail, emailVerified: false });
                     logger.info(`[forgotPassword] Created Firebase Auth record for legacy user: ${normalizedEmail}`);
                 } catch (createErr) {
-                    if (createErr.code === 'auth/email-already-exists') {
-                        // Race condition: another request already created it between our get and create calls.
-                        // This is fine — the account exists, continue.
-                        logger.info(`[forgotPassword] Firebase user already exists (race condition) for: ${normalizedEmail}`);
-                    } else {
-                        throw createErr;
-                    }
+                    if (createErr.code !== 'auth/email-already-exists') throw createErr;
+                    // Race condition — account exists, continue
                 }
             } else {
                 throw e;
             }
         }
 
-        // 3. Tell the frontend it's safe to call Firebase sendPasswordResetEmail()
-        //    Firebase will send the email using its own infrastructure.
-        return genericOk();
+        // 3. Confirm to the frontend that it's safe to send the Firebase reset email.
+        return Response.sendResponse(res, { message: 'ok' });
 
     } catch (err) {
         logger.error('[forgotPassword] Error:', err);

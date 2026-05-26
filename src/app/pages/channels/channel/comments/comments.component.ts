@@ -314,8 +314,8 @@ storeComment() {
     (err) => {
       // Handle any errors
       console.error('Error adding comment:', err);
-      const errorMessage = err.error?.errors?.text?.[0] || err.message || 'Failed to add comment';
-      this.toastService.presentErrorToastr(`Error adding comment: ${errorMessage}`);
+      const errorMessage = err.error?.errors?.text?.[0] || err.error?.message || (typeof err.error === 'string' ? err.error : null) || 'Failed to add comment';
+      this.toastService.presentErrorToastr(errorMessage);
     }
   );
 }

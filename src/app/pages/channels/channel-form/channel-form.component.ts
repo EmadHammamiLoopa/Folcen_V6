@@ -153,7 +153,11 @@ export class ChannelFormComponent implements OnInit {
       .then(
         (resp: any) => {
           this.imageLoading = false;
-          let imageUrl = this.webView.convertFileSrc(resp.imageData);
+          if (!resp?.file) {
+            this.toastService.presentErrorToastr('Could not read the selected image. Please try again.');
+            return;
+          }
+          const imageUrl = this.webView.convertFileSrc(resp.imageData);
           this.channelImage = {
             url: imageUrl,
             file: resp.file,

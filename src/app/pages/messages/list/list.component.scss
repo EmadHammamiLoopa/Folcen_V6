@@ -325,9 +325,9 @@ ion-item-option {
 }
 
 // ─── Bell button ─────────────────────────────────────────────────────────────
+// Hidden in v1 — missed calls feature not launched; do not delete, re-enable in v2
 .header-bell-wrap {
-  display: flex;
-  align-items: center;
+  display: none !important;
 }
 
 .fancy-bell {

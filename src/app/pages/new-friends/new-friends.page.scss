@@ -26,8 +26,9 @@
 }
 
 // ─── Mode toggle pill ────────────────────────────────────────────
+// Hidden in v1 — random feature disabled; do not delete, re-enable in v2
 .mode-pill {
-  display: flex;
+  display: none !important;
   align-items: center;
   justify-content: space-between;
   background: var(--folcen-tabbar-background);

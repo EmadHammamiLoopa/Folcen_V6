@@ -209,6 +209,10 @@ export class TabsPage implements OnInit, OnDestroy {
 
     if (activeTab === 'feed') {
       this.badges.reset('feed');
+      // User visited the feed — clear the missed-call budget indicator locally
+      // and tell the backend to reset the counter so stale "1" values don't persist
+      this.badges.setBudget(0);
+      this.userService.resetBudget().subscribe({ error: () => {} });
     }
 
     if (activeTab === 'channels') {

@@ -168,11 +168,12 @@ ion-content {
     font-weight: 600;
     line-height: 1.5;
     min-height: clamp(120px, 28vw, 180px);
-    text-align: center;
+    text-align: start;
 
-    &::placeholder { color: inherit; opacity: 0.5; text-align: center; }
-    &::part(native) { text-align: center; }
-    &::part(placeholder) { text-align: center; }
+    // Left-align placeholder so it is never clipped on narrow screens
+    &::placeholder { color: inherit; opacity: 0.5; text-align: start; }
+    &::part(native) { text-align: start; }
+    &::part(placeholder) { text-align: start; white-space: normal; }
   }
 
   .char-counter {
@@ -210,12 +211,12 @@ ion-content {
 }
 
 .post-card {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(14px);
   border-radius: 20px;
   margin: 12px clamp(12px, 4vw, 20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
 
   ion-card-content { padding: 6px 0 4px; }
@@ -226,7 +227,7 @@ ion-content {
     gap: 10px;
     padding: 14px 16px 10px;
 
-    ion-icon { font-size: 20px; opacity: 0.8; }
+    ion-icon { font-size: 20px; opacity: 0.9; }
     ion-label { font-weight: 800; font-size: 0.95rem; letter-spacing: -0.3px; }
   }
 
@@ -243,12 +244,13 @@ ion-content {
       gap: 6px;
       padding: clamp(10px, 3vw, 14px) 6px;
       border-radius: 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      // Always visible regardless of post background color
+      background: rgba(255, 255, 255, 0.1);
+      border: 1.5px solid rgba(255, 255, 255, 0.22);
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
       color: inherit;
-      opacity: 0.6;
+      opacity: 1; // always fully visible
 
       .icon-wrapper {
         width: clamp(32px, 9vw, 42px);
@@ -257,7 +259,7 @@ ion-content {
         align-items: center;
         justify-content: center;
         border-radius: 12px;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.18);
         font-size: clamp(16px, 5vw, 22px);
         transition: all 0.25s ease;
       }
@@ -270,13 +272,13 @@ ion-content {
 
       &.active {
         opacity: 1;
-        background: rgba(255, 255, 255, 0.13);
-        border-color: var(--active-color, rgba(255,255,255,0.5));
+        background: rgba(255, 255, 255, 0.22);
+        border-color: var(--active-color, rgba(255,255,255,0.7));
         transform: translateY(-2px);
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 
         .icon-wrapper {
-          background: var(--active-color, white);
+          background: var(--active-color, rgba(255,255,255,0.9));
           color: var(--post-bg, #6366f1);
           transform: scale(1.08);
         }

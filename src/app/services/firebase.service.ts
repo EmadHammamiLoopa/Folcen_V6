@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
   onAuthStateChanged,
   updateProfile,
+  deleteUser,
   User as FirebaseUser
 } from 'firebase/auth';
 import { environment } from 'src/environments/environment';
@@ -38,7 +39,7 @@ export class FirebaseService {
     return this.auth;
   }
 
-  async signUp(email, password, displayName?) {
+  async signUp(email: string, password: string, displayName?: string) {
     const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
     if (displayName) {
       await updateProfile(userCredential.user, { displayName }).catch(err => devLogger.error('Update profile error:', err));
@@ -47,7 +48,7 @@ export class FirebaseService {
     return userCredential.user;
   }
 
-  async signIn(email, password) {
+  async signIn(email: string, password: string) {
     devLogger.log('[DEBUG] FirebaseService: signIn called for:', email);
     try {
       const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
@@ -63,7 +64,7 @@ export class FirebaseService {
     return signOut(this.auth);
   }
 
-  async resetPassword(email) {
+  async resetPassword(email: string) {
     return sendPasswordResetEmail(this.auth, email);
   }
 
@@ -93,5 +94,31 @@ export class FirebaseService {
 
   onAuthStateChanged(callback: (user: FirebaseUser | null) => void) {
     return onAuthStateChanged(this.auth, callback);
+  }
+
+  /**
+   * Returns a Promise that resolves to the current Firebase user (or null)
+   * once Firebase has finished restoring auth state from persistence.
+   * Required in Firebase 9.x — authStateReady() was only added in v10.1.
+   */
+  waitForAuthReady(): Promise<FirebaseUser | null> {
+    return new Promise((resolve) => {
+      const unsubscribe = onAuthStateChanged(this.auth, (user) => {
+        unsubscribe();
+        resolve(user);
+      });
+    });
+  }
+
+  /**
+   * Delete the currently signed-in Firebase user.
+   * Called to keep Firebase in sync with MongoDB when a backend failure
+   * prevents the MongoDB record from being created.
+   */
+  async deleteCurrentUser(): Promise<void> {
+    const user = this.auth.currentUser;
+    if (user) {
+      await deleteUser(user);
+    }
   }
 }

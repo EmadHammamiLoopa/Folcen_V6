@@ -101,8 +101,8 @@ export class UploadFileService {
     }
 
   takePicture(sourceType: number, mediaType: 'image' | 'video' = 'image'): Promise<any> {
-    const mediaTypeValue = (mediaType === 'image') 
-      ? this.camera.MediaType.PICTURE 
+    const mediaTypeValue = (mediaType === 'image')
+      ? this.camera.MediaType.PICTURE
       : this.camera.MediaType.VIDEO;
 
     const options: CameraOptions = {
@@ -114,28 +114,51 @@ export class UploadFileService {
       correctOrientation: true
     };
 
+    // Infer MIME type from file extension; fallback to image/jpeg or video/mp4
+    const mimeFromName = (name: string): string => {
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      const map: { [k: string]: string } = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif',
+        mp4: 'video/mp4', mov: 'video/quicktime', '3gp': 'video/3gpp',
+        avi: 'video/x-msvideo', mkv: 'video/x-matroska',
+      };
+      return map[ext] || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4');
+    };
+
     return this.camera.getPicture(options).then(async imageData => {
-      let fileBlob = null;
-      
+      let fileBlob: Blob = null;
+
+      // Derive safe filename with extension from the URI
+      const rawName = imageData.substring(imageData.lastIndexOf('/') + 1) || '';
+      const safeName = rawName.includes('.') ? rawName : rawName + (mediaType === 'image' ? '.jpg' : '.mp4');
+      const mimeType = mimeFromName(safeName);
+
       if (this.platform.is('cordova')) {
         try {
           const convertedPath = this.webView.convertFileSrc(imageData);
           const response = await fetch(convertedPath);
-          fileBlob = await response.blob();
+          const blob = await response.blob();
+          fileBlob = new Blob([blob], { type: blob.type || mimeType });
         } catch (e) {
-          console.error('Error converting URI to blob', e);
-          // Fallback to File plugin if fetch fails
-          const path = imageData.substring(0, imageData.lastIndexOf('/') + 1);
-          const name = imageData.substring(imageData.lastIndexOf('/') + 1);
-          fileBlob = await this.file.readAsArrayBuffer(path, name).then(buffer => new Blob([buffer]));
+          console.warn('fetch via convertFileSrc failed, trying File plugin', e);
+          try {
+            // For content:// URIs (Android 13+), resolve to native file path first
+            let nativePath = imageData;
+            if (imageData.startsWith('content://')) {
+              nativePath = await this.filePath.resolveNativePath(imageData);
+            }
+            const dir = nativePath.substring(0, nativePath.lastIndexOf('/') + 1);
+            const fileName = nativePath.substring(nativePath.lastIndexOf('/') + 1);
+            const buffer = await this.file.readAsArrayBuffer(dir, fileName);
+            fileBlob = new Blob([buffer], { type: mimeType });
+          } catch (e2) {
+            console.error('File plugin fallback also failed', e2);
+          }
         }
       }
 
-      return {
-        imageData: imageData,
-        file: fileBlob,
-        name: imageData.substring(imageData.lastIndexOf('/') + 1)
-      };
+      return { imageData, file: fileBlob, name: safeName, mimeType };
     });
   }
 }

@@ -31,17 +31,17 @@ import { SocketService } from 'src/app/services/socket.service';
 })
 export class DisplayComponent implements OnInit, OnDestroy {
   pageLoading = true;
-  authUser: User;
-  @Input() user: User;
+  authUser!: User;
+  @Input() user!: User;
   domaine = constants.DOMAIN_URL;
-  myProfile: boolean;
+  myProfile!: boolean;
   isFriend: boolean = false;
   notFriendOrMe: boolean = false;
   private _isFriendReloadDone = false;
   outgoingRequestId: string | null = null;
   pendingRequestsCount = 0;
-  userId: string;
-  mainAvatar: string;
+  userId: string | null = null;
+  mainAvatar!: string;
   imageLoading = false;
   isUploading = false;
   usedCached = false;
@@ -474,15 +474,22 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
   
   private processSelectedMedia(resp: any) {
+    if (!resp?.file) {
+      this.toastService.presentErrorToastr('Could not read the selected image. Please try again.');
+      return;
+    }
+
     let imageUrl = resp.imageData;
-  
+
     if (this.platform.is('cordova')) {
       imageUrl = this.webView.convertFileSrc(resp.imageData);
     }
-  
-    const imageFile = new Blob([resp.file], { type: resp.file.type });
-    const imageName = resp.name || resp.file.name;
-  
+
+    const mimeType = resp.file.type || resp.mimeType || 'image/jpeg';
+    const imageFile = new Blob([resp.file], { type: mimeType });
+    const rawName = resp.name || 'avatar';
+    const imageName = rawName.includes('.') ? rawName : rawName + '.jpg';
+
     const formData = new FormData();
     formData.append('avatar', imageFile, imageName);
   
@@ -511,9 +518,9 @@ export class DisplayComponent implements OnInit, OnDestroy {
           this.toastService.presentErrorToastr('Invalid response from server.');
         }
       },
-      error: () => {
+      error: (err: any) => {
         this.isUploading = false;
-        this.toastService.presentErrorToastr('Error uploading image');
+        this.toastService.presentErrorToastr(err);
       }
     });
   }
@@ -730,7 +737,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
             }
           },
           error: (error) => {
-            this.toastService.presentErrorToastr('Error uploading image: ' + error);
+            this.toastService.presentErrorToastr(error);
           }
         });
       }, err => {
@@ -769,7 +776,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     }
   }
 
-  refresh(event) {
+  refresh(event: any) {
     if (this.userId && this.userId !== 'null') {
       this.getUser(event);
       // prefer currentUser then fallback to legacy key
@@ -792,7 +799,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     }
   }
 
-  getUser(event?) {
+  getUser(event?: any) {
     this.userService.getUserProfile(this.userId).subscribe({
       next: (user: User) => {
         if (user && user._id) {
@@ -853,7 +860,6 @@ export class DisplayComponent implements OnInit, OnDestroy {
     this.toastService.presentErrorToastr('Failed to load user data. Please try again later.');
   
     // Reset relevant variables
-    this.user = null;
     this.pageLoading = false;
   }
   
@@ -876,7 +882,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     else this.requestFriendship();
   }
 
-  handleError(err) {
+  handleError(err: any) {
     this.toastService.presentErrorToastr(err);
   }
 
@@ -1257,7 +1263,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
         reportPayload.entityType = 'Photo';
       }
 
-      this.userService.report(this.userId, reportPayload).subscribe(
+      this.userService.report(this.userId as string, reportPayload).subscribe(
         (resp: any) => {
           loading.dismiss();
           this.toastService.presentSuccessToastr(resp.message || 'Report submitted successfully');

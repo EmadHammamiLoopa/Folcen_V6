@@ -322,8 +322,30 @@ export class ListComponent implements OnInit, OnDestroy {
             this.users.unshift(moved);
             this.sortUsersByLatestMessage();
             this.cdr.markForCheck();
+          } else if (normalized.to) {
+            // First message to this peer — add them to the list immediately
+            this.userService.getUserProfile(normalized.to).subscribe((profile: any) => {
+              const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
+              if (idx2 !== -1) {
+                const user = this.users[idx2];
+                user.messages = [normalized, ...(user.messages || [])];
+                user.hasUnread = false;
+                const [moved] = this.users.splice(idx2, 1);
+                this.users.unshift(moved);
+              } else {
+                const user = new User().initialize({
+                  ...profile,
+                  _id: peerKey,
+                  id: peerKey,
+                  messages: [normalized],
+                }) as ListUser;
+                user.hasUnread = false;
+                this.users.unshift(user);
+              }
+              this.sortUsersByLatestMessage();
+              this.cdr.markForCheck();
+            });
           }
-          // If peer row doesn't exist yet, it will appear on next list refresh
         } catch (e) {
           console.error('list/message-sent error', e, raw);
         }

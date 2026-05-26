@@ -105,10 +105,13 @@
     --indicator-color: #3b82f6;
     --color: #94a3b8;
     --color-checked: #ffffff;
-    --border-radius: 12px;
+    --border-radius: 10px;
+    --padding-start: 4px;
+    --padding-end: 4px;
     font-weight: 600;
-    font-size: 0.85rem;
-    min-height: 44px;
+    font-size: 0.78rem;
+    min-height: 40px;
+    min-width: 0;
     transition: all 0.3s ease;
   }
 

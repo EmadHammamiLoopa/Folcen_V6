@@ -346,18 +346,16 @@ export class SignupComponent implements OnInit, OnDestroy {
         else this.validationErrors['email'] = ['this email is already exists'];
       }, err => {
         this.btnLoading = false;
-        if (err && err.error && err.error.errors) {
-          this.validationErrors = err.error.errors;
-        } else if (err && err.errors) {
-          this.validationErrors = err.errors;
+        const errBody = err?.error;
+        if (errBody?.errors && typeof errBody.errors === 'object') {
+          this.validationErrors = errBody.errors;
         } else {
-          let message = 'An unexpected error occurred.';
-          if (err && err.error) {
-            if (typeof err.error === 'string') message = err.error;
-            else if (err.error.message) message = err.error.message;
-          } else if (err && err.message) {
-            message = err.message;
-          }
+          // Surface a readable message — no raw JSON
+          const message = errBody?.message
+            || (typeof errBody?.errors === 'string' ? errBody.errors : null)
+            || (typeof errBody === 'string' ? errBody : null)
+            || err?.message
+            || 'An unexpected error occurred.';
           this.toastService.presentErrorToastr(message);
         }
       });
@@ -382,11 +380,15 @@ export class SignupComponent implements OnInit, OnDestroy {
       this.pageLoading = false;
       devLogger.error('Signup error:', err);
 
-      // Email already exists in Firebase (e.g. legacy account or ghost account from password reset)
+      // Email already in Firebase with a different password — real existing user.
+      // Direct them to sign in; the "Forgot password?" flow there will clean up
+      // any orphaned Firebase account if they are not in MongoDB.
       if (err && err.code === 'email-already-in-use') {
         const alert = await this.alertCtrl.create({
           header: 'Account Already Exists',
-          message: 'An account with this email already exists. Would you like to sign in instead?',
+          message:
+            'An account with this email already exists. ' +
+            'Sign in with your password, or tap "Forgot password?" on the sign-in page to reset it.',
           buttons: [
             { text: 'Cancel', role: 'cancel' },
             {
@@ -399,21 +401,12 @@ export class SignupComponent implements OnInit, OnDestroy {
         return;
       }
 
-      if (err && err.error && err.error.errors) {
-        this.validationErrors = err.error.errors;
-        this.backToError();
-      } else if (err && err.errors) {
+      // Field-level validation errors from the backend
+      if (err && err.errors && typeof err.errors === 'object') {
         this.validationErrors = err.errors;
         this.backToError();
       } else {
-        let message = 'An unexpected error occurred.';
-        if (err && err.error) {
-          if (typeof err.error === 'string') message = err.error;
-          else if (err.error.message) message = err.error.message;
-        } else if (err && err.message) {
-          message = err.message;
-        }
-        this.toastService.presentErrorToastr(message);
+        this.toastService.presentErrorToastr(err?.message || 'An unexpected error occurred.');
       }
     }
   }

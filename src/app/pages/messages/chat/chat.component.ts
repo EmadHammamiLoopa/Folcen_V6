@@ -1089,7 +1089,12 @@ private async uploadImageAndGetUrl(): Promise<string> {
       .pipe(take(1))
       .toPromise();
 
-    return uploadResponse?.fileUrl || null;
+    let fileUrl = uploadResponse?.fileUrl || null;
+    // Ensure HTTPS — Railway terminates SSL at the proxy; internal req.protocol may be 'http'
+    if (fileUrl && fileUrl.startsWith('http://')) {
+      fileUrl = fileUrl.replace('http://', 'https://');
+    }
+    return fileUrl;
   } catch (error) {
     console.error('Image upload failed:', error);
     this.toastService.presentErrorToastr('Failed to upload image');
@@ -1246,32 +1251,19 @@ removeImage() {
 async pickMedia(mediaType: 'image' | 'video') {
   try {
     if (this.platform.is('cordova')) {
-      const sourceType = this.camera.PictureSourceType.CAMERA;
-      const mediaTypeValue = mediaType === 'image' ? this.camera.MediaType.PICTURE : this.camera.MediaType.VIDEO;
-
-      const options = {
-        quality: 75,
-        destinationType: this.camera.DestinationType.FILE_URI,
-        mediaType: mediaTypeValue,
-        sourceType: sourceType,
-        saveToPhotoAlbum: false,
-        correctOrientation: true,
-      };
-
-      const fileUri = await this.camera.getPicture(options);
-      const nativePath = await this.filePath.resolveNativePath(fileUri);
-      const fileEntry = await this.file.resolveLocalFilesystemUrl(nativePath) as FileEntry;
-
-      fileEntry.file(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const blob = new Blob([reader.result], { type: file.type });
-          const newFile = new File([blob], file.name, { type: file.type });
-          this.imageFile = { file: newFile, imageData: nativePath };
-          this.image = this.webView.convertFileSrc(nativePath);
-        };
-        reader.readAsArrayBuffer(file);
-      });
+      // Use takePicture (handles fetch + File-plugin fallback + proper MIME type)
+      const resp = await this.uploadFileService.takePicture(
+        this.camera.PictureSourceType.PHOTOLIBRARY,
+        mediaType
+      );
+      if (!resp?.file) {
+        this.toastService.presentErrorToastr('Could not read the selected file. Please try again.');
+        return;
+      }
+      const previewUrl = this.webView.convertFileSrc(resp.imageData);
+      this.imageFile = { file: resp.file, imageData: resp.imageData };
+      this.image = this.sanitizeImageUrl(previewUrl) as string;
+      this.changeDetection.detectChanges();
 
     } else {
       // Browser fallback
