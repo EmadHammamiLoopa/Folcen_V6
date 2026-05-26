@@ -121,9 +121,7 @@ const allowedOrigins = [
   'http://127.0.0.1:4200',
   'http://localhost:8100',
   'http://127.0.0.1:8100',
-  'http://localhost:2302',
-  'https://localhost',        // Capacitor Android WebView origin
-  'capacitor://localhost',    // Capacitor iOS WebView origin
+  'http://localhost:2302'
 ];
 
 function _isOriginAllowed(origin) {
@@ -440,7 +438,9 @@ try {
 } catch (e) {
   console.warn('Admin routes failed to mount', e && e.message);
 }
-// Serve uploads from the uploads directory (for post media, etc.)
+// Serve uploads from both modern and legacy locations.
+// New avatar uploads are written under public/uploads, while older post media can still be in uploads/.
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/public/images/avatars', express.static(path.join(__dirname, 'public/images/avatars')));
 app.use('/channels', express.static(path.join(__dirname, 'public/channels')));
