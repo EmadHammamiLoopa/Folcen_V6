@@ -112,29 +112,31 @@ export class SigninComponent implements OnInit {
           const fbResp = await this.auth.firebaseSignin(email, password, true);
           await this._handleSigninSuccess(fbResp);
           return;
-        } catch (fbErr) {
-          // Firebase also failed — fall through and show the original error
+        } catch (fbErr: any) {
           console.warn('Firebase fallback signin also failed:', fbErr);
+
+          // Firebase auth itself succeeded (the token was obtained) but the backend
+          // returned 404 — the user has a Firebase account but no MongoDB record
+          // (orphaned / incomplete signup). Route them back to the signup flow so
+          // they complete their profile; firebaseSignup() will then call
+          // firebase-login WITH the profile, which creates the MongoDB record.
+          const backendStatus = fbErr?.status ?? fbErr?.error?.status;
+          if (backendStatus === 404) {
+            this.pageLoading = false;
+            this.toastService.presentErrorToastr(
+              'Your account registration was not completed. Please sign up again to finish creating your account.'
+            );
+            await this.router.navigate(['/auth/signup']);
+            return;
+          }
+          // All other errors: fall through and show the original sign-in error
         }
       }
 
       this.pageLoading = false;
       console.error('Sign-in error:', firstErr);
 
-      let message = 'An unexpected error occurred.';
-      if (firstErr && firstErr.error) {
-        if (typeof firstErr.error === 'string') {
-          message = firstErr.error;
-        } else if (firstErr.error.message) {
-          message = firstErr.error.message;
-        } else if (firstErr.error.error) {
-          message = firstErr.error.error;
-        }
-      } else if (firstErr && firstErr.message) {
-        message = firstErr.message;
-      } else if (typeof firstErr === 'string') {
-        message = firstErr;
-      }
+      const message = this.extractSigninErrorMessage(firstErr);
 
       if (firstErr && firstErr.errors) {
         this.validationErrors = firstErr.errors;
@@ -144,6 +146,35 @@ export class SigninComponent implements OnInit {
         this.toastService.presentErrorToastr(message);
       }
     }
+  }
+
+  private extractSigninErrorMessage(err: any): string {
+    const status = err?.status ?? err?.error?.status;
+    const raw = err?.error;
+
+    if (status === 404) {
+      return 'No account found with this email address. Please sign up first.';
+    }
+
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.message) return parsed.message;
+        if (parsed?.error) return parsed.error;
+      } catch (_) {
+        if (raw.trim().startsWith('{') && raw.trim().endsWith('}')) {
+          return 'No account found with this email address. Please sign up first.';
+        }
+        return raw;
+      }
+      return raw;
+    }
+
+    if (raw?.message) return raw.message;
+    if (raw?.error) return raw.error;
+    if (err?.message) return err.message;
+    if (typeof err === 'string') return err;
+    return 'An unexpected error occurred.';
   }
 
   private async _handleSigninSuccess(resp: any) {
@@ -161,6 +192,22 @@ export class SigninComponent implements OnInit {
     }
 
     this.pageLoading = false;
+
+    // Email not yet verified in MongoDB — MongoDB may be stale if the user
+    // clicked the verification link after signup but before this login attempt.
+    // Check Firebase directly: reload() + force-refresh token picks up the
+    if (this.user.emailVerified === false) {
+      let verifyResp: any = null;
+      try { verifyResp = await this.auth.checkVerification(); } catch (_) {}
+      if (verifyResp) {
+        // Firebase confirmed verification and synced MongoDB → re-process
+        await this._handleSigninSuccess(verifyResp);
+        return;
+      }
+      this.toastService.presentErrorToastr('Please verify your email address. Check your inbox and click the verification link, then sign in again.');
+      await this.router.navigate(['/auth/signup']);
+      return;
+    }
 
     if (!this.user.loggedIn) {
       console.log('User not logged in according to flag, showing welcome alert');
@@ -248,16 +295,26 @@ export class SigninComponent implements OnInit {
   }
 
   private async _sendPasswordReset(email: string) {
-    // Step 1 — backend pre-flight: ensures a Firebase Auth account exists for
-    // legacy MongoDB-only users. Run in the background and never block the
-    // Firebase email send — if it fails the account may already exist anyway.
+    // Step 1 — backend pre-flight: MongoDB is the source of truth.
+    // The backend returns 404 if the user is not in MongoDB (and deletes any
+    // orphaned Firebase account). We MUST NOT send a reset email in that case.
     try {
       await this.auth.sendRequest({ method: 'post', url: 'forgot-password', data: { email } });
-    } catch (_ignored) {
-      // Backend unavailable or user not in DB — still attempt Firebase below.
+    } catch (err: any) {
+      const status = err?.status ?? err?.error?.status;
+      if (status === 404) {
+        // User not in our database — no account to reset.
+        this.toastService.presentErrorToastr(
+          'No account found with this email address. Please sign up to create an account.'
+        );
+        return; // Do NOT fall through to Firebase
+      }
+      // Any other error (5xx, network) — backend may be temporarily down.
+      // Fall through and attempt Firebase so legitimate users aren't blocked.
+      console.warn('[_sendPasswordReset] Backend pre-flight failed, attempting Firebase anyway:', err);
     }
 
-    // Step 2 — Firebase sends the reset email via its own infrastructure.
+    // Step 2 — Backend confirmed user exists (or was unavailable). Send via Firebase.
     try {
       await this.firebaseService.resetPassword(email);
       this.toastService.presentSuccessToastr(
@@ -270,8 +327,7 @@ export class SigninComponent implements OnInit {
       } else if (err?.code === 'auth/too-many-requests') {
         msg = 'Too many attempts. Please wait a few minutes and try again.';
       } else if (err?.code === 'auth/user-not-found') {
-        // Still show generic message — don't reveal if address exists
-        msg = 'If that email is registered, a reset link will be sent.';
+        msg = 'No account found with this email address.';
       }
       this.toastService.presentErrorToastr(msg);
     }

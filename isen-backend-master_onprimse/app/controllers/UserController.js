@@ -1157,7 +1157,7 @@ exports.storeAvatar = async (avatar, user) => {
         user.avatar.type = avatar.type;
 
         // Save the user object to the database
-        logger.info(`Saving user data with new avatar path: ${user.avatar.path}`);
+        logger.info(`Saving user data with new avatar path: ${newAvatarPath}`);
         await user.save();
 
         // 🔥 REAL-TIME: Emit targeted profile update
@@ -1219,20 +1219,11 @@ exports.updateAvatar = async (req, res) => {
         if (!user) return res.status(404).send('User not found');
 
         if (req.file) {
-            const avatarUrl = req.savedAvatarPath; // Adjust based on how you save the path
-
-            // Also add to the user's avatar history array
-            if (!user.avatar) user.avatar = [];
-            user.avatar.push(avatarUrl);
-
-            await user.save();
-
-            // 🔥 REAL-TIME: Emit targeted profile update
-            realtime.emitProfileUpdate(user);
+            await module.exports.storeAvatar(req.file, user);
 
             return res.status(200).send({
                 message: 'Avatar updated successfully',
-                avatarUrl: avatarUrl,
+                avatarUrl: user.mainAvatar,
                 user: user.publicInfo()
             });
         } else {

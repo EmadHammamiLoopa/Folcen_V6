@@ -642,9 +642,20 @@ export class WebrtcService {
     try {
       const stored = localStorage.getItem('missedCalls');
       const parsed: MissedCall[] = stored ? JSON.parse(stored) : [];
+      const now = Date.now();
+      const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+      const sanitized = (Array.isArray(parsed) ? parsed : []).filter((call: any) => {
+        if (!call || !call.userId) return false;
+        const ts = call.timestamp ? new Date(call.timestamp).getTime() : 0;
+        if (!ts || !Number.isFinite(ts)) return false;
+        return (now - ts) <= maxAgeMs;
+      });
+      if (sanitized.length !== (Array.isArray(parsed) ? parsed.length : 0)) {
+        localStorage.setItem('missedCalls', JSON.stringify(sanitized));
+      }
       // do not force change detection for heavy load; update internals then notify zone
-      this.missedCallsSubject.next(parsed);
-      try { this.zone.run(() => { this.appEvents.setMissedCalls(parsed); }); } catch(e) {}
+      this.missedCallsSubject.next(sanitized);
+      try { this.zone.run(() => { this.appEvents.setMissedCalls(sanitized); }); } catch(e) {}
     } catch (err) {
       console.error('Error loading missed calls:', err);
       this.missedCallsSubject.next([]);

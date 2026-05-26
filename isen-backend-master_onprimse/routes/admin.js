@@ -13,7 +13,7 @@ router.post('/messages/send', [requireSignin, withAuthUser, isSuperAdmin], Admin
 
 // Announcements
 router.get('/announcements', [requireSignin, withAuthUser, isAdmin], AdminController.getAnnouncements);
-router.post('/announcements', [requireSignin, withAuthUser, isSuperAdmin], AdminController.createAnnouncement);
+router.post('/announcements', [requireSignin, withAuthUser, isAdmin], AdminController.createAnnouncement);
 router.delete('/announcements/:id', [requireSignin, withAuthUser, isSuperAdmin], AdminController.deleteAnnouncement);
 
 // User Management & Analytics

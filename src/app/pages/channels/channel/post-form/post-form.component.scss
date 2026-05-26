@@ -331,8 +331,9 @@ ion-content {
       border: 1px solid rgba(255, 255, 255, 0.12);
       width: 100%;
       font-size: 0.95rem;
-      display: flex;
-      align-items: center;
+      display: block;
+      min-height: 44px;
+      line-height: 1.35;
       transition: all 0.2s ease;
 
       &:focus-within {
@@ -340,8 +341,13 @@ ion-content {
         border-color: rgba(255, 255, 255, 0.28);
       }
 
-      &::part(native) { padding: 0; width: 100%; }
-      &::part(placeholder), &::placeholder { opacity: 0.55; color: inherit; }
+      &::part(native) { padding: 0; width: 100%; line-height: 1.35; }
+      &::part(placeholder), &::placeholder {
+        opacity: 0.72;
+        color: inherit;
+        white-space: normal;
+        line-height: 1.35;
+      }
     }
 
     ion-datetime.custom-input {
@@ -363,7 +369,11 @@ ion-content {
       --padding-top: 14px;
       --padding-bottom: 14px;
       --placeholder-color: inherit;
-      --placeholder-opacity: 0.55;
+      --placeholder-opacity: 0.75;
+      &::part(placeholder) {
+        white-space: normal;
+        line-height: 1.35;
+      }
     }
 
     .range-wrapper {

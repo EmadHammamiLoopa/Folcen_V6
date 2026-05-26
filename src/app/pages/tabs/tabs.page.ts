@@ -26,6 +26,7 @@ export class TabsPage implements OnInit, OnDestroy {
   private badgeCounts = new Map<TabKey, number>();
   showTabs = true;
   budget = 0;
+  missedCallsCount = 0;
 
   tabs: { url: TabKey; icon: string; notificationEvent?: string }[] = [
     { url: 'profile',        icon: 'fas fa-user' },
@@ -57,6 +58,16 @@ export class TabsPage implements OnInit, OnDestroy {
     this.badges.budget$.subscribe(b => {
       this.zone.run(() => {
         this.budget = b || 0;
+      });
+    });
+
+    this.badges.missedCalls$.pipe(takeUntil(this.destroy$)).subscribe((calls: any[]) => {
+      this.zone.run(() => {
+        const count = Array.isArray(calls) ? calls.length : 0;
+        this.missedCallsCount = count;
+        if (count === 0 && this.budget > 0) {
+          this.budget = 0;
+        }
       });
     });
 

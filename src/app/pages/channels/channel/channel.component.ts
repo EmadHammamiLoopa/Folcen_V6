@@ -12,6 +12,9 @@ import { DropDownComponent } from './../../drop-down/drop-down.component';
 import { ReportModalComponent } from '../../../components/report-modal/report-modal.component';
 import { OneSignalService } from 'src/app/services/one-signal.service';
 import { AuthService } from 'src/app/services/auth.service';
+import { SocketService } from 'src/app/services/socket.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-channel',
@@ -28,6 +31,8 @@ export class ChannelComponent implements OnInit {
   pageLoading = false;
   posts: Post[] = [];
   page = 0;
+  private destroy$ = new Subject<void>();
+  private feedRefreshTimer: any;
 
   constructor(
     private channelService: ChannelService,
@@ -47,6 +52,38 @@ export class ChannelComponent implements OnInit {
   ngOnInit() {
     this.getUserData();
     this.getChannelParams();
+    this.bindRealtimePostRefresh();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+    try { if (this.feedRefreshTimer) clearTimeout(this.feedRefreshTimer); } catch (e) {}
+  }
+
+  private bindRealtimePostRefresh() {
+    SocketService.newFeedPost$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+      try {
+        const currentChannelId = String(this.channel?.id || '');
+        if (!currentChannelId) return;
+
+        const payloadChannelId = String(
+          payload?.channel?._id ||
+          payload?.channel ||
+          payload?.channelId ||
+          payload?.post?.channel?._id ||
+          payload?.post?.channel ||
+          ''
+        );
+
+        if (!payloadChannelId || payloadChannelId !== currentChannelId) return;
+
+        if (this.feedRefreshTimer) clearTimeout(this.feedRefreshTimer);
+        this.feedRefreshTimer = setTimeout(() => {
+          this.getChannelPosts(null, true);
+        }, 250);
+      } catch (e) {}
+    });
   }
 
   isOwner(channel: Channel): boolean {
@@ -172,7 +209,10 @@ export class ChannelComponent implements OnInit {
 async showPostForm() {
   const modal = await this.modalCtrl.create({
     component: PostFormComponent,
-    componentProps: { channelId: this.channel.id },
+    componentProps: {
+      channelId: this.channel.id,
+      channel: this.channel ? this.channel.toObject() : null,
+    },
   });
 
   await modal.present();
