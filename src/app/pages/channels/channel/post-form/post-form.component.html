@@ -19,6 +19,7 @@
 
 <ion-content
   [style]="{'--background': postBackColor, '--color': postTextColor}"
+  [class.light-bg]="isLightBg"
 >
   <app-sandglass-loader [visible]="postLoading" message="Posting"></app-sandglass-loader>
   <ion-card class="post-card">

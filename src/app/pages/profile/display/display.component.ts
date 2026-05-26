@@ -520,9 +520,23 @@ export class DisplayComponent implements OnInit, OnDestroy {
       },
       error: (err: any) => {
         this.isUploading = false;
-        this.toastService.presentErrorToastr(err);
+        const msg = err?.error?.message || err?.message || 'Failed to upload photo. Please try again.';
+        this.toastService.presentErrorToastr(msg);
       }
     });
+  }
+
+  private getMediaPickerErrorMessage(err: any): string | null {
+    if (err === 20 || err?.code === 20) {
+      return 'Photo permission denied. Please allow Photos/Media access in app settings and try again.';
+    }
+
+    const text = (typeof err === 'string' ? err : (err?.message || '')).toLowerCase();
+    if (text.includes('cancel') || text.includes('no image selected')) {
+      return null;
+    }
+
+    return err?.error?.message || err?.message || 'Could not open media picker. Please try again.';
   }
   
 
@@ -566,7 +580,12 @@ export class DisplayComponent implements OnInit, OnDestroy {
       // Native mobile: use existing uploadFile logic
       this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'image')
         .then(resp => this.processSelectedMedia(resp))
-        .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
+        .catch(err => {
+          const msg = this.getMediaPickerErrorMessage(err);
+          if (msg) {
+            this.toastService.presentErrorToastr(msg);
+          }
+        });
     } else {
       // Browser: trigger file input manually
       const input = document.getElementById('webImageInput') as HTMLInputElement;
@@ -578,13 +597,23 @@ export class DisplayComponent implements OnInit, OnDestroy {
   openCameraPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image')
       .then(resp => this.processSelectedMedia(resp))
-      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
+      .catch(err => {
+        const msg = this.getMediaPickerErrorMessage(err);
+        if (msg) {
+          this.toastService.presentErrorToastr(msg);
+        }
+      });
   }
   
   openVideoPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'video')
       .then(resp => this.processSelectedMedia(resp))
-      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
+      .catch(err => {
+        const msg = this.getMediaPickerErrorMessage(err);
+        if (msg) {
+          this.toastService.presentErrorToastr(msg);
+        }
+      });
   }
   
 
@@ -918,12 +947,14 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   cancelRequest() {
-    const requestId = (this.user.requests && this.user.requests[0]?._id) || this.outgoingRequestId;
-    if (!requestId) {
+    // Use cancelRequestByUser which finds the request by user-pair, more reliable
+    // than looking up by request ID when outgoing request ID may not be cached
+    const targetUserId = this.user._id || this.user.id;
+    if (!targetUserId) {
       this.toastService.presentErrorToastr('Could not find request to cancel');
       return;
     }
-    this.requestService.cancelRequest(requestId).then(
+    this.requestService.cancelRequestByUser(targetUserId).then(
       () => {
         this.user.request  = null;
         this.user.requests = [];

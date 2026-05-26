@@ -392,25 +392,26 @@
 
 .visitor-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-bottom: 20px;
   width: 100%;
   box-sizing: border-box;
   
   .primary-action {
     flex: 1;
-    min-width: 120px;
+    min-width: 0;
     height: clamp(44px, 10vw, 50px);
     --border-radius: 16px;
     font-weight: 700;
     margin: 0;
-    font-size: clamp(0.85rem, 3.5vw, 0.95rem);
+    font-size: clamp(0.75rem, 3vw, 0.9rem);
     --box-shadow: 0 8px 20px rgba(var(--ion-color-primary-rgb), 0.3);
   }
   
   .secondary-action {
     width: clamp(44px, 10vw, 50px);
+    flex-shrink: 0;
     height: clamp(44px, 10vw, 50px);
     --border-radius: 16px;
     margin: 0;

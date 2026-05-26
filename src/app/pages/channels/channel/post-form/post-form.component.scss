@@ -508,3 +508,70 @@ ion-toggle {
 .mr-2 {
   margin-right: 8px;
 }
+
+// Light background overrides — when post color is a light/pale theme
+ion-content.light-bg {
+  .post-card {
+    background: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.1);
+
+    .visibility-item {
+      background: rgba(0, 0, 0, 0.07);
+      border-color: rgba(0, 0, 0, 0.18);
+      color: inherit;
+
+      &.active {
+        background: rgba(0, 0, 0, 0.15);
+        border-color: rgba(0, 0, 0, 0.5);
+      }
+
+      .icon-wrapper {
+        background: rgba(0, 0, 0, 0.1);
+      }
+    }
+
+    .field-container {
+      .custom-input,
+      .custom-textarea,
+      .custom-select,
+      ion-datetime.custom-input {
+        background: rgba(0, 0, 0, 0.06);
+        border-color: rgba(0, 0, 0, 0.15);
+        color: inherit;
+
+        &:focus-within {
+          background: rgba(0, 0, 0, 0.1);
+          border-color: rgba(0, 0, 0, 0.3);
+        }
+      }
+
+      .range-wrapper {
+        background: rgba(0, 0, 0, 0.06);
+        border-color: rgba(0, 0, 0, 0.12);
+
+        .custom-range {
+          --bar-background: rgba(0, 0, 0, 0.2);
+          --bar-background-active: rgba(0, 0, 0, 0.7);
+          --knob-background: rgba(0, 0, 0, 0.8);
+        }
+      }
+    }
+
+    ion-item {
+      --border-color: rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .upload-zone {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.2);
+  }
+
+  .creative-post-wrapper {
+    border-color: rgba(0, 0, 0, 0.15);
+  }
+
+  ion-toggle {
+    --background: rgba(0, 0, 0, 0.12);
+  }
+}

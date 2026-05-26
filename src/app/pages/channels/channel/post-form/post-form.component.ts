@@ -51,6 +51,11 @@ export class PostFormComponent implements OnInit {
   postBackColor = "#6366f1";
   postTextColor = "#ffffff";
 
+  get isLightBg(): boolean {
+    // Consider it a light background when the text color is dark (close to black)
+    return this.postTextColor === '#0f172a' || this.postTextColor === '#000000' || this.postTextColor === '#111827';
+  }
+
   postText = "";
   @ViewChild('fileInput', { static: false }) fileInput: ElementRef;
   visibilitySelectOptions = {

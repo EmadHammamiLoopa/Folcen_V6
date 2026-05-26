@@ -547,8 +547,8 @@ async function purgeUser(userId) {
   const fs = require('fs').promises;
   const path = require('path');
 
-  // 0. Fetch user to get file paths before deletion
-  const user = await User.findById(userId).select('mainAvatar avatar').lean();
+  // 0. Fetch user to get file paths and firebaseUid before deletion
+  const user = await User.findById(userId).select('mainAvatar avatar firebaseUid').lean();
   if (user) {
     const filesToDelete = [];
     if (user.mainAvatar && user.mainAvatar.startsWith('/uploads/')) {
@@ -650,6 +650,20 @@ async function purgeUser(userId) {
     User.updateMany({}, { $pull: { followers: userId, following: userId, friends: userId, blockedUsers: userId } }),
     Channel.updateMany({}, { $pull: { followers: userId } })
   ]);
+
+  // 3. Hard-delete from Firebase Auth (non-fatal if missing)
+  if (user && user.firebaseUid) {
+    try {
+      const { admin: firebaseAdmin } = require('./services/firebaseAdmin');
+      if (firebaseAdmin && firebaseAdmin.auth) {
+        await firebaseAdmin.auth().deleteUser(user.firebaseUid);
+        console.log(`[GDPR Purge] Deleted Firebase Auth user: ${user.firebaseUid}`);
+      }
+    } catch (fbErr) {
+      // User may already be deleted from Firebase; non-fatal
+      console.warn(`[GDPR Purge] Firebase Auth delete failed (non-fatal):`, fbErr.message);
+    }
+  }
 }
 
 /** Wake the callee: emit on socket if online, else push */
