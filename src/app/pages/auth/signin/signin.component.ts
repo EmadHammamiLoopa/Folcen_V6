@@ -136,20 +136,7 @@ export class SigninComponent implements OnInit {
       this.pageLoading = false;
       console.error('Sign-in error:', firstErr);
 
-      let message = 'An unexpected error occurred.';
-      if (firstErr && firstErr.error) {
-        if (typeof firstErr.error === 'string') {
-          message = firstErr.error;
-        } else if (firstErr.error.message) {
-          message = firstErr.error.message;
-        } else if (firstErr.error.error) {
-          message = firstErr.error.error;
-        }
-      } else if (firstErr && firstErr.message) {
-        message = firstErr.message;
-      } else if (typeof firstErr === 'string') {
-        message = firstErr;
-      }
+      const message = this.extractSigninErrorMessage(firstErr);
 
       if (firstErr && firstErr.errors) {
         this.validationErrors = firstErr.errors;
@@ -159,6 +146,35 @@ export class SigninComponent implements OnInit {
         this.toastService.presentErrorToastr(message);
       }
     }
+  }
+
+  private extractSigninErrorMessage(err: any): string {
+    const status = err?.status ?? err?.error?.status;
+    const raw = err?.error;
+
+    if (status === 404) {
+      return 'No account found with this email address. Please sign up first.';
+    }
+
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.message) return parsed.message;
+        if (parsed?.error) return parsed.error;
+      } catch (_) {
+        if (raw.trim().startsWith('{') && raw.trim().endsWith('}')) {
+          return 'No account found with this email address. Please sign up first.';
+        }
+        return raw;
+      }
+      return raw;
+    }
+
+    if (raw?.message) return raw.message;
+    if (raw?.error) return raw.error;
+    if (err?.message) return err.message;
+    if (typeof err === 'string') return err;
+    return 'An unexpected error occurred.';
   }
 
   private async _handleSigninSuccess(resp: any) {
@@ -177,10 +193,18 @@ export class SigninComponent implements OnInit {
 
     this.pageLoading = false;
 
-    // Email not yet verified — send user to the verification step instead of
-    // showing the main app (auth guard would redirect anyway, but doing it here
-    // gives an explicit message rather than looking like "unauthorized").
+    // Email not yet verified in MongoDB — MongoDB may be stale if the user
+    // clicked the verification link after signup but before this login attempt.
+    // Check Firebase directly: reload() + force-refresh token picks up the
+    // latest server-side emailVerified state and firebase-login syncs MongoDB.
     if (this.user.emailVerified === false) {
+      let verifyResp: any = null;
+      try { verifyResp = await this.auth.checkVerification(); } catch (_) {}
+      if (verifyResp) {
+        // Firebase confirmed verification and synced MongoDB → re-process
+        await this._handleSigninSuccess(verifyResp);
+        return;
+      }
       this.toastService.presentErrorToastr('Please verify your email address. Check your inbox and click the verification link, then sign in again.');
       await this.router.navigate(['/auth/signup']);
       return;

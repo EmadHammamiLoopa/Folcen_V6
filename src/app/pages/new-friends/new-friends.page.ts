@@ -50,6 +50,21 @@ export class NewFriendsPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   showSandglass: boolean = false;
 
+  private getExcludedUserIds(): Set<string> {
+    const currentUser = this.authUser || this.userService.currentUserValue;
+    const excluded = new Set<string>();
+    const myId = currentUser?._id || currentUser?.id;
+    if (myId) excluded.add(String(myId));
+
+    const blocked = currentUser?.blockedUsers || [];
+    blocked.forEach((entry: any) => {
+      const blockedId = typeof entry === 'string' ? entry : (entry?._id || entry?.id);
+      if (blockedId) excluded.add(String(blockedId));
+    });
+
+    return excluded;
+  }
+
   /** Tracks users the current user has already acted on (requested / followed) this session */
   connectState = new Map<string, 'requested' | 'following'>();
 
@@ -81,6 +96,8 @@ export class NewFriendsPage implements OnInit, OnDestroy {
       if (user) {
         this.authUser = user;
         console.log('Authenticated user data fetched via service:', this.authUser);
+        const excludedUserIds = this.getExcludedUserIds();
+        this.users = this.users.filter((entry: any) => entry?.isDivider || !excludedUserIds.has(String(entry?._id || entry?.id || '')));
         this.changeDetectorRef.detectChanges();
       }
     });
@@ -140,12 +157,16 @@ export class NewFriendsPage implements OnInit, OnDestroy {
 
           if (refresh) this.users = [];
   
+          const excludedUserIds = this.getExcludedUserIds();
           resp.data.users.forEach(user => {
             if (user.isDivider) {
               this.users.push({ isDivider: true, scope: user.scope });
             } else {
               const initializedUser = new User().initialize(user);
               const userId = (initializedUser as any).id || (initializedUser as any)._id;
+              if (userId && excludedUserIds.has(String(userId))) {
+                return;
+              }
               if (userId && !this.connectState.has(userId)) {
                 if (user.followRequestSent) {
                   this.connectState.set(userId, 'following');

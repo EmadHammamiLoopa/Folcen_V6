@@ -7,7 +7,7 @@ const Announcement = require('../models/Announcement');
 const Channel = require('../models/Channel');
 const Subscription = require('../models/Subscription');
 const Response = require('./Response');
-const { emitToUsers, emitToAll } = require('../helpers');
+const { emitToUsers, emitToAll, sendNotification } = require('../helpers');
 
 // Return aggregated counts for auth events and recent entries (privacy-safe)
 exports.authEventsOverview = async (req, res) => {
@@ -130,6 +130,21 @@ exports.sendAdminMessage = async (req, res) => {
         
         // Emit via socket if user is online
         emitToUsers([userId], 'new-message', msg);
+
+        // Push fallback so offline users are notified the same way as normal chat
+        try {
+          const senderName = req.authUser?.firstName
+            ? `${req.authUser.firstName} ${req.authUser.lastName || ''}`.trim()
+            : 'System';
+          sendNotification(
+            [String(userId)],
+            String(text).substring(0, 120),
+            senderName,
+            String(fromId)
+          ).catch(() => {});
+        } catch (pushErr) {
+          console.warn('AdminController.sendAdminMessage push notify failed:', pushErr?.message || pushErr);
+        }
       } catch (saveErr) {
         console.error(`Failed to save message for user ${userId}:`, saveErr.message || saveErr);
         if (saveErr.errors) {

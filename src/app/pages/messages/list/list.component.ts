@@ -43,6 +43,7 @@ export class ListComponent implements OnInit, OnDestroy {
   private static READ_KEY = 'chatLastReadAt';
   private lastReadAt: Record<string, number> = {};
   private prevMissedCount = 0;
+  private listRefreshTimer: any;
 
   constructor(
     private messageService: MessageService,
@@ -346,6 +347,7 @@ export class ListComponent implements OnInit, OnDestroy {
               this.cdr.markForCheck();
             });
           }
+          this.scheduleListRefresh();
         } catch (e) {
           console.error('list/message-sent error', e, raw);
         }
@@ -381,6 +383,17 @@ export class ListComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
     try { this.missedSub?.unsubscribe(); } catch(e) {}
+    try { if (this.listRefreshTimer) clearTimeout(this.listRefreshTimer); } catch (e) {}
+  }
+
+  private scheduleListRefresh() {
+    try {
+      if (this.listRefreshTimer) clearTimeout(this.listRefreshTimer);
+      this.listRefreshTimer = setTimeout(() => {
+        this.page = 0;
+        this.getUsersMessages(null, true);
+      }, 250);
+    } catch (e) {}
   }
 
   private keyOf = (idOrUser: any) =>

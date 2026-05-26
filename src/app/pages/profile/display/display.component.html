@@ -99,11 +99,13 @@
         </ion-button>
         
         <ion-button class="secondary-action" [routerLink]="['/messages/chat/', user.id]" color="secondary" *ngIf="user.isFriend || isFriend || !user.isPrivate">
-          <ion-icon name="chatbubble-ellipses"></ion-icon>
+          <ion-icon name="chatbubble-ellipses" slot="start"></ion-icon>
+          Chat
         </ion-button>
 
         <ion-button class="secondary-action" *ngIf="user.isFriend" (click)="videoCall()" color="tertiary">
-          <ion-icon name="videocam"></ion-icon>
+          <ion-icon name="videocam" slot="start"></ion-icon>
+          Call
         </ion-button>
       </div>
 

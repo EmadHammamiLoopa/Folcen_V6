@@ -548,7 +548,7 @@ async function purgeUser(userId) {
   const path = require('path');
 
   // 0. Fetch user to get file paths and firebaseUid before deletion
-  const user = await User.findById(userId).select('mainAvatar avatar firebaseUid').lean();
+  const user = await User.findById(userId).select('mainAvatar avatar firebaseUid email').lean();
   if (user) {
     const filesToDelete = [];
     if (user.mainAvatar && user.mainAvatar.startsWith('/uploads/')) {
@@ -652,16 +652,39 @@ async function purgeUser(userId) {
   ]);
 
   // 3. Hard-delete from Firebase Auth (non-fatal if missing)
-  if (user && user.firebaseUid) {
+  if (user && (user.firebaseUid || user.email)) {
     try {
       const { admin: firebaseAdmin } = require('./services/firebaseAdmin');
-      if (firebaseAdmin && firebaseAdmin.auth) {
-        await firebaseAdmin.auth().deleteUser(user.firebaseUid);
-        console.log(`[GDPR Purge] Deleted Firebase Auth user: ${user.firebaseUid}`);
+      if (firebaseAdmin && firebaseAdmin.apps && firebaseAdmin.apps.length && firebaseAdmin.auth) {
+        let firebaseUid = user.firebaseUid || null;
+
+        if (!firebaseUid && user.email) {
+          try {
+            const firebaseRecord = await firebaseAdmin.auth().getUserByEmail(String(user.email).trim().toLowerCase());
+            firebaseUid = firebaseRecord.uid;
+          } catch (lookupErr) {
+            if (lookupErr.code !== 'auth/user-not-found') {
+              console.warn('[GDPR Purge] Firebase lookup by email failed (non-fatal):', lookupErr.message);
+            }
+          }
+        }
+
+        if (firebaseUid) {
+          try {
+            await firebaseAdmin.auth().deleteUser(firebaseUid);
+            console.log(`[GDPR Purge] Deleted Firebase Auth user: ${firebaseUid}`);
+          } catch (deleteErr) {
+            if (deleteErr.code === 'auth/user-not-found') {
+              console.warn('[GDPR Purge] Firebase user already absent during delete');
+            } else {
+              throw deleteErr;
+            }
+          }
+        }
       }
     } catch (fbErr) {
       // User may already be deleted from Firebase; non-fatal
-      console.warn(`[GDPR Purge] Firebase Auth delete failed (non-fatal):`, fbErr.message);
+      console.warn('[GDPR Purge] Firebase Auth delete failed (non-fatal):', fbErr.message);
     }
   }
 }

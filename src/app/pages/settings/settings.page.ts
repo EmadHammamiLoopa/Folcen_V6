@@ -483,7 +483,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     const alert = await this.alertController.create({
       header: 'Delete Account',
       message:
-        'After deleting your account you will still have a chance to restore it within the next 4 days by logging into it, otherwise the account will be deleted permanently from thee application',
+        'Your account will be deactivated immediately and you will be signed out. You can restore it by logging in again before the retention period ends. After deletion, we will show you the exact number of days remaining before permanent removal.',
       buttons: [
         {
           text: 'cancel',
@@ -494,15 +494,24 @@ export class SettingsPage implements OnInit, OnDestroy {
           cssClass: 'text-danger',
           handler: () => {
             this.userService.deleteAccount().subscribe(
-              (resp) => {
+              async (resp) => {
                 try {
                   const days = resp && resp.data && resp.data.retentionDays ? resp.data.retentionDays : null;
-                  const msg = days ? `Your account is scheduled for permanent deletion in ${days} days.` : 'Your account has been deleted.';
+                  const msg = days
+                    ? `Your account is scheduled for permanent deletion in ${days} days. You can restore it any time before then by signing in again.`
+                    : 'Your account has been deleted.';
                   // store a short-lived notice so the signin page can show it after navigation
                   try { localStorage.setItem('deletionNotice', JSON.stringify({ message: msg, expiresAt: Date.now() + 24 * 3600 * 1000 })); } catch (e) {}
-                  this.toastService.presentSuccessToastr(msg);
+                  const confirmAlert = await this.alertController.create({
+                    header: 'Account Scheduled For Deletion',
+                    message: msg,
+                    buttons: [{
+                      text: 'OK',
+                      handler: () => this.signout()
+                    }]
+                  });
+                  await confirmAlert.present();
                 } catch (e) {}
-                this.signout();
               },
               (err) => {
                 this.toastService.presentErrorToastr(err);

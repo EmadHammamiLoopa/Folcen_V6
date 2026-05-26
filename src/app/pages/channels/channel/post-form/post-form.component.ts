@@ -69,22 +69,25 @@ export class PostFormComponent implements OnInit {
   constructor(private channelService: ChannelService, private route: ActivatedRoute,private toastService: ToastService, private modalCtrl:
               ModalController, private sanitizer: DomSanitizer) { }
 
+  private applyChannelTypeFlags() {
+    const t = this.channel?.type;
+    this.showEventFields = t === 'static_events';
+    this.showDatingFields = t === 'static_dating';
+  }
+
 
   ngOnInit() {
+    // Modal path: channel is passed via componentProps from channel page.
+    if (this.channel) {
+      this.channel = new Channel().initialize(this.channel as any);
+      this.applyChannelTypeFlags();
+    }
+
     this.route.queryParams.subscribe((params) => {
       if (params.channel) {
         const channelData = JSON.parse(params.channel);
         this.channel = new Channel().initialize(channelData);
-
-        // Toggle event fields for static_events
-        if (this.channel.type === 'static_events') {
-          this.showEventFields = true;
-        }
-
-        // Toggle dating fields for static_dating
-        if (this.channel.type === 'static_dating') {
-          this.showDatingFields = true;
-        }
+        this.applyChannelTypeFlags();
       }
     });
   }
