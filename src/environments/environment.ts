@@ -1,8 +1,7 @@
 export const environment = {
   production: false,
-  // Release/v0.9 debug APKs should hit production backend when installed on physical devices.
-  apiUrl: 'https://folcenv6-production.up.railway.app/api/v1',
-  socketUrl: 'https://folcenv6-production.up.railway.app',
+  apiUrl: 'http://127.0.0.1:3300/api/v1',
+  socketUrl: 'http://127.0.0.1:3300', // Browser on same machine
   socketPath: '/socket.io',
   SELLER_DISCLAIMER_VERSION: 'v1.0',
 
