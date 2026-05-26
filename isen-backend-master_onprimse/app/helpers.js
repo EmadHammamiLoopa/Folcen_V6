@@ -549,7 +549,7 @@ async function purgeUser(userId) {
 
   // 0. Fetch user to get file paths and firebaseUid before deletion
   const user = await User.findById(userId).select('mainAvatar avatar firebaseUid email').lean();
-    // 0. Fetch user to get file paths and firebaseUid before deletion
+  if (user) {
     const filesToDelete = [];
     if (user.mainAvatar && user.mainAvatar.startsWith('/uploads/')) {
       filesToDelete.push(path.join(__dirname, '..', 'public', user.mainAvatar));

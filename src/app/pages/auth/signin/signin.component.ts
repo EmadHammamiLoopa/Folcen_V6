@@ -18,10 +18,10 @@ import { SocketService } from 'src/app/services/socket.service';
   styleUrls: ['./signin.component.scss'],
 })
 export class SigninComponent implements OnInit {
-  form: FormGroup;
+  form!: FormGroup;
   pageLoading = false;
-  validationErrors = {};
-  user: User;
+  validationErrors: Record<string, any> = {};
+  user!: User;
 
   constructor(
     private formBuilder: FormBuilder,
@@ -80,10 +80,10 @@ export class SigninComponent implements OnInit {
     if (this.form.invalid) {
       this.pageLoading = false;
       this.validationErrors = {};
-      Object.keys(this.form.controls).forEach((k) => {
+      Object.keys(this.form.controls).forEach((k: string) => {
         const control = this.form.get(k);
         if (control && control.errors) {
-          this.validationErrors[k] = Object.keys(control.errors).map(e => {
+          this.validationErrors[k] = Object.keys(control.errors).map((e: string) => {
             if (e === 'required') return 'This field is required';
             if (e === 'email') return 'Enter a valid email address';
             return e;
@@ -99,7 +99,7 @@ export class SigninComponent implements OnInit {
       // Primary path: MongoDB-based signin
       const resp = await this.auth.signin({ email, password });
       await this._handleSigninSuccess(resp);
-    } catch (firstErr) {
+    } catch (firstErr: any) {
       // If the backend returns 401, the user's MongoDB password may be stale
       // after a Firebase password reset (Firebase reset email updates Firebase
       // only — MongoDB hash is not changed). Fall back to Firebase signin so
@@ -370,7 +370,7 @@ export class SigninComponent implements OnInit {
       }
   
       this.router.navigate(['/tabs/new-friends']);
-    } catch (err) {
+    } catch (err: any) {
       this.pageLoading = false;
       console.error('Google Sign-In error:', err);
 
