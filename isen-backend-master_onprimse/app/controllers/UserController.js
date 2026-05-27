@@ -7,7 +7,7 @@ const fsp = fs.promises;
 const path = require('path')
 const _ = require('lodash')
 const Request = require("../models/Request")
-const { manAvatarPath, womenAvatarPath, normalizeId, normalizeLeanDoc, setOnlineUsers, extractDashParams, report, sendNotification, emitFriendRequestsUpdated, emitToUsers, validatePassword, realtime } = require("../helpers")
+const { manAvatarPath, womenAvatarPath, normalizeId, normalizeLeanDoc, setOnlineUsers, extractDashParams, report, sendNotification, createNotification, emitFriendRequestsUpdated, emitToUsers, validatePassword, realtime } = require("../helpers")
 const Report = require("../models/Report")
 const Channel = require("../models/Channel")
 const Product = require("../models/Product")
@@ -1253,10 +1253,17 @@ exports.deleteAccount = async(req, res) => {
         // Notify user that their account is scheduled for deletion per retention policy
         try {
             const msg = `Your account has been marked for deletion and will be permanently removed in ${days} days. Contact support if you wish to restore it.`;
-            const helpers = require('../helpers');
-            // sendNotification expects (userIds, message, senderName, fromUserId)
-            if (helpers && typeof helpers.sendNotification === 'function') {
-                helpers.sendNotification(String(user._id), msg, { en: 'System' }, String(user._id)).catch(() => {});
+            if (typeof createNotification === 'function') {
+                await createNotification({
+                    recipientId: String(user._id),
+                    senderId: String(user._id),
+                    type: 'system_account_deletion',
+                    title: 'System',
+                    body: msg,
+                    data: { system: true }
+                });
+            } else if (typeof sendNotification === 'function') {
+                sendNotification(String(user._id), msg, { en: 'System' }, String(user._id)).catch(() => {});
             }
         } catch (e) { logger.warn('Failed to send deletion notification', e); }
         // Revoke any tokens for this user (user-scoped revocation)

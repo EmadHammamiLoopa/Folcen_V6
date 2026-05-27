@@ -24,6 +24,7 @@ export class TabsPage implements OnInit, OnDestroy {
   private activeTab = ''; // track active tab directly from ionTabsDidChange
   private routerSub: any;
   private badgeCounts = new Map<TabKey, number>();
+  notificationCount = 0;
   showTabs = true;
   budget = 0;
   missedCallsCount = 0;
@@ -50,14 +51,20 @@ export class TabsPage implements OnInit, OnDestroy {
   async ngOnInit() {
     // Initialize badge subscriptions
     this.tabs.forEach(tab => {
-      this.badges.badge$(tab.url).subscribe(count => {
+      this.badges.badge$(tab.url).pipe(takeUntil(this.destroy$)).subscribe(count => {
         this.badgeCounts.set(tab.url, count || 0);
       });
     });
 
-    this.badges.budget$.subscribe(b => {
+    this.badges.budget$.pipe(takeUntil(this.destroy$)).subscribe(b => {
       this.zone.run(() => {
         this.budget = b || 0;
+      });
+    });
+
+    this.badges.notificationCount$.pipe(takeUntil(this.destroy$)).subscribe(count => {
+      this.zone.run(() => {
+        this.notificationCount = count || 0;
       });
     });
 
@@ -71,7 +78,7 @@ export class TabsPage implements OnInit, OnDestroy {
       });
     });
 
-    this.badges.showTabs$.subscribe(show => {
+    this.badges.showTabs$.pipe(takeUntil(this.destroy$)).subscribe(show => {
       this.showTabs = show;
     });
 
@@ -220,10 +227,6 @@ export class TabsPage implements OnInit, OnDestroy {
 
     if (activeTab === 'feed') {
       this.badges.reset('feed');
-      // User visited the feed — clear the missed-call budget indicator locally
-      // and tell the backend to reset the counter so stale "1" values don't persist
-      this.badges.setBudget(0);
-      this.userService.resetBudget().subscribe({ error: () => {} });
     }
 
     if (activeTab === 'channels') {

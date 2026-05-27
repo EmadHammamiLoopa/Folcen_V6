@@ -19,7 +19,6 @@
 
 <ion-content
   [style]="{'--background': postBackColor, '--color': postTextColor}"
-  [class.light-bg]="isLightBg"
 >
   <app-sandglass-loader [visible]="postLoading" message="Posting"></app-sandglass-loader>
   <ion-card class="post-card">
@@ -120,7 +119,7 @@
       <ion-card-content>
         <div class="field-container">
           <ion-label class="field-label">Relationship Goals</ion-label>
-          <ion-select [(ngModel)]="relationshipGoals" placeholder="Select goal" interface="popover" class="custom-select">
+          <ion-select [(ngModel)]="relationshipGoals" placeholder="Select goal" interface="alert" class="custom-select">
             <ion-select-option value="casual">Casual</ion-select-option>
             <ion-select-option value="long-term">Long-term</ion-select-option>
             <ion-select-option value="friendship">Friendship</ion-select-option>

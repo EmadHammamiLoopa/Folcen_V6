@@ -19,7 +19,7 @@ import { SocketService } from './socket.service';
 @Injectable({ providedIn: 'root' })
 export class AppEventsService {
   private subjects = new Map<TabKey, BehaviorSubject<number>>();
-  private debug = true; // Set to false in production
+  private debug = false; // Keep disabled to reduce runtime overhead
   // Centralized missed-calls stream so UI can subscribe to a single source of truth
   // We keep an internal subject for immediate updates but expose a debounced
   // stream that runs the zone.run only at most every 100ms to avoid CD thrash.

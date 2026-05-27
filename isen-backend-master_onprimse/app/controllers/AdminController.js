@@ -177,12 +177,32 @@ exports.createAnnouncement = async (req, res) => {
       createdBy: req.auth._id
     });
     await announcement.save();
-    
-    // Notify users via socket
-    if (target === 'all') {
-      emitToAll('new_announcement', announcement);
+
+    // Notify recipients via socket + push fallback (offline users)
+    let recipientIds = [];
+    if (target === 'all' || !target) {
+      const users = await User.find(
+        { enabled: true, banned: { $ne: true }, isDeleted: { $ne: true } },
+        { _id: 1 }
+      ).lean();
+      recipientIds = users.map(u => String(u._id));
+    } else if (Array.isArray(target?.userIds)) {
+      recipientIds = target.userIds.map((id) => String(id)).filter(Boolean);
+    }
+
+    if (recipientIds.length > 0) {
+      emitToUsers(recipientIds, 'new_announcement', announcement);
+      try {
+        await sendNotification(
+          recipientIds,
+          content || title || 'New announcement',
+          'Folcen Team',
+          String(req.auth?._id || 'system')
+        );
+      } catch (pushErr) {
+        console.warn('AdminController.createAnnouncement push notify failed:', pushErr?.message || pushErr);
+      }
     } else {
-      // Logic for specific targets could be added here
       emitToAll('new_announcement', announcement);
     }
 

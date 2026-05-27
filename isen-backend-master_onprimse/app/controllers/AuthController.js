@@ -190,8 +190,19 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
         });
         await welcomeMsg.save();
         
-        // Also send a push notification
-        helpers.sendNotification(String(user._id), "Welcome to Folcen 👋", senderName, String(senderId)).catch(() => {});
+                // Also create a persistent notification so the client can show an in-app badge
+                if (helpers && typeof helpers.createNotification === 'function') {
+                    await helpers.createNotification({
+                        recipientId: String(user._id),
+                        senderId: String(senderId),
+                        type: 'system_welcome',
+                        title: senderName,
+                        body: 'Welcome to Folcen 👋',
+                        data: { system: true }
+                    });
+                } else {
+                    helpers.sendNotification(String(user._id), "Welcome to Folcen 👋", senderName, String(senderId)).catch(() => {});
+                }
         
         console.log(`✅ Welcome message sent to user ${user._id} from ${senderName} (${senderId})`);
       } catch (welcomeErr) {
@@ -544,35 +555,10 @@ exports.firebaseLogin = async (req, res) => {
                     user.mainAvatar = user.getDefaultAvatar();
                 }
 
-                // Save the user FIRST so they exist in MongoDB even if the optional
-                // setup steps below fail (channels, subscription, etc.).
-                try {
-                    await user.save();
-                } catch (saveErr) {
-                    // Duplicate key: a MongoDB record already exists for this email/firebaseUid
-                    // (e.g. created by a parallel request or a previous partial signup).
-                    // Recover by loading the existing record so we can still return a token.
-                    if (saveErr.code === 11000) {
-                        logger.warn('[firebaseLogin] Duplicate key on new user save — recovering existing record', saveErr.keyValue);
-                        user = await User.findOne({
-                            $or: [{ firebaseUid: uid }, { email: email.toLowerCase() }]
-                        });
-                        if (!user) {
-                            return Response.sendError(res, 409, 'Account already exists. Please sign in.');
-                        }
-                        if (!user.firebaseUid) {
-                            user.firebaseUid = uid;
-                            await user.save().catch(e => logger.warn('[firebaseLogin] Could not update firebaseUid on recovered user', e));
-                        }
-                    } else {
-                        throw saveErr;
-                    }
-                }
-
-                // Optional setup — errors here do not prevent user creation
-                try { await autoFollowStaticChannels(user); } catch (e) { logger.warn('[firebaseLogin] autoFollowStaticChannels failed', e.message); }
-                try { await addLocalChannels(user); } catch (e) { logger.warn('[firebaseLogin] addLocalChannels failed', e.message); }
-                try { await addFreeSubscription(user); await user.save(); } catch (e) { logger.warn('[firebaseLogin] addFreeSubscription failed', e.message); }
+                await autoFollowStaticChannels(user);
+                await addLocalChannels(user);
+                await addFreeSubscription(user);
+                await user.save();
                 
                 // Record legal acceptance if provided in profile
                 if (profile.acceptedTerms) {
@@ -588,29 +574,6 @@ exports.firebaseLogin = async (req, res) => {
                     } catch (e) {
                         console.warn('Failed to record legal acceptance during firebase signup', e);
                     }
-                }
-
-                // Send welcome message from the Folcen Team system account
-                try {
-                    const systemUserId = '66c7ba8cb077a84040bd9ee6';
-                    let systemUser = await User.findById(systemUserId);
-                    if (!systemUser) systemUser = await User.findOne({ email: 'folcenteam@gmail.com' });
-                    if (!systemUser) {
-                        systemUser = new User({
-                            firstName: 'Folcen', lastName: 'Team',
-                            email: 'folcenteam@gmail.com',
-                            password: crypto.randomBytes(32).toString('hex'),
-                            emailVerified: true,
-                        });
-                        await systemUser.save();
-                    }
-                    const welcomeText = `Welcome to Folcen 👋\n\nWe're excited to have you join our community!\nFolcen is built to help you connect, share, and stay focused in a clean and meaningful way.\n\nIf you have any suggestions, feedback, or run into any issues, we'd love to hear from you.\n📩 Contact us anytime at: folcenteam@gmail.com\n\nEnjoy exploring Folcen — and thank you for being part of it!`;
-                    const welcomeMsg = new Message({ from: systemUser._id, to: user._id, text: welcomeText, type: 'friend', state: 'sent', createdAt: new Date() });
-                    await welcomeMsg.save();
-                    helpers.sendNotification(String(user._id), 'Welcome to Folcen 👋', `${systemUser.firstName} ${systemUser.lastName}`.trim(), String(systemUser._id)).catch(() => {});
-                    logger.info(`[firebaseLogin] Welcome message sent to new user ${user._id}`);
-                } catch (welcomeErr) {
-                    logger.warn('[firebaseLogin] Failed to send welcome message:', welcomeErr.message);
                 }
             } else {
                 return Response.sendError(res, 404, 'User not found. Please sign up first.');
@@ -679,46 +642,42 @@ exports.forgotPassword = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Generic response to prevent user-enumeration
+    const genericOk = () =>
+        Response.sendResponse(res, { message: 'If that email is registered, a reset link has been sent.' });
+
     try {
-        // 1. Verify the user exists in MongoDB — this is the source of truth.
+        // 1. Verify the user exists in our database
         const user = await User.findOne({ email: normalizedEmail });
+        if (!user) return genericOk();
 
-        if (!user) {
-            // User not in MongoDB. Clean up any orphaned Firebase account to
-            // enforce consistency: if not in MongoDB → must not be in Firebase.
-            try {
-                const fbRecord = await admin.auth().getUserByEmail(normalizedEmail);
-                await admin.auth().deleteUser(fbRecord.uid);
-                logger.info(`[forgotPassword] Deleted orphaned Firebase account for ${normalizedEmail} (not in MongoDB)`);
-            } catch (fbErr) {
-                if (fbErr.code !== 'auth/user-not-found') {
-                    logger.warn(`[forgotPassword] Could not check/clean Firebase for ${normalizedEmail}:`, fbErr.message);
-                }
-                // auth/user-not-found is fine — nothing to clean up
-            }
-            // Return 404 so the frontend knows to block the Firebase reset email.
-            return Response.sendError(res, 404, 'No account found with this email address.');
-        }
-
-        // 2. User IS in MongoDB. Ensure Firebase account exists too (legacy users).
+        // 2. Ensure a Firebase Auth account exists (legacy MongoDB-only users won't have one)
         try {
             await admin.auth().getUserByEmail(normalizedEmail);
+            // User already exists in Firebase — nothing to do
         } catch (e) {
             if (e.code === 'auth/user-not-found') {
+                // Create a Firebase Auth entry so sendPasswordResetEmail works
                 try {
                     await admin.auth().createUser({ email: normalizedEmail, emailVerified: false });
                     logger.info(`[forgotPassword] Created Firebase Auth record for legacy user: ${normalizedEmail}`);
                 } catch (createErr) {
-                    if (createErr.code !== 'auth/email-already-exists') throw createErr;
-                    // Race condition — account exists, continue
+                    if (createErr.code === 'auth/email-already-exists') {
+                        // Race condition: another request already created it between our get and create calls.
+                        // This is fine — the account exists, continue.
+                        logger.info(`[forgotPassword] Firebase user already exists (race condition) for: ${normalizedEmail}`);
+                    } else {
+                        throw createErr;
+                    }
                 }
             } else {
                 throw e;
             }
         }
 
-        // 3. Confirm to the frontend that it's safe to send the Firebase reset email.
-        return Response.sendResponse(res, { message: 'ok' });
+        // 3. Tell the frontend it's safe to call Firebase sendPasswordResetEmail()
+        //    Firebase will send the email using its own infrastructure.
+        return genericOk();
 
     } catch (err) {
         logger.error('[forgotPassword] Error:', err);

@@ -34,7 +34,7 @@ export class ListComponent implements OnInit, OnDestroy {
   missedCalls: any[] = [];
   public missedMap: { [userId: string]: number } = {};
   private missedSub: Subscription | null = null;
-  public missedMap$: Observable<{ [userId: string]: number }>;
+  public missedMap$!: Observable<{ [userId: string]: number }>;
   // Latest snapshot for template-friendly access
   public missedMapLatest: { [userId: string]: number } = {};
   private socket: any;
@@ -323,9 +323,8 @@ export class ListComponent implements OnInit, OnDestroy {
             this.users.unshift(moved);
             this.sortUsersByLatestMessage();
             this.cdr.markForCheck();
-          } else if (normalized.to) {
-            // First message to this peer — add them to the list immediately
-            this.userService.getUserProfile(normalized.to).subscribe((profile: any) => {
+          } else {
+            this.userService.getUserProfile(peerKey).subscribe((profile: any) => {
               const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
               if (idx2 !== -1) {
                 const user = this.users[idx2];
@@ -392,7 +391,7 @@ export class ListComponent implements OnInit, OnDestroy {
       this.listRefreshTimer = setTimeout(() => {
         this.page = 0;
         this.getUsersMessages(null, true);
-      }, 250);
+      }, 650);
     } catch (e) {}
   }
 
@@ -611,7 +610,7 @@ private formatTimeAgo(timestamp: string): string {
   
   
 
-  getUsersMessages(event?, refresh?) {
+  getUsersMessages(event?: any, refresh: boolean = false) {
     if (!event) this.pageLoading = true;
     if (refresh) this.page = 0;
 
@@ -620,10 +619,10 @@ private formatTimeAgo(timestamp: string): string {
         this.pageLoading = false;
         if (refresh) this.users = [];
 
-  (resp?.data?.users || []).forEach((usr) => {
+  (resp?.data?.users || []).forEach((usr: any) => {
           if (usr.messages && usr.messages.length > 0) {
             this.userService.getUserProfile(usr._id).subscribe((userProfile) => {
-              const messages = usr.messages.map((message) =>
+              const messages = usr.messages.map((message: any) =>
                 new Message().initialize({
                   ...message,
                   createdAt: this.getMessageDate(message),
@@ -644,7 +643,7 @@ private formatTimeAgo(timestamp: string): string {
               }) as ListUser;
             
               const last = messages?.[0];
-              const isIncoming = !!last && this.authId && last.from !== this.authId;
+              const isIncoming = !!last && !!this.authId && last.from !== this.authId;
               const hasServerUnread = Number.isFinite(usr.unreadCount);
               
               // ✅ prefer server unreadCount if provided, else fallback to local last-read logic
