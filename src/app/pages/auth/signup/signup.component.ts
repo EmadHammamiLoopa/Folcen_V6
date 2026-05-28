@@ -14,6 +14,7 @@ import { ToastService } from '../../../services/toast.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../models/User';
 import { SocketService } from '../../../services/socket.service';
+import { OneSignalService } from '../../../services/one-signal.service';
 
 @Component({
   selector: 'app-signup',
@@ -78,6 +79,7 @@ export class SignupComponent implements OnInit, OnDestroy {
     private schoolService: SchoolService,
     private toastService: ToastService,
     private userService: UserService,
+    private oneSignalService: OneSignalService,
     private platform: Platform,
     private pickerCtrl: PickerController
   ) { }
@@ -97,6 +99,9 @@ export class SignupComponent implements OnInit, OnDestroy {
           this.form.patchValue({ email: user.email });
         }
         this.toastService.presentErrorToastr('Your email address is not verified. Please check your inbox and click the verification link to access the app.');
+        setTimeout(() => {
+          this.checkVerification().catch(() => {});
+        }, 300);
       }
     }
   }
@@ -454,6 +459,8 @@ export class SignupComponent implements OnInit, OnDestroy {
           await SocketService.initializeSocket();
           SocketService.bindToAuthUser();
         } catch (e) {}
+
+        this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
 
         this.step++; // Go to success step
       } else {

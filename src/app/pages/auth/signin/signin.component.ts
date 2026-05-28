@@ -94,6 +94,7 @@ export class SigninComponent implements OnInit {
     }
   
     const { email, password } = this.form.value;
+      await this.clearStaleAuthData();
 
     try {
       // Primary path: MongoDB-based signin
@@ -141,7 +142,8 @@ export class SigninComponent implements OnInit {
       }
 
       this.pageLoading = false;
-      this.clearStaleAuthData();
+      await this.clearStaleAuthData();
+      await this.auth.signOutFirebase();
       console.error('Sign-in error:', firstErr);
 
       const message = this.extractSigninErrorMessage(firstErr);
@@ -199,6 +201,10 @@ export class SigninComponent implements OnInit {
       console.error('❌ WebSocket initialization failed:', error);
     }
 
+    try {
+      this.oneSignalService.open(this.user?.id || this.user?._id || '');
+    } catch (_) {}
+
     this.pageLoading = false;
 
     // Email not yet verified in MongoDB — MongoDB may be stale if the user
@@ -240,11 +246,18 @@ export class SigninComponent implements OnInit {
     await this.router.navigate(['/tabs/new-friends']);
   }
 
-  private clearStaleAuthData() {
+  private async clearStaleAuthData() {
+    try {
+      if (this.platform.is('cordova')) {
+        await this.nativeStorage.remove('token').catch(() => {});
+        await this.nativeStorage.remove('currentUser').catch(() => {});
+        await this.nativeStorage.remove('user').catch(() => {});
+      }
+    } catch (_) {}
     try { localStorage.removeItem('token'); } catch (_) {}
     try { localStorage.removeItem('currentUser'); } catch (_) {}
     try { localStorage.removeItem('user'); } catch (_) {}
-    try { SocketService.logout(); } catch (_) {}
+    try { await SocketService.logout(); } catch (_) {}
   }
   
 

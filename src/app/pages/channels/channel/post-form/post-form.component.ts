@@ -2,7 +2,7 @@ import { ModalController } from '@ionic/angular';
 import { Post } from './../../../../models/Post';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
-import { Component, OnInit, ViewChild, ElementRef, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnChanges, SimpleChanges, ViewChild, ElementRef, Input, Output, EventEmitter } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { Channel } from 'src/app/models/Channel';
@@ -12,7 +12,7 @@ import { Channel } from 'src/app/models/Channel';
   templateUrl: './post-form.component.html',
   styleUrls: ['./post-form.component.scss'],
 })
-export class PostFormComponent implements OnInit {
+export class PostFormComponent implements OnInit, OnChanges {
   @Input() channelId;
   mediaFile: File | null = null;
   mediaPreview: any = ''; // Media preview for images or videos
@@ -73,6 +73,13 @@ export class PostFormComponent implements OnInit {
     const t = this.channel?.type;
     this.showEventFields = t === 'static_events';
     this.showDatingFields = t === 'static_dating';
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['channel'] && this.channel) {
+      this.channel = new Channel().initialize(this.channel as any);
+      this.applyChannelTypeFlags();
+    }
   }
 
 
@@ -154,14 +161,19 @@ removeMedia() {
 
 
 addPost() {
-  // Ensure postText is not null or undefined and check if it's empty after trimming
-  if (!this.postText || !this.postText.trim()) {
+  const text = (this.postText || '').trim();
+  if (!text && !this.mediaFile) {
     this.toastService.presentErrorToastr('Please add text or media before submitting.');
     return;
   }
 
+  if (!this.channel || !this.channelId) {
+    this.toastService.presentErrorToastr('Channel is not ready yet. Please try again.');
+    return;
+  }
+
   const formData = new FormData();
-  formData.append('text', this.postText.trim());
+  formData.append('text', text);
   formData.append('backgroundColor', this.postBackColor);
   formData.append('color', this.postTextColor);
   formData.append('anonyme', this.anonyme.toString());

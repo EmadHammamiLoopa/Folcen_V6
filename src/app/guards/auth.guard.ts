@@ -2,6 +2,8 @@ import { Injectable } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
 import { Platform } from '@ionic/angular';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -10,7 +12,8 @@ export class AuthGuard implements CanActivate {
   constructor(
     private nativeStorage: NativeStorage,
     private router: Router,
-    private platform: Platform
+    private platform: Platform,
+    private http: HttpClient
   ) {}
 
   private parseJwtPayload(token: string): any | null {
@@ -47,6 +50,33 @@ export class AuthGuard implements CanActivate {
     }
   }
 
+  private async refreshVerificationStatus(token: string, user: any): Promise<any> {
+    if (!token || !user || user.emailVerified !== false) {
+      return user;
+    }
+
+    try {
+      const resp: any = await this.http.get(
+        `${environment.apiUrl}/auth/user`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).toPromise();
+      const freshUser = resp?.data || user;
+
+      if (freshUser) {
+        try { localStorage.setItem('currentUser', JSON.stringify(freshUser)); } catch (e) {}
+        try { localStorage.setItem('user', JSON.stringify(freshUser)); } catch (e) {}
+        if (this.platform.is('cordova')) {
+          try { await this.nativeStorage.setItem('currentUser', freshUser); } catch (e) {}
+          try { await this.nativeStorage.setItem('user', freshUser); } catch (e) {}
+        }
+      }
+
+      return freshUser;
+    } catch (e) {
+      return user;
+    }
+  }
+
   async canActivate(): Promise<boolean> {
     await this.platform.ready();
     
@@ -68,8 +98,8 @@ export class AuthGuard implements CanActivate {
       }
     } else {
       token = localStorage.getItem('token');
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  user = raw ? JSON.parse(raw) : null;
+      const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+      user = raw ? JSON.parse(raw) : null;
       if (token) {
         console.log('Auth token found in localStorage:', token);
       } else {
@@ -84,6 +114,8 @@ export class AuthGuard implements CanActivate {
         this.router.navigate(['/auth/signin']);
         return false;
       }
+
+      user = await this.refreshVerificationStatus(token, user);
 
       // Block unverified users — redirect to the verify-email step in signup
       if (user.emailVerified === false) {

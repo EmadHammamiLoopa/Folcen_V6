@@ -363,6 +363,7 @@ export class AppComponent implements OnDestroy {
         console.log('📱 App resumed - checking connections...');
         if (this.user?.id) {
           this.handleReconnection();
+          this.checkAnnouncements();
         } else {
           console.warn('⚠️ Skipping reconnection: user not yet loaded.');
         }
@@ -453,6 +454,8 @@ export class AppComponent implements OnDestroy {
       if (!WebrtcService.peer || WebrtcService.peer.disconnected) {
         await this.initWebrtc();
       }
+
+      this.checkAnnouncements();
 
       console.log('✅ All services reconnected successfully');
     } catch (error) {

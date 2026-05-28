@@ -8,6 +8,7 @@ import { Platform } from '@ionic/angular';
 import { SessionStoreService } from './session-store.service';
 import { SocketService } from './socket.service';
 import { UserService } from './user.service';
+import { OneSignalService } from './one-signal.service';
 import constants from './../helpers/constants';
 
 type HttpMethod = 'get' | 'post' | 'put' | 'delete';
@@ -34,7 +35,8 @@ export class DataService {
     private httpClient: HttpClient,
     private router: Router,
     public platform: Platform,
-    @Optional() private sessionStore?: SessionStoreService
+    @Optional() private sessionStore?: SessionStoreService,
+    @Optional() private oneSignalService?: OneSignalService
   ) {}
 
   getToken() {
@@ -47,12 +49,24 @@ export class DataService {
     return this.getToken().then((token: string) => {
       const base = this.url || '';
       const url = constants.DOMAIN_URL + (requestOptions.noApi ? '' : constants.API_V1) + base + requestOptions.url;
-      
-      const headers = {
+
+      const authPath = `${String(base || '')}${String(requestOptions.url || '')}`.toLowerCase();
+      const skipAuthHeader =
+        authPath.includes('auth/signin') ||
+        authPath.includes('auth/signup') ||
+        authPath.includes('auth/checkemail') ||
+        authPath.includes('auth/forgot-password') ||
+        authPath.includes('auth/google-signin') ||
+        authPath.includes('auth/google-signup') ||
+        authPath.includes('auth/firebase-login');
+
+      const headers: any = {
         ...(requestOptions.header || {}),
-        VERSION: constants.VERSION,
-        'Authorization': 'Bearer ' + token
+        VERSION: constants.VERSION
       };
+      if (!skipAuthHeader && token) {
+        headers['Authorization'] = 'Bearer ' + token;
+      }
 
       // Ensure that data contains params for GET requests, 
       // as both cordova and browser implementations use requestOptions.data for query params.
@@ -145,6 +159,9 @@ export class DataService {
 
       // 5. Clear user service state
       try { UserService.clearUserState(); } catch (e) { devLogger.warn('UserService clear failed', e); }
+
+      // 5.1 Unregister push token
+      try { this.oneSignalService?.close(); } catch (e) { devLogger.warn('Push unregister failed', e); }
 
       // 6. Clear any other known caches (e.g. PeerJS)
       if ((window as any).peer) {

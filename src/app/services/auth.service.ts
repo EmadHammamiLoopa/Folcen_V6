@@ -224,6 +224,14 @@ export class AuthService extends DataService {
     }
   }
 
+  async signOutFirebase(): Promise<void> {
+    try {
+      await this.firebaseSvc.logout();
+    } catch (e) {
+      // best-effort cleanup
+    }
+  }
+
   private handleAuthError(err: any): { message: string; code?: string; status?: number; errors?: any } {
     console.error('Auth error caught in AuthService:', err);
 
@@ -233,6 +241,7 @@ export class AuthService extends DataService {
         case 'auth/user-not-found':
           return { message: 'No account found with this email. Please sign up first.' };
         case 'auth/wrong-password':
+        case 'auth/invalid-credential':
         case 'auth/invalid-login-credentials':
           return { message: 'Incorrect email or password. Please try again.' };
         case 'auth/invalid-email':
