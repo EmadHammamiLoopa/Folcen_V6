@@ -126,6 +126,11 @@ export class ListComponent implements OnInit, OnDestroy {
     } catch (e) { return 0; }
   }
 
+  private extractSocketMessage(raw: any): any {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+    return parsed?.message || parsed?.data?.message || parsed?.data || parsed;
+  }
+
   ngOnInit() {
     // Load authId early so mapping logic can derive the other party correctly
     try {
@@ -222,7 +227,7 @@ export class ListComponent implements OnInit, OnDestroy {
     SocketService.newMessage$.pipe(takeUntil(this.destroy$)).subscribe((raw: any) => {
       this.zone.run(() => {
         try {
-          const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          const msg = this.extractSocketMessage(raw);
 
           const normalized = new Message().initialize({
             id: msg.id || msg._id,
@@ -253,6 +258,7 @@ export class ListComponent implements OnInit, OnDestroy {
             this.users.unshift(moved);
             this.sortUsersByLatestMessage();
             this.cdr.markForCheck();
+            this.scheduleListRefresh();
             return;
           }
 
@@ -276,6 +282,7 @@ export class ListComponent implements OnInit, OnDestroy {
             }
             this.sortUsersByLatestMessage();
             this.cdr.markForCheck();
+            this.scheduleListRefresh();
           });
         } catch (e) {
           console.error('list/new-message error', e, raw);
@@ -289,7 +296,7 @@ export class ListComponent implements OnInit, OnDestroy {
     SocketService.messageSent$.pipe(takeUntil(this.destroy$)).subscribe((raw: any) => {
       this.zone.run(() => {
         try {
-          const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          const msg = this.extractSocketMessage(raw);
 
           const normalized = new Message().initialize({
             id: msg._id || msg.id,
@@ -303,8 +310,11 @@ export class ListComponent implements OnInit, OnDestroy {
             state: msg.state ?? 'sent',
           });
 
-          // The peer is always the recipient (msg.to) for a sent message
-          const peerKey = this.keyOf(normalized.to);
+          // Prefer recipient for sent messages; fallback to the "other" id when payload shape varies.
+          const fallbackPeer = this.authId
+            ? (String(normalized.from) === String(this.authId) ? normalized.to : normalized.from)
+            : (normalized.to || normalized.from);
+          const peerKey = this.keyOf(fallbackPeer);
 
           const existingIdx = this.users.findIndex(u => this.keyOf(u) === peerKey);
           if (existingIdx !== -1) {

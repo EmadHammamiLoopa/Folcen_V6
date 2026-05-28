@@ -94,18 +94,26 @@ export class SigninComponent implements OnInit {
     }
   
     const { email, password } = this.form.value;
+      await this.clearStaleAuthData();
 
     try {
       // Primary path: MongoDB-based signin
       const resp = await this.auth.signin({ email, password });
-      await this._handleSigninSuccess(resp);
+      await this._handleSigninSuccess(resp, { email, password });
     } catch (firstErr: any) {
       // If the backend returns 401, the user's MongoDB password may be stale
       // after a Firebase password reset (Firebase reset email updates Firebase
       // only — MongoDB hash is not changed). Fall back to Firebase signin so
       // that users who reset their password can still log in.
       const status = firstErr?.status ?? firstErr?.error?.status;
-      if (status === 401) {
+      // Only run Firebase password-sync fallback when backend explicitly reports
+      // MongoDB password drift. Generic 401 must remain a hard login failure.
+      const canFallback = status === 401 && (
+        firstErr?.error?.code === 'mongo_password_stale' ||
+        firstErr?.error?.reasonCode === 'mongo_password_stale'
+      );
+
+      if (canFallback) {
         try {
           // Pass syncMongoPassword=true so the backend re-hashes and stores
           // this password in MongoDB, fixing future MongoDB-only logins.
@@ -134,6 +142,8 @@ export class SigninComponent implements OnInit {
       }
 
       this.pageLoading = false;
+      await this.clearStaleAuthData();
+      await this.auth.signOutFirebase();
       console.error('Sign-in error:', firstErr);
 
       const message = this.extractSigninErrorMessage(firstErr);
@@ -177,7 +187,7 @@ export class SigninComponent implements OnInit {
     return 'An unexpected error occurred.';
   }
 
-  private async _handleSigninSuccess(resp: any) {
+  private async _handleSigninSuccess(resp: any, creds?: { email: string; password: string }) {
     console.log('Sign-in response:', resp);
     this.user = new User().initialize(resp.data.user);
 
@@ -191,6 +201,10 @@ export class SigninComponent implements OnInit {
       console.error('❌ WebSocket initialization failed:', error);
     }
 
+    try {
+      this.oneSignalService.open(this.user?.id || this.user?._id || '');
+    } catch (_) {}
+
     this.pageLoading = false;
 
     // Email not yet verified in MongoDB — MongoDB may be stale if the user
@@ -199,10 +213,24 @@ export class SigninComponent implements OnInit {
     if (this.user.emailVerified === false) {
       let verifyResp: any = null;
       try { verifyResp = await this.auth.checkVerification(); } catch (_) {}
+
+      // If there is no active Firebase user in memory yet, try one explicit
+      // Firebase sign-in with current credentials to refresh emailVerified.
+      if (!verifyResp && creds?.email && creds?.password) {
+        try {
+          verifyResp = await this.auth.firebaseSignin(creds.email, creds.password, false);
+        } catch (_) {}
+      }
+
       if (verifyResp) {
+        const verifiedUser = verifyResp?.data?.user
+          ? new User().initialize(verifyResp.data.user)
+          : null;
         // Firebase confirmed verification and synced MongoDB → re-process
-        await this._handleSigninSuccess(verifyResp);
-        return;
+        if (!verifiedUser || verifiedUser.emailVerified !== false) {
+          await this._handleSigninSuccess(verifyResp, creds);
+          return;
+        }
       }
       this.toastService.presentErrorToastr('Please verify your email address. Check your inbox and click the verification link, then sign in again.');
       await this.router.navigate(['/auth/signup']);
@@ -216,6 +244,20 @@ export class SigninComponent implements OnInit {
 
     console.log('Navigating to /tabs/new-friends');
     await this.router.navigate(['/tabs/new-friends']);
+  }
+
+  private async clearStaleAuthData() {
+    try {
+      if (this.platform.is('cordova')) {
+        await this.nativeStorage.remove('token').catch(() => {});
+        await this.nativeStorage.remove('currentUser').catch(() => {});
+        await this.nativeStorage.remove('user').catch(() => {});
+      }
+    } catch (_) {}
+    try { localStorage.removeItem('token'); } catch (_) {}
+    try { localStorage.removeItem('currentUser'); } catch (_) {}
+    try { localStorage.removeItem('user'); } catch (_) {}
+    try { await SocketService.logout(); } catch (_) {}
   }
   
 

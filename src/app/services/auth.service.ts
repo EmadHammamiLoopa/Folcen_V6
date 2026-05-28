@@ -149,22 +149,59 @@ export class AuthService extends DataService {
     }
   }
 
-  async firebaseSignup(email, password, profile) {
+  async firebaseSignup(email: string, password: string, profile: any) {
     try {
       const displayName = `${profile.firstName} ${profile.lastName}`;
-      const fbUser = await this.firebaseSvc.signUp(email, password, displayName);
+      let fbUser: any;
+      let isNewFirebaseAccount = false;
+
+      try {
+        fbUser = await this.firebaseSvc.signUp(email, password, displayName);
+        isNewFirebaseAccount = true;
+      } catch (fbSignupErr: any) {
+        if (fbSignupErr.code === 'auth/email-already-in-use') {
+          // Try to sign in with the same credentials in case the Firebase account
+          // already exists with the same password (e.g. interrupted previous signup).
+          try {
+            fbUser = await this.firebaseSvc.signIn(email, password);
+            isNewFirebaseAccount = false;
+          } catch (fbSigninErr: any) {
+            // Different password — cannot recover automatically. Surface the error
+            // so the UI shows the "Account Already Exists" dialog.
+            throw fbSignupErr;
+          }
+        } else {
+          throw fbSignupErr;
+        }
+      }
+
       const idToken = await fbUser.getIdToken();
-      return await this.sendRequest({
-        method: 'post',
-        url: 'firebase-login',
-        data: { idToken, profile }
-      });
+      try {
+        return await this.sendRequest({
+          method: 'post',
+          url: 'firebase-login',
+          data: { idToken, profile }
+        });
+      } catch (backendErr: any) {
+        // Backend failed to create the MongoDB record.
+        // If we JUST created this Firebase account, delete it so Firebase and
+        // MongoDB stay in sync — no orphaned Firebase accounts.
+        if (isNewFirebaseAccount) {
+          try {
+            await this.firebaseSvc.deleteCurrentUser();
+            console.log('[firebaseSignup] Cleaned up new Firebase account after backend failure');
+          } catch (deleteErr) {
+            console.warn('[firebaseSignup] Could not delete orphaned Firebase account:', deleteErr);
+          }
+        }
+        throw backendErr;
+      }
     } catch (err) {
       throw this.handleAuthError(err);
     }
   }
 
-  async firebaseSignin(email, password, syncMongoPassword = false) {
+  async firebaseSignin(email: string, password: string, syncMongoPassword = false) {
     try {
       console.log('[DEBUG] AuthService: firebaseSignin called for:', email);
       const fbUser = await this.firebaseSvc.signIn(email, password);
@@ -187,44 +224,63 @@ export class AuthService extends DataService {
     }
   }
 
-  private handleAuthError(err: any) {
+  async signOutFirebase(): Promise<void> {
+    try {
+      await this.firebaseSvc.logout();
+    } catch (e) {
+      // best-effort cleanup
+    }
+  }
+
+  private handleAuthError(err: any): { message: string; code?: string; status?: number; errors?: any } {
     console.error('Auth error caught in AuthService:', err);
-    
-    // Handle Firebase specific error codes
+
+    // Firebase-specific error codes
     if (err && err.code) {
       switch (err.code) {
         case 'auth/user-not-found':
           return { message: 'No account found with this email. Please sign up first.' };
         case 'auth/wrong-password':
-          return { message: 'Incorrect password. Please try again.' };
+        case 'auth/invalid-credential':
+        case 'auth/invalid-login-credentials':
+          return { message: 'Incorrect email or password. Please try again.' };
         case 'auth/invalid-email':
-          return { message: 'The email address is badly formatted.' };
+          return { message: 'The email address is not valid.' };
         case 'auth/user-disabled':
           return { message: 'This account has been disabled. Please contact support.' };
         case 'auth/email-already-in-use':
-          return { message: 'An account with this email already exists. Please sign in instead.', code: 'email-already-in-use' };
+          return { message: 'An account with this email already exists.', code: 'email-already-in-use' };
         case 'auth/weak-password':
-          return { message: 'The password is too weak. Please use at least 8 characters.' };
+          return { message: 'Password too weak. Please use at least 8 characters.' };
         case 'auth/network-request-failed':
-          return { message: 'Network error. Please check your internet connection.' };
+          return { message: 'Network error. Please check your internet connection and try again.' };
         case 'auth/too-many-requests':
           return { message: 'Too many failed attempts. Please try again later.' };
-        case 'auth/invalid-login-credentials':
-          return { message: 'Invalid email or password. Please check your credentials.' };
         default:
           return { message: err.message || 'Authentication failed. Please try again.' };
       }
     }
 
-    // If it's already a formatted error from our backend
-    if (err && err.error && typeof err.error === 'string') {
-      return err;
+    // Backend HTTP error (Angular HttpErrorResponse)
+    if (err && typeof err.status === 'number') {
+      const body = err.error;
+      // Preserve field-level validation errors if the backend sent an errors object
+      if (body && body.errors && typeof body.errors === 'object' && !Array.isArray(body.errors)) {
+        return { message: body.message || 'Please correct the highlighted fields.', status: err.status, errors: body.errors };
+      }
+      // Plain message from backend
+      const msg = body?.message
+        || (typeof body?.errors === 'string' ? body.errors : null)
+        || (typeof body === 'string' ? body : null)
+        || `Request failed (${err.status}). Please try again.`;
+      return { message: msg, status: err.status };
     }
 
-    return err;
+    // Fallback
+    return { message: err?.message || 'An unexpected error occurred. Please try again.' };
   }
 
-  async firebaseResetPassword(email) {
+  async firebaseResetPassword(email: string) {
     return this.firebaseSvc.resetPassword(email);
   }
 
@@ -233,16 +289,41 @@ export class AuthService extends DataService {
   }
 
   async checkVerification() {
-    const fbUser = await this.firebaseSvc.reloadUser();
-    if (fbUser && fbUser.emailVerified) {
-      const idToken = await this.firebaseSvc.getIdToken(true); // Force refresh to get updated email_verified claim
-      return await this.sendRequest({
-        method: 'post',
-        url: 'firebase-login',
-        data: { idToken }
-      });
+    // Wait for Firebase auth state to be restored from persistence.
+    // This is essential when the app is opened fresh (not a same-session signup):
+    // currentUser is null until the async restoration completes.
+    // Firebase 9.x has no authStateReady() — we use onAuthStateChanged instead.
+    const fbUser: any = await this.firebaseSvc.waitForAuthReady();
+    if (!fbUser) return null; // Not signed in to Firebase at all
+
+    // Reload to pick up the latest server-side state (emailVerified flag).
+    try { await fbUser.reload(); } catch (_) { /* network issue — continue anyway */ }
+
+    // Force-refresh the ID token. The new token contains the definitive
+    // email_verified claim issued directly by Firebase Auth servers.
+    // This is more reliable than fbUser.emailVerified, which can lag behind
+    // the server state even after reload() in some Firebase SDK versions.
+    const idToken = await fbUser.getIdToken(true);
+    if (!idToken) return null;
+
+    // Decode the JWT payload to read email_verified (claims are public, no secret needed).
+    let emailVerified = false;
+    try {
+      const b64 = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const claims = JSON.parse(atob(b64 + '='.repeat((4 - b64.length % 4) % 4)));
+      emailVerified = claims.email_verified === true;
+    } catch (_) {
+      // Fallback to the local flag if JWT decode fails for any reason
+      emailVerified = fbUser.emailVerified === true;
     }
-    return null;
+
+    if (!emailVerified) return null;
+
+    return await this.sendRequest({
+      method: 'post',
+      url: 'firebase-login',
+      data: { idToken }
+    });
   }
 
   signin(data: any) {
@@ -274,7 +355,7 @@ export class AuthService extends DataService {
     });
   }
 
-  getUserId(): string {
+  getUserId(): string | null {
     try {
       const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
       const user = raw ? JSON.parse(raw) : null;

@@ -22,7 +22,8 @@ import { environment } from '../../environments/environment';
 export class FcmPushService {
 
   private currentToken: string | null = null;
-  private readonly apiBase = environment.apiUrl || 'http://127.0.0.1:3300/api/v1';
+  private listenersAttached = false;
+  private readonly apiBase = environment.apiUrl;
 
   constructor(
     private platform: Platform,
@@ -35,6 +36,10 @@ export class FcmPushService {
     const isNative = typeof window !== 'undefined' && 'cordova' in window;
     if (!isNative) {
       console.log('[FcmPushService] Browser mode — skipping FCM registration');
+      return;
+    }
+    if (this.currentToken) {
+      await this.sendTokenToBackend(this.currentToken);
       return;
     }
     await this.registerFcm();
@@ -58,6 +63,34 @@ export class FcmPushService {
 
   private async registerFcm(): Promise<void> {
     try {
+      if (!this.listenersAttached) {
+        PushNotifications.addListener('registration', async (tokenData) => {
+          const token = tokenData.value;
+          this.currentToken = token;
+          console.log('[FcmPushService] FCM token received');
+          await this.sendTokenToBackend(token);
+        });
+
+        PushNotifications.addListener('registrationError', (err) => {
+          console.error('[FcmPushService] FCM registration error:', err);
+        });
+
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('[FcmPushService] Notification received in foreground:', notification.title);
+        });
+
+        PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+          const data = action.notification?.data;
+          if (data?.link) {
+            this.platform.ready().then(() => {
+              setTimeout(() => this.router.navigateByUrl(data.link), 200);
+            });
+          }
+        });
+
+        this.listenersAttached = true;
+      }
+
       // 1. Request permission
       let permStatus = await PushNotifications.checkPermissions();
       if (permStatus.receive === 'prompt') {
@@ -70,33 +103,6 @@ export class FcmPushService {
 
       // 2. Register with FCM
       await PushNotifications.register();
-
-      // 3. Listen for FCM registration token
-      PushNotifications.addListener('registration', async (tokenData) => {
-        const token = tokenData.value;
-        this.currentToken = token;
-        console.log('[FcmPushService] FCM token received');
-        await this.sendTokenToBackend(token);
-      });
-
-      PushNotifications.addListener('registrationError', (err) => {
-        console.error('[FcmPushService] FCM registration error:', err);
-      });
-
-      // 4. Handle foreground notifications
-      PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        console.log('[FcmPushService] Notification received in foreground:', notification.title);
-      });
-
-      // 5. Handle notification tap (background/closed)
-      PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-        const data = action.notification?.data;
-        if (data?.link) {
-          this.platform.ready().then(() => {
-            setTimeout(() => this.router.navigateByUrl(data.link), 200);
-          });
-        }
-      });
 
     } catch (err) {
       console.error('[FcmPushService] registerFcm error:', err);
