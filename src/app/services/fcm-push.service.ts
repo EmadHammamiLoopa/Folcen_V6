@@ -80,11 +80,24 @@ export class FcmPushService {
         });
 
         PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-          const data = action.notification?.data;
+          const data: any = action.notification?.data || {};
+
           if (data?.link) {
             this.platform.ready().then(() => {
               setTimeout(() => this.router.navigateByUrl(data.link), 200);
             });
+          }
+
+          const isAnnouncement =
+            data?.type === 'announcement' ||
+            data?.category === 'announcement' ||
+            data?.kind === 'announcement' ||
+            !!data?.announcementId;
+
+          if (isAnnouncement) {
+            try {
+              window.dispatchEvent(new CustomEvent('announcement-notification-tapped', { detail: data }));
+            } catch (_) {}
           }
         });
 

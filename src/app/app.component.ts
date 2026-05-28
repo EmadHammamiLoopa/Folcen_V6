@@ -68,6 +68,7 @@ export class AppComponent implements OnDestroy {
   private userSub: Subscription | null = null;
   private forceLogoutHandler: any = null;
   private forceLogoutMessageHandler: any = null;
+  private announcementTapHandler: any = null;
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -122,6 +123,16 @@ export class AppComponent implements OnDestroy {
         } catch (e) {}
       };
       window.addEventListener('message', this.forceLogoutMessageHandler as any);
+
+      this.announcementTapHandler = () => {
+        // Delay slightly so auth/session restoration can finish after app wakeup.
+        setTimeout(() => {
+          if (this.user?.id) {
+            this.checkAnnouncements();
+          }
+        }, 300);
+      };
+      window.addEventListener('announcement-notification-tapped', this.announcementTapHandler as any);
     } catch (e) {}
     // Subscribe to central user store so this.user stays in sync across pages
     try {
@@ -268,6 +279,7 @@ export class AppComponent implements OnDestroy {
     } catch (e) {}
     try { if (this.forceLogoutHandler) window.removeEventListener('force-logout', this.forceLogoutHandler); } catch (e) {}
     try { if (this.forceLogoutMessageHandler) window.removeEventListener('message', this.forceLogoutMessageHandler); } catch (e) {}
+    try { if (this.announcementTapHandler) window.removeEventListener('announcement-notification-tapped', this.announcementTapHandler); } catch (e) {}
     try { if (this.connectionMonitorInterval) { clearInterval(this.connectionMonitorInterval); this.connectionMonitorInterval = null; } } catch (e) {}
   }
 
