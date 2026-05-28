@@ -263,6 +263,7 @@ export class ListComponent implements OnInit, OnDestroy {
           }
 
           this.userService.getUserProfile(peerId).subscribe((profile: any) => {
+            const resolvedProfile = profile?.data ?? profile ?? {};
             const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
             if (idx2 !== -1) {
               const user = this.users[idx2];
@@ -272,9 +273,32 @@ export class ListComponent implements OnInit, OnDestroy {
               this.users.unshift(moved);
             } else {
               const user = new User().initialize({
-                ...profile,
+                ...resolvedProfile,
                 _id: peerKey,
                 id: peerKey,
+                messages: [normalized],
+              }) as ListUser;
+              user.hasUnread = shouldHighlight;
+              this.users.unshift(user);
+            }
+            this.sortUsersByLatestMessage();
+            this.cdr.markForCheck();
+            this.scheduleListRefresh();
+          }, () => {
+            // Fallback: never drop a conversation from the list if profile lookup fails.
+            const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
+            if (idx2 !== -1) {
+              const user = this.users[idx2];
+              user.messages = [normalized, ...(user.messages || [])];
+              user.hasUnread = shouldHighlight;
+              const [moved] = this.users.splice(idx2, 1);
+              this.users.unshift(moved);
+            } else {
+              const user = new User().initialize({
+                _id: peerKey,
+                id: peerKey,
+                firstName: 'User',
+                lastName: '',
                 messages: [normalized],
               }) as ListUser;
               user.hasUnread = shouldHighlight;
@@ -335,6 +359,7 @@ export class ListComponent implements OnInit, OnDestroy {
             this.cdr.markForCheck();
           } else {
             this.userService.getUserProfile(peerKey).subscribe((profile: any) => {
+              const resolvedProfile = profile?.data ?? profile ?? {};
               const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
               if (idx2 !== -1) {
                 const user = this.users[idx2];
@@ -344,9 +369,30 @@ export class ListComponent implements OnInit, OnDestroy {
                 this.users.unshift(moved);
               } else {
                 const user = new User().initialize({
-                  ...profile,
+                  ...resolvedProfile,
                   _id: peerKey,
                   id: peerKey,
+                  messages: [normalized],
+                }) as ListUser;
+                user.hasUnread = false;
+                this.users.unshift(user);
+              }
+              this.sortUsersByLatestMessage();
+              this.cdr.markForCheck();
+            }, () => {
+              const idx2 = this.users.findIndex(u => this.keyOf(u) === peerKey);
+              if (idx2 !== -1) {
+                const user = this.users[idx2];
+                user.messages = [normalized, ...(user.messages || [])];
+                user.hasUnread = false;
+                const [moved] = this.users.splice(idx2, 1);
+                this.users.unshift(moved);
+              } else {
+                const user = new User().initialize({
+                  _id: peerKey,
+                  id: peerKey,
+                  firstName: 'User',
+                  lastName: '',
                   messages: [normalized],
                 }) as ListUser;
                 user.hasUnread = false;
@@ -632,6 +678,7 @@ private formatTimeAgo(timestamp: string): string {
   (resp?.data?.users || []).forEach((usr: any) => {
           if (usr.messages && usr.messages.length > 0) {
             this.userService.getUserProfile(usr._id).subscribe((userProfile) => {
+              const profile = (userProfile as any)?.data ?? userProfile ?? {};
               const messages = usr.messages.map((message: any) =>
                 new Message().initialize({
                   ...message,
@@ -642,14 +689,14 @@ private formatTimeAgo(timestamp: string): string {
             
               const uid = this.keyOf(usr._id);
               const user = new User().initialize({
-                ...userProfile,
+                ...profile,
                 _id: uid,
                 id: uid,
                 messages,
-                firstName: userProfile.firstName || usr.firstName,
-                lastName: userProfile.lastName || usr.lastName,
-                mainAvatar: userProfile.mainAvatar || usr.mainAvatar,
-                avatar: userProfile.avatar?.length ? userProfile.avatar : usr.avatar,
+                firstName: profile.firstName || usr.firstName,
+                lastName: profile.lastName || usr.lastName,
+                mainAvatar: profile.mainAvatar || usr.mainAvatar,
+                avatar: profile.avatar?.length ? profile.avatar : usr.avatar,
               }) as ListUser;
             
               const last = messages?.[0];
@@ -671,6 +718,45 @@ private formatTimeAgo(timestamp: string): string {
                 this.users.unshift(user);
               }
             
+              this.sortUsersByLatestMessage();
+              this.cdr.markForCheck();
+            }, () => {
+              // Fallback to aggregate payload if profile endpoint fails.
+              const messages = (usr.messages || []).map((message: any) =>
+                new Message().initialize({
+                  ...message,
+                  createdAt: this.getMessageDate(message),
+                  productId: message.type === 'product' ? message.productId : message.productId ?? null,
+                })
+              );
+
+              const uid = this.keyOf(usr._id);
+              const user = new User().initialize({
+                _id: uid,
+                id: uid,
+                messages,
+                firstName: usr.firstName || 'User',
+                lastName: usr.lastName || '',
+                mainAvatar: usr.mainAvatar,
+                avatar: usr.avatar,
+              }) as ListUser;
+
+              const last = messages?.[0];
+              const isIncoming = !!last && !!this.authId && last.from !== this.authId;
+              const hasServerUnread = Number.isFinite(usr.unreadCount);
+              user.hasUnread = hasServerUnread
+                ? (usr.unreadCount > 0)
+                : this.isUnread(uid, last, isIncoming);
+
+              const idx = this.users.findIndex(u => this.keyOf(u) === uid);
+              if (idx !== -1) {
+                this.users[idx] = user;
+                const [moved] = this.users.splice(idx, 1);
+                this.users.unshift(moved);
+              } else {
+                this.users.unshift(user);
+              }
+
               this.sortUsersByLatestMessage();
               this.cdr.markForCheck();
             });

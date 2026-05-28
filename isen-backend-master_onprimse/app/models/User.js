@@ -176,8 +176,6 @@ userSchema.virtual('password')
     .set(function(password) {
         this._password = password;
         this.hashed_password = bcrypt.hashSync(password, 10);  // bcrypt handles salt internally
-        console.log(`Setting password for ${this.email}`);
-        console.log(`Hashed password: ${this.hashed_password}`);
     })
     .get(function() {
         return this._password;
@@ -190,31 +188,42 @@ userSchema.virtual('password')
 
 // Authenticate method to compare passwords
 userSchema.methods.authenticate = async function(plainText) {
-    console.log(`Authenticating user with plain text password: ${plainText}`);
+    const candidate = String(plainText || '');
+    const currentHash = String(this.hashed_password || '');
+    if (!candidate || !currentHash) return false;
 
-    if (this.isOldPasswordFormat()) {
-        // Re-hash using bcrypt if the password is in an old format
-        console.log('Old password format detected, re-hashing password...');
-        this.hashed_password = await bcrypt.hash(plainText, 10);
-        this.salt = undefined;  // Remove the old salt field if it was used
-        await this.save();
-        console.log('Password re-hashed and updated to new bcrypt format.');
+    // Normal/modern path: bcrypt hashes start with $2a$, $2b$, or $2y$.
+    if (/^\$2[aby]\$\d{2}\$/.test(currentHash)) {
+        return bcrypt.compare(candidate, currentHash);
     }
 
-    const isMatch = await bcrypt.compare(plainText, this.hashed_password);
-
-    if (!isMatch) {
-        console.log('Password mismatch');
+    // Legacy path: only migrate if the candidate matches the legacy salted hash.
+    const hasLegacySalt = typeof this.salt === 'string' && this.salt.length > 0;
+    if (!hasLegacySalt) {
         return false;
     }
 
+    const legacyHash = crypto
+        .createHmac('sha1', this.salt)
+        .update(candidate)
+        .digest('hex');
+
+    if (legacyHash !== currentHash) {
+        return false;
+    }
+
+    // Successful legacy login: transparently upgrade to bcrypt.
+    this.hashed_password = await bcrypt.hash(candidate, 10);
+    this.salt = undefined;
+    await this.save();
     return true;
 };
 
 
 
 userSchema.methods.isOldPasswordFormat = function() {
-    return !this.salt || this.hashed_password.length !== 60; // bcrypt hash length is typically 60 characters
+    const currentHash = String(this.hashed_password || '');
+    return !/^\$2[aby]\$\d{2}\$/.test(currentHash);
 };
 
 
