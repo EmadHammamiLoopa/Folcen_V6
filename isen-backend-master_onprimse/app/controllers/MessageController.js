@@ -144,8 +144,8 @@ exports.getUsersMessages = async (req, res) => {
           messages: [{
             text: '$lastMessage.text',
             createdAt: '$lastMessage.createdAt',
-            from: '$lastMessage.from',
-            to: '$lastMessage.to',
+            from: { $toString: '$lastMessage.from' },
+            to: { $toString: '$lastMessage.to' },
             type: '$lastMessage.type',
             productId: '$lastMessage.productId'
           }]

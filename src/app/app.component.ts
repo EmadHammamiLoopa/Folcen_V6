@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, NgZone, OnDestroy } from '@angular/core';
 import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { Platform, ModalController } from '@ionic/angular';
@@ -86,6 +86,7 @@ export class AppComponent implements OnDestroy {
     private backgroundMode: BackgroundMode,
     private modalCtrl: ModalController,
     private changeDetectorRef: ChangeDetectorRef,
+    private zone: NgZone,
     private toastService: ToastService,
     private requestService: RequestService,
     private socketService: SocketService,
@@ -215,7 +216,8 @@ export class AppComponent implements OnDestroy {
       try {
         if (!this.user || !announcement?._id) return;
         if (!this.shownAnnouncements.has(announcement._id)) {
-          this.showAnnouncement(announcement);
+          // Run inside Angular zone — ModalController requires it to render the overlay correctly
+          this.zone.run(() => this.showAnnouncement(announcement));
         }
       } catch (e) {}
     });

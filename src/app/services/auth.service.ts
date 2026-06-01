@@ -307,22 +307,38 @@ export class AuthService extends DataService {
     if (!idToken) return null;
 
     // Decode the JWT payload to read email_verified (claims are public, no secret needed).
-    let emailVerified = false;
-    try {
-      const b64 = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      const claims = JSON.parse(atob(b64 + '='.repeat((4 - b64.length % 4) % 4)));
-      emailVerified = claims.email_verified === true;
-    } catch (_) {
-      // Fallback to the local flag if JWT decode fails for any reason
-      emailVerified = fbUser.emailVerified === true;
+    const decodeVerified = (token: string): boolean => {
+      try {
+        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const claims = JSON.parse(atob(b64 + '='.repeat((4 - b64.length % 4) % 4)));
+        return claims.email_verified === true;
+      } catch (_) {
+        return fbUser.emailVerified === true;
+      }
+    };
+
+    let emailVerified = decodeVerified(idToken);
+
+    // Firebase can take a few seconds to propagate email verification across all
+    // servers. If the first check says "not verified", wait 2 s and retry once
+    // before giving up — this avoids making the user tap the button twice.
+    if (!emailVerified) {
+      await new Promise(r => setTimeout(r, 2000));
+      try { await fbUser.reload(); } catch (_) {}
+      const idToken2 = await fbUser.getIdToken(true).catch(() => null);
+      if (idToken2) {
+        emailVerified = decodeVerified(idToken2);
+      }
     }
 
     if (!emailVerified) return null;
 
+    // Always use a fresh token for the backend call
+    const finalToken = await fbUser.getIdToken(false).catch(() => null) || idToken;
     return await this.sendRequest({
       method: 'post',
       url: 'firebase-login',
-      data: { idToken }
+      data: { idToken: finalToken }
     });
   }
 

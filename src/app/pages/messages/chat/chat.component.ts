@@ -120,6 +120,8 @@ activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | null, messageI
   }
 
 ionViewWillLeave() {
+  // Reset so re-entering this conversation always reloads messages from the server
+  this.lastLoadedPeerId = null;
   // tell server to cancel any pendings in this thread
   if (this.socket?.connected && this.user?.id) {
     this.socket.emit('leave-chat', { withUser: this.user.id });
@@ -303,6 +305,15 @@ ngOnDestroy() {
     this.sessionStart = Date.now();
     this.activeVideoCall = { status: null, messageId: undefined }
     
+    // Reload messages every time the view becomes active so the user always sees
+    // the latest conversation state (handles messages sent while they were away).
+    if (this.user?.id) {
+      this.page = 0;
+      this.messages = [];
+      this.groupedMessages = [];
+      this.getUserProfile(this.user.id);
+    }
+
     console.log("ionViewWillEnter called");
     // Do not reset global messages badge when entering a chat thread —
     // clearing should be handled by markThreadRead() so we only clear per-user counts.

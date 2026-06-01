@@ -1,7 +1,7 @@
 import { devLogger } from "../../../utils/dev-logger";
 import { ListSearchComponent } from './../../list-search/list-search.component';
 import { AuthService } from './../../../services/auth.service';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AlertController, ModalController, PickerController, Platform } from '@ionic/angular';
@@ -65,6 +65,7 @@ export class SignupComponent implements OnInit, OnDestroy {
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private auth: AuthService,
     private formBuilder: FormBuilder,
     private modalCtrl: ModalController,
@@ -83,8 +84,15 @@ export class SignupComponent implements OnInit, OnDestroy {
 
   ionViewWillEnter() {
     this.step = 0;
-    
-    // Check if we have a logged-in but unverified user
+
+    // Auto-open verify step only when user was explicitly redirected here
+    // due to EMAIL_NOT_VERIFIED (guard/interceptor). This avoids forcing
+    // verification from stale cached auth state during normal signup/login.
+    const reason = this.route.snapshot.queryParamMap.get('reason');
+    if (reason !== 'email_not_verified') {
+      return;
+    }
+
     const user = this.userService.currentUserValue;
     if (user && user.emailVerified === false) {
       devLogger.log('SignupComponent: Unverified user detected, jumping to verifyEmail step');
@@ -92,13 +100,10 @@ export class SignupComponent implements OnInit, OnDestroy {
       if (verifyStepIndex !== -1) {
         this.step = verifyStepIndex;
         // Ensure the email is shown in the template
-        if (user.email) {
+        if (this.form && user.email) {
           this.form.patchValue({ email: user.email });
         }
         this.toastService.presentErrorToastr('Your email address is not verified. Please check your inbox and click the verification link to access the app.');
-        setTimeout(() => {
-          this.checkVerification().catch(() => {});
-        }, 300);
       }
     }
   }

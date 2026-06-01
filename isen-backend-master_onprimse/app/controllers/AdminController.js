@@ -177,14 +177,35 @@ exports.createAnnouncement = async (req, res) => {
       createdBy: req.auth._id
     });
     await announcement.save();
-    
-    // Notify users via socket
-    if (target === 'all') {
-      emitToAll('new_announcement', announcement);
-    } else {
-      // Logic for specific targets could be added here
-      emitToAll('new_announcement', announcement);
+
+    // Notify recipients via socket + push fallback (offline users)
+    let recipientIds = [];
+    if (target === 'all' || !target) {
+      const users = await User.find(
+        { enabled: true, banned: { $ne: true }, isDeleted: { $ne: true } },
+        { _id: 1 }
+      ).lean();
+      recipientIds = users.map(u => String(u._id));
+    } else if (Array.isArray(target?.userIds)) {
+      recipientIds = target.userIds.map((id) => String(id)).filter(Boolean);
     }
+
+    if (recipientIds.length > 0) {
+      emitToUsers(recipientIds, 'new_announcement', announcement);
+      try {
+        // Use the 5-argument signature so the push payload includes type/announcementId.
+        // The FCM tap handler in the app checks data.type === 'announcement' to show the modal.
+        await sendNotification(
+          { en: title || content || 'New announcement' },
+          { en: content || title || 'You have a new announcement' },
+          { type: 'announcement', announcementId: String(announcement._id) },
+          null,
+          recipientIds
+        );
+      } catch (pushErr) {
+        console.warn('AdminController.createAnnouncement push notify failed:', pushErr?.message || pushErr);
+      }
+
 
     return Response.sendResponse(res, announcement, 'Announcement created');
   } catch (err) {

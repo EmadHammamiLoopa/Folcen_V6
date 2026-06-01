@@ -27,7 +27,27 @@ export class AuthInterceptor implements HttpInterceptor {
     await toast.present();
   }
 
+  private isAuthEntryRequest(url: string): boolean {
+    const normalized = (url || '').toLowerCase();
+    return (
+      normalized.includes('/auth/signin') ||
+      normalized.includes('/auth/signup') ||
+      normalized.includes('/auth/firebase-login') ||
+      normalized.includes('/auth/verify-email') ||
+      normalized.includes('/auth/check-verification') ||
+      normalized.includes('/auth/resend-verification') ||
+      normalized.includes('/auth/reset-password') ||
+      normalized.includes('/auth/forgot-password')
+    );
+  }
+
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    // Never attach stale auth tokens to auth entry endpoints; these requests
+    // must rely only on the credentials in their payload.
+    if (this.isAuthEntryRequest(req.url)) {
+      return next.handle(req);
+    }
+
     return from(this.platform.ready()).pipe(
       switchMap(() => {
         if (this.platform.is('cordova')) {
@@ -50,7 +70,9 @@ export class AuthInterceptor implements HttpInterceptor {
               if (error.status === 403 && error.error?.errorCode === 'EMAIL_NOT_VERIFIED') {
                 devLogger.log('Email not verified — redirecting to verify-email step');
                 this.showEmailNotVerifiedToast();
-                this.router.navigate(['/auth/signup']);
+                if (this.router.url !== '/auth/signup') {
+                  this.router.navigate(['/auth/signup'], { queryParams: { reason: 'email_not_verified' } });
+                }
               }
               return throwError(error);
             })
