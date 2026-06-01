@@ -193,11 +193,14 @@ exports.createAnnouncement = async (req, res) => {
     if (recipientIds.length > 0) {
       emitToUsers(recipientIds, 'new_announcement', announcement);
       try {
+        // Use the 5-argument signature so the push payload includes type/announcementId.
+        // The FCM tap handler in the app checks data.type === 'announcement' to show the modal.
         await sendNotification(
-          recipientIds,
-          content || title || 'New announcement',
-          'Folcen Team',
-          String(req.auth?._id || 'system')
+          { en: title || content || 'New announcement' },
+          { en: content || title || 'You have a new announcement' },
+          { type: 'announcement', announcementId: String(announcement._id) },
+          null,
+          recipientIds
         );
       } catch (pushErr) {
         console.warn('AdminController.createAnnouncement push notify failed:', pushErr?.message || pushErr);

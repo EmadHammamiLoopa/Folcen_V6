@@ -1240,7 +1240,9 @@ exports.updateAvatar = async (req, res) => {
 
 
 exports.deleteAccount = async(req, res) => {
+    try {
     const user = req.authUser
+    if (!user) return Response.sendError(res, 401, 'User not found');
     const days = parseInt(process.env.DATA_RETENTION_DAYS || '30');
     const now = new Date();
     
@@ -1314,6 +1316,10 @@ exports.deleteAccount = async(req, res) => {
     } catch (e) { logger.warn('deleteAccount post-delete hooks failed', e); }
 
     return Response.sendResponse(res, { retentionDays: days }, 'account deleted')
+    } catch (err) {
+        logger.error('UserController.deleteAccount error', err);
+        return Response.sendError(res, 500, 'Failed to delete account');
+    }
 }
 
 exports.restoreAccount = async (req, res) => {
