@@ -53,9 +53,9 @@ export class ChatComponent implements OnInit {
   videoCallDeclined = false;
 
   page = 0;
-  resend = [];
-  product: Product;
-  productId: string;
+  resend: any[] = [];
+  product!: Product;
+  productId!: string;
 inSession = true;
 sessionStart = 0;
 
@@ -67,22 +67,22 @@ private loadingMessages = false;
 
   private lastLoadedPeerId: string | null = null;
 
-  image: string = null;
-  imageFile: ImageFileObject = null;
+  image: string | null = null;
+  imageFile: ImageFileObject | null = null;
   messageText = "";
   private activityListeners: any[] = [];
   private lastActivityTime = Date.now();
 
   connected = false;
-  @ViewChild('content') private content: IonContent;
-  @ViewChild('infScroll') private infScroll: IonInfiniteScroll;
+  @ViewChild('content') private content!: IonContent;
+  @ViewChild('infScroll') private infScroll!: IonInfiniteScroll;
 
   messages: Message[] = [];
     groupedMessages: any[] = []; // For date grouping
 
   socket: any;
-  user: User;
-  authUser: User;
+  user!: User;
+  authUser!: User;
   pageLoading = false;
   private sendMessageCounter = 0;
 
@@ -343,7 +343,7 @@ ngOnDestroy() {
     }
   }
 
-  getProductDetails(productId: string, event?) {
+  getProductDetails(productId: string, event?: any) {
     if (!event) this.pageLoading = true;
     this.productService.get(productId).then(
       (resp: any) => {
@@ -376,9 +376,9 @@ ngOnDestroy() {
 
   
 async acceptVideoCall(message: Message) {
-  message['busy'] = true;
+  (message as any)['busy'] = true;
   const realId = await this.ensureRealId(message);
-  if (!realId) { message['busy'] = false; return this.toastService.presentErrorToastr('Still preparing… try again'); }
+  if (!realId) { (message as any)['busy'] = false; return this.toastService.presentErrorToastr('Still preparing… try again'); }
 
   const other = message.from === this.authUser.id ? message.to : message.from;
   this.socket.emit('video-call-accepted', {
@@ -390,9 +390,9 @@ async acceptVideoCall(message: Message) {
 }
 
 async cancelVideoCallRequest(message: Message) {
-  message['busy'] = true;
+  (message as any)['busy'] = true;
   const realId = await this.ensureRealId(message);
-  if (!realId) { message['busy'] = false; return this.toastService.presentErrorToastr('Still preparing… try again'); }
+  if (!realId) { (message as any)['busy'] = false; return this.toastService.presentErrorToastr('Still preparing… try again'); }
 
   const other = message.from === this.authUser.id ? message.to : message.from;
   this.socket.emit('video-call-cancelled', {
@@ -535,9 +535,9 @@ async initializeSocket() {
 
 // Group messages by date
 groupMessagesByDate() {
-  const grouped = [];
-  let currentDate = null;
-  let currentGroup = null;
+  const grouped: any[] = [];
+  let currentDate: string | null = null;
+  let currentGroup: any = null;
 
   // Sort messages by date (oldest first)
   const sortedMessages = [...this.messages].sort((a, b) => 
@@ -647,7 +647,7 @@ private normalizeMessagesTimestamps(): void {
     }, 100);
   }
 
-async getMessages(event?) {
+async getMessages(event?: any) {
   if (this.loadingMessages) {
     event?.target?.complete?.();
     return;
@@ -665,13 +665,13 @@ async getMessages(event?) {
     const resp: any = await this.messageService.indexMessages(this.user?.id || this.productId, this.page++);
 
     if (resp?.data?.messages?.length) {
-      const newMessages = (resp?.data?.messages || []).map(m => {
+      const newMessages = (resp?.data?.messages || []).map((m: any) => {
         if (m.image && typeof m.image === 'object' && m.image.path) m.image = m.image.path;
         return new Message().initialize(m);
       });
 
       const seen = new Set(this.messages.map(m => m.id));
-      newMessages.forEach(m => { if (!seen.has(m.id)) this.messages.unshift(m); });
+      newMessages.forEach((m: any) => { if (!seen.has(m.id)) this.messages.unshift(m); });
 
       if (this.page === 1) this.markThreadRead();
       // Normalize timestamps derived from ObjectIds for messages that lacked createdAt
@@ -741,7 +741,7 @@ private recomputeActiveCall() {
       );
   }
 
-  checkMessageExisting(message) {
+  checkMessageExisting(message: any) {
     return this.messages.find(msg => msg.id == message._id) ? true : false;
   }
 
@@ -856,12 +856,12 @@ this.socket.on('message-sent', (saved: any) => {
 
 
 // in accepted/cancelled listeners:
-this.socket.on('video-call-accepted', (data) => {
+this.socket.on('video-call-accepted', (data: any) => {
   this.zone.run(() => {
     const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
     if (msg) {
       msg.status = 'accepted';
-      msg['busy'] = false;
+      (msg as any)['busy'] = false;
       this.recomputeActiveCall();
       this.groupMessagesByDate();
       this.recomputeActiveCall(); // <— add here too
@@ -871,12 +871,12 @@ this.socket.on('video-call-accepted', (data) => {
   });
 });
 
-this.socket.on('video-call-cancelled', (data) => {
+this.socket.on('video-call-cancelled', (data: any) => {
   this.zone.run(() => {
     const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
     if (msg) {
       msg.status = 'cancelled';
-      msg['busy'] = false;
+      (msg as any)['busy'] = false;
       this.recomputeActiveCall();
       this.groupMessagesByDate();
       this.changeDetection.detectChanges();
@@ -960,7 +960,7 @@ this.socket.on('video-call-cancelled', (data) => {
 getLatestVideoCallStatus(): string | null {
   const calls = this.messages.filter(m => m.type === 'video-call-request');
   if (!calls.length) return null;
-  return calls[calls.length - 1].status; // last call's status
+  return calls[calls.length - 1].status ?? null; // last call's status
 }
 
 hasAcceptedCall(): boolean {
@@ -1012,7 +1012,7 @@ private handleIncomingVideoCall(message: Message) {
    
   
 
-  resendMessage(message) {
+  resendMessage(message: any) {
     this.resend.push(message.id);
     this.sendMessage(message);
   }
@@ -1086,13 +1086,13 @@ private async compressImage(base64Image: string): Promise<string> {
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx!.drawImage(img, 0, 0, width, height);
       resolve(canvas.toDataURL('image/jpeg', 0.7));
     };
   });
 }
 
-private async uploadImageAndGetUrl(): Promise<string> {
+private async uploadImageAndGetUrl(): Promise<string | null> {
   try {
     if (!this.imageFile?.file) return null;
 
@@ -1100,7 +1100,12 @@ private async uploadImageAndGetUrl(): Promise<string> {
       .pipe(take(1))
       .toPromise();
 
-    return uploadResponse?.fileUrl || null;
+    let fileUrl = uploadResponse?.fileUrl || null;
+    // Ensure HTTPS — Railway terminates SSL at the proxy; internal req.protocol may be 'http'
+    if (fileUrl && fileUrl.startsWith('http://')) {
+      fileUrl = fileUrl.replace('http://', 'https://');
+    }
+    return fileUrl;
   } catch (error) {
     console.error('Image upload failed:', error);
     this.toastService.presentErrorToastr('Failed to upload image');
@@ -1112,7 +1117,7 @@ private async uploadImageAndGetUrl(): Promise<string> {
 
 private dataURLtoBlob(dataurl: string): Blob {
   const arr = dataurl.split(',');
-  const mime = arr[0].match(/:(.*?);/)[1];
+  const mime = arr[0].match(/:(.*?);/)![1];
   const bstr = atob(arr[1]);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
@@ -1124,7 +1129,7 @@ private dataURLtoBlob(dataurl: string): Blob {
 
 private dataURLtoFile(dataurl: string, filename: string): File {
   const arr = dataurl.split(',');
-  const mime = arr[0].match(/:(.*?);/)[1];
+  const mime = arr[0].match(/:(.*?);/)![1];
   const bstr = atob(arr[1]);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
@@ -1257,32 +1262,19 @@ removeImage() {
 async pickMedia(mediaType: 'image' | 'video') {
   try {
     if (this.platform.is('cordova')) {
-      const sourceType = this.camera.PictureSourceType.CAMERA;
-      const mediaTypeValue = mediaType === 'image' ? this.camera.MediaType.PICTURE : this.camera.MediaType.VIDEO;
-
-      const options = {
-        quality: 75,
-        destinationType: this.camera.DestinationType.FILE_URI,
-        mediaType: mediaTypeValue,
-        sourceType: sourceType,
-        saveToPhotoAlbum: false,
-        correctOrientation: true,
-      };
-
-      const fileUri = await this.camera.getPicture(options);
-      const nativePath = await this.filePath.resolveNativePath(fileUri);
-      const fileEntry = await this.file.resolveLocalFilesystemUrl(nativePath) as FileEntry;
-
-      fileEntry.file(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const blob = new Blob([reader.result], { type: file.type });
-          const newFile = new File([blob], file.name, { type: file.type });
-          this.imageFile = { file: newFile, imageData: nativePath };
-          this.image = this.webView.convertFileSrc(nativePath);
-        };
-        reader.readAsArrayBuffer(file);
-      });
+      // Use takePicture (handles fetch + File-plugin fallback + proper MIME type)
+      const resp = await this.uploadFileService.takePicture(
+        this.camera.PictureSourceType.PHOTOLIBRARY,
+        mediaType
+      );
+      if (!resp?.file) {
+        this.toastService.presentErrorToastr('Could not read the selected file. Please try again.');
+        return;
+      }
+      const previewUrl = this.webView.convertFileSrc(resp.imageData);
+      this.imageFile = { file: resp.file, imageData: resp.imageData };
+      this.image = this.sanitizeImageUrl(previewUrl) as string;
+      this.changeDetection.detectChanges();
 
     } else {
       // Browser fallback
@@ -1290,7 +1282,7 @@ async pickMedia(mediaType: 'image' | 'video') {
       input.type = 'file';
       input.accept = mediaType === 'image' ? 'image/*' : 'video/*';
       input.onchange = () => {
-        const file = input.files[0];
+        const file = input.files![0];
         if (file) {
           const objectUrl = URL.createObjectURL(file);
           this.imageFile = { file, imageData: objectUrl };
@@ -1313,7 +1305,7 @@ async pickMedia(mediaType: 'image' | 'video') {
 // Helper function to convert base64 into File object
 private convertBase64ToFile(base64String: string, filename: string): File {
   const arr = base64String.split(',');
-  const mime = arr[0].match(/:(.*?);/)[1];
+  const mime = arr[0].match(/:(.*?);/)![1];
   const bstr = atob(arr[1]);
   const u8arr = new Uint8Array(bstr.length);
   for (let i = 0; i < bstr.length; i++) {
@@ -1392,7 +1384,7 @@ showUproduct() {
   getProductImage(product: Product): string {
     if (product.photos && product.photos.length > 0) {
       console.log("imageeeeerrrrrrrrrrrrrrrrreeeeee",product.photos[0].url);
-      return product.photos[0].url; // Return the URL of the first photo
+      return product.photos[0]?.url ?? ''; // Return the URL of the first photo
     } else {
       return 'assets/imgs/no-image.png'; // Placeholder image if no photos exist
     }
@@ -1510,7 +1502,7 @@ private async sendVideoCallRequest() {
 
   // 3️⃣ Emit to server
   if (this.socket?.connected) {
-    this.socket.emit('video-call-request', payload, (ack) => {
+    this.socket.emit('video-call-request', payload, (ack: any) => {
       if (!ack?.success) {
         // fallback: mark as failed
         const i = this.messages.findIndex(m => m.id === tempId);

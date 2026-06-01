@@ -94,4 +94,20 @@ export class FirebaseService {
   onAuthStateChanged(callback: (user: FirebaseUser | null) => void) {
     return onAuthStateChanged(this.auth, callback);
   }
+
+  async waitForAuthReady(): Promise<FirebaseUser | null> {
+    return new Promise(resolve => {
+      const unsubscribe = onAuthStateChanged(this.auth, user => {
+        unsubscribe();
+        resolve(user);
+      });
+    });
+  }
+
+  async deleteCurrentUser(): Promise<void> {
+    const user = this.auth.currentUser;
+    if (user) {
+      await user.delete();
+    }
+  }
 }
