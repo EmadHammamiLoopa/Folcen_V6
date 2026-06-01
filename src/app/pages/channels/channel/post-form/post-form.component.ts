@@ -13,13 +13,13 @@ import { Channel } from 'src/app/models/Channel';
   styleUrls: ['./post-form.component.scss'],
 })
 export class PostFormComponent implements OnInit, OnChanges {
-  @Input() channelId;
+  @Input() channelId!: string;
   mediaFile: File | null = null;
   mediaPreview: any = ''; // Media preview for images or videos
-  @Input() channel:Channel;
+  @Input() channel!: Channel;
   showEventFields = false; // Flag to toggle event-specific fields
   showDatingFields = false; // Flag to toggle dating-specific fields
-  @ViewChild('postTextarea', { static: false }) postTextarea: ElementRef;
+  @ViewChild('postTextarea', { static: false }) postTextarea!: ElementRef;
 
   anonyme = false;
   visibility = 'public'; // Default visibility
@@ -57,7 +57,7 @@ export class PostFormComponent implements OnInit, OnChanges {
   }
 
   postText = "";
-  @ViewChild('fileInput', { static: false }) fileInput: ElementRef;
+  @ViewChild('fileInput', { static: false }) fileInput!: ElementRef;
   visibilitySelectOptions = {
     cssClass: 'visibility-popover',
     backdropDismiss: true,
@@ -118,7 +118,7 @@ export class PostFormComponent implements OnInit, OnChanges {
   }
 
   
-  onMediaSelected(event) {
+  onMediaSelected(event: any) {
     const file = event.target.files[0];
     console.log("Selected file type:", file.type); // Log the file type for debugging
     if (file && this.isValidMedia(file)) {
@@ -252,7 +252,7 @@ resetForm() {
   setTimeout(() => this.forceTextareaResize(), 200); // Recalculate after UI updates
 }
 
-  selectColor(color){
+  selectColor(color: any){
     this.postBackColor = color.background;
     this.postTextColor = color.text;
   }
