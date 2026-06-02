@@ -514,7 +514,8 @@ export class SettingsPage implements OnInit, OnDestroy {
                 } catch (e) {}
               },
               (err) => {
-                this.toastService.presentErrorToastr(err);
+                const msg = err?.error?.message || err?.message || 'Failed to delete account. Please try again.';
+                this.toastService.presentErrorToastr(msg);
               }
             );
           },
