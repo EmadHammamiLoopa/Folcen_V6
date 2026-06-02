@@ -8,6 +8,7 @@ const Activity = require('../models/Activity');
 const Response = require("./Response")
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
 const logger = require('../utils/logger');
+const mongoose = require('mongoose');
 
 // excerpt helper
 const makeExcerpt = (text, max = 150) => {
@@ -304,6 +305,22 @@ exports.storeComment = async (req, res) => {
                     const mentionRegex = /@([\w\s._-]+?)(?=\s|$|@)/g;
                     let match;
                     const mentionedUsers = new Set();
+
+                    // Prefer structured IDs from the frontend tag picker when present.
+                    const explicitIds = []
+                      .concat(req.body['mentionedUserIds'] || [])
+                      .concat(req.body['mentionedUserIds[]'] || []);
+                    for (const rawId of explicitIds) {
+                      try {
+                        const id = String(rawId);
+                        if (!mongoose.Types.ObjectId.isValid(id)) continue;
+                        if (id === req.auth._id.toString()) continue;
+                        if (isAnon) { if (!participants.has(id)) continue; }
+                        else { if (!participants.has(id) && !friends.includes(id)) continue; }
+                        mentionedUsers.add(id);
+                      } catch (_) {}
+                    }
+
                     while ((match = mentionRegex.exec(commentText)) !== null) {
                         const name = match[1].trim();
                         let user = await User.findOne({ firstName: new RegExp(`^${name}$`, 'i') });

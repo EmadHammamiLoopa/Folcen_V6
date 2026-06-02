@@ -173,11 +173,13 @@ export class ChannelService extends DataService {
         console.log("Data is not FormData:", data);
     }
 
-    // Send the request
+    // Send the request — FormData MUST be sent as multipart on Android
+    // (cordova-advanced-http defaults to JSON serializer which silently drops files).
     return this.sendRequest({
         method: 'post',
         url: '/post/' + id + '/comment', // Make sure `id` is a valid postId
-        data
+        data,
+        serializer: data instanceof FormData ? 'multipart' : undefined
     });
 }
 

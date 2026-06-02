@@ -395,6 +395,31 @@ ion-content {
           color: var(--ion-color-step-500);
         }
       }
+
+      .post-extras {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+
+        .extra-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 9px;
+          border-radius: 999px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          background: rgba(99, 102, 241, 0.10);
+          color: var(--ion-color-step-800);
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          ion-icon { font-size: 12px; }
+        }
+        &.dating .extra-chip {
+          background: rgba(244, 114, 182, 0.10);
+          border-color: rgba(244, 114, 182, 0.30);
+        }
+      }
     }
   }
 

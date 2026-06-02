@@ -32,17 +32,17 @@ import { SocketService } from 'src/app/services/socket.service';
 export class DisplayComponent implements OnInit, OnDestroy {
   readonly features = environment.features;
   pageLoading = true;
-  authUser: User;
-  @Input() user: User;
+  authUser!: User;
+  @Input() user!: User;
   domaine = constants.DOMAIN_URL;
-  myProfile: boolean;
+  myProfile!: boolean;
   isFriend: boolean = false;
   notFriendOrMe: boolean = false;
   private _isFriendReloadDone = false;
   outgoingRequestId: string | null = null;
   pendingRequestsCount = 0;
-  userId: string;
-  mainAvatar: string;
+  userId!: string;
+  mainAvatar!: string;
   imageLoading = false;
   isUploading = false;
   usedCached = false;
@@ -337,7 +337,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
 
   getUserId() {
     this.route.paramMap.subscribe(params => {
-      this.userId = params.get('id');
+      this.userId = params.get('id') || '';
       console.log('Route userId:', this.userId);
       // Defensive: decode URL-safe base64 transport ids if present
       try {
@@ -770,7 +770,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     }
   }
 
-  refresh(event) {
+  refresh(event: any) {
     if (this.userId && this.userId !== 'null') {
       this.getUser(event);
       // prefer currentUser then fallback to legacy key
@@ -793,7 +793,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     }
   }
 
-  getUser(event?) {
+  getUser(event?: any) {
     this.userService.getUserProfile(this.userId).subscribe({
       next: (user: User) => {
         if (user && user._id) {
@@ -854,7 +854,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     this.toastService.presentErrorToastr('Failed to load user data. Please try again later.');
   
     // Reset relevant variables
-    this.user = null;
+    this.user = null as any;
     this.pageLoading = false;
   }
   
@@ -877,7 +877,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     else this.requestFriendship();
   }
 
-  handleError(err) {
+  handleError(err: any) {
     this.toastService.presentErrorToastr(err);
   }
 

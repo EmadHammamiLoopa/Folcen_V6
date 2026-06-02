@@ -157,7 +157,10 @@ selectUser(user) {
   textParts[textParts.length - 1] = user.name + ' ';
   this.commentText = textParts.join('@');
   this.tagging = false;
+  this.taggedUserIds.add(user.id);
 }
+
+taggedUserIds: Set<string> = new Set();
 
 
   private fetchUserFromLocalStorage() {
@@ -292,6 +295,10 @@ storeComment() {
   const formData = new FormData();
   formData.append('text', this.commentText.trim());
   formData.append('anonyme', this.anonyme.toString());
+  // Send structured mention IDs so the backend doesn't have to guess from text.
+  if (this.taggedUserIds && this.taggedUserIds.size) {
+    Array.from(this.taggedUserIds).forEach(id => formData.append('mentionedUserIds[]', id));
+  }
   if (this.mediaFile) {
       formData.append('media', this.mediaFile);
   }
@@ -308,14 +315,15 @@ storeComment() {
       this.commentText = ""; // Reset the comment text
       this.mediaFile = null; // Reset the media file
       this.mediaPreview = ""; // Clear media preview
+      this.taggedUserIds.clear();
 
       this.toastService.presentSuccessToastr('Comment added successfully.');
     },
     (err) => {
       // Handle any errors
       console.error('Error adding comment:', err);
-      const errorMessage = err.error?.errors?.text?.[0] || err.error?.message || (typeof err.error === 'string' ? err.error : null) || 'Failed to add comment';
-      this.toastService.presentErrorToastr(errorMessage);
+      const errorMessage = err.error?.errors?.text?.[0] || err.message || 'Failed to add comment';
+      this.toastService.presentErrorToastr(`Error adding comment: ${errorMessage}`);
     }
   );
 }

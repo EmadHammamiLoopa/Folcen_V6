@@ -254,6 +254,7 @@ socket.on("connect-user", async (user_id) => {
       const senderId = socket.userId;
       if (!senderId) {
         console.warn('send-message rejected: socket not authenticated');
+        try { socket.emit('send-message-error', { tempId, reason: 'not_authenticated' }); } catch (_) {}
         return;
       }
 
@@ -266,12 +267,14 @@ socket.on("connect-user", async (user_id) => {
       // Validate required fields
       if (!msg.to || (typeof msg.text !== "string" && typeof msg.image !== "string")) {
         console.error("❌ Invalid message format! Must include text or image.", msg);
+        try { socket.emit('send-message-error', { tempId, reason: 'invalid_format' }); } catch (_) {}
         return;
       }
 
       // Validate ObjectId for recipient
       if (!mongoose.Types.ObjectId.isValid(msg.to)) {
-        console.error("❌ Invalid recipient ID in message");
+        console.error("❌ Invalid recipient ID in message", msg.to);
+        try { socket.emit('send-message-error', { tempId, reason: 'invalid_recipient_id', to: msg.to }); } catch (_) {}
         return;
       }
 
@@ -284,6 +287,7 @@ socket.on("connect-user", async (user_id) => {
       ]);
       if (!sender || !receiver) {
         console.error("❌ Sender or Receiver not found!");
+        try { socket.emit('send-message-error', { tempId, reason: 'user_not_found' }); } catch (_) {}
         return;
       }
 
@@ -293,6 +297,7 @@ socket.on("connect-user", async (user_id) => {
 
       if (isBlockedByReceiver || isBlockedBySender) {
         console.warn(`Message blocked: ${senderId} and ${msg.to} have a block relationship`);
+        try { socket.emit('send-message-error', { tempId, reason: 'blocked' }); } catch (_) {}
         return;
       }
 

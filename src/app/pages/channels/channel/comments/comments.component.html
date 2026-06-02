@@ -93,6 +93,15 @@
     </div>
 
     <div class="text-input-container">
+      <div class="tag-dropdown" *ngIf="tagging && filteredTaggableUsers?.length">
+        <button type="button" class="tag-option"
+                *ngFor="let u of filteredTaggableUsers"
+                (mousedown)="$event.preventDefault()"
+                (click)="selectUser(u)">
+          <ion-icon name="at-circle-outline"></ion-icon>
+          <span>{{ u.name }}</span>
+        </button>
+      </div>
       <ion-textarea
         [(ngModel)]="commentText"
         placeholder="Write a comment..."

@@ -75,6 +75,43 @@
           <div class="card-content-creative">
             <h3 class="activity-summary" *ngIf="activity.activityType !== 'post'">{{ activity.summary }}</h3>
             <p class="activity-text" [class.is-post]="activity.activityType === 'post'">{{ activity.text }}</p>
+
+            <!-- Event post extras -->
+            <div class="post-extras event" *ngIf="activity.eventDate || activity.eventLocation || activity.eventTime">
+              <div class="extra-chip" *ngIf="activity.eventDate">
+                <ion-icon name="calendar-outline"></ion-icon>
+                <span>{{ activity.eventDate | date:'dd MMM y' }}</span>
+              </div>
+              <div class="extra-chip" *ngIf="activity.eventTime">
+                <ion-icon name="time-outline"></ion-icon>
+                <span>{{ activity.eventTime | date:'HH:mm' }}</span>
+              </div>
+              <div class="extra-chip" *ngIf="activity.eventLocation">
+                <ion-icon name="location-outline"></ion-icon>
+                <span>{{ activity.eventLocation }}</span>
+              </div>
+            </div>
+
+            <!-- Dating post extras -->
+            <div class="post-extras dating"
+                 *ngIf="activity.relationshipGoals?.length || activity.ageRange || activity.interests?.length || activity.hintAboutMe">
+              <div class="extra-chip" *ngIf="activity.relationshipGoals?.length">
+                <ion-icon name="heart-outline"></ion-icon>
+                <span>{{ activity.relationshipGoals.join(', ') }}</span>
+              </div>
+              <div class="extra-chip" *ngIf="activity.ageRange && (activity.ageRange.min || activity.ageRange.max)">
+                <ion-icon name="person-outline"></ion-icon>
+                <span>{{ activity.ageRange.min }}–{{ activity.ageRange.max }} yrs</span>
+              </div>
+              <div class="extra-chip" *ngIf="activity.interests?.length">
+                <ion-icon name="sparkles-outline"></ion-icon>
+                <span>{{ activity.interests.slice(0,3).join(', ') }}</span>
+              </div>
+              <div class="extra-line" *ngIf="activity.hintAboutMe">
+                <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+                <span>{{ activity.hintAboutMe }}</span>
+              </div>
+            </div>
           </div>
 
           <div class="card-footer-minimal">

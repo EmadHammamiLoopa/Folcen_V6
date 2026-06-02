@@ -244,6 +244,30 @@ isLatestCall(message: Message): boolean {
         this.zone.run(() => this.handleMessageSent(saved));
       });
 
+      SocketService.sendMessageError$.pipe(takeUntil(this.destroy$)).subscribe((errPayload: any) => {
+        this.zone.run(() => {
+          const reason = errPayload?.reason || 'unknown';
+          const map: Record<string, string> = {
+            not_authenticated: 'Reconnecting… please try again.',
+            invalid_format: 'Message is empty or malformed.',
+            invalid_recipient_id: 'Unable to identify recipient.',
+            user_not_found: 'Recipient account is unavailable.',
+            blocked: 'You can no longer message this user.',
+          };
+          this.toastService.presentErrorToastr(map[reason] || `Send failed (${reason})`);
+          // Mark the optimistic message as failed so user can retry.
+          const tid = errPayload?.tempId;
+          if (tid) {
+            const i = this.messages.findIndex(m => m.tempId === tid || m.id === tid);
+            if (i !== -1) {
+              (this.messages[i] as any).state = 'failed';
+              this.groupMessagesByDate();
+              try { this.changeDetection.detectChanges(); } catch (_) {}
+            }
+          }
+        });
+      });
+
       SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
         try {
           const uid = payload?.userId;
@@ -1159,12 +1183,25 @@ sanitizeImageUrl(url: string): SafeUrl {
 
 
 async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
+  // Resolve canonical recipient ObjectId hex. Backend rejects non-ObjectId silently,
+  // so a Base64-encoded route id would otherwise drop the message with no feedback.
+  const objectIdHex = /^[a-f0-9]{24}$/i;
+  const rawTo = (this.user as any)?._id || this.user?.id;
+  const rawFrom = (this.authUser as any)?._id || this.authUser?.id;
+  const toId = objectIdHex.test(String(rawTo)) ? String(rawTo) : (this.idService.normalizeId(String(rawTo)) || String(rawTo));
+  const fromId = objectIdHex.test(String(rawFrom)) ? String(rawFrom) : (this.idService.normalizeId(String(rawFrom)) || String(rawFrom));
+  if (!objectIdHex.test(toId) || !objectIdHex.test(fromId)) {
+    console.error('[chat.sendMessage] Invalid ObjectId(s)', { rawFrom, rawTo, fromId, toId });
+    this.toastService.presentErrorToastr('Unable to send: invalid recipient id.');
+    return false;
+  }
+
   // Build final payload (trust message.image which was uploaded in addMessage)
   const payload = {
     id: message.id,
-    tempId: message.tempId,  
-    from: this.authUser.id,
-    to: this.user.id,
+    tempId: message.tempId,
+    from: fromId,
+    to: toId,
     text: message.text ?? '',
     state: 'sending',
     image: message.image ?? null,
@@ -1172,6 +1209,11 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     productId: message.productId ?? this.productId ?? null,
     createdAt: message.createdAt ?? null,
   };
+
+  console.log('[chat.sendMessage] emit send-message', {
+    tempId: payload.tempId, to: payload.to, from: payload.from,
+    socketConnected: !!(SocketService as any).socketInstance?.connected,
+  });
 
   // Update local temp message immediately
   const idx = this.messages.findIndex(m => m.id === message.id);

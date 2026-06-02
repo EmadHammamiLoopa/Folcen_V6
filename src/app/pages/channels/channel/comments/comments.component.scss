@@ -209,7 +209,43 @@
 
     .text-input-container {
       flex-grow: 1;
-      
+      position: relative;
+
+      .tag-dropdown {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        overflow-y: auto;
+        background: rgba(20, 22, 38, 0.96);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 14px;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+        padding: 6px;
+        z-index: 50;
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+
+        .tag-option {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          padding: 10px 12px;
+          background: transparent;
+          border: none;
+          color: #fff;
+          text-align: left;
+          font-size: 0.95rem;
+          border-radius: 10px;
+          cursor: pointer;
+
+          ion-icon { font-size: 18px; color: var(--ion-color-primary, #6a5cff); }
+          &:hover, &:active { background: rgba(255,255,255,0.06); }
+        }
+      }
+
       .comment-textarea {
         --padding-top: 12px;
         --padding-bottom: 12px;

@@ -89,6 +89,38 @@
             <div class="item-text" [ngClass]="{'italic': !a.snippet}">
               {{ a.snippet || a.summary }}
             </div>
+
+            <div class="post-extras event"
+                 *ngIf="a.postExtras && (a.postExtras.eventDate || a.postExtras.eventLocation || a.postExtras.eventTime)">
+              <span class="extra-chip" *ngIf="a.postExtras.eventDate">
+                <ion-icon name="calendar-outline"></ion-icon>
+                {{ a.postExtras.eventDate | date:'dd MMM y' }}
+              </span>
+              <span class="extra-chip" *ngIf="a.postExtras.eventTime">
+                <ion-icon name="time-outline"></ion-icon>
+                {{ a.postExtras.eventTime | date:'HH:mm' }}
+              </span>
+              <span class="extra-chip" *ngIf="a.postExtras.eventLocation">
+                <ion-icon name="location-outline"></ion-icon>
+                {{ a.postExtras.eventLocation }}
+              </span>
+            </div>
+
+            <div class="post-extras dating"
+                 *ngIf="a.postExtras && (a.postExtras.relationshipGoals?.length || a.postExtras.ageRange || a.postExtras.interests?.length || a.postExtras.hintAboutMe)">
+              <span class="extra-chip" *ngIf="a.postExtras.relationshipGoals?.length">
+                <ion-icon name="heart-outline"></ion-icon>
+                {{ a.postExtras.relationshipGoals.join(', ') }}
+              </span>
+              <span class="extra-chip" *ngIf="a.postExtras.ageRange && (a.postExtras.ageRange.min || a.postExtras.ageRange.max)">
+                <ion-icon name="person-outline"></ion-icon>
+                {{ a.postExtras.ageRange.min }}–{{ a.postExtras.ageRange.max }} yrs
+              </span>
+              <span class="extra-chip" *ngIf="a.postExtras.interests?.length">
+                <ion-icon name="sparkles-outline"></ion-icon>
+                {{ a.postExtras.interests.slice(0,3).join(', ') }}
+              </span>
+            </div>
           </div>
         </div>
         

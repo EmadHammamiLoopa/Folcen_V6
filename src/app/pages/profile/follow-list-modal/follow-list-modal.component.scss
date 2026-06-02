@@ -211,6 +211,17 @@
     --color: var(--ion-text-color);
     font-size: 0.8rem;
   }
+
+  .unfriend-btn {
+    --background: var(--ion-color-light);
+    --background-hover: var(--ion-color-light-shade);
+    --background-activated: var(--ion-color-light-shade);
+    --border-color: var(--ion-color-medium-tint);
+    --border-width: 1px;
+    --color: var(--ion-color-dark);
+    --box-shadow: none;
+    font-weight: 600;
+  }
 }
 
 .empty-state {

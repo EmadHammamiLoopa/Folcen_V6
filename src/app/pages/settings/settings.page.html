@@ -17,7 +17,7 @@
     <div class="settings-section">
       <h3 class="section-title">Account</h3>
       <div class="settings-card">
-        <ion-item lines="none" button="true" routerLink="/tabs/subscription" class="premium-item">
+        <ion-item lines="none" button="true" routerLink="/tabs/subscription" class="premium-item" *ngIf="features.premiumTier">
           <div class="icon-box premium">
             <ion-icon name="diamond-outline"></ion-icon>
           </div>
@@ -28,7 +28,7 @@
           <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
         </ion-item>
 
-        <div class="divider"></div>
+        <div class="divider" *ngIf="features.premiumTier"></div>
 
         <ion-item lines="none" button="true" (click)="changeEmail()">
           <div class="icon-box">
@@ -52,7 +52,6 @@
     <div class="settings-section">
       <h3 class="section-title">Privacy & Visibility</h3>
       <div class="settings-card">
-        <!-- TODO v2: Re-enable when random feature is activated
         <ion-item lines="none">
           <div class="icon-box">
             <ion-icon name="people-outline"></ion-icon>
@@ -65,7 +64,6 @@
         </ion-item>
 
         <div class="divider"></div>
-        -->
 
         <ion-item lines="none">
           <div class="icon-box">

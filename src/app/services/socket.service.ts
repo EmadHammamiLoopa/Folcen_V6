@@ -61,6 +61,9 @@ export class SocketService {
   private static messageSentSubject = new Subject<any>();
   static messageSent$ = SocketService.messageSentSubject.asObservable();
 
+  private static sendMessageErrorSubject = new Subject<any>();
+  static sendMessageError$ = SocketService.sendMessageErrorSubject.asObservable();
+
   // Emits when a new post lands in the current user's feed
   private static newFeedPostSubject = new Subject<any>();
   static newFeedPost$ = SocketService.newFeedPostSubject.asObservable();
@@ -384,6 +387,14 @@ export class SocketService {
         try {
           SocketService.messageSentSubject.next(payload);
         } catch (e) { console.warn('Error handling message-sent payload', e); }
+      });
+
+      // Backend rejected a send-message (auth, invalid id, blocked, etc.)
+      SocketService.socketInstance.on('send-message-error', (payload: any) => {
+        try {
+          console.warn('⚠️ send-message-error:', payload);
+          SocketService.sendMessageErrorSubject.next(payload);
+        } catch (e) { console.warn('Error handling send-message-error payload', e); }
       });
 
       // New post in feed (recipients of a channel/follower post)

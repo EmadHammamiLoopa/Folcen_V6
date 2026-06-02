@@ -196,6 +196,36 @@ exports.list = async (req, res) => {
       return d;
     });
 
+    // Enrich post-typed activities with event/dating extras so the activity list
+    // can render the same per-type info that the post detail page shows.
+    try {
+      const extrasPostIds = processed
+        .filter(d => d.targetType === 'post' && d.targetId)
+        .map(d => d.targetId);
+      if (extrasPostIds.length) {
+        const extras = await Post.find({ _id: { $in: extrasPostIds } })
+          .select('_id eventDate eventLocation eventTime relationshipGoals ageRange interests hintAboutMe')
+          .lean();
+        const extrasMap = new Map(extras.map(p => [String(p._id), p]));
+        processed.forEach(d => {
+          if (d.targetType === 'post' && d.targetId) {
+            const ex = extrasMap.get(String(d.targetId));
+            if (ex) {
+              d.postExtras = {
+                eventDate: ex.eventDate || null,
+                eventLocation: ex.eventLocation || null,
+                eventTime: ex.eventTime || null,
+                relationshipGoals: ex.relationshipGoals || [],
+                ageRange: ex.ageRange || null,
+                interests: ex.interests || [],
+                hintAboutMe: ex.hintAboutMe || null,
+              };
+            }
+          }
+        });
+      }
+    } catch (e) { logger && logger.warn && logger.warn('activity extras enrichment failed', e); }
+
     return Response.sendResponse(res, { docs: processed, page, limit });
   } catch (err) {
     console.error('Error listing activities', err);

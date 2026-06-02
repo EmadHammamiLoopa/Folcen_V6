@@ -15,6 +15,7 @@ import { TermsOfServiceComponent } from '../terms-of-service/terms-of-service.co
 import { Socket } from 'socket.io-client';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'app-settings',
@@ -22,6 +23,7 @@ import { takeUntil } from 'rxjs/operators';
   styleUrls: ['./settings.page.scss'],
 })
 export class SettingsPage implements OnInit, OnDestroy {
+  readonly features = environment.features;
   appVersion = constants.VERSION;
   user: User;
   socket: Socket | null = null; // Use the Socket type from socket.io-client

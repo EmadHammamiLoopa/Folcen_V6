@@ -16,6 +16,10 @@ const commentSchema = new mongoose.Schema({
         type: Boolean,
         default: false // Whether the comment was posted anonymously
     },
+    anonymName: {
+        type: String,
+        default: null // Stable anonymous display name for this post→commenter pair
+    },
     media: {
         url: { type: String },  // URL to the uploaded image or video
         expiryDate: { type: Date } // Timestamp when the media expires

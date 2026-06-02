@@ -10,7 +10,7 @@ export const environment = {
   // To release v1.1: set videoCalls=true and create a release/v1.1 branch.
   features: {
     randomVideoCall: false,   // unlock in v1.1 (Sep 2026) — stranger video from discovery screen
-    friendVideoCall: false,   // unlock in v1.1 (Sep 2026) — call a contact from chat/profile
+    friendVideoCall: true,    // enabled in v1.0 (friends only)
     marketplace:     false,   // unlock in v1.2 (Dec 2026)
     jobsBoard:       false,   // unlock in v1.2 (Dec 2026)
     servicesBoard:   false,   // unlock in v1.2 (Dec 2026)

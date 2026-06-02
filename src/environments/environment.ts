@@ -10,7 +10,7 @@ export const environment = {
   // v0.9 (beta): all false  |  v1.0: calls=false  |  v1.1+: all true
   features: {
     randomVideoCall: false,   // v1.1 — Video call a stranger from the new-friends discovery/swipe screen
-    friendVideoCall: false,   // v1.1 — Video call an existing friend/contact from chat or profile
+    friendVideoCall: true,    // enabled in v1.0 (friends only)
     marketplace:     false,   // v1.2 — Buy & Sell listings
     jobsBoard:       false,   // v1.2 — Jobs board
     servicesBoard:   false,   // v1.2 — Services / small-business board
