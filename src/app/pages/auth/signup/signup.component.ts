@@ -39,6 +39,7 @@ export class SignupComponent implements OnInit, OnDestroy {
   adjustingEmail = false;
   resendCooldown = 0;
   resendInterval: any;
+  private verifyPollInterval: any;
   form!: FormGroup;
 
   countriesObject: any;
@@ -107,6 +108,7 @@ export class SignupComponent implements OnInit, OnDestroy {
           this.form.patchValue({ email: user.email });
         }
         this.toastService.presentErrorToastr('Your email address is not verified. Please check your inbox and click the verification link to access the app.');
+        this.startVerificationPolling();
       }
     }
   }
@@ -122,6 +124,42 @@ export class SignupComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     if (this.resendInterval) {
       clearInterval(this.resendInterval);
+    }
+    this.stopVerificationPolling();
+  }
+
+  private startVerificationPolling() {
+    this.stopVerificationPolling();
+    // Poll every 4 seconds while on the verifyEmail step so the user
+    // doesn't have to manually tap "Continue" after clicking the link.
+    this.verifyPollInterval = setInterval(async () => {
+      if (this.steps[this.step] !== 'verifyEmail') {
+        this.stopVerificationPolling();
+        return;
+      }
+      try {
+        const resp = await this.auth.checkVerification();
+        if (resp && resp.data && resp.data.token) {
+          this.stopVerificationPolling();
+          await this.storeUserData(resp.data.token, resp.data.user);
+          try {
+            await SocketService.initializeSocket();
+            SocketService.bindToAuthUser();
+          } catch (e) {}
+          this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
+          this.step++; // advance to success step
+          this.cdr.detectChanges();
+        }
+      } catch (_) {
+        // not yet verified — keep polling silently
+      }
+    }, 4000);
+  }
+
+  private stopVerificationPolling() {
+    if (this.verifyPollInterval) {
+      clearInterval(this.verifyPollInterval);
+      this.verifyPollInterval = null;
     }
   }
 
@@ -240,6 +278,8 @@ export class SignupComponent implements OnInit, OnDestroy {
       devLogger.log('Calling submit() from ageVisibility step');
       this.submit();
     } else if (currentStep === 'verifyEmail') {
+      // Manual check (user pressed Continue / "I've verified")
+      this.stopVerificationPolling();
       this.checkVerification();
     } else if (this.step < this.steps.length - 1) {
       this.validationErrors[currentStep] = undefined;
@@ -386,6 +426,10 @@ export class SignupComponent implements OnInit, OnDestroy {
       }
       this.pageLoading = false;
       this.step++;
+      // Start auto-polling so verification is detected without user interaction
+      if (this.steps[this.step] === 'verifyEmail') {
+        this.startVerificationPolling();
+      }
     } catch (err: any) {
       this.pageLoading = false;
       devLogger.error('Signup error:', err);
