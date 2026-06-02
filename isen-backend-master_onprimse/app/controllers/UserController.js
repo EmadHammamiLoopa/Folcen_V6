@@ -312,10 +312,16 @@ exports.allUsers = async (req, res) => {
         // Build aggregation pipeline
         const pipeline = [];
         
-        // Always filter out deleted users and apply other filters
+        // Always filter out deleted users and apply other filters,
+        // unless the admin explicitly requests them via ?includeDeleted=1.
         const filter = { ...dashParams.filter };
-        if (filter.deletedAt === undefined) {
+        const includeDeleted = String(req.query.includeDeleted || '').toLowerCase();
+        const wantDeleted = includeDeleted === '1' || includeDeleted === 'true' || includeDeleted === 'only';
+        if (!wantDeleted && filter.deletedAt === undefined) {
             filter.deletedAt = null;
+        }
+        if (includeDeleted === 'only') {
+            filter.isDeleted = true;
         }
         pipeline.push({ $match: filter });
 
@@ -1318,12 +1324,18 @@ exports.deleteAccount = async(req, res) => {
 
 exports.restoreAccount = async (req, res) => {
     try {
-        const user = req.authUser;
+        // Route runs without withAuthUser so soft-deleted users can reach it.
+        let user = req.authUser;
+        if (!user) {
+            const uid = req.auth && req.auth._id;
+            if (!uid) return Response.sendError(res, 401, 'Unauthorized');
+            user = await User.findById(uid).lean();
+        }
+        if (!user) return Response.sendError(res, 404, 'User not found');
         if (!user.isDeleted) {
             return Response.sendError(res, 400, 'Account is not deleted');
         }
 
-        // req.authUser is lean: use a direct update instead of .save()
         await User.updateOne({ _id: user._id }, { $set: { isDeleted: false, deletedAt: null, purgeAt: null } });
         user.isDeleted = false;
         user.deletedAt = null;

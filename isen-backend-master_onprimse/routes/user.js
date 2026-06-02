@@ -279,8 +279,8 @@ router.post('/:userId/unblock', [requireSignin], unblockUser);
 router.delete('/', [requireSignin, withAuthUser], deleteAccount);
 // Self-delete alias for dashboard / compatibility
 router.post('/me/delete', [requireSignin, withAuthUser], deleteAccount);
-// Self-restore alias
-router.post('/me/restore', [requireSignin, withAuthUser], restoreAccount);
+// Self-restore alias — must NOT use withAuthUser, which blocks isDeleted users
+router.post('/me/restore', [requireSignin], restoreAccount);
 router.delete('/:userId', [requireSignin, isAdmin], deleteUser);
 router.delete('/delete/:userId', [requireSignin, isAdmin], deleteUser);
 

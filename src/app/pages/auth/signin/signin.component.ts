@@ -191,6 +191,16 @@ export class SigninComponent implements OnInit {
     console.log('Sign-in response:', resp);
     this.user = new User().initialize(resp.data.user);
 
+    // If the account was soft-deleted, prompt the user to restore it before
+    // proceeding. The User class doesn't track isDeleted, so read from raw resp.
+    const rawUser: any = resp?.data?.user || {};
+    if (rawUser.isDeleted === true) {
+      await this.storeUserData(resp.data.token, resp.data.user);
+      this.pageLoading = false;
+      await this.showRestoreAccountPrompt(rawUser, resp, creds);
+      return;
+    }
+
     await this.storeUserData(resp.data.token, resp.data.user);
 
     try {
@@ -293,6 +303,60 @@ export class SigninComponent implements OnInit {
         // swallow fallback errors
       }
     }
+  }
+
+  private daysUntilPurge(rawUser: any): number {
+    try {
+      const purgeAt = rawUser?.purgeAt ? new Date(rawUser.purgeAt) : null;
+      if (purgeAt && !isNaN(purgeAt.getTime())) {
+        const diff = Math.ceil((purgeAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        return Math.max(0, diff);
+      }
+      const deletedAt = rawUser?.deletedAt ? new Date(rawUser.deletedAt) : null;
+      if (deletedAt && !isNaN(deletedAt.getTime())) {
+        const elapsed = Math.floor((Date.now() - deletedAt.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.max(0, 30 - elapsed);
+      }
+    } catch (_) {}
+    return 30;
+  }
+
+  private async showRestoreAccountPrompt(rawUser: any, resp: any, creds?: { email: string; password: string }) {
+    const days = this.daysUntilPurge(rawUser);
+    const alert = await this.alertCtrl.create({
+      header: 'Account Deactivated',
+      message: `Your account was deleted and will be permanently removed in ${days} day${days === 1 ? '' : 's'}. Restore it to continue using Folcen.`,
+      backdropDismiss: false,
+      buttons: [
+        {
+          text: 'Keep Deleted',
+          role: 'cancel',
+          handler: async () => {
+            try { await this.auth.signOutFirebase(); } catch (_) {}
+            try { await SocketService.logout(); } catch (_) {}
+            try { localStorage.removeItem('token'); } catch (_) {}
+            try { localStorage.removeItem('currentUser'); } catch (_) {}
+            try { localStorage.removeItem('user'); } catch (_) {}
+            await this.router.navigate(['/auth/signin']);
+          }
+        },
+        {
+          text: 'Restore Account',
+          handler: async () => {
+            try {
+              await this.userService.restoreAccount().toPromise();
+              this.toastService.presentSuccessToastr('Account restored successfully!');
+              const restored = { ...resp, data: { ...resp.data, user: { ...resp.data.user, isDeleted: false, deletedAt: null, purgeAt: null } } };
+              await this._handleSigninSuccess(restored, creds);
+            } catch (e) {
+              console.error('Restore failed', e);
+              this.toastService.presentErrorToastr('Failed to restore account. Please try again.');
+            }
+          }
+        }
+      ]
+    });
+    await alert.present();
   }
 
   async forgotPassword() {
