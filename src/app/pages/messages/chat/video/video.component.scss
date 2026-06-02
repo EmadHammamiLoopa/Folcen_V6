@@ -50,6 +50,17 @@
     width: 100%;
     height: 100%;
     z-index: 2;
+
+    &.hidden-stage { visibility: hidden; pointer-events: none; }
+
+    video::-webkit-media-controls,
+    video::-webkit-media-controls-panel,
+    video::-webkit-media-controls-play-button,
+    video::-webkit-media-controls-start-playback-button {
+      display: none !important;
+      -webkit-appearance: none !important;
+    }
+    video { background: transparent; }
   }
 
   .main-video {

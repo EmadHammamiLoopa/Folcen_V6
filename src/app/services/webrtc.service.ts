@@ -979,10 +979,10 @@ public async bindMissedCallSocketHandlers() {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.error('[webrtc] peer.open timeout (20 s)');
+        console.error('[webrtc] peer.open timeout (60 s)');
         cleanup();
-        reject(new Error('⏰ peer.open timeout (20 s)'));
-      }, 20_000);
+        reject(new Error('⏰ peer.open timeout (60 s)'));
+      }, 60_000);
 
       const onOpen = () => {
         clearTimeout(timeout);

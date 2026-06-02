@@ -1264,7 +1264,9 @@ async addMessage() {
   }
 
   try {
-    await this.getChatPermission();
+    if (this.features.premiumTier) {
+      await this.getChatPermission();
+    }
 
     const tempId = Date.now().toString();
     
@@ -1304,7 +1306,7 @@ async addMessage() {
     }
 
   } catch (err) {
-    if (err) this.router.navigate(['/tabs/subscription']);
+    if (err && this.features.premiumTier) this.router.navigate(['/tabs/subscription']);
   }
 }
 
