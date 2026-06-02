@@ -18,18 +18,18 @@ import { AppEventsService } from 'src/app/services/app-events.service';
 })
 export class CommentsComponent implements OnInit, OnDestroy {
 
-  @ViewChild('infinitScroll') infinitScroll: IonInfiniteScroll;
+  @ViewChild('infinitScroll') infinitScroll!: IonInfiniteScroll;
   @HostListener('document:click', ['$event'])
-  onClickOutside(event) {
+  onClickOutside(event: any) {
     if (!event.target.closest('.tag-dropdown')) {
       this.tagging = false;
     }
   }
   
   @Output() addComment = new EventEmitter();
-  post: Post;
-  postId: string;
-  user: User;
+  post!: Post;
+  postId!: string;
+  user!: User;
   postError: boolean = false;
 
   anonyme = false;
@@ -37,7 +37,7 @@ export class CommentsComponent implements OnInit, OnDestroy {
   commentText = "";
   mediaFile: File | null = null; // Store the selected media file
   mediaPreview: any = "";
-  comments: Comment[];
+  comments: Comment[] = [];
 
   page = 0;
   pageLoading = false;
@@ -131,32 +131,36 @@ export class CommentsComponent implements OnInit, OnDestroy {
 tagging = false;
 
 onKeyDown(event: KeyboardEvent) {
-  if (event.key === '@') {
-    this.tagging = true;
-    this.filteredTaggableUsers = this.getTaggableUsers();
-  } else if (this.tagging) {
-    const query = this.commentText.split('@').pop();
-    this.filteredTaggableUsers = this.getTaggableUsers().filter(user =>
-      user.name.toLowerCase().includes(query.toLowerCase())
-    );
-
-    // Check if "@" is removed or no query after "@"
-    if (!this.commentText.includes('@') || query === '') {
-      this.tagging = false;
-    }
-  }
-
   if (event.key === 'Escape') {
     this.tagging = false;
   }
 }
 
+/** Called on every input change. Detects an unfinished @mention at the end of the current text. */
+onCommentInput(value: string) {
+  this.commentText = value ?? '';
+  const m = /(?:^|\s)@([^\s@]*)$/.exec(this.commentText);
+  if (m) {
+    const query = (m[1] || '').toLowerCase();
+    const all = this.getTaggableUsers();
+    this.filteredTaggableUsers = query
+      ? all.filter(u => u.name.toLowerCase().includes(query))
+      : all;
+    this.tagging = this.filteredTaggableUsers.length > 0;
+  } else {
+    this.tagging = false;
+    this.filteredTaggableUsers = [];
+  }
+}
 
-selectUser(user) {
-  const textParts = this.commentText.split('@');
-  textParts[textParts.length - 1] = user.name + ' ';
-  this.commentText = textParts.join('@');
+selectUser(user: { name: string; id: string }) {
+  // Replace the trailing @query with @Name + space
+  this.commentText = this.commentText.replace(/(?:^|\s)@([^\s@]*)$/, (full, _q, offset) => {
+    const lead = offset === 0 ? '' : full[0];
+    return `${lead}@${user.name} `;
+  });
   this.tagging = false;
+  this.filteredTaggableUsers = [];
   this.taggedUserIds.add(user.id);
 }
 
@@ -178,7 +182,7 @@ taggedUserIds: Set<string> = new Set();
   getPostId(){
     this.route.paramMap.subscribe(
       params => {
-        this.postId = params.get('id');
+        this.postId = params.get('id') || '';
         this.getPost();
       }
     )
@@ -202,7 +206,7 @@ taggedUserIds: Set<string> = new Set();
     );
   }
 
-  getComments(event?, refresh?) {
+  getComments(event?: any, refresh?: boolean) {
     if (!event) this.pageLoading = true;
     if (refresh) this.page = 0;
   
@@ -226,7 +230,7 @@ taggedUserIds: Set<string> = new Set();
         }
   
         // Push only new comments
-        resp.data.comments.forEach(cmt => {
+        resp.data.comments.forEach((cmt: any) => {
           if (!this.comments.some(existingComment => existingComment.id === cmt._id)) {
             this.comments.push(new Comment().initialize(cmt));
           }
@@ -256,7 +260,7 @@ taggedUserIds: Set<string> = new Set();
   }
   
   
-  onMediaSelected(event) {
+  onMediaSelected(event: any) {
     const file = event.target.files[0];
     console.log("Selected file type:", file.type); // Log the file type for debugging
     if (file && this.isValidMedia(file)) {

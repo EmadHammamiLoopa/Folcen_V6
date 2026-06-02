@@ -108,6 +108,7 @@
         rows="1"
         autoGrow="true"
         class="comment-textarea"
+        (ionInput)="onCommentInput($any($event).target.value)"
         (keydown)="onKeyDown($event)"
       ></ion-textarea>
     </div>
