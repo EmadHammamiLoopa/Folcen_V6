@@ -1245,12 +1245,13 @@ exports.deleteAccount = async(req, res) => {
     if (!user) return Response.sendError(res, 401, 'User not found');
     const days = parseInt(process.env.DATA_RETENTION_DAYS || '30');
     const now = new Date();
-    
-    user.deletedAt = now
-    user.isDeleted = true
-    user.purgeAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-    
-    await user.save()
+    const purgeAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    // req.authUser is a lean (plain) object, so it has no .save(). Use a direct update.
+    await User.updateOne({ _id: user._id }, { $set: { deletedAt: now, isDeleted: true, purgeAt } });
+    user.deletedAt = now;
+    user.isDeleted = true;
+    user.purgeAt = purgeAt;
     try {
         // Notify user that their account is scheduled for deletion per retention policy
         try {
@@ -1322,10 +1323,11 @@ exports.restoreAccount = async (req, res) => {
             return Response.sendError(res, 400, 'Account is not deleted');
         }
 
+        // req.authUser is lean: use a direct update instead of .save()
+        await User.updateOne({ _id: user._id }, { $set: { isDeleted: false, deletedAt: null, purgeAt: null } });
         user.isDeleted = false;
         user.deletedAt = null;
         user.purgeAt = null;
-        await user.save();
 
         // Unrevoke user in blacklist
         try { await tokenBlacklist.unrevokeUser(String(user._id)); } catch (e) { logger.warn('Failed to unrevoke user', e); }

@@ -215,6 +215,10 @@ export class AppComponent implements OnDestroy {
     SocketService.newAnnouncement$.pipe(takeUntil(this.destroy$)).subscribe((announcement: any) => {
       try {
         if (!this.user || !announcement?._id) return;
+        // Ignore announcements created before this user signed up
+        const userCreated = this.user.createdAt ? new Date(this.user.createdAt).getTime() : 0;
+        const annCreated = announcement.createdAt ? new Date(announcement.createdAt).getTime() : Date.now();
+        if (userCreated && annCreated < userCreated) return;
         if (!this.shownAnnouncements.has(announcement._id)) {
           // Run inside Angular zone — ModalController requires it to render the overlay correctly
           this.zone.run(() => this.showAnnouncement(announcement));
