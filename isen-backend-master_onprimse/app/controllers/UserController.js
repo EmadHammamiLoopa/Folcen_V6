@@ -432,6 +432,7 @@ exports.getMyAnnouncements = async (req, res) => {
             announcements = await Announcement.find({ 
                 isActive: true, 
                 seenBy: { $nin: [userIdStr] },
+                createdAt: { $gte: user.createdAt },
                 $or: [
                     { expiresAt: { $exists: false } },
                     { expiresAt: { $gt: now } },

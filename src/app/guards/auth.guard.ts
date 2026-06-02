@@ -125,6 +125,26 @@ export class AuthGuard implements CanActivate {
       return true;
     } else {
       if (token && !user) {
+        // On Cordova, NativeStorage writes are async fire-and-forget; the user object
+        // may not be persisted yet. Try localStorage as a fallback before clearing.
+        const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+        if (raw) {
+          try { user = JSON.parse(raw); } catch (e) { user = null; }
+        }
+        if (user) {
+          // Found user in localStorage — re-run the verified check
+          if (this.isTokenExpired(token)) {
+            await this.clearStoredAuth();
+            this.router.navigate(['/auth/signin']);
+            return false;
+          }
+          user = await this.refreshVerificationStatus(token, user);
+          if (user.emailVerified === false) {
+            this.router.navigate(['/auth/signup'], { queryParams: { reason: 'email_not_verified' } });
+            return false;
+          }
+          return true;
+        }
         console.warn('AuthGuard: Token found but user missing. Clearing inconsistent storage to prevent loop.');
         await this.clearStoredAuth();
       }

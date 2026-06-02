@@ -564,6 +564,59 @@ exports.firebaseLogin = async (req, res) => {
                         console.warn('Failed to record legal acceptance during firebase signup', e);
                     }
                 }
+
+                // --- Welcome Message ---
+                try {
+                    const systemUserId = '66c7ba8cb077a84040bd9ee6';
+                    let systemUser = await User.findById(systemUserId);
+                    if (!systemUser) {
+                        systemUser = await User.findOne({ email: 'folcenteam@gmail.com' });
+                    }
+                    if (!systemUser) {
+                        try {
+                            systemUser = new User({
+                                firstName: 'Folcen',
+                                lastName:  'Team',
+                                email:     'folcenteam@gmail.com',
+                                password:  crypto.randomBytes(32).toString('hex'),
+                                emailVerified: true,
+                                mainAvatar: othersAvatarPath,
+                            });
+                            await systemUser.save();
+                        } catch (createErr) {
+                            systemUser = await User.findOne({ email: 'folcenteam@gmail.com' });
+                            if (!systemUser) throw createErr;
+                        }
+                    }
+
+                    const senderId   = systemUser._id;
+                    const senderName = `${systemUser.firstName} ${systemUser.lastName}`.trim();
+
+                    const welcomeText = `Welcome to Folcen 👋
+
+We're excited to have you join our community!
+Folcen is built to help you connect, share, and stay focused in a clean and meaningful way.
+
+If you have any suggestions, feedback, or run into any issues, we'd love to hear from you.
+📩 Contact us anytime at: folcenteam@gmail.com
+
+Enjoy exploring Folcen — and thank you for being part of it!`;
+
+                    const welcomeMsg = new Message({
+                        from: senderId,
+                        to: user._id,
+                        text: welcomeText,
+                        type: 'friend',
+                        state: 'sent',
+                        createdAt: new Date()
+                    });
+                    await welcomeMsg.save();
+
+                    helpers.sendNotification(String(user._id), "Welcome to Folcen 👋", senderName, String(senderId)).catch(() => {});
+                    logger.info(`[firebaseLogin] Welcome message sent to new user ${user._id}`);
+                } catch (welcomeErr) {
+                    console.error('[firebaseLogin] Failed to send welcome message:', welcomeErr);
+                }
             } else {
                 return Response.sendError(res, 404, 'User not found. Please sign up first.');
             }
