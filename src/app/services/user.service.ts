@@ -791,6 +791,10 @@ getCurrentUserId(): string | null {
     return this.http.delete(this.apiUrl);
   }
 
+  restoreAccount(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/me/restore`, {});
+  }
+
   profileVisited(): Observable<any> {
     return this.http.get(`${this.apiUrl}/profile-visited`, { headers: { 'Cache-Control': 'no-cache' } });
   }

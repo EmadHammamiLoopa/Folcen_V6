@@ -227,6 +227,18 @@ isLatestCall(message: Message): boolean {
 
     // Refresh peer/auth profiles when notified by server
     try {
+      // Re-bind socket listeners whenever SocketService reconnects.
+      // Without this, the underlying socket.io instance is replaced after a
+      // disconnect and our 'new-message'/'message-sent' listeners are lost,
+      // so messages save server-side but never update the UI in real time.
+      SocketService.connection$.pipe(takeUntil(this.destroy$)).subscribe(status => {
+        try {
+          if (status === 'connected' && (this.user?.id || this.authUser?.id)) {
+            this.initializeSocket();
+          }
+        } catch (e) { console.warn('chat reconnect handler error', e); }
+      });
+
       SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
         try {
           const uid = payload?.userId;
