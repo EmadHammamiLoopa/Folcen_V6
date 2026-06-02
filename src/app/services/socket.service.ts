@@ -103,10 +103,22 @@ export class SocketService {
     }
   }
 
+  /** Synchronous fallback token cache, populated from NativeStorage at app boot. */
+  private static tokenCache: string | null = null;
+  static setTokenCache(token: string | null): void {
+    SocketService.tokenCache = token || null;
+  }
+  private static readToken(): string | null {
+    try {
+      const t = localStorage.getItem('token');
+      if (t) return t;
+    } catch {}
+    return SocketService.tokenCache;
+  }
+
   /** Read current auth token & compute owner id. */
   private static resolveOwnerId(): string | null {
-    const token = localStorage.getItem('token');
-    return SocketService.extractUserIdFromToken(token);
+    return SocketService.extractUserIdFromToken(SocketService.readToken());
   }
 
   /** Public getter for the socket owner id. */
@@ -143,7 +155,7 @@ export class SocketService {
 
     // If same user, just update socket auth payload and reconnect if needed
     if (newAuthId && newAuthId === SocketService.ownerId) {
-      const token = localStorage.getItem('token');
+      const token = SocketService.readToken();
       if (SocketService.socketInstance && token) {
         // Update auth for next handshake
         (SocketService.socketInstance as any).auth = { token };
@@ -212,7 +224,7 @@ export class SocketService {
       // Auth pre-check: if there's no token (user not signed-in yet),
       // skip WebSocket initialization silently instead of rejecting.
       // Server-side will still enforce auth for protected socket events.
-      const token = localStorage.getItem('token');
+      const token = SocketService.readToken();
       if (!token) {
         console.log('ℹ️ No auth token found — skipping WebSocket initialization.');
         SocketService.reconnectionInProgress = false;

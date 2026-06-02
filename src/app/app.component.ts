@@ -345,15 +345,32 @@ export class AppComponent implements OnDestroy {
       this.themeService.initializeTheme();
 
       // Backfill localStorage from NativeStorage so SocketService (which reads
-      // localStorage only) can authenticate the WebSocket on Android.
+      // localStorage only) can authenticate the WebSocket on Android. Also
+      // populate SocketService.tokenCache as a synchronous fallback in case
+      // localStorage.setItem is unreliable under Capacitor.
       try {
-        if (!localStorage.getItem('token')) {
-          const t = await this.nativeStorage.getItem('token').catch(() => null);
-          if (t) localStorage.setItem('token', typeof t === 'string' ? t : String(t));
+        let tok: any = null;
+        try { tok = localStorage.getItem('token'); } catch {}
+        if (!tok) {
+          tok = await this.nativeStorage.getItem('token').catch(() => null);
+          if (tok) {
+            const tokStr = typeof tok === 'string' ? tok : String(tok);
+            try { localStorage.setItem('token', tokStr); } catch {}
+            SocketService.setTokenCache(tokStr);
+            console.log('🔑 Token backfilled from NativeStorage to localStorage+cache');
+          }
+        } else {
+          SocketService.setTokenCache(typeof tok === 'string' ? tok : String(tok));
         }
         if (!localStorage.getItem('currentUser')) {
           const u = await this.nativeStorage.getItem('currentUser').catch(() => null);
-          if (u) localStorage.setItem('currentUser', typeof u === 'string' ? u : JSON.stringify(u));
+          if (u) {
+            try { localStorage.setItem('currentUser', typeof u === 'string' ? u : JSON.stringify(u)); } catch {}
+          }
+        }
+        // Force socket re-init now that token cache is populated
+        if (tok) {
+          try { await SocketService.refreshAuth(); } catch (e) { console.warn('socket refreshAuth failed', e); }
         }
       } catch (e) { /* ignore */ }
 

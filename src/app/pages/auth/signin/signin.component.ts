@@ -277,9 +277,9 @@ export class SigninComponent implements OnInit {
     try {
       if (this.platform.is('cordova')) {
         await this.nativeStorage.setItem('token', token);
-      } else {
-        try { localStorage.setItem('token', token); } catch (e) {}
       }
+      try { localStorage.setItem('token', token); } catch (e) {}
+      try { SocketService.setTokenCache(token); } catch (e) {}
     } catch (e) {
       // token persistence failed, continue
     }
