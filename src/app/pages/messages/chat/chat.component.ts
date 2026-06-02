@@ -518,6 +518,9 @@ async initializeSocket() {
     // (Optional but safe/idempotent) ensure the server binds this socket to the JWT user
     SocketService.bindToAuthUser();
 
+    // Force re-bind on every (re)connect — the underlying socket instance may have
+    // been replaced by SocketService after a reconnect, leaving stale listeners.
+    this.listenersBound = false;
     this.initSocketListeners();
   } catch (error) {
     console.error("❌ Socket initialization failed:", error);
@@ -750,8 +753,17 @@ private recomputeActiveCall() {
       console.error("❌ WebSocket not initialized.");
       return;
     }
-    if (this.listenersBound) return;  // already bound once, don't rebind
+    if (this.listenersBound) return;  // already bound on this socket instance
     this.listenersBound = true;
+
+    // Remove any stale listeners from a previous socket instance before re-binding
+    try {
+      this.socket.off('new-message');
+      this.socket.off('message-sent');
+      this.socket.off('video-session-reset');
+      this.socket.off('video-call-accepted');
+      this.socket.off('video-call-cancelled');
+    } catch (_) {}
   
     // helper to normalize any message payload
 const normalize = (m: any): Message => {

@@ -147,8 +147,8 @@ export class SignupComponent implements OnInit, OnDestroy {
             SocketService.bindToAuthUser();
           } catch (e) {}
           this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
-          this.step++; // advance to success step
-          this.cdr.detectChanges();
+          // Skip the success step + manual login: drop the user straight into the app.
+          this.router.navigate(['/tabs/new-friends']);
         }
       } catch (_) {
         // not yet verified — keep polling silently
@@ -511,7 +511,8 @@ export class SignupComponent implements OnInit, OnDestroy {
 
         this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
 
-        this.step++; // Go to success step
+        // Go straight into the app instead of forcing another manual login.
+        this.router.navigate(['/tabs/new-friends']);
       } else {
         this.toastService.presentErrorToastr('Email not verified yet. Please check your inbox and click the link.');
       }
