@@ -233,7 +233,7 @@ export class SigninComponent implements OnInit {
         }
       }
       this.toastService.presentErrorToastr('Please verify your email address. Check your inbox and click the verification link, then sign in again.');
-      await this.router.navigate(['/auth/signup']);
+      await this.router.navigate(['/auth/signup'], { queryParams: { reason: 'email_not_verified' } });
       return;
     }
 

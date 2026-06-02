@@ -173,7 +173,7 @@ exports.withAuthUser = async (req, res, next) => {
 
         // Only select the minimal necessary fields to avoid transferring/storing full docs
         let user = await User.findById(userId)
-            .select('_id email role banned banUntil isDeleted emailVerified bannedReason lastSeen friends followers city country')
+            .select('_id email role banned banUntil isDeleted emailVerified bannedReason lastSeen friends followers city country createdAt')
             .lean();
         if (!user) {
             logger.info('withAuthUser error: User not found in DB for ID:', userId);
