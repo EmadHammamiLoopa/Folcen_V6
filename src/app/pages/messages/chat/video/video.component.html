@@ -22,12 +22,12 @@
     </video>
   </div>
 
-  <div class="top-overlay" *ngIf="partner && !answered">
+  <div class="top-overlay" *ngIf="partner && answered">
     <div class="minimal-caller-card">
       <app-avatar [profile]="partner" [size]="60" class="mini-avatar"></app-avatar>
       <div class="info">
         <h3>{{ partner?.fullName }}</h3>
-        <span class="status">{{ answer ? 'Incoming Call' : 'Calling...' }}</span>
+        <span class="status">In Call</span>
       </div>
     </div>
   </div>

@@ -344,6 +344,19 @@ export class AppComponent implements OnDestroy {
       // Initialize Theme
       this.themeService.initializeTheme();
 
+      // Backfill localStorage from NativeStorage so SocketService (which reads
+      // localStorage only) can authenticate the WebSocket on Android.
+      try {
+        if (!localStorage.getItem('token')) {
+          const t = await this.nativeStorage.getItem('token').catch(() => null);
+          if (t) localStorage.setItem('token', typeof t === 'string' ? t : String(t));
+        }
+        if (!localStorage.getItem('currentUser')) {
+          const u = await this.nativeStorage.getItem('currentUser').catch(() => null);
+          if (u) localStorage.setItem('currentUser', typeof u === 'string' ? u : JSON.stringify(u));
+        }
+      } catch (e) { /* ignore */ }
+
       // Initialize session/user once per app boot (deduped)
       console.log('⏳ Initializing session store...');
       try {
