@@ -30,18 +30,19 @@ import { SocketService } from 'src/app/services/socket.service';
   styleUrls: ['./display.component.scss'],
 })
 export class DisplayComponent implements OnInit, OnDestroy {
+  readonly features = environment.features;
   pageLoading = true;
-  authUser!: User;
-  @Input() user!: User;
+  authUser: User;
+  @Input() user: User;
   domaine = constants.DOMAIN_URL;
-  myProfile!: boolean;
+  myProfile: boolean;
   isFriend: boolean = false;
   notFriendOrMe: boolean = false;
   private _isFriendReloadDone = false;
   outgoingRequestId: string | null = null;
   pendingRequestsCount = 0;
-  userId: string | null = null;
-  mainAvatar!: string;
+  userId: string;
+  mainAvatar: string;
   imageLoading = false;
   isUploading = false;
   usedCached = false;
@@ -474,22 +475,15 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
   
   private processSelectedMedia(resp: any) {
-    if (!resp?.file) {
-      this.toastService.presentErrorToastr('Could not read the selected image. Please try again.');
-      return;
-    }
-
     let imageUrl = resp.imageData;
-
+  
     if (this.platform.is('cordova')) {
       imageUrl = this.webView.convertFileSrc(resp.imageData);
     }
-
-    const mimeType = resp.file.type || resp.mimeType || 'image/jpeg';
-    const imageFile = new Blob([resp.file], { type: mimeType });
-    const rawName = resp.name || 'avatar';
-    const imageName = rawName.includes('.') ? rawName : rawName + '.jpg';
-
+  
+    const imageFile = new Blob([resp.file], { type: resp.file.type });
+    const imageName = resp.name || resp.file.name;
+  
     const formData = new FormData();
     formData.append('avatar', imageFile, imageName);
   
@@ -518,25 +512,11 @@ export class DisplayComponent implements OnInit, OnDestroy {
           this.toastService.presentErrorToastr('Invalid response from server.');
         }
       },
-      error: (err: any) => {
+      error: () => {
         this.isUploading = false;
-        const msg = err?.error?.message || err?.message || 'Failed to upload photo. Please try again.';
-        this.toastService.presentErrorToastr(msg);
+        this.toastService.presentErrorToastr('Error uploading image');
       }
     });
-  }
-
-  private getMediaPickerErrorMessage(err: any): string | null {
-    if (err === 20 || err?.code === 20) {
-      return 'Photo permission denied. Please allow Photos/Media access in app settings and try again.';
-    }
-
-    const text = (typeof err === 'string' ? err : (err?.message || '')).toLowerCase();
-    if (text.includes('cancel') || text.includes('no image selected')) {
-      return null;
-    }
-
-    return err?.error?.message || err?.message || 'Could not open media picker. Please try again.';
   }
   
 
@@ -580,12 +560,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
       // Native mobile: use existing uploadFile logic
       this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'image')
         .then(resp => this.processSelectedMedia(resp))
-        .catch(err => {
-          const msg = this.getMediaPickerErrorMessage(err);
-          if (msg) {
-            this.toastService.presentErrorToastr(msg);
-          }
-        });
+        .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
     } else {
       // Browser: trigger file input manually
       const input = document.getElementById('webImageInput') as HTMLInputElement;
@@ -597,23 +572,13 @@ export class DisplayComponent implements OnInit, OnDestroy {
   openCameraPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image')
       .then(resp => this.processSelectedMedia(resp))
-      .catch(err => {
-        const msg = this.getMediaPickerErrorMessage(err);
-        if (msg) {
-          this.toastService.presentErrorToastr(msg);
-        }
-      });
+      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
   }
   
   openVideoPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'video')
       .then(resp => this.processSelectedMedia(resp))
-      .catch(err => {
-        const msg = this.getMediaPickerErrorMessage(err);
-        if (msg) {
-          this.toastService.presentErrorToastr(msg);
-        }
-      });
+      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
   }
   
 
@@ -766,7 +731,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
             }
           },
           error: (error) => {
-            this.toastService.presentErrorToastr(error);
+            this.toastService.presentErrorToastr('Error uploading image: ' + error);
           }
         });
       }, err => {
@@ -805,7 +770,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     }
   }
 
-  refresh(event: any) {
+  refresh(event) {
     if (this.userId && this.userId !== 'null') {
       this.getUser(event);
       // prefer currentUser then fallback to legacy key
@@ -828,7 +793,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     }
   }
 
-  getUser(event?: any) {
+  getUser(event?) {
     this.userService.getUserProfile(this.userId).subscribe({
       next: (user: User) => {
         if (user && user._id) {
@@ -889,6 +854,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     this.toastService.presentErrorToastr('Failed to load user data. Please try again later.');
   
     // Reset relevant variables
+    this.user = null;
     this.pageLoading = false;
   }
   
@@ -911,7 +877,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
     else this.requestFriendship();
   }
 
-  handleError(err: any) {
+  handleError(err) {
     this.toastService.presentErrorToastr(err);
   }
 
@@ -947,14 +913,12 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   cancelRequest() {
-    // Use cancelRequestByUser which finds the request by user-pair, more reliable
-    // than looking up by request ID when outgoing request ID may not be cached
-    const targetUserId = this.user._id || this.user.id;
-    if (!targetUserId) {
+    const requestId = (this.user.requests && this.user.requests[0]?._id) || this.outgoingRequestId;
+    if (!requestId) {
       this.toastService.presentErrorToastr('Could not find request to cancel');
       return;
     }
-    this.requestService.cancelRequestByUser(targetUserId).then(
+    this.requestService.cancelRequest(requestId).then(
       () => {
         this.user.request  = null;
         this.user.requests = [];
@@ -1294,7 +1258,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
         reportPayload.entityType = 'Photo';
       }
 
-      this.userService.report(this.userId as string, reportPayload).subscribe(
+      this.userService.report(this.userId, reportPayload).subscribe(
         (resp: any) => {
           loading.dismiss();
           this.toastService.presentSuccessToastr(resp.message || 'Report submitted successfully');

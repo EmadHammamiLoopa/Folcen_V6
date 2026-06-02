@@ -228,15 +228,20 @@ isLatestCall(message: Message): boolean {
     // Refresh peer/auth profiles when notified by server
     try {
       // Re-bind socket listeners whenever SocketService reconnects.
-      // Without this, the underlying socket.io instance is replaced after a
-      // disconnect and our 'new-message'/'message-sent' listeners are lost,
-      // so messages save server-side but never update the UI in real time.
       SocketService.connection$.pipe(takeUntil(this.destroy$)).subscribe(status => {
         try {
           if (status === 'connected' && (this.user?.id || this.authUser?.id)) {
             this.initializeSocket();
           }
         } catch (e) { console.warn('chat reconnect handler error', e); }
+      });
+
+      // Reconnect-safe message streams (bound once, survive socket-instance swaps).
+      SocketService.newMessage$.pipe(takeUntil(this.destroy$)).subscribe((raw: any) => {
+        this.zone.run(() => this.handleIncomingMessage(raw));
+      });
+      SocketService.messageSent$.pipe(takeUntil(this.destroy$)).subscribe((saved: any) => {
+        this.zone.run(() => this.handleMessageSent(saved));
       });
 
       SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
@@ -743,6 +748,75 @@ private recomputeActiveCall() {
 
   
 
+  private normalizeMessagePayload = (m: any): Message => {
+    const copy: any = { ...m };
+    copy.id = copy.id || copy._id || `${copy.from}-${copy.to}-${copy.createdAt || Date.now()}`;
+    copy.tempId = copy.tempId ?? m.tempId;
+    copy.createdAt = copy.createdAt ? new Date(copy.createdAt) : null;
+    if (copy.image && typeof copy.image === 'object' && copy.image.path) {
+      copy.image = copy.image.path;
+    }
+    if (copy.type !== 'video-call-request') copy.status = null;
+    return new Message().initialize(copy);
+  };
+
+  private handleIncomingMessage(raw: any) {
+    try {
+      if (typeof raw === 'string') raw = JSON.parse(raw);
+      const msg = this.normalizeMessagePayload(raw);
+      const fromStr = String(msg.from || '');
+      const toStr   = String(msg.to   || '');
+      const peerId  = String((this.user as any)?._id || this.user?.id || '');
+      const selfId  = String((this.authUser as any)?._id || this.authUser?.id || '');
+      const relevant = (fromStr === peerId && toStr === selfId)
+                    || (fromStr === selfId && toStr === peerId);
+      if (!relevant) return;
+      if (this.user) {
+        this.markThreadRead();
+        this.messageService.clearCacheForThread(this.user.id);
+      }
+      if (this.messages.some(m => m.id === msg.id)) return;
+      this.messages.push(msg);
+      try { this.normalizeMessagesTimestamps(); } catch (_) {}
+      if (msg.type === 'video-call-request') this.recomputeActiveCall();
+      this.groupMessagesByDate();
+      this.scrollToBottom();
+    } catch (e) {
+      console.error('Failed to process incoming message:', e, raw);
+    }
+  }
+
+  private handleMessageSent(saved: any) {
+    try {
+      const fromStr = String(saved?.from || '');
+      const toStr   = String(saved?.to   || '');
+      const peerId  = String((this.user as any)?._id || this.user?.id || '');
+      const selfId  = String((this.authUser as any)?._id || this.authUser?.id || '');
+      const relevant = (fromStr === peerId && toStr === selfId)
+                    || (fromStr === selfId && toStr === peerId);
+      if (!relevant) return;
+      const msg = this.normalizeMessagePayload({
+        ...saved,
+        id: saved._id || saved.id,
+        _id: saved._id || saved.id,
+        state: 'sent'
+      });
+      if (saved.tempId) {
+        const i = this.messages.findIndex(m => m.id === saved.tempId || m.tempId === saved.tempId);
+        if (i !== -1) this.messages[i] = msg; else this.messages.push(msg);
+      } else {
+        const idx = this.messages.findIndex(m => m.id === msg.id);
+        if (idx !== -1) this.messages[idx] = msg; else this.messages.push(msg);
+      }
+      if (msg.type === 'video-call-request') this.recomputeActiveCall();
+      try { this.normalizeMessagesTimestamps(); } catch (_) {}
+      this.groupMessagesByDate();
+      this.changeDetection.detectChanges();
+    } catch (e) {
+      console.error('Failed to process message-sent:', e, saved);
+    }
+  }
+
   getFriendInfo(friendId: string) {
     this.userService.getUserProfile(friendId)
       .subscribe(
@@ -768,33 +842,16 @@ private recomputeActiveCall() {
     if (this.listenersBound) return;  // already bound on this socket instance
     this.listenersBound = true;
 
-    // Remove any stale listeners from a previous socket instance before re-binding
+    // Only re-bind video-* listeners (new-message/message-sent are handled by
+    // SocketService.newMessage$/messageSent$ in ngOnInit). We must NOT call
+    // socket.off('new-message') here — it would kill the SocketService bridge.
     try {
-      this.socket.off('new-message');
-      this.socket.off('message-sent');
       this.socket.off('video-session-reset');
       this.socket.off('video-call-accepted');
       this.socket.off('video-call-cancelled');
     } catch (_) {}
-  
-    // helper to normalize any message payload
-const normalize = (m: any): Message => {
-  const copy: any = { ...m };
-  copy.id = copy.id || copy._id || `${copy.from}-${copy.to}-${copy.createdAt || Date.now()}`;
-  copy.tempId = copy.tempId ?? m.tempId;     // ⬅️ keep tempId for replacement
-  // Do not default to `new Date()` here — leave undefined/null so Message.initialize
-  // can derive a proper timestamp (e.g. from ObjectId) instead of showing 'now'
-  copy.createdAt = copy.createdAt ? new Date(copy.createdAt) : null;
-  if (copy.image && typeof copy.image === 'object' && copy.image.path) {
-    copy.image = copy.image.path;
-  }
 
-    if (copy.type !== 'video-call-request') {
-    copy.status = null;
-  }
-
-  return new Message().initialize(copy);
-};
+    const normalize = this.normalizeMessagePayload;
 
 
   this.socket.on('video-session-reset', () => {
@@ -809,73 +866,6 @@ const normalize = (m: any): Message => {
       this.changeDetection.detectChanges();
     });
   });
-
-  
-this.socket.on('new-message', (raw: any) => {
-  this.zone.run(() => {
-    try {
-      if (typeof raw === 'string') raw = JSON.parse(raw);
-      const msg = normalize(raw);
-
-      // ── Only process messages that belong to THIS conversation ──
-      // The backend emits new-message to ALL sockets of the recipient, so
-      // messages from other conversations may arrive here too.
-      const fromStr  = String(msg.from  || '');
-      const toStr    = String(msg.to    || '');
-      const peerId   = String(this.user?._id  || this.user?.id  || '');
-      const selfId   = String(this.authUser?._id || this.authUser?.id || '');
-      const relevant = (fromStr === peerId && toStr === selfId)
-                    || (fromStr === selfId && toStr === peerId);
-      if (!relevant) return;
-
-      if (this.user && relevant) {
-        this.markThreadRead();
-        // ✅ Clear REST cache for this thread since we just received a live update
-        this.messageService.clearCacheForThread(this.user.id);
-      }
-      if (this.messages.some(m => m.id === msg.id)) return;
-
-      this.messages.push(msg);
-      // Normalize timestamps in-case msg was stamped with local 'now' earlier
-      try { this.normalizeMessagesTimestamps(); } catch(_) {}
-      if (msg.type === 'video-call-request') this.recomputeActiveCall(); // <— add
-      this.groupMessagesByDate();
-      this.scrollToBottom();
-    } catch (e) {
-      console.error('Failed to process incoming message:', e, raw);
-    }
-  });
-});
-
-  
-this.socket.on('message-sent', (saved: any) => {
-  this.zone.run(() => {
-    const msg = normalize({
-      ...saved,
-      id: saved._id || saved.id,
-      _id: saved._id || saved.id,
-      state: 'sent'
-    });
-
-    if (saved.tempId) {
-      const i = this.messages.findIndex(m => m.id === saved.tempId || m.tempId === saved.tempId);
-      if (i !== -1) this.messages[i] = msg; else this.messages.push(msg);
-    } else {
-      const idx = this.messages.findIndex(m => m.id === msg.id);
-      if (idx !== -1) this.messages[idx] = msg; else this.messages.push(msg);
-    }
-
-    if (msg.type === 'video-call-request') this.recomputeActiveCall(); // <— add
-
-    // Normalize timestamps in case server-sent object lacked createdAt and
-    // a previous local placeholder used current time.
-    try { this.normalizeMessagesTimestamps(); } catch(_) {}
-
-    this.groupMessagesByDate();
-    this.changeDetection.detectChanges();
-  });
-});
-
 
 
 

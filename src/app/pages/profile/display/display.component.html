@@ -103,7 +103,7 @@
           Chat
         </ion-button>
 
-        <ion-button class="secondary-action" *ngIf="user.isFriend" (click)="videoCall()" color="tertiary">
+        <ion-button class="secondary-action" *ngIf="user.isFriend && features.friendVideoCall" (click)="videoCall()" color="tertiary">
           <ion-icon name="videocam" slot="start"></ion-icon>
           Call
         </ion-button>
