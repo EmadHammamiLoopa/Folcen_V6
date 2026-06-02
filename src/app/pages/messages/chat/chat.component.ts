@@ -1333,8 +1333,8 @@ allowToShowDate(ind: number): boolean {
   conversationStarted() {
     // Reply-first rule for non-friends:
     // - Friends: always allowed
-    // - Non-friends: allow the very first outgoing message (so guest can start),
-    //   but after that require at least one incoming reply before sending again.
+    // - Non-friends: allow up to 5 outgoing messages before requiring a reply,
+    //   so the sender can give context without being immediately blocked.
     if (this.user && this.user.isFriend) return true;
 
     if (!this.messages || this.messages.length === 0) return true; // no history -> allowed to send
@@ -1343,9 +1343,9 @@ allowToShowDate(ind: number): boolean {
     const outgoing = this.messages.filter(m => m.isMine(this.authUser.id)).length;
     const incoming = this.messages.filter(m => !m.isMine(this.authUser.id)).length;
 
-    // Allow if no outgoing messages yet (first message), or recipient has replied (incoming >= outgoing)
-    if (outgoing === 0) return true;
-    return incoming >= outgoing;
+    // Allow if the recipient has replied at any point, OR if fewer than 5 messages sent without reply
+    if (incoming > 0) return true;
+    return outgoing < 5;
   }
 
 // Modify ProfileEnabled to always return true

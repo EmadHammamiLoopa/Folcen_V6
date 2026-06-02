@@ -115,16 +115,22 @@ exports.getUsersMessages = async (req, res) => {
           ],
           as: 'peerInfo' 
       }},
-      { $unwind: '$peerInfo' },
+      { $unwind: { path: '$peerInfo', preserveNullAndEmptyArrays: true } },
       
       // Stage 5: Security & Lifecycle Filter (Privacy Hardening)
+      // peerInfo may be null when preserveNullAndEmptyArrays is true (e.g. system user),
+      // so we only enforce lifecycle/block filters when peerInfo exists.
       { $match: {
-          'peerInfo.deletedAt': null,
-          'peerInfo.enabled': { $ne: false },
-          // Filter out users I have blocked
+          $or: [
+            { peerInfo: null },
+            {
+              'peerInfo.deletedAt': null,
+              'peerInfo.enabled': { $ne: false },
+              'peerInfo.blockedUsers': { $ne: authId }
+            }
+          ],
+          // Filter out users I have blocked (always applies)
           '_id': { $nin: (req.authUser.blockedUsers || []) },
-          // Hide me from people who blocked me (normalized comparison)
-          'peerInfo.blockedUsers': { $ne: authId }
         }
       },
       
@@ -136,8 +142,8 @@ exports.getUsersMessages = async (req, res) => {
       // Stage 7: Clean Object Construction
       { $project: {
           _id: { $toString: '$_id' },
-          firstName: '$peerInfo.firstName',
-          lastName: '$peerInfo.lastName',
+          firstName: { $ifNull: ['$peerInfo.firstName', 'Folcen'] },
+          lastName: { $ifNull: ['$peerInfo.lastName', 'Team'] },
           mainAvatar: '$peerInfo.mainAvatar',
           avatarStyle: '$peerInfo.avatarStyle',
           avatarSeed: '$peerInfo.avatarSeed',
