@@ -711,6 +711,20 @@ function notifyPeerNeeded(calleeId, callerId = null) {
         category: 'call',
         callerId: callerId ? String(callerId) : '',
         fromUserId: callerId ? String(callerId) : ''
+      },
+      android: {
+        priority: 'high',
+        ttl: 30 * 1000,
+        notification: {
+          channelId: 'calls',
+          sound: 'default',
+          priority: 'max',
+          defaultSound: true
+        }
+      },
+      apns: {
+        headers: { 'apns-priority': '10' },
+        payload: { aps: { sound: 'default' } }
       }
     });
   }

@@ -389,8 +389,7 @@ ngOnDestroy() {
     if (this.socket?.connected && this.user?.id) {
       this.socket.emit('mark-thread-read', { peerId: this.user.id });
     }
-    // ✅ clear only this peer's missed calls and update the global badge
-    try { this.webRTC.removeMissedCallsFor(this.user.id); } catch(e) {}
+    // Keep missed calls visible in the calls/missed-call UI until the user clears them there.
     try {
       const remaining = (this.badges.getMissedCalls && typeof this.badges.getMissedCalls === 'function') ? this.badges.getMissedCalls() : this.webRTC.getMissedCalls();
       const count = Array.isArray(remaining) ? remaining.length : 0;
@@ -1609,7 +1608,8 @@ private async sendVideoCallRequest() {
     from: this.authUser.id,
     to: this.user.id,
     text: tempMessage.text,
-    messageId: tempId
+    messageId: tempId,
+    requestOnly: true
   };
 
   // 3️⃣ Emit to server
@@ -1619,6 +1619,23 @@ private async sendVideoCallRequest() {
         // fallback: mark as failed
         const i = this.messages.findIndex(m => m.id === tempId);
         if (i !== -1) this.messages[i].state = 'failed';
+        this.groupMessagesByDate();
+        this.changeDetection.detectChanges();
+        return;
+      }
+
+      const realId = String(ack.messageId || '');
+      const i = this.messages.findIndex(m => m.id === tempId || m.tempId === tempId);
+      if (i !== -1) {
+        const existing: any = this.messages[i];
+        existing._id = realId || existing._id || existing.id;
+        existing.state = 'sent';
+        existing.status = 'pending';
+        existing.tempId = tempId;
+        this.messages[i] = existing;
+        this.recomputeActiveCall();
+        this.groupMessagesByDate();
+        this.changeDetection.detectChanges();
       }
     });
   } else {

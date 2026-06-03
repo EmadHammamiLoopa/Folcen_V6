@@ -314,9 +314,11 @@ async ionViewWillEnter() {
 
     if (this.answer) {
       // Incoming side: DO NOT open camera yet
+      await this.ensureIncomingPeerReady();
       this.ringer.start('ringing.mp3');
       // keep your startUnansweredTimeout() from ngOnInit or call here
     } else {
+      await this.ensurePartnerLoaded();
       // Outgoing side: we can open camera
       const ok = await this.webRTC.init(this.myEl, this.partnerEl);
       if (!ok) throw new Error('Media init failed');
@@ -329,6 +331,34 @@ async ionViewWillEnter() {
   } finally {
     this.pageLoading = false;
     this.cdr.detectChanges();
+  }
+}
+
+private async ensureIncomingPeerReady(): Promise<void> {
+  try {
+    const myId = this.authUser?._id || this.authUser?.id;
+    if (!myId) return;
+    await this.webRTC.createPeer(myId);
+    await this.webRTC.waitForPeerOpen();
+    await this.webRTC.wait();
+  } catch (e) {
+    console.warn('[video] incoming peer warmup failed', e);
+  }
+}
+
+private async ensurePartnerLoaded(): Promise<void> {
+  if (this.partner?._id || (this.partner as any)?.id) return;
+  if (!this.userId) return;
+
+  try {
+    const resp: any = await this.userService.getUserProfile(this.userId).toPromise();
+    const userData = resp?.data || resp;
+    if (userData) {
+      this.partner = userData instanceof User ? userData : new User().initialize(userData);
+      this.cdr.detectChanges();
+    }
+  } catch (e) {
+    console.warn('[video] partner preload failed', e);
   }
 }
 

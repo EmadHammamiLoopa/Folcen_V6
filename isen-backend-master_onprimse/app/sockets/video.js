@@ -136,6 +136,8 @@ module.exports = (io, socket) => {   // ✅ no extra param
   // ─────────────────────────────── call request ──────────────────────────────
   socket.on('video-call-request', async (data, callback) => {
     try {
+      if (data?.requestOnly) return;
+
       const { to, text, messageId } = data || {};
       const from = socket.userId; // authoritative
       if (!from || !to || !text || !messageId) {

@@ -60,13 +60,19 @@
       display: none !important;
       -webkit-appearance: none !important;
     }
-    video { background: transparent; }
+    video {
+      background: transparent;
+      transform: none !important;
+      -webkit-transform: none !important;
+    }
   }
 
   .main-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transform: none !important;
+    -webkit-transform: none !important;
   }
 
   // FIXED OVERLAP: Put self-video at the bottom right during a call
@@ -78,6 +84,8 @@
     height: 160px;
     border-radius: 16px;
     object-fit: cover;
+    transform: none !important;
+    -webkit-transform: none !important;
     z-index: 10;
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 20px rgba(0,0,0,0.4);

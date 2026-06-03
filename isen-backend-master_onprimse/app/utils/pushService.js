@@ -9,12 +9,12 @@
 const { sendPushToUser } = require('../services/fcmPushService');
 
 /**
- * sendPush(userIds, { title, body, data })
+ * sendPush(userIds, { title, body, data, android, apns })
  *
  * @param {string|string[]} userIds  – MongoDB user-ids
- * @param {{ title, body, data? }} payload
+ * @param {{ title, body, data?, android?, apns? }} payload
  */
-async function sendPush(userIds, { title, body, data = {} }) {
+async function sendPush(userIds, { title, body, data = {}, android = null, apns = null }) {
   const ids = (Array.isArray(userIds) ? userIds : [userIds])
     .filter(id => id && typeof id === 'string' && id.trim());
 
@@ -24,7 +24,7 @@ async function sendPush(userIds, { title, body, data = {} }) {
   }
 
   const results = await Promise.all(
-    ids.map(uid => sendPushToUser(uid, { title, body, data }).catch(err => {
+    ids.map(uid => sendPushToUser(uid, { title, body, data, android, apns }).catch(err => {
       console.error(`[pushService] FCM error for user ${uid}:`, err.message);
       return null;
     }))
