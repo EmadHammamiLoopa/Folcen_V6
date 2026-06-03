@@ -571,7 +571,10 @@ listenForVideoCallEvents() {
   this.socket.off('video-call-ended');
   this.socket.off('leave-call');
 
-  this.socket.on('video-call-started', () => this.ringer.start('calling.mp3'));
+  this.socket.on('video-call-started', () => {
+    this.ringer.stop();
+    this.calling = false;
+  });
 
   const onCanceled = async (ev?: any) => {
     const from = ev?.from ?? ev?.callerId ?? this.userId;
@@ -935,7 +938,7 @@ async placeCall() {
     this.lastPlaceCallAt = now;
     this.placingCall = true;
     this.calling     = true;
-    this.ringer.start('ringing.mp3');
+    this.ringer.start('calling.mp3');
   // start the missed-call timeout immediately so PeerJS delays don't prevent it
   try { this.startMissedCallTimeout(); } catch(e) {}
 
@@ -971,6 +974,7 @@ async placeCall() {
 
     this.calling = true;
   } catch (err: any) {
+    this.ringer.stop();
     this.toastService.presentErrorToastr(err.message ?? String(err));
   } finally {
     this.placingCall = false;

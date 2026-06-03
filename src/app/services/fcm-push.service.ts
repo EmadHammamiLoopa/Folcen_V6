@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { environment } from '../../environments/environment';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 /**
  * FcmPushService
@@ -86,10 +87,31 @@ export class FcmPushService {
 
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
           console.log('[FcmPushService] Notification received in foreground:', notification.title);
+          const data: any = notification.data || {};
+          if (data?.type === 'video-call' || data?.category === 'call') {
+            LocalNotifications.schedule({
+              notifications: [{
+                id: Date.now() % 2147483647,
+                title: notification.title || 'Incoming video call',
+                body: notification.body || 'Tap to answer',
+                extra: data
+              }]
+            }).catch(() => {});
+          }
         });
 
         PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
           const data: any = action.notification?.data || {};
+
+          if (data?.type === 'video-call' || data?.category === 'call') {
+            const callerId = data.callerId || data.fromUserId;
+            if (callerId) {
+              this.platform.ready().then(() => {
+                setTimeout(() => this.router.navigate(['/messages/video', callerId], { queryParams: { answer: true } }), 200);
+              });
+              return;
+            }
+          }
 
           if (data?.link) {
             this.platform.ready().then(() => {

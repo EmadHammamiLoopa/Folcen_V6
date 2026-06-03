@@ -150,7 +150,12 @@ export class WebrtcService {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: { exact: videoId } },
-          audio: { deviceId: { exact: audioId } }
+          audio: {
+            deviceId: { exact: audioId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
         });
         this.myStream = stream;
         console.log('[webrtc] ✅ Acquired stream successfully.');
@@ -225,9 +230,7 @@ export class WebrtcService {
     await this.waitForPeerOpen(); // throws after 10 s timeout
 
     /* 2 — look-up partner’s current peer-id ------------------------------ */
-    const partnerPeerId = await this.userService
-      .getPartnerPeerId(partnerUserId)
-      .toPromise();
+    const partnerPeerId = await this.resolvePartnerPeerId(partnerUserId);
     if (!partnerPeerId) {
       throw new Error('Partner is offline or has no peer-id');
     }
@@ -307,6 +310,23 @@ export class WebrtcService {
     return mc;
   }
 
+  private async resolvePartnerPeerId(partnerUserId: string): Promise<string | null> {
+    const delays = [0, 350, 700, 1200, 1800, 2500, 3200];
+    let lastPeerId: string | null = null;
+
+    for (const delayMs of delays) {
+      if (delayMs) await this.delay(delayMs);
+      try {
+        lastPeerId = await this.userService.getPartnerPeerId(partnerUserId).toPromise();
+        if (lastPeerId) return lastPeerId;
+      } catch (err) {
+        console.warn('[webrtc] partner peer lookup failed; retrying', err);
+      }
+    }
+
+    return lastPeerId;
+  }
+
   // central cleanup used when remote cancels or timeout occurs
   private cleanupCallState(reason?: string) {
     try { clearTimeout(this.callTimeoutTimer); } catch(_) {}
@@ -382,7 +402,12 @@ export class WebrtcService {
           frameRate: { ideal: 15, max: 30 },
           deviceId: { exact: videoDeviceId }
         },
-        audio: { deviceId: { exact: audioDeviceId } }
+        audio: {
+          deviceId: { exact: audioDeviceId },
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
       });
 
       // Log the actual devices being used
@@ -460,7 +485,16 @@ export class WebrtcService {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: { exact: videoDevice.deviceId } },
-          audio: audioDevices.length > 0 ? { deviceId: { exact: audioDevices[0].deviceId } } : true
+          audio: audioDevices.length > 0 ? {
+            deviceId: { exact: audioDevices[0].deviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } : {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
         });
         return stream;
       } catch (videoError) {
@@ -472,7 +506,12 @@ export class WebrtcService {
     for (const audioDevice of audioDevices) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: { exact: audioDevice.deviceId } },
+          audio: {
+            deviceId: { exact: audioDevice.deviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
           video: false
         });
         return stream;
@@ -762,7 +801,11 @@ public async bindMissedCallSocketHandlers() {
   getMedia(facingMode: string) {
     return navigator.mediaDevices.getUserMedia({
       video: { facingMode: facingMode },
-      audio: true
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
     })
     .then((stream) => {
       this.handleSuccess(stream);
@@ -1155,7 +1198,12 @@ WebrtcService.peer.once('open', async () => {
           frameRate: { ideal: 15, max: 30 },
           deviceId: { exact: videoDeviceId }
         },
-        audio: { deviceId: { exact: audioDeviceId } }
+        audio: {
+          deviceId: { exact: audioDeviceId },
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
       });
   
       // ✅ Keep references so close() can stop tracks reliably
@@ -1179,7 +1227,11 @@ WebrtcService.peer.once('open', async () => {
         console.log('Attempting fallback with relaxed constraints');
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           video: true,
-          audio: true
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
         });
   
         // ✅ Also keep references for fallback

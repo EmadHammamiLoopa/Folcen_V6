@@ -693,12 +693,23 @@ async function purgeUser(userId) {
 }
 
 /** Wake the callee: emit on socket if online, else push */
-function notifyPeerNeeded(calleeId) {
+function notifyPeerNeeded(calleeId, callerId = null) {
   if (!io) return console.warn('notifyPeerNeeded called before helpers.initSocket(io)');
   if (io.sockets?.adapter?.rooms?.has(calleeId)) {
-    io.to(calleeId).emit('incoming-call');
+    const payload = callerId ? { callerId: String(callerId) } : {};
+    io.to(calleeId).emit('incoming-call', payload);
+    io.to(calleeId).emit('called', payload);
   } else {
-    pushSvc.sendPush(calleeId, { title: 'Incoming call', body: 'Tap to answer' });
+    pushSvc.sendPush(calleeId, {
+      title: 'Incoming video call',
+      body: 'Tap to answer',
+      data: {
+        type: 'video-call',
+        category: 'call',
+        callerId: callerId ? String(callerId) : '',
+        fromUserId: callerId ? String(callerId) : ''
+      }
+    });
   }
 }
 

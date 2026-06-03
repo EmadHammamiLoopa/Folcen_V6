@@ -629,8 +629,6 @@ export class AppComponent implements OnDestroy {
         console.log('📞 Incoming call from:', data.callerId);
         localStorage.setItem('partnerId', data.callerId);
 
-        this.playAudio('/assets/audio/ringing.mp3');
-
         this.messengerService.onMessage().subscribe((msg) => {
           if (msg?.event === 'stop-audio') this.audio?.pause();
         });

@@ -145,7 +145,7 @@ router.get('/:userId/peer', [requireSignin], async (req, res, next) => {
     const record = await peerStore.get(userId); // { peerId, lastUpdated } | null
 
     if (!record) {
-      notifyPeerNeeded(userId); // wake the callee via socket or other means
+      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id); // wake the callee via socket or other means
       return res.json({ success: true, peerId: null });
     }
 

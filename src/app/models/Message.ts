@@ -13,7 +13,7 @@ export class Message {
   private _createdAt: Date;
   private _image: string;
   private _type: string;
-  public   status?: 'pending' | 'accepted' | 'cancelled';
+  public   status?: 'pending' | 'accepted' | 'cancelled' | 'used';
   public productId?: string; // Property to store product ID
   public product?: Product;  // Property to store product details
   public safeImage?: SafeUrl; // sanitized image

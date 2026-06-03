@@ -89,7 +89,7 @@ private loadingMessages = false;
   allowToChat = false;
   business = false;
   showMediaOptions: boolean = false;
-activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | null, messageId?: string } = { status: null };
+activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'used' | null, messageId?: string } = { status: null };
 
 
   
@@ -901,6 +901,7 @@ private recomputeActiveCall() {
     try {
       this.socket.off('video-session-reset');
       this.socket.off('video-call-accepted');
+      this.socket.off('video-call-used');
       this.socket.off('video-call-cancelled');
     } catch (_) {}
 
@@ -933,6 +934,19 @@ this.socket.on('video-call-accepted', (data: any) => {
       this.groupMessagesByDate();
       this.recomputeActiveCall(); // <— add here too
 
+      this.changeDetection.detectChanges();
+    }
+  });
+});
+
+this.socket.on('video-call-used', (data: any) => {
+  this.zone.run(() => {
+    const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
+    if (msg) {
+      msg.status = 'used';
+      (msg as any)['busy'] = false;
+      this.recomputeActiveCall();
+      this.groupMessagesByDate();
       this.changeDetection.detectChanges();
     }
   });
@@ -1052,7 +1066,16 @@ onVideoButtonPressed() {
 
   // non-friends:
   if (this.activeVideoCall.status === 'accepted') {
-    // already accepted -> jump to call UI
+    // already accepted -> consume the one-time approval and jump to call UI
+    if (this.activeVideoCall.messageId && this.socket?.connected) {
+      this.socket.emit('video-call-used', { messageId: this.activeVideoCall.messageId });
+      const msg = this.messages.find(m => m.id === this.activeVideoCall.messageId || m.tempId === this.activeVideoCall.messageId);
+      if (msg) {
+        msg.status = 'used';
+        this.recomputeActiveCall();
+        this.groupMessagesByDate();
+      }
+    }
     return this.router.navigateByUrl('/messages/video/' + this.user.id);
   }
 

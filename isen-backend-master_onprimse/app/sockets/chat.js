@@ -5,6 +5,7 @@ const fsp = fs.promises;
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Follow = require("../models/Follow");
+const { sendPushToUser } = require("../services/fcmPushService");
 
 // ✅ Import from socketManager
 const { connectedUsers } = require("../utils/socketManager");
@@ -143,8 +144,59 @@ socket.on("video-call-accepted", async (data) => {
 
     emitToUser(data.to, "video-call-accepted", { messageId: msg.id, status: "accepted" });
     emitToUser(data.from, "video-call-accepted", { messageId: msg.id, status: "accepted" });
+    User.findById(data.from).select("firstName lastName").lean().then(accepter => {
+      const accepterName = [accepter?.firstName, accepter?.lastName].filter(Boolean).join(" ") || "Your video request";
+      return sendPushToUser(String(msg.from), {
+        title: "Video request accepted",
+        body: `${accepterName} accepted your video call request`,
+        data: {
+          type: "video-call-accepted",
+          category: "message",
+          fromUserId: String(msg.to),
+          messageId: String(msg._id),
+          link: `/messages/chat/${String(msg.to)}`
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "default",
+            sound: "default",
+            defaultSound: true
+          }
+        },
+        apns: {
+          headers: { "apns-priority": "10" },
+          payload: { aps: { sound: "default" } }
+        }
+      });
+    }).catch(err => console.warn("[chat] accepted video request push failed:", err.message));
   } catch (err) {
     console.error("❌ Error in video-call-accepted:", err);
+  }
+});
+
+socket.on("video-call-used", async (data) => {
+  try {
+    const authUser = socket.userId;
+    if (!authUser || !mongoose.Types.ObjectId.isValid(data?.messageId)) return;
+
+    const msg = await Message.findOneAndUpdate(
+      {
+        _id: data.messageId,
+        from: authUser,
+        type: "video-call-request",
+        status: "accepted"
+      },
+      { status: "used" },
+      { new: true }
+    );
+    if (!msg) return;
+
+    const payload = { messageId: msg.id, status: "used" };
+    emitToUser(String(msg.from), "video-call-used", payload);
+    emitToUser(String(msg.to), "video-call-used", payload);
+  } catch (err) {
+    console.error("Error in video-call-used:", err);
   }
 });
 

@@ -48,7 +48,7 @@ const messageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product', // Reference to the Product if the message is about a product
   },
-    status: { type: String, enum: ['pending', 'accepted', 'cancelled'], default: null },
+    status: { type: String, enum: ['pending', 'accepted', 'cancelled', 'used'], default: null },
 
 }, { timestamps: true }); // Automatically adds createdAt and updatedAt fields
 

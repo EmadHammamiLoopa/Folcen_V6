@@ -17,10 +17,10 @@ const PushToken  = require('../models/PushToken');
  * Send an FCM push notification to all devices registered for a user.
  *
  * @param {string|ObjectId} userId
- * @param {{ title: string, body: string, data?: object }} payload
+ * @param {{ title: string, body: string, data?: object, android?: object, apns?: object }} payload
  * @returns {Promise<{ successCount: number, failureCount: number, removedInvalid: number }>}
  */
-async function sendPushToUser(userId, { title, body, data = {} }) {
+async function sendPushToUser(userId, { title, body, data = {}, android = null, apns = null }) {
   if (!userId) {
     console.warn('[fcmPushService] sendPushToUser called with no userId');
     return { successCount: 0, failureCount: 0, removedInvalid: 0 };
@@ -54,6 +54,8 @@ async function sendPushToUser(userId, { title, body, data = {} }) {
     data: stringData,
     tokens,
   };
+  if (android) message.android = android;
+  if (apns) message.apns = apns;
 
   let successCount  = 0;
   let failureCount  = 0;
