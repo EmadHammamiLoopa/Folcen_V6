@@ -29,6 +29,18 @@ node_modules/
 /platforms
 /plugins
 /www
+
+# Local signing/secrets. Keep release keys outside Git; losing this key
+# means future APK updates cannot use the same signing identity.
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# Local rollback bundles/snapshots created during dev.
+/version-backups
+
 # Ignore Gradle project-specific cache directory
 .gradle
 
