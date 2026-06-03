@@ -143,9 +143,12 @@ router.get('/:userId/peer', [requireSignin], async (req, res, next) => {
   try {
     const { userId } = req.params;
     const record = await peerStore.get(userId); // { peerId, lastUpdated } | null
+    if (req.query?.wake === '1' || req.query?.wake === 'true') {
+      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id); // wake callee for a real call attempt
+    }
 
     if (!record) {
-      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id); // wake the callee via socket or other means
+      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id);
       return res.json({ success: true, peerId: null });
     }
 

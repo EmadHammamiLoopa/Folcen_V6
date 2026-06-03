@@ -210,7 +210,7 @@ isLatestCall(message: Message): boolean {
           if (this.infScroll) this.infScroll.disabled = false;
         }
 
-        this.getUserProfile(normalized);
+        this.getUserProfile(normalized, true);
         this.videoCallDeclined = false;
       }
     });
@@ -293,6 +293,16 @@ isLatestCall(message: Message): boolean {
             }, () => {});
           }
         } catch (e) { console.warn('chat profile update handler error', e); }
+      });
+
+      SocketService.friendRequestsUpdated$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+        const peerId = String((this.user as any)?._id || this.user?.id || '');
+        const changedUserId = String(payload?.userId || payload?.from || payload?.to || '');
+        if (!peerId || (changedUserId && changedUserId !== peerId)) return;
+
+        this.lastLoadedPeerId = null;
+        this.activeVideoCall = { status: null, messageId: undefined };
+        if (this.user?.id) this.getUserProfile(this.user.id, true);
       });
     } catch (e) {}
   }
@@ -500,18 +510,18 @@ async cancelVideoCallRequest(message: Message) {
   }
 
 
-getUserProfile(userId: string) {
+getUserProfile(userId: string, forceRefresh = false) {
   if (!userId) { this.pageLoading = false; return; }
 
   // Avoid duplicate fetches for the same peer during a single view session
-  if (this.lastLoadedPeerId === userId && this.user?.id === userId) {
+  if (!forceRefresh && this.lastLoadedPeerId === userId && this.user?.id === userId) {
     this.pageLoading = false;
     return;
   }
   this.lastLoadedPeerId = userId;
 
   console.log('Fetching profile for user ID:', userId);
-  this.userService.getUserProfile(userId).subscribe(
+  this.userService.getUserProfile(userId, { forceRefresh }).subscribe(
     async (resp: any) => {
       const raw = resp?.data ?? resp;
 
@@ -529,7 +539,12 @@ getUserProfile(userId: string) {
         return this.location.back();
       }
 
-      this.user = new User().initialize(raw);
+      const freshUser = new User().initialize(raw);
+      const wasFriend = !!this.user?.isFriend;
+      this.user = freshUser;
+      if (wasFriend && !this.user.isFriend) {
+        this.activeVideoCall = { status: null, messageId: undefined };
+      }
       console.log('Recipient stored:', this.user);
 
       await waitUntil(() => !!this.authUser?.id);
@@ -1435,10 +1450,14 @@ allowToShowDate(ind: number): boolean {
 
     if (!this.messages || this.messages.length === 0) return true;
 
-    const outgoing = this.messages.filter(m => m.isMine(this.authUser.id)).length;
-    const incoming = this.messages.filter(m => !m.isMine(this.authUser.id)).length;
+    const normalMessages = this.messages
+      .filter(m => m.type !== 'video-call-request')
+      .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
 
-    return incoming >= outgoing;
+    if (!normalMessages.length) return true;
+
+    const last = normalMessages[normalMessages.length - 1];
+    return !last.isMine(this.authUser.id);
   }
 
 // Modify ProfileEnabled to always return true
@@ -1615,7 +1634,7 @@ canRequestVideoCall(): boolean {
   if (!this.user) return false;
   if (this.user.isFriend) return true;  // Always allow friends
   if (this.videoCallDeclined) return false;  // Block after declined
-  return true;  // Allow if not declined
+  return true;  // Allow a fresh request when there is no accepted one-time approval
 }
 
   

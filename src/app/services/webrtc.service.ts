@@ -314,10 +314,11 @@ export class WebrtcService {
     const delays = [0, 350, 700, 1200, 1800, 2500, 3200];
     let lastPeerId: string | null = null;
 
-    for (const delayMs of delays) {
+    for (let i = 0; i < delays.length; i++) {
+      const delayMs = delays[i];
       if (delayMs) await this.delay(delayMs);
       try {
-        lastPeerId = await this.userService.getPartnerPeerId(partnerUserId).toPromise();
+        lastPeerId = await this.userService.getPartnerPeerId(partnerUserId, i === 0).toPromise();
         if (lastPeerId) return lastPeerId;
       } catch (err) {
         console.warn('[webrtc] partner peer lookup failed; retrying', err);

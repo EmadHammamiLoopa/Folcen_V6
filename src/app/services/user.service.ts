@@ -692,9 +692,9 @@ getCurrentUserId(): string | null {
     }, 500);
   }
 
-  getPartnerPeerId(userId: string): Observable<string | null> {
+  getPartnerPeerId(userId: string, wake = false): Observable<string | null> {
     return this.http.get<{ success: boolean; peerId?: string; message: string }>(
-      `${this.apiUrl}/${userId}/peer`
+      `${this.apiUrl}/${userId}/peer${wake ? '?wake=1' : ''}`
     ).pipe(
       map(response => {
         return response.success && response.peerId ? response.peerId : null;

@@ -695,10 +695,13 @@ async function purgeUser(userId) {
 /** Wake the callee: emit on socket if online, else push */
 function notifyPeerNeeded(calleeId, callerId = null) {
   if (!io) return console.warn('notifyPeerNeeded called before helpers.initSocket(io)');
-  if (io.sockets?.adapter?.rooms?.has(calleeId)) {
+  const sockets = userSocketIds(String(calleeId));
+  if (sockets.length > 0) {
     const payload = callerId ? { callerId: String(callerId) } : {};
-    io.to(calleeId).emit('incoming-call', payload);
-    io.to(calleeId).emit('called', payload);
+    sockets.forEach(sid => {
+      io.to(sid).emit('incoming-call', payload);
+      io.to(sid).emit('called', payload);
+    });
   } else {
     pushSvc.sendPush(calleeId, {
       title: 'Incoming video call',
