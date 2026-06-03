@@ -54,28 +54,6 @@ export class Product {
     this._tags = product.tags || [];
     this._createdAt = new Date(product.createdAt) || new Date();
 
-    // Log each field for debugging
-    console.log('Product initialized with:');
-    console.log('ID:', this._id);
-    console.log('Label:', this._label);
-    console.log('Description:', this._description);
-    console.log('Price:', this._price);
-    console.log('Currency:', this._currency);
-    console.log('Country:', this._country);
-    console.log('City:', this._city);
-    console.log('Enabled:', this._enabled);
-    console.log('Sold:', this._sold);
-    console.log('Photos:', this._photos);
-    console.log('User:', this._user);
-    console.log('Category:', this._category);
-    console.log('Stock:', this._stock);
-    console.log('Brand:', this._brand);
-    console.log('Condition:', this._condition);
-    console.log('Weight:', this._weight);
-    console.log('Dimensions:', this._dimensions);
-    console.log('Tags:', this._tags);
-    console.log('Created At:', this._createdAt);
-
     return this;
   }
 

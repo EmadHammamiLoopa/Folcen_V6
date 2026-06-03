@@ -180,33 +180,31 @@ export class UserService {
           }
         } catch (e) { devLogger.warn('Failed to normalize stored user id', e); }
 
-        // Validate the persisted user by fetching fresh server data. If validation
-        // fails (token revoked/deleted), clear stored user data and force sign-in.
-        try {
-          // Ensure the stored user id is accessible via getCurrentUserId()
-          // (this relies on localStorage being populated with the stored user)
-          const fresh = await firstValueFrom(this.refreshCurrentUser({ forceRefresh: true }));
-          // Apply server-fresh user and force overwrite of any in-memory user
-          this.setCurrentUser(fresh, { force: true });
-          devLogger.log('✅ Current user validated and refreshed from server:', fresh._id);
-        } catch (e) {
-          devLogger.warn('Stored user validation failed; clearing persisted user and token', e);
-          // clear persisted user and token from both storages to prevent auth loops
-          try { 
-            localStorage.removeItem('currentUser'); 
-            localStorage.removeItem('user'); 
-            localStorage.removeItem('token');
-          } catch (er) {}
-          try { 
-            if (this.nativeStorage && typeof this.nativeStorage.remove === 'function') { 
-              await this.nativeStorage.remove('currentUser').catch(()=>{}); 
-              await this.nativeStorage.remove('user').catch(()=>{}); 
-              await this.nativeStorage.remove('token').catch(()=>{});
-            } 
-          } catch (er) {}
-          // ensure in-memory is cleared
-          this.setCurrentUser(null);
-        }
+        this.setCurrentUser(user, { force: true });
+        setTimeout(() => {
+          this.refreshCurrentUser({ forceRefresh: true }).subscribe({
+            next: fresh => this.setCurrentUser(fresh, { force: true }),
+            error: e => {
+              const status = e?.status || e?.error?.status;
+              if (status === 401 || status === 403) {
+                devLogger.warn('Stored user validation failed; clearing persisted user and token', e);
+                try {
+                  localStorage.removeItem('currentUser');
+                  localStorage.removeItem('user');
+                  localStorage.removeItem('token');
+                } catch (er) {}
+                try {
+                  if (this.nativeStorage && typeof this.nativeStorage.remove === 'function') {
+                    this.nativeStorage.remove('currentUser').catch(()=>{});
+                    this.nativeStorage.remove('user').catch(()=>{});
+                    this.nativeStorage.remove('token').catch(()=>{});
+                  }
+                } catch (er) {}
+                this.setCurrentUser(null);
+              }
+            }
+          });
+        }, 0);
       } else {
         devLogger.warn('⚠️ No user found in any storage');
       }

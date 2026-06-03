@@ -95,7 +95,6 @@ export class NewFriendsPage implements OnInit, OnDestroy {
     this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
       if (user) {
         this.authUser = user;
-        console.log('Authenticated user data fetched via service:', this.authUser);
         const excludedUserIds = this.getExcludedUserIds();
         this.users = this.users.filter((entry: any) => entry?.isDivider || !excludedUserIds.has(String(entry?._id || entry?.id || '')));
         this.changeDetectorRef.detectChanges();
@@ -145,16 +144,10 @@ export class NewFriendsPage implements OnInit, OnDestroy {
     if (String(v).toLowerCase() === 'null' || String(v).toLowerCase() === 'undefined') delete params[k];
   });
 
-  console.log('Fetching users with params:', params);
   this.userService.getUsers(this.page++, params)
       .subscribe(
         (resp: any) => {
           this.isGlobalSearch = resp.data.isGlobalSearch; // Capture the flag from the backend
-       console.log("global..........", this.isGlobalSearch);
-
-      console.log("Response received from backend:", resp);
-    console.log("Users array:", resp.data.users);
-
           if (refresh) this.users = [];
   
           const excludedUserIds = this.getExcludedUserIds();
@@ -174,7 +167,6 @@ export class NewFriendsPage implements OnInit, OnDestroy {
                   this.connectState.set(userId, 'requested');
                 }
               }
-              console.log('Initialized User:', initializedUser);
               this.users.push(initializedUser);
             }
           });
@@ -205,7 +197,7 @@ export class NewFriendsPage implements OnInit, OnDestroy {
           if (refresh && this.infinitScroll) this.infinitScroll.disabled = false;
   
           this.pageLoading = false;
-          console.log(err);
+          console.warn(err);
         }
       );
   }
@@ -241,7 +233,6 @@ export class NewFriendsPage implements OnInit, OnDestroy {
     });
     await modal.present();
     const { data } = await modal.onDidDismiss();
-    console.log('Modal dismissed with data:', data);
     // If modal signalled a reset, clear stored snapshot and reset options
     if (data && data.reset) {
       this.options = { gender: 'both', profession: '0', education: '0', minAge: null as any, maxAge: null as any, interestsList: '', languages: '', online: false };
@@ -262,7 +253,6 @@ export class NewFriendsPage implements OnInit, OnDestroy {
       this.options.languages = data.languages || '';
       this.options.online = data.online === '1' || data.online === true;
       
-      console.log('Updated options:', this.options);
       this.page = 0;
       this.getNearUsers(null, true);
 
@@ -335,7 +325,6 @@ export class NewFriendsPage implements OnInit, OnDestroy {
       } catch (e) { /* ignore normalization errors */ }
 
         const cached = this.userService.getCachedProfile(targetId);
-        console.log('showProfile -> targetId:', targetId, 'cached?', !!cached);
         
         // 🚫 Guard: Do not allow viewing Admin profiles
         if (cached && this.isAdmin(cached)) {
@@ -350,7 +339,6 @@ export class NewFriendsPage implements OnInit, OnDestroy {
 
     this.showSandglass = true;
     this.changeDetectorRef.markForCheck();
-    console.log('Navigating to profile display for id:', targetId);
     this.router.navigate(['/tabs/profile/display', String(targetId)]).finally(() => {
       this.showSandglass = false;
       try { this.changeDetectorRef.markForCheck(); } catch (e) {}

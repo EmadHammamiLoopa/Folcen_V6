@@ -205,8 +205,9 @@ export class SigninComponent implements OnInit {
     await this.storeUserData(resp.data.token, resp.data.user);
 
     try {
-      await SocketService.initializeSocket();
-      SocketService.bindToAuthUser();
+      SocketService.initializeSocket()
+        .then(() => SocketService.bindToAuthUser())
+        .catch(error => console.warn('WebSocket background initialization failed:', error));
       console.log('✅ WebSocket initialized and bound');
     } catch (error) {
       console.error('❌ WebSocket initialization failed:', error);

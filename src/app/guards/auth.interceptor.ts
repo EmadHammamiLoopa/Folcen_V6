@@ -48,17 +48,23 @@ export class AuthInterceptor implements HttpInterceptor {
       return next.handle(req);
     }
 
-    return from(this.platform.ready()).pipe(
-      switchMap(() => {
-        if (this.platform.is('cordova')) {
-          return from(this.nativeStorage.getItem('token').catch(err => {
+    const localToken = (() => {
+      try { return localStorage.getItem('token'); } catch (_) { return null; }
+    })();
+
+    const token$ = localToken
+      ? from(Promise.resolve(localToken))
+      : (this.platform.is('cordova')
+        ? from(this.nativeStorage.getItem('token').then(token => {
+            try { if (token) localStorage.setItem('token', token); } catch (_) {}
+            return token;
+          }).catch(err => {
             devLogger.log('Auth token not found in NativeStorage', err);
             return null;
-          }));
-        } else {
-          return from(Promise.resolve(localStorage.getItem('token')));
-        }
-      }),
+          }))
+        : from(Promise.resolve(null)));
+
+    return token$.pipe(
       switchMap(token => {
         if (token) {
       //    console.log('Token:', token); // Log the token

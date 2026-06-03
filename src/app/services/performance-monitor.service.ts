@@ -1,13 +1,10 @@
 import { Injectable } from '@angular/core';
 
-/**
- * Performance monitoring service to track duplicate operations
- * This is for debugging and optimization purposes only
- */
 @Injectable({
   providedIn: 'root'
 })
 export class PerformanceMonitorService {
+  private debug = false;
   private counters = {
     userFetchCount: 0,
     userNormalizeCount: 0,
@@ -18,27 +15,27 @@ export class PerformanceMonitorService {
 
   incrementUserFetch() {
     this.counters.userFetchCount++;
-    console.log(`📊 [PERF] User fetch count: ${this.counters.userFetchCount}`);
+    if (this.debug) console.log(`[PERF] User fetch count: ${this.counters.userFetchCount}`);
   }
 
   incrementUserNormalize() {
     this.counters.userNormalizeCount++;
-    console.log(`📊 [PERF] User normalize count: ${this.counters.userNormalizeCount}`);
+    if (this.debug) console.log(`[PERF] User normalize count: ${this.counters.userNormalizeCount}`);
   }
 
   incrementRequestsFetch() {
     this.counters.requestsFetchCount++;
-    console.log(`📊 [PERF] Requests fetch count: ${this.counters.requestsFetchCount}`);
+    if (this.debug) console.log(`[PERF] Requests fetch count: ${this.counters.requestsFetchCount}`);
   }
 
   incrementMissedCallsSet() {
     this.counters.missedCallsSetCount++;
-    console.log(`📊 [PERF] MissedCalls set count: ${this.counters.missedCallsSetCount}`);
+    if (this.debug) console.log(`[PERF] MissedCalls set count: ${this.counters.missedCallsSetCount}`);
   }
 
   incrementSocketBind() {
     this.counters.socketBindCount++;
-    console.log(`📊 [PERF] Socket bind count: ${this.counters.socketBindCount}`);
+    if (this.debug) console.log(`[PERF] Socket bind count: ${this.counters.socketBindCount}`);
   }
 
   getCounters() {
@@ -46,7 +43,7 @@ export class PerformanceMonitorService {
   }
 
   resetCounters() {
-    console.log('📊 [PERF] Resetting all counters', this.counters);
+    if (this.debug) console.log('[PERF] Resetting all counters', this.counters);
     this.counters = {
       userFetchCount: 0,
       userNormalizeCount: 0,
@@ -57,12 +54,12 @@ export class PerformanceMonitorService {
   }
 
   logSummary() {
-    console.log('📊 ====== PERFORMANCE SUMMARY ======');
-    console.log('📊 User Fetch Count:', this.counters.userFetchCount);
-    console.log('📊 User Normalize Count:', this.counters.userNormalizeCount);
-    console.log('📊 Requests Fetch Count:', this.counters.requestsFetchCount);
-    console.log('📊 MissedCalls Set Count:', this.counters.missedCallsSetCount);
-    console.log('📊 Socket Bind Count:', this.counters.socketBindCount);
-    console.log('📊 ==================================');
+    console.log('====== PERFORMANCE SUMMARY ======');
+    console.log('User Fetch Count:', this.counters.userFetchCount);
+    console.log('User Normalize Count:', this.counters.userNormalizeCount);
+    console.log('Requests Fetch Count:', this.counters.requestsFetchCount);
+    console.log('MissedCalls Set Count:', this.counters.missedCallsSetCount);
+    console.log('Socket Bind Count:', this.counters.socketBindCount);
+    console.log('==================================');
   }
 }

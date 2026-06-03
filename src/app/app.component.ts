@@ -141,6 +141,10 @@ export class AppComponent implements OnDestroy {
         if (u) {
           this.user = u;
           this.checkAnnouncements();
+          if (this.requestsLoadedForUser !== u.id) {
+            this.requestsLoadedForUser = u.id;
+            this.loadRequests();
+          }
           this.changeDetectorRef.detectChanges();
         } else {
           this.user = null;
@@ -230,15 +234,22 @@ export class AppComponent implements OnDestroy {
   
 
   ngOnInit() {
-    this.loadRequests();
   }
 
   private shownAnnouncements = new Set<string>();
+  private checkingAnnouncements = false;
+  private lastAnnouncementCheckAt = 0;
+  private requestsLoadedForUser: string | null = null;
 
   checkAnnouncements() {
     if (!this.user) return;
+    const now = Date.now();
+    if (this.checkingAnnouncements || (now - this.lastAnnouncementCheckAt < 60000 && this.shownAnnouncements.size === 0)) return;
+    this.checkingAnnouncements = true;
+    this.lastAnnouncementCheckAt = now;
     
     this.userService.getAnnouncements().subscribe((resp: any) => {
+      this.checkingAnnouncements = false;
       if (resp && resp.data && resp.data.length > 0) {
         // Show only the first unseen; after it's dismissed+marked-seen we come back for the next
         const announcement = resp.data.find((a: any) => !this.shownAnnouncements.has(a._id));
@@ -246,6 +257,8 @@ export class AppComponent implements OnDestroy {
           this.showAnnouncement(announcement);
         }
       }
+    }, () => {
+      this.checkingAnnouncements = false;
     });
   }
 
@@ -377,7 +390,7 @@ export class AppComponent implements OnDestroy {
       // Initialize session/user once per app boot (deduped)
       console.log('⏳ Initializing session store...');
       try {
-        await this.sessionStore.init();
+        this.sessionStore.init().catch(e => console.warn('Session store init failed', e));
         console.log('✅ Session store initialized');
       } catch (e) {
         console.warn('⚠️ Session store init failed', e);
@@ -386,7 +399,7 @@ export class AppComponent implements OnDestroy {
       // ✅ Ask notification permission
       console.log('⏳ Requesting notification permissions...');
       try {
-        await LocalNotifications.requestPermissions();
+        LocalNotifications.requestPermissions().catch(e => console.warn('Notification permissions failed', e));
         console.log('✅ Notification permissions handled');
       } catch (e) {
         console.warn('⚠️ Notification permissions failed', e);
@@ -747,15 +760,6 @@ export class AppComponent implements OnDestroy {
     this.connectUser();
     this.changeDetectorRef.detectChanges();
 
-    // Refresh user data from server to ensure latest followers/channels/budget
-    this.userService.refreshCurrentUser().subscribe({
-      next: (refreshedUser) => {
-        this.user = refreshedUser;
-        this.changeDetectorRef.detectChanges();
-        console.log('✅ User data synchronized with server');
-      },
-      error: (err) => console.warn('Could not refresh user data from server', err)
-    });
   }
 
   private async initWebrtc() {

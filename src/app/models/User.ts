@@ -434,7 +434,6 @@ export class User {
 
   // ✅ Setter for peerId
 public setPeerId(peerId: string | null): void {
-    console.log(`🔄 Setting Peer ID: ${peerId}`);
     this._peerId = peerId;
 }
 get peerId(): string | null {
@@ -613,7 +612,6 @@ set peerId(peerId: string | null) {
     if (cacheKey && fingerprint) {
       const cached = User.normalizationCache.get(cacheKey);
       if (cached && cached.fingerprint === fingerprint) {
-        console.log('📍 Skipping re-normalize for identical user payload', cacheKey);
         return cached.normalized;
       }
     }
@@ -751,13 +749,8 @@ set peerId(peerId: string | null) {
     } catch (e) {
       console.warn('Error during user normalization:', e);
     }
-    console.log('⚠️ Received raw user data from backend:', user);
-    console.log('🔍 DEBUG interests type:', typeof user.interests, 'value:', user.interests);
-    console.log('🔍 DEBUG languages type:', typeof user.languages, 'value:', user.languages);
-
     // Performance monitoring
     if (typeof (window as any).__perfMonitor !== 'undefined') {
-      console.log('📍 User normalize caller stack:', new Error().stack);
       (window as any).__perfMonitor.incrementUserNormalize();
     }
 
@@ -907,13 +900,6 @@ set peerId(peerId: string | null) {
     if (cacheKey && fingerprint) {
       User.normalizationCache.set(cacheKey, { fingerprint, normalized: this });
     }
-    console.log('✅ After initialization, lastSeenText:', this.lastSeenText);
-    try {
-      console.log('✅ After initialization, full User object:', JSON.stringify(this.toObject()));
-    } catch(e) {
-      console.log('✅ After initialization, full User object (raw):', this.toObject());
-    }
-
     if (!this._profileCreated) {
       this._profileCreated = true;
     }
@@ -934,8 +920,6 @@ set peerId(peerId: string | null) {
 
 
   private normalizeAvatarPath(avatarPath: string): string {
-    console.log("avatarpath in normalizeAvatarPath:", avatarPath);
-
     // Normalize the path by removing the domain and any '/public' prefix
     try {
       const url = new URL(avatarPath);

@@ -142,10 +142,9 @@ export class SignupComponent implements OnInit, OnDestroy {
         if (resp && resp.data && resp.data.token) {
           this.stopVerificationPolling();
           await this.storeUserData(resp.data.token, resp.data.user);
-          try {
-            await SocketService.initializeSocket();
-            SocketService.bindToAuthUser();
-          } catch (e) {}
+          SocketService.initializeSocket()
+            .then(() => SocketService.bindToAuthUser())
+            .catch(() => {});
           this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
           // Skip the success step + manual login: drop the user straight into the app.
           this.router.navigate(['/tabs/new-friends']);
@@ -503,11 +502,9 @@ export class SignupComponent implements OnInit, OnDestroy {
         // Success! User is verified and logged in.
         await this.storeUserData(resp.data.token, resp.data.user);
         
-        // Initialize Socket
-        try {
-          await SocketService.initializeSocket();
-          SocketService.bindToAuthUser();
-        } catch (e) {}
+        SocketService.initializeSocket()
+          .then(() => SocketService.bindToAuthUser())
+          .catch(() => {});
 
         this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
 

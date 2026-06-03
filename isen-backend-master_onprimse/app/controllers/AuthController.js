@@ -14,6 +14,10 @@ const admin = require('firebase-admin');
 const peerStore = require('../utils/peerStorage');
 const logger = require('../utils/logger');
 
+function recordAuthEvent(event) {
+    AuthEvent.create(event).catch(() => {});
+}
+
 
 
 
@@ -56,7 +60,7 @@ const autoFollowStaticChannels = async (authUser) => {
 
 exports.signup = async (req, res) => {
     try {
-      console.log('DEBUG: AuthController.signup body', JSON.stringify(req.body, null, 2));
+      if (process.env.DEBUG_AUTH === '1') console.log('DEBUG: AuthController.signup body', JSON.stringify(req.body, null, 2));
       // --- normalize payload ---
       const body = { ...req.body };
   
@@ -325,7 +329,7 @@ exports.signin = async (req, res) => {
 
     try {
         // record signin attempt (privacy-safe)
-        try { await AuthEvent.create({ type: 'signin_attempt', ipHash, meta: { ua: req.headers['user-agent'] || '' } }); } catch (e) {}
+        recordAuthEvent({ type: 'signin_attempt', ipHash, meta: { ua: req.headers['user-agent'] || '' } });
 
         // Find the user by email (normalize)
         const normalizedEmail = (email || '').toLowerCase();
@@ -333,7 +337,7 @@ exports.signin = async (req, res) => {
 
         // Generic failure to avoid user enumeration unless detailed errors are enabled
         if (!user) {
-            try { await AuthEvent.create({ type: 'signin_failed', ipHash, reasonCode: 'user_not_found' }); } catch (e) {}
+            recordAuthEvent({ type: 'signin_failed', ipHash, reasonCode: 'user_not_found' });
             if (String(process.env.ENABLE_DETAILED_AUTH_ERRORS || '').toLowerCase() === 'true') {
                 return Response.sendError(res, 401, 'Account not found');
             }
@@ -342,20 +346,20 @@ exports.signin = async (req, res) => {
 
         // banned users should fail generically
         if (user.banned) {
-            try { await AuthEvent.create({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'banned' }); } catch (e) {}
+            recordAuthEvent({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'banned' });
             return Response.sendError(res, 401, 'Authentication failed');
         }
 
         // Ensure enabled
         if (!user.enabled) {
-            try { await AuthEvent.create({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'disabled' }); } catch (e) {}
+            recordAuthEvent({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'disabled' });
             return Response.sendError(res, 401, 'Your account has been disabled. Please contact support.');
         }
 
         // Authenticate using model method (handles formats)
         const isAuthenticated = await user.authenticate(password);
         if (!isAuthenticated) {
-            try { await AuthEvent.create({ type: 'signin_failed', user: user._id, ipHash, reasonCode: 'invalid_password' }); } catch (e) {}
+            recordAuthEvent({ type: 'signin_failed', user: user._id, ipHash, reasonCode: 'invalid_password' });
             if (String(process.env.ENABLE_DETAILED_AUTH_ERRORS || '').toLowerCase() === 'true') {
                 return Response.sendError(res, 401, 'Incorrect password');
             }
@@ -399,15 +403,15 @@ exports.signin = async (req, res) => {
             userInfo.isDeleted = true;
         }
 
-        await user.save();
+        User.updateOne({ _id: user._id }, { $set: { loggedIn: true, lastSeen: new Date() } }).catch(() => {});
 
         // Record signin success (avoid logging tokens)
-        try { await AuthEvent.create({ type: 'signin_success', user: user._id, ipHash }); } catch (e) {}
+        recordAuthEvent({ type: 'signin_success', user: user._id, ipHash });
 
         return Response.sendResponse(res, { token, user: userInfo });
 
     } catch (error) {
-        try { await AuthEvent.create({ type: 'signin_failed', ipHash, reasonCode: 'internal_error' }); } catch (e) {}
+        recordAuthEvent({ type: 'signin_failed', ipHash, reasonCode: 'internal_error' });
         console.error('SignIn Error:', error && error.message ? error.message : error);
         return Response.sendError(res, 500, 'Internal server error');
     }

@@ -1779,7 +1779,7 @@ function buildBaseFilter(req) {
         }
     }
 
-    logger.info("🛠️ Generated MongoDB Filter:", JSON.stringify(filter, null, 2));
+    if (process.env.DEBUG_USER_SEARCH === '1') logger.info("Generated MongoDB Filter:", JSON.stringify(filter, null, 2));
     return filter;
 }
 
@@ -1871,7 +1871,7 @@ async function fetchUsersThenFilterOnline(req, baseFilter, skip, limit) {
 // Helper function to find users in a specific city
 async function findUsersInCity(req, filter, skip, limit) {
     if (!req.authUser || !req.authUser.city) {
-        logger.info("findUsersInCity: No city found for auth user", {
+        if (process.env.DEBUG_USER_SEARCH === '1') logger.info("findUsersInCity: No city found for auth user", {
             hasAuthUser: !!req.authUser,
             authUserId: req.authUser?._id,
             city: req.authUser?.city,
@@ -1882,7 +1882,7 @@ async function findUsersInCity(req, filter, skip, limit) {
     // Use case-insensitive regex for city matching
     const cityRegex = new RegExp('^' + req.authUser.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
     const cityFilter = { ...filter, city: cityRegex };
-    logger.info("Filter being used for city search:", cityFilter);
+    if (process.env.DEBUG_USER_SEARCH === '1') logger.info("Filter being used for city search:", cityFilter);
 
     if (req.query.online === '1' || req.query.online === 'true') {
         return await fetchUsersThenFilterOnline(req, cityFilter, skip, limit);
@@ -1901,7 +1901,7 @@ async function findUsersInCity(req, filter, skip, limit) {
 // Helper function to find users in a specific country
 async function findUsersInCountry(req, filter, skip, limit) {
     if (!req.authUser || !req.authUser.country) {
-        logger.info("findUsersInCountry: No country found for auth user", {
+        if (process.env.DEBUG_USER_SEARCH === '1') logger.info("findUsersInCountry: No country found for auth user", {
             hasAuthUser: !!req.authUser,
             authUserId: req.authUser?._id,
             city: req.authUser?.city,
@@ -1913,7 +1913,7 @@ async function findUsersInCountry(req, filter, skip, limit) {
     const countryRegex = new RegExp('^' + req.authUser.country.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
     const countryFilter = { ...filter, country: countryRegex };
     delete countryFilter['city'];
-    logger.info("Filter being used for country search:", countryFilter);
+    if (process.env.DEBUG_USER_SEARCH === '1') logger.info("Filter being used for country search:", countryFilter);
 
     if (req.query.online === '1' || req.query.online === 'true') {
         return await fetchUsersThenFilterOnline(req, countryFilter, skip, limit);
@@ -1934,7 +1934,7 @@ async function findUsersGlobally(req, filter, skip, limit) {
     const globalFilter = { ...filter };
     delete globalFilter['city'];
     delete globalFilter['country'];
-    logger.info("Filter being used for global search:", globalFilter);
+    if (process.env.DEBUG_USER_SEARCH === '1') logger.info("Filter being used for global search:", globalFilter);
 
     if (req.query.online === '1' || req.query.online === 'true') {
         return await fetchUsersThenFilterOnline(req, globalFilter, skip, limit);
@@ -1970,7 +1970,7 @@ async function findRandomUsers(req, filter, limit) {
   // Ensure we only show users who want to be visible in random discovery
   filter['randomVisible'] = true;
 
-  logger.info("🔎 Random Discovery filter:", JSON.stringify(filter));
+  if (process.env.DEBUG_USER_SEARCH === '1') logger.info("Random Discovery filter:", JSON.stringify(filter));
 
   // Fetch candidates matching the filters (gender, age, interests, etc.)
   const candidates = await User.find(filter)
@@ -1982,12 +1982,12 @@ async function findRandomUsers(req, filter, limit) {
   // Normalize all ObjectIds to strings
   const normalizedCandidates = normalizeLeanDoc(candidates);
 
-  logger.info(`👥 Candidates before online filter: ${normalizedCandidates.length}`);
+  if (process.env.DEBUG_USER_SEARCH === '1') logger.info(`Candidates before online filter: ${normalizedCandidates.length}`);
 
   // Apply online filter in Node.js
   const onlineUsers = normalizedCandidates.filter(u => isUserOnline(u._id.toString()));
 
-  logger.info(`✅ Online candidates after filter: ${onlineUsers.length}`);
+  if (process.env.DEBUG_USER_SEARCH === '1') logger.info(`Online candidates after filter: ${onlineUsers.length}`);
 
   // Random slice
   const count = onlineUsers.length;
@@ -2100,13 +2100,13 @@ function formatLastSeen(lastSeenDate) {
 }
 
 exports.getUserProfile = async (req, res) => {
-    logger.info(`Fetching user profile for ID: ${req.params.userId}`);
+    if (process.env.DEBUG_PROFILE === '1') logger.info(`Fetching user profile for ID: ${req.params.userId}`);
   
     try {
       const userId = normalizeId(req.params.userId);
       const authUserId = req.auth._id.toString();
   
-      logger.info(`Authenticated user ID: ${authUserId}`);
+      if (process.env.DEBUG_PROFILE === '1') logger.info(`Authenticated user ID: ${authUserId}`);
   
       // Find the user by ID and populate subscription details
       const userDoc = await User.findOne({ _id: userId })
@@ -2322,7 +2322,7 @@ exports.getUserProfile = async (req, res) => {
       };
       
   
-            logger.info("Sending user profile:", {
+            if (process.env.DEBUG_PROFILE === '1') logger.info("Sending user profile:", {
                 _id: response._id,
                 isLoggedInUser: response.isLoggedInUser,
                 isFriend: response.isFriend,
