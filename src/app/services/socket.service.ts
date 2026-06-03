@@ -241,8 +241,8 @@ export class SocketService {
       // Create socket
       SocketService.socketInstance = io(environment.socketUrl, {
         path: environment.socketPath || '/socket.io',
-        // Keep both to survive proxies; websocket is preferred by engine.io
-        transports: [ 'polling','websocket'],
+        // Prefer websocket on mobile; keep polling fallback for restrictive proxies.
+        transports: [ 'websocket', 'polling' ],
         withCredentials: true,
         reconnection: true,
         reconnectionAttempts: Infinity,

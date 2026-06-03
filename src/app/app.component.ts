@@ -728,6 +728,15 @@ export class AppComponent implements OnDestroy {
     this.userService.setCurrentUser(this.user); // Ensure UserService is updated
 
     try {
+      const userId = this.user?.id || (this.user as any)?._id;
+      if (userId) {
+        this.oneSignalService.open(String(userId));
+      }
+    } catch (err) {
+      console.warn('Push registration refresh failed:', err);
+    }
+
+    try {
       await SocketService.initializeSocket();
       SocketService.bindToAuthUser();
     } catch (err) {

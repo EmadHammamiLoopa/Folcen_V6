@@ -3,6 +3,7 @@ import { Platform } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 import { environment } from '../../environments/environment';
 
 /**
@@ -33,11 +34,19 @@ export class FcmPushService {
 
   /** Call after a successful login. */
   async open(userId: string): Promise<void> {
-    const isNative = typeof window !== 'undefined' && 'cordova' in window;
+    const isNative =
+      Capacitor.isNativePlatform() ||
+      this.platform.is('capacitor') ||
+      this.platform.is('cordova') ||
+      (typeof window !== 'undefined' && 'cordova' in window);
+
     if (!isNative) {
       console.log('[FcmPushService] Browser mode — skipping FCM registration');
       return;
     }
+
+    await this.platform.ready();
+
     if (this.currentToken) {
       await this.sendTokenToBackend(this.currentToken);
       return;
@@ -123,6 +132,8 @@ export class FcmPushService {
   }
 
   private async sendTokenToBackend(token: string): Promise<void> {
+    if (!token) return;
+
     try {
       await this.http
         .post(`${this.apiBase}/push/register`, {

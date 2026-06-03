@@ -7,10 +7,20 @@ if (environment.production) {
   enableProdMode();
 }
 
-document.addEventListener('deviceready', () => {
-  platformBrowserDynamic().bootstrapModule(AppModule)
-    .catch(err => console.log(err));
-}, false);
+let bootstrapped = false;
 
-platformBrowserDynamic().bootstrapModule(AppModule)
-  .catch(err => console.log(err));
+function bootstrapApp() {
+  if (bootstrapped) return;
+  bootstrapped = true;
+
+  platformBrowserDynamic().bootstrapModule(AppModule)
+    .catch(err => console.error(err));
+}
+
+const hasCordova = typeof window !== 'undefined' && !!(window as any).cordova;
+
+if (hasCordova) {
+  document.addEventListener('deviceready', bootstrapApp, false);
+} else {
+  bootstrapApp();
+}
