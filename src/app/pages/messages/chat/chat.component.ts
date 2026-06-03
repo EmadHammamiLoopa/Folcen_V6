@@ -707,9 +707,8 @@ async getMessages(event?: any) {
   if (!event) this.pageLoading = true;
 
   try {
-    if (!this.socket) {
-      if (this.user?.id) await this.initializeSocket();
-      else throw new Error('Socket not ready and no user id yet');
+    if (!this.socket && this.user?.id) {
+      this.initializeSocket().catch(e => console.warn('Socket warmup failed while loading messages', e));
     }
 
     const resp: any = await this.messageService.indexMessages(this.user?.id || this.productId, this.page++);
@@ -1226,8 +1225,6 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     return false;
   }
 
-  const socketConnected = SocketService.isConnected();
-
   // Build final payload (trust message.image which was uploaded in addMessage)
   const payload = {
     id: message.id,
@@ -1235,17 +1232,12 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     from: fromId,
     to: toId,
     text: message.text ?? '',
-    state: socketConnected ? 'sending' : 'queued',
+    state: 'sending',
     image: message.image ?? null,
     type: message.type || (this.productId ? 'product' : 'friend'),
     productId: message.productId ?? this.productId ?? null,
     createdAt: message.createdAt ?? null,
   };
-
-  console.log('[chat.sendMessage] emit send-message', {
-    tempId: payload.tempId, to: payload.to, from: payload.from,
-    socketConnected,
-  });
 
   // Update local temp message immediately
   const idx = this.messages.findIndex(m => m.id === message.id);
@@ -1254,28 +1246,23 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     this.groupMessagesByDate();
   }
 
-  // Queue-safe emit (works even if socket reconnects)
-  SocketService.emit('send-message', payload);
-  
-  // ✅ Clear REST cache for this thread so subsequent loads (or re-entry) get the new message
-  this.messageService.clearCacheForThread(this.user.id);
-
-  // If the backend does not confirm persistence, keep the UI honest and let
-  // the user retry instead of showing a false "sent" state.
-  const fallbackTempId = payload.tempId;
-  setTimeout(() => {
-    const i = this.messages.findIndex(
-      m => (m.tempId === fallbackTempId || m.id === fallbackTempId) && ['sending', 'queued'].includes((m as any).state)
-    );
+  // Persist first; realtime delivery is handled by the backend after save.
+  try {
+    const resp: any = await this.messageService.sendMessage(payload);
+    const saved = resp?.data ?? resp;
+    this.handleMessageSent({ ...saved, tempId: payload.tempId });
+    this.messageService.clearCacheForThread(this.user.id);
+    return true;
+  } catch (err: any) {
+    const i = this.messages.findIndex(m => m.tempId === payload.tempId || m.id === payload.tempId);
     if (i !== -1) {
       (this.messages[i] as any).state = 'failed';
       this.groupMessagesByDate();
       try { this.changeDetection.detectChanges(); } catch (_) {}
-      this.toastService.presentErrorToastr('Message was not confirmed. Please try again.');
     }
-  }, 15000);
-
-  return true;
+    this.toastService.presentErrorToastr(err?.error?.message || err?.message || 'Message could not be saved. Please try again.');
+    return false;
+  }
 }
 
 

@@ -11,6 +11,7 @@ import { FirebaseService } from '../../../services/firebase.service';
 import { User } from '../../../models/User';
 import { WelcomeAlertComponent } from '../welcome-alert/welcome-alert.component';
 import { SocketService } from 'src/app/services/socket.service';
+import { DataService } from 'src/app/services/data.service';
 
 @Component({
   selector: 'app-signin',
@@ -280,6 +281,7 @@ export class SigninComponent implements OnInit {
       }
       try { localStorage.setItem('token', token); } catch (e) {}
       try { SocketService.setTokenCache(token); } catch (e) {}
+      try { DataService.setTokenCache(token); } catch (e) {}
     } catch (e) {
       // token persistence failed, continue
     }

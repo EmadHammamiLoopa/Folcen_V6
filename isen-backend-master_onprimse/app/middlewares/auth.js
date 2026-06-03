@@ -39,7 +39,9 @@ exports.requireSignin = (req, res, next) => {
                 return Response.sendError(res, 500, 'Server error');
             }
 
-            try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+            if (process.env.DEBUG_AUTH === '1') {
+                try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+            }
             return next();
         })();
         return;
@@ -122,7 +124,9 @@ exports.requireSignin = (req, res, next) => {
         }
 
         // Only log non-sensitive identifiers
-        try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+        if (process.env.DEBUG_AUTH === '1') {
+            try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+        }
         return next();
     });
 };
@@ -183,7 +187,9 @@ exports.withAuthUser = async (req, res, next) => {
         // Normalize all ObjectIds to strings to prevent buffer serialization
         user = normalizeLeanDoc(user);
 
-        logger.info('withAuthUser: User loaded id/email:', user._id, user.email);
+        if (process.env.DEBUG_AUTH === '1') {
+            logger.info('withAuthUser: User loaded id/email:', user._id, user.email);
+        }
         // Attach to `req.authUser` always. Only attach to `req.user` if not already set 
         // (to avoid overwriting param-loaded target users).
         req.authUser = user;
@@ -257,4 +263,3 @@ exports.requireEmailVerified = (req, res, next) => {
     }
     next();
 };
-

@@ -28,6 +28,16 @@ type RequestOptions = {
   providedIn: 'root'
 })
 export class DataService {
+  private static tokenCache: string | null = null;
+
+  static setTokenCache(token: string | null) {
+    DataService.tokenCache = token || null;
+    try {
+      if (token) localStorage.setItem('token', token);
+      else localStorage.removeItem('token');
+    } catch (_) {}
+  }
+
   constructor(
     @Optional() @Inject('string') private url: string,
     private nativeStorage: NativeStorage,
@@ -40,9 +50,22 @@ export class DataService {
   ) {}
 
   getToken() {
+    const localToken = (() => {
+      try { return localStorage.getItem('token'); } catch (_) { return null; }
+    })();
+    if (localToken) {
+      DataService.tokenCache = localToken;
+      return Promise.resolve(localToken);
+    }
+    if (DataService.tokenCache) {
+      return Promise.resolve(DataService.tokenCache);
+    }
     return this.platform.is('cordova')
-      ? this.nativeStorage.getItem('token').catch(() => '')
-      : Promise.resolve(localStorage.getItem('token'));
+      ? this.nativeStorage.getItem('token').then(token => {
+          DataService.setTokenCache(token || null);
+          return token || '';
+        }).catch(() => '')
+      : Promise.resolve('');
   }
 
   sendRequest(requestOptions: RequestOptions) {
@@ -140,6 +163,7 @@ export class DataService {
 
       // 1. Clear all persistence
       try { await this.nativeStorage.clear(); } catch (e) { devLogger.warn('NativeStorage clear failed', e); }
+      DataService.setTokenCache(null);
       try { localStorage.clear(); } catch (e) { devLogger.warn('localStorage clear failed', e); }
       try { sessionStorage.clear(); } catch (e) { devLogger.warn('sessionStorage clear failed', e); }
       

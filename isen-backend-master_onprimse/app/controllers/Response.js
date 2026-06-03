@@ -44,7 +44,7 @@ module.exports = {
         }
 
         try {
-            if (data && (data.token || (data.user && data.user._id))) {
+            if (process.env.DEBUG_AUTH_RESPONSE === '1' && data && (data.token || (data.user && data.user._id))) {
                 console.log('DEBUG Response.sendResponse: sending data keys', Object.keys(data));
                 if (data.token) console.log('DEBUG Response.sendResponse: token present (len)', String(data.token).length);
             }

@@ -76,6 +76,14 @@ export class MessageService extends DataService {
     });
   }
 
+  sendMessage(payload: any) {
+    return this.sendRequest({
+      method: 'post',
+      url: '/',
+      data: payload
+    });
+  }
+
   clearCaches(reason = 'manual') {
     devLogger.log(`🧹 Clearing message cache (${reason})`);
     this.threadInflight.clear();

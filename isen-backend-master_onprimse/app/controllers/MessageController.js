@@ -4,9 +4,117 @@ const { setOnlineUsers, connectedUsers } = require('../helpers');
 const { userSubscribed } = require('../middlewares/subscription');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const Follow = require('../models/Follow');
 const Response = require('./Response');
 const helpers = require('../helpers');          // path to helpers/index.js
 const logger = require('../utils/logger');
+
+function normalizeImagePayload(image) {
+    if (!image) return null;
+    if (typeof image === 'object' && image.path) return image;
+    if (typeof image !== 'string') return null;
+    if (!image.startsWith('http')) return null;
+
+    const lower = image.toLowerCase();
+    const type = lower.endsWith('.jpg') || lower.endsWith('.jpeg') ? 'image/jpeg'
+        : lower.endsWith('.png') ? 'image/png'
+        : lower.endsWith('.gif') ? 'image/gif'
+        : 'application/octet-stream';
+    return { path: image, type };
+}
+
+function messagePayload(savedMessage, tempId, delivery) {
+    return {
+        _id: String(savedMessage._id),
+        id: String(savedMessage._id),
+        text: savedMessage.text,
+        from: String(savedMessage.from),
+        to: String(savedMessage.to),
+        image: savedMessage.image || null,
+        state: savedMessage.state || 'sent',
+        type: savedMessage.type || 'friend',
+        productId: savedMessage.productId ? String(savedMessage.productId) : null,
+        status: savedMessage.status || null,
+        createdAt: savedMessage.createdAt,
+        tempId,
+        delivery: delivery || 'sent'
+    };
+}
+
+exports.storeMessage = async (req, res) => {
+    const tempId = req.body?.tempId || req.body?.id || null;
+
+    try {
+        const senderId = req.auth && req.auth._id;
+        const recipientId = req.body?.to || req.body?._to;
+        const text = typeof req.body?.text === 'string' ? req.body.text : '';
+        const image = normalizeImagePayload(req.body?.image);
+
+        if (!senderId) return Response.sendError(res, 401, 'Unauthorized');
+        if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+            return Response.sendError(res, 400, 'Unable to identify recipient');
+        }
+        if (!text.trim() && !image) {
+            return Response.sendError(res, 400, 'Message is empty');
+        }
+
+        const [sender, receiver] = await Promise.all([
+            User.findById(senderId).select('firstName lastName blockedUsers friends'),
+            User.findById(recipientId).select('blockedUsers friends isPrivate')
+        ]);
+
+        if (!sender || !receiver) {
+            return Response.sendError(res, 404, 'Recipient account is unavailable');
+        }
+
+        const isBlockedByReceiver = receiver.blockedUsers && receiver.blockedUsers.some(id => String(id) === String(senderId));
+        const isBlockedBySender = sender.blockedUsers && sender.blockedUsers.some(id => String(id) === String(recipientId));
+        if (isBlockedByReceiver || isBlockedBySender) {
+            return Response.sendError(res, 403, 'You can no longer message this user');
+        }
+
+        if (receiver.isPrivate) {
+            const isFriend = receiver.friends && receiver.friends.some(id => String(id) === String(senderId));
+            const follow = await Follow.findOne({ follower: senderId, followed: recipientId, status: 'active' }).select('_id').lean();
+            if (!isFriend && !follow) {
+                return Response.sendError(res, 403, 'You cannot message this private account yet');
+            }
+        }
+
+        const savedMessage = await Message.create({
+            text,
+            from: new mongoose.Types.ObjectId(senderId),
+            to: new mongoose.Types.ObjectId(recipientId),
+            image,
+            state: 'sent',
+            type: req.body?.type || 'friend',
+            productId: mongoose.Types.ObjectId.isValid(req.body?.productId) ? req.body.productId : null,
+        });
+
+        await Promise.all([
+            User.findByIdAndUpdate(senderId, { $addToSet: { messages: savedMessage._id } }),
+            User.findByIdAndUpdate(recipientId, { $addToSet: { messages: savedMessage._id } }),
+        ]);
+
+        const safePayload = messagePayload(savedMessage, tempId);
+        const delivered = await helpers.emitToUser(recipientId, 'new-message', safePayload);
+
+        if (!delivered) {
+            try {
+                const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'New message';
+                const preview = text ? text.substring(0, 100) : 'Image';
+                helpers.sendNotification([String(recipientId)], preview, senderName, String(senderId)).catch(() => {});
+            } catch (pushErr) {
+                logger.warn('[message.store] push failed for offline recipient:', pushErr.message);
+            }
+        }
+
+        return Response.sendResponse(res, messagePayload(savedMessage, tempId, delivered ? 'delivered' : 'sent'));
+    } catch (error) {
+        logger.error('storeMessage error:', error);
+        return Response.sendError(res, 500, 'Message could not be saved. Please try again.');
+    }
+};
 
 exports.indexMessages = async (req, res) => {
     const limit = 20;
