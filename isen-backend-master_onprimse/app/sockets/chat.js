@@ -214,6 +214,32 @@ socket.on("leave-chat", async ({ withUser }) => {
   }
 });
 
+socket.on("mark-thread-read", async ({ peerId } = {}) => {
+  try {
+    const readerId = socket.userId;
+    if (!readerId || !mongoose.Types.ObjectId.isValid(peerId)) return;
+
+    const readAt = new Date();
+    const result = await Message.updateMany(
+      { from: peerId, to: readerId, state: { $ne: "seen" } },
+      {
+        $set: { state: "seen" },
+        $addToSet: { readBy: { user: new mongoose.Types.ObjectId(readerId), at: readAt } }
+      }
+    );
+
+    if ((result.modifiedCount || result.nModified || 0) > 0) {
+      emitToUser(String(peerId), "message-read", {
+        readerId: String(readerId),
+        peerId: String(peerId),
+        readAt: readAt.toISOString()
+      });
+    }
+  } catch (e) {
+    console.error("mark-thread-read failed", e);
+  }
+});
+
 
 // connect-user
 socket.on("connect-user", async (user_id) => {
@@ -425,7 +451,9 @@ socket.on("connect-user", async (user_id) => {
 
       // Confirm to sender using server-authoritative senderId (not client-supplied msg.from).
       // This ensures the confirmation always reaches the right socket even if msg.from encoding differs.
-      emitToUser(senderId, "message-sent", { ...safePayload, tempId });
+      const senderConfirmation = { ...safePayload, tempId, delivery: delivered ? 'delivered' : 'sent' };
+      socket.emit("message-sent", senderConfirmation);
+      await emitToUser(senderId, "message-sent", senderConfirmation);
 
       // (Optional) Emit a counter update event if you maintain per-tab badges:
       // emitToUser(msg.to, 'messages-updated', { delta: 1 });

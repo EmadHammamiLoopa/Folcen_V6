@@ -160,6 +160,9 @@
             <span *ngIf="message?.state === 'sent'" class="message-status">
               <ion-icon name="checkmark-done"></ion-icon>
             </span>
+            <span *ngIf="message?.state === 'seen'" class="message-status">
+              <ion-icon name="checkmark-done-circle"></ion-icon>
+            </span>
           </div>
           
           <!-- Resend button for failed messages -->

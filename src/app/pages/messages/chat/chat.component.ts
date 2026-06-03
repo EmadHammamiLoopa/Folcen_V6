@@ -243,6 +243,9 @@ isLatestCall(message: Message): boolean {
       SocketService.messageSent$.pipe(takeUntil(this.destroy$)).subscribe((saved: any) => {
         this.zone.run(() => this.handleMessageSent(saved));
       });
+      SocketService.messageRead$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+        this.zone.run(() => this.handleMessageRead(payload));
+      });
 
       SocketService.sendMessageError$.pipe(takeUntil(this.destroy$)).subscribe((errPayload: any) => {
         this.zone.run(() => {
@@ -841,6 +844,30 @@ private recomputeActiveCall() {
       this.changeDetection.detectChanges();
     } catch (e) {
       console.error('Failed to process message-sent:', e, saved);
+    }
+  }
+
+  private handleMessageRead(payload: any) {
+    try {
+      const readerId = String(payload?.readerId || '');
+      const selfId = String((this.authUser as any)?._id || this.authUser?.id || '');
+      const peerId = String((this.user as any)?._id || this.user?.id || '');
+      if (!readerId || readerId !== peerId) return;
+
+      let changed = false;
+      this.messages.forEach((m: any) => {
+        if (String(m.from || '') === selfId && String(m.to || '') === readerId && m.state === 'sent') {
+          m.state = 'seen';
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        this.groupMessagesByDate();
+        this.changeDetection.detectChanges();
+      }
+    } catch (e) {
+      console.error('Failed to process message-read:', e, payload);
     }
   }
 

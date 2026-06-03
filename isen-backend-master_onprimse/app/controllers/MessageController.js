@@ -9,8 +9,6 @@ const helpers = require('../helpers');          // path to helpers/index.js
 const logger = require('../utils/logger');
 
 exports.indexMessages = async (req, res) => {
-    logger.info("hereeeeeeeeeeeeeeeeeeeee");
-
     const limit = 20;
     const page = +req.query.page || 0;
     const authUserId = new mongoose.Types.ObjectId(req.auth._id);
@@ -23,15 +21,11 @@ exports.indexMessages = async (req, res) => {
         ]
     };
 
-    logger.info('Message filter:', JSON.stringify(filter, null, 2)); // Log the filter
-
     try {
         const messages = await Message.find(filter)
             .sort({ createdAt: -1 })
             .skip(limit * page)
             .limit(limit);
-
-        logger.info('Messages found:', messages); // Log the messages
 
         const count = await Message.countDocuments(filter);
         
@@ -40,12 +34,6 @@ exports.indexMessages = async (req, res) => {
         const allowToChat = check.allowed;
         const budgetRemaining = check.budgetRemaining;
     
-
-            messages.forEach((msg, i) => {
-              logger.info(`📥 [${i}] Image path:`, msg.image?.path || null);
-            });
-
-            
         return Response.sendResponse(res, {
             messages,
             more: (count - (limit * (page + 1))) > 0,
@@ -212,4 +200,3 @@ exports.sendMessagePermission = async (req, res) => {
         return Response.sendError(res, 500, 'Server error');
     }
 };
-

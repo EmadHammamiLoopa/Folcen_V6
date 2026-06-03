@@ -61,6 +61,9 @@ export class SocketService {
   private static messageSentSubject = new Subject<any>();
   static messageSent$ = SocketService.messageSentSubject.asObservable();
 
+  private static messageReadSubject = new Subject<any>();
+  static messageRead$ = SocketService.messageReadSubject.asObservable();
+
   private static sendMessageErrorSubject = new Subject<any>();
   static sendMessageError$ = SocketService.sendMessageErrorSubject.asObservable();
 
@@ -403,6 +406,12 @@ export class SocketService {
         try {
           SocketService.messageSentSubject.next(payload);
         } catch (e) { console.warn('Error handling message-sent payload', e); }
+      });
+
+      SocketService.socketInstance.on('message-read', (payload: any) => {
+        try {
+          SocketService.messageReadSubject.next(payload);
+        } catch (e) { console.warn('Error handling message-read payload', e); }
       });
 
       // Backend rejected a send-message (auth, invalid id, blocked, etc.)
