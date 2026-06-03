@@ -308,6 +308,7 @@ socket.on("connect-user", async (user_id) => {
         
         if (!isFriend && !follow) {
           console.warn(`Message blocked: ${msg.to} is private and ${senderId} is not a friend or active follower`);
+          try { socket.emit('send-message-error', { tempId, reason: 'privacy_blocked' }); } catch (_) {}
           emitToUser(senderId, 'message-blocked-privacy', { recipientId: msg.to });
           return;
         }
@@ -326,6 +327,7 @@ socket.on("connect-user", async (user_id) => {
         if (socket._msgCount > maxPerWindow) {
           console.warn(`Rate limit exceeded for ${senderId}`);
           try { await recordMessageEvent({ from: senderId, to: msg.to, event: 'blocked', reason: 'rate_limit' }); } catch (e) {}
+          try { socket.emit('send-message-error', { tempId, reason: 'rate_limited' }); } catch (_) {}
           emitToUser(senderId, 'message-rate-limited', { perMinute: maxPerWindow });
           return;
         }
@@ -403,7 +405,7 @@ socket.on("connect-user", async (user_id) => {
       };
 
       // Deliver to receiver (ALL sockets)
-      const delivered = emitToUser(msg.to, "new-message", safePayload);
+      const delivered = await emitToUser(msg.to, "new-message", safePayload);
       if (delivered) {
         console.log(`📤 Delivered to receiver (${msg.to}) on ${getUserSockets(msg.to).length} socket(s)`);
         try { await recordMessageEvent({ messageId: savedMessage._id, from: senderId, to: msg.to, event: 'delivered' }); } catch (e) { console.warn('Failed to record message delivered event', e); }
@@ -430,8 +432,7 @@ socket.on("connect-user", async (user_id) => {
 
     } catch (err) {
       console.error("❌ Error in send-message:", err);
-      // Optional: notify sender about failure for UI rollback
-      // emitToUser(msg.from, 'message-send-failed', { tempId, error: 'save_failed' });
+      try { socket.emit('send-message-error', { tempId, reason: 'save_failed' }); } catch (_) {}
     }
   });
 };

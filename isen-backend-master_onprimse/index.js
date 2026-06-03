@@ -108,6 +108,7 @@ try {
 }
 const app = express();
 app.set('trust proxy', true);
+const DEBUG_SOCKET_EVENTS = process.env.DEBUG_SOCKET_EVENTS === '1';
 // Security: restrict CORS in production to explicit origins.
 // CORS_ORIGIN env var: set to '*' (allow-all) or comma-separated list of origins.
 // e.g. CORS_ORIGIN=https://folcen-dashboard.pages.dev,https://8cd4a0ac.folcen-dashboard.pages.dev
@@ -525,7 +526,7 @@ io.on('connection', async (socket) => {
   });
 
   // 📢 Debug all events
-  socket.onAny((event, ...args) => {
+  if (DEBUG_SOCKET_EVENTS) socket.onAny((event, ...args) => {
     console.log(`📢 WebSocket Event Received: ${event}`, args);
   });
 

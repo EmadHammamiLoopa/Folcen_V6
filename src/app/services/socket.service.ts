@@ -126,6 +126,10 @@ export class SocketService {
     return SocketService.ownerId ?? SocketService.resolveOwnerId();
   }
 
+  static isConnected(): boolean {
+    return !!SocketService.socketInstance?.connected;
+  }
+
   /** Bind the service to the authenticated user (from JWT). */
   static bindToAuthUser(): void {
     const authId = SocketService.resolveOwnerId();

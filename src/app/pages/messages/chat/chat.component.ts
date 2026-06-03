@@ -253,6 +253,9 @@ isLatestCall(message: Message): boolean {
             invalid_recipient_id: 'Unable to identify recipient.',
             user_not_found: 'Recipient account is unavailable.',
             blocked: 'You can no longer message this user.',
+            privacy_blocked: 'You cannot message this private account yet.',
+            rate_limited: 'You are sending too fast. Please wait a moment.',
+            save_failed: 'Message could not be saved. Please try again.',
           };
           this.toastService.presentErrorToastr(map[reason] || `Send failed (${reason})`);
           // Mark the optimistic message as failed so user can retry.
@@ -1196,6 +1199,8 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     return false;
   }
 
+  const socketConnected = SocketService.isConnected();
+
   // Build final payload (trust message.image which was uploaded in addMessage)
   const payload = {
     id: message.id,
@@ -1203,7 +1208,7 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     from: fromId,
     to: toId,
     text: message.text ?? '',
-    state: 'sending',
+    state: socketConnected ? 'sending' : 'queued',
     image: message.image ?? null,
     type: message.type || (this.productId ? 'product' : 'friend'),
     productId: message.productId ?? this.productId ?? null,
@@ -1212,7 +1217,7 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
 
   console.log('[chat.sendMessage] emit send-message', {
     tempId: payload.tempId, to: payload.to, from: payload.from,
-    socketConnected: !!(SocketService as any).socketInstance?.connected,
+    socketConnected,
   });
 
   // Update local temp message immediately
@@ -1228,20 +1233,20 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
   // ✅ Clear REST cache for this thread so subsequent loads (or re-entry) get the new message
   this.messageService.clearCacheForThread(this.user.id);
 
-  // Fallback: if `message-sent` never arrives (e.g. a transient socket disconnect
-  // races with delivery), optimistically resolve the message to 'sent' after 8s
-  // so the sender is never permanently stuck looking at the "sending" indicator.
+  // If the backend does not confirm persistence, keep the UI honest and let
+  // the user retry instead of showing a false "sent" state.
   const fallbackTempId = payload.tempId;
   setTimeout(() => {
     const i = this.messages.findIndex(
-      m => (m.tempId === fallbackTempId || m.id === fallbackTempId) && (m as any).state === 'sending'
+      m => (m.tempId === fallbackTempId || m.id === fallbackTempId) && ['sending', 'queued'].includes((m as any).state)
     );
     if (i !== -1) {
-      (this.messages[i] as any).state = 'sent';
+      (this.messages[i] as any).state = 'failed';
       this.groupMessagesByDate();
       try { this.changeDetection.detectChanges(); } catch (_) {}
+      this.toastService.presentErrorToastr('Message was not confirmed. Please try again.');
     }
-  }, 8000);
+  }, 15000);
 
   return true;
 }

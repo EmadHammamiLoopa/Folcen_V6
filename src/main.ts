@@ -5,6 +5,9 @@ import { environment } from './environments/environment';
 
 if (environment.production) {
   enableProdMode();
+  console.log = () => {};
+  console.debug = () => {};
+  console.info = () => {};
 }
 
 let bootstrapped = false;
@@ -21,6 +24,7 @@ const hasCordova = typeof window !== 'undefined' && !!(window as any).cordova;
 
 if (hasCordova) {
   document.addEventListener('deviceready', bootstrapApp, false);
+  setTimeout(bootstrapApp, 1200);
 } else {
   bootstrapApp();
 }

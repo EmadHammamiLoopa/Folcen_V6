@@ -154,6 +154,9 @@
             <span *ngIf="message?.state === 'sending'" class="message-status">
               <ion-spinner name="dots"></ion-spinner>
             </span>
+            <span *ngIf="message?.state === 'queued'" class="message-status">
+              <ion-icon name="time-outline"></ion-icon>
+            </span>
             <span *ngIf="message?.state === 'sent'" class="message-status">
               <ion-icon name="checkmark-done"></ion-icon>
             </span>

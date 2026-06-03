@@ -127,7 +127,7 @@ function setOnlineUsers(users) {
 
 /** Emit an event to all sockets of a single user */
 async function emitToUser(userId, event, payload = {}, options = {}) {
-  if (!io) return;
+  if (!io) return false;
 
   // Reliability Hardening: Inject metadata (timestamp/version) for Task 2
   if (payload && typeof payload === 'object') {
@@ -141,6 +141,7 @@ async function emitToUser(userId, event, payload = {}, options = {}) {
   const sockets = userSocketIds(String(userId));
   if (sockets.length > 0) {
     sockets.forEach(sid => io.to(sid).emit(event, payload));
+    return true;
   } else if (options.persistIfOffline) {
     // Guaranteed Delivery: Save to Outbox if user is offline (Task 1)
     try {
@@ -155,6 +156,8 @@ async function emitToUser(userId, event, payload = {}, options = {}) {
       console.error('Failed to stash offline event:', err.message);
     }
   }
+
+  return false;
 }
 
 /** Replay events stashed while the user was offline */
@@ -843,8 +846,11 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
         : (senderName ? String(senderName) : 'New Message');
     body  = String(message)    || 'You have a new message';
 
-    const chatId = [fromUserId, recipientIds[0]].sort().join('-');
-    data = { type: 'message', link: `/messages/chat/${chatId}` };
+    data = {
+      type: 'message',
+      link: `/messages/chat/${fromUserId}`,
+      fromUserId: fromUserId ? String(fromUserId) : ''
+    };
   }
 
   recipientIds = recipientIds

@@ -453,12 +453,12 @@ export class AppComponent implements OnDestroy {
       }
 
       this.getUserData();
-      this.getJsonData();
+      setTimeout(() => this.getJsonData(), 1500);
 
       setTimeout(() => {
         console.log('✨ Hiding splash screen');
         this.showSplash = false;
-      }, 3000);
+      }, 1200);
     });
 
 
@@ -743,7 +743,7 @@ export class AppComponent implements OnDestroy {
       console.error('WebSocket initialization failed:', err);
     }
 
-    setTimeout(() => this.initWebrtc(), 500);
+    setTimeout(() => this.initWebrtc(), 2500);
     this.connectUser();
     this.changeDetectorRef.detectChanges();
 
