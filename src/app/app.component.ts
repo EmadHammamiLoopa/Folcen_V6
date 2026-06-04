@@ -70,6 +70,7 @@ export class AppComponent implements OnDestroy {
   private forceLogoutMessageHandler: any = null;
   private announcementTapHandler: any = null;
   private destroy$ = new Subject<void>();
+  private incomingCallKeys = new Set<string>();
 
   constructor(
     private platform: Platform,
@@ -411,10 +412,11 @@ export class AppComponent implements OnDestroy {
       LocalNotifications.addListener(
         'localNotificationActionPerformed',
         (notification) => {
-          const callerId = notification.notification.extra?.callerId;
+          const extra: any = notification.notification.extra || {};
+          const callerId = extra.callerId || extra.fromUserId;
           if (callerId) {
             this.router.navigate(['/messages/video', callerId], {
-              queryParams: { answer: true },
+              queryParams: { answer: true, callId: extra.callId || undefined },
             });
           }
         },
@@ -617,6 +619,66 @@ export class AppComponent implements OnDestroy {
       });
   }
 
+  private normalizeCallInvite(data: any = {}) {
+    const callerId = data.callerId || data.fromUserId || data.from;
+    if (!callerId) return null;
+    const callId = data.callId || `legacy-${callerId}-${data.timestamp || Date.now()}`;
+    return {
+      ...data,
+      type: data.type || 'incoming_call',
+      category: data.category || 'call',
+      event: data.event || 'call:invite',
+      status: data.status || 'ringing',
+      callType: data.callType || 'video',
+      callerId: String(callerId),
+      fromUserId: String(callerId),
+      callId: String(callId),
+      timestamp: data.timestamp || Date.now()
+    };
+  }
+
+  private async handleIncomingCallInvite(data: any) {
+    const invite = this.normalizeCallInvite(data);
+    if (!invite) return;
+
+    const key = invite.callId || `${invite.callerId}-${invite.timestamp}`;
+    if (this.incomingCallKeys.has(key)) return;
+    this.incomingCallKeys.add(key);
+    setTimeout(() => this.incomingCallKeys.delete(key), 45000);
+
+    console.log('Incoming call invite:', invite);
+    localStorage.setItem('partnerId', invite.callerId);
+
+    const queryParams = { answer: true, callId: invite.callId };
+    const state = await CapacitorApp.getState().catch(() => ({ isActive: true }));
+    if (state.isActive) {
+      this.zone.run(() => {
+        this.router.navigate(['/messages/video', invite.callerId], { queryParams });
+      });
+      return;
+    }
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: Math.abs(this.hashCallId(invite.callId)) || 1,
+          title: invite.callerName ? `${invite.callerName} is calling` : 'Incoming video call',
+          body: 'Tap to answer',
+          schedule: { at: new Date(Date.now() + 250) },
+          extra: invite,
+        },
+      ],
+    }).catch(() => {});
+  }
+
+  private hashCallId(callId: string): number {
+    let hash = 0;
+    for (let i = 0; i < callId.length; i++) {
+      hash = ((hash << 5) - hash + callId.charCodeAt(i)) | 0;
+    }
+    return hash % 2147483647;
+  }
+
   async connectUser() {
     try {
       const socket = await SocketService.getSocket();
@@ -624,34 +686,14 @@ export class AppComponent implements OnDestroy {
 
       SocketService.emit('connect-user', this.user.id);
 
-      // Avoid duplicate handlers on reconnect
-      socket.off('called').on('called', (data) => {
-        console.log('📞 Incoming call from:', data.callerId);
-        localStorage.setItem('partnerId', data.callerId);
+      // Avoid duplicate handlers on reconnect. Backend emits all three for compatibility.
+      const onIncomingInvite = (data: any) => this.handleIncomingCallInvite(data);
+      ['call:invite', 'incoming-call', 'called'].forEach(eventName => {
+        socket.off(eventName).on(eventName, onIncomingInvite);
+      });
 
-        this.messengerService.onMessage().subscribe((msg) => {
-          if (msg?.event === 'stop-audio') this.audio?.pause();
-        });
-
-        CapacitorApp.getState().then((state) => {
-          if (state.isActive) {
-            this.router.navigate(['/messages/video', data.callerId], {
-              queryParams: { answer: true },
-            });
-          } else {
-            LocalNotifications.schedule({
-              notifications: [
-                {
-                  id: 1,
-                  title: '📞 Incoming Call',
-                  body: 'You have an incoming video call',
-                  schedule: { at: new Date(Date.now() + 1000) },
-                  extra: { callerId: data.callerId },
-                },
-              ],
-            });
-          }
-        });
+      this.messengerService.onMessage().subscribe((msg) => {
+        if (msg?.event === 'stop-audio') this.audio?.pause();
       });
 
       socket.off('video-canceled').on('video-canceled', (data) => {

@@ -88,7 +88,7 @@ export class FcmPushService {
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
           console.log('[FcmPushService] Notification received in foreground:', notification.title);
           const data: any = notification.data || {};
-          if (data?.type === 'video-call' || data?.category === 'call') {
+          if (this.isCallNotification(data)) {
             LocalNotifications.schedule({
               notifications: [{
                 id: Date.now() % 2147483647,
@@ -103,11 +103,14 @@ export class FcmPushService {
         PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
           const data: any = action.notification?.data || {};
 
-          if (data?.type === 'video-call' || data?.category === 'call') {
+          if (this.isCallNotification(data)) {
             const callerId = data.callerId || data.fromUserId;
             if (callerId) {
               this.platform.ready().then(() => {
-                setTimeout(() => this.router.navigate(['/messages/video', callerId], { queryParams: { answer: true } }), 200);
+                setTimeout(() => this.router.navigate(
+                  ['/messages/video', callerId],
+                  { queryParams: { answer: true, callId: data.callId || undefined } }
+                ), 200);
               });
               return;
             }
@@ -168,5 +171,12 @@ export class FcmPushService {
     } catch (err) {
       console.error('[FcmPushService] Failed to register token on backend:', err);
     }
+  }
+
+  private isCallNotification(data: any): boolean {
+    return data?.type === 'incoming_call' ||
+      data?.type === 'video-call' ||
+      data?.category === 'call' ||
+      data?.event === 'call:invite';
   }
 }

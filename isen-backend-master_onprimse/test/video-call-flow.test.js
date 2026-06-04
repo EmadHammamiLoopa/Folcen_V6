@@ -12,6 +12,63 @@ describe('video call request flow', function () {
     connectedUsers.clear();
   });
 
+  it('emits a structured incoming call invite to an online receiver', async function () {
+    const helpers = require('../app/helpers');
+    const { connectedUsers } = require('../app/utils/socketManager');
+    const emitted = [];
+    const io = { to: sid => ({ emit: (event, payload) => emitted.push({ sid, event, payload }) }) };
+
+    helpers.initSocket(io);
+    connectedUsers.set(calleeId, new Set(['callee-socket']));
+
+    helpers.notifyPeerNeeded(calleeId, callerId, {
+      callId: 'call-test-1',
+      callType: 'video',
+      callerName: 'Caller One',
+      callerAvatar: '/avatar.webp'
+    });
+
+    const invite = emitted.find(e => e.event === 'call:invite');
+    assert.ok(invite, 'call:invite should be emitted to online receiver');
+    assert.strictEqual(invite.sid, 'callee-socket');
+    assert.strictEqual(invite.payload.callId, 'call-test-1');
+    assert.strictEqual(invite.payload.callerId, callerId);
+    assert.strictEqual(invite.payload.receiverId, calleeId);
+    assert.strictEqual(invite.payload.type, 'incoming_call');
+    assert.strictEqual(invite.payload.status, 'ringing');
+    assert.ok(emitted.some(e => e.event === 'incoming-call'));
+    assert.ok(emitted.some(e => e.event === 'called'));
+  });
+
+  it('sends structured high-priority call push when receiver is offline', async function () {
+    const pushSvc = require('../app/utils/pushService');
+    const helpers = require('../app/helpers');
+    const originalSendPush = pushSvc.sendPush;
+    let push;
+
+    pushSvc.sendPush = (userId, payload) => {
+      push = { userId, payload };
+      return Promise.resolve();
+    };
+
+    try {
+      helpers.notifyPeerNeeded(calleeId, callerId, {
+        callId: 'call-test-offline',
+        callerName: 'Caller One'
+      });
+
+      assert.strictEqual(push.userId, calleeId);
+      assert.strictEqual(push.payload.data.type, 'incoming_call');
+      assert.strictEqual(push.payload.data.category, 'call');
+      assert.strictEqual(push.payload.data.callId, 'call-test-offline');
+      assert.strictEqual(push.payload.data.callerId, callerId);
+      assert.strictEqual(push.payload.android.priority, 'high');
+      assert.strictEqual(push.payload.android.notification.channelId, 'calls');
+    } finally {
+      pushSvc.sendPush = originalSendPush;
+    }
+  });
+
   it('does not treat non-friend request messages as real ringing calls', async function () {
     const registerVideoSocket = require('../app/sockets/video');
     const socket = {

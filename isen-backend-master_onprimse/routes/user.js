@@ -139,16 +139,24 @@ router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeU
  *  – If a fresh record exists      → return {peerId, expires}
  *  – If missing/expired            → nudge callee + return {peerId:null}
  */
-router.get('/:userId/peer', [requireSignin], async (req, res, next) => {
+router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next) => {
   try {
     const { userId } = req.params;
     const record = await peerStore.get(userId); // { peerId, lastUpdated } | null
+    const caller = req.authUser || {};
+    const callerName = [caller.firstName, caller.lastName].filter(Boolean).join(' ').trim();
+    const callInvite = {
+      callId: req.query?.callId,
+      callType: req.query?.callType || 'video',
+      callerName,
+      callerAvatar: caller.mainAvatar || caller.avatar || ''
+    };
     if (req.query?.wake === '1' || req.query?.wake === 'true') {
-      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id); // wake callee for a real call attempt
+      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite); // wake callee for a real call attempt
     }
 
     if (!record) {
-      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id);
+      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite);
       return res.json({ success: true, peerId: null });
     }
 

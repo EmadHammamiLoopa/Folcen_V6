@@ -230,7 +230,8 @@ export class WebrtcService {
     await this.waitForPeerOpen(); // throws after 10 s timeout
 
     /* 2 — look-up partner’s current peer-id ------------------------------ */
-    const partnerPeerId = await this.resolvePartnerPeerId(partnerUserId);
+    const callId = this.createCallId(partnerUserId);
+    const partnerPeerId = await this.resolvePartnerPeerId(partnerUserId, callId);
     if (!partnerPeerId) {
       throw new Error('Partner is offline or has no peer-id');
     }
@@ -262,7 +263,7 @@ export class WebrtcService {
           try {
             const sock = await SocketService.getSocket();
             if (sock?.connected) {
-              sock.emit('video-call-timeout', { from: this.userId, to: partnerUserId, at: Date.now() });
+              sock.emit('video-call-timeout', { from: this.userId, to: partnerUserId, callId, at: Date.now() });
               // Explicit missed outcome for callee (authoritative)
               this.emitMissedOutcomeOnce(this.userId!, partnerUserId, 'timeout');
             }
@@ -300,6 +301,7 @@ export class WebrtcService {
       sock?.emit('video-call-started', {
         from : this.userId,
         to : partnerUserId,
+        callId,
         myPeerId : this.getPeerId(),
         partnerPeerId
       });
@@ -310,7 +312,7 @@ export class WebrtcService {
     return mc;
   }
 
-  private async resolvePartnerPeerId(partnerUserId: string): Promise<string | null> {
+  private async resolvePartnerPeerId(partnerUserId: string, callId?: string): Promise<string | null> {
     const delays = [0, 350, 700, 1200, 1800, 2500, 3200];
     let lastPeerId: string | null = null;
 
@@ -318,7 +320,11 @@ export class WebrtcService {
       const delayMs = delays[i];
       if (delayMs) await this.delay(delayMs);
       try {
-        lastPeerId = await this.userService.getPartnerPeerId(partnerUserId, i === 0).toPromise();
+        lastPeerId = await this.userService.getPartnerPeerId(
+          partnerUserId,
+          i === 0,
+          callId ? { callId, callType: 'video' } : undefined
+        ).toPromise();
         if (lastPeerId) return lastPeerId;
       } catch (err) {
         console.warn('[webrtc] partner peer lookup failed; retrying', err);
@@ -326,6 +332,11 @@ export class WebrtcService {
     }
 
     return lastPeerId;
+  }
+
+  private createCallId(partnerUserId: string): string {
+    const randomPart = Math.random().toString(36).slice(2, 10);
+    return `call-${this.userId || 'me'}-${partnerUserId}-${Date.now()}-${randomPart}`;
   }
 
   // central cleanup used when remote cancels or timeout occurs

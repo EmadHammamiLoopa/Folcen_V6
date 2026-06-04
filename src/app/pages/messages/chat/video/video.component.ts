@@ -36,6 +36,7 @@ export class VideoComponent implements OnInit, OnDestroy {
   partnerEl: HTMLVideoElement;
   public partnerId?: string;
   public userId?: string;
+  public callId?: string;
   partner: User = new User();
   user: User = new User();
   answer = false;
@@ -171,6 +172,7 @@ async ngOnInit() {
       /* caller / callee mode */
       this.route.queryParamMap.subscribe(qp => {
         this.answer = qp.get('answer') === 'true';
+        this.callId = qp.get('callId') || undefined;
         if (!this.answer) {
           console.log('🔄 Caller mode — call will start on view enter');
         } else {
@@ -190,7 +192,7 @@ private handleBackButton() {
   console.log('🔙 Handling back button');
   if (this.answer && !this.answered && this.userId && this.socket?.connected) {
     // Callee rejecting: emit explicit MISSED_REJECTED before teardown
-    const base = { from: this.userId, to: this.authUser._id, at: Date.now() };
+    const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
     // canonical explicit event for deterministic accounting
     this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'rejected' });
     // legacy generic for older servers
@@ -279,6 +281,7 @@ startMissedCallTimeout() {
         this.emitWebSocketEvent(VideoEvents.MISSED_TIMEOUT, {
           from: this.authUser._id,
           to: this.userId,
+          callId: this.callId,
           at: Date.now(),
           reason: 'timeout'
         });
@@ -286,6 +289,7 @@ startMissedCallTimeout() {
         this.emitWebSocketEvent(VideoEvents.MISSED, {
           from: this.authUser._id,
           to: this.userId,
+          callId: this.callId,
           at: Date.now(),
           reason: 'timeout'
         });
@@ -424,6 +428,7 @@ getUserId() {
       
       this.route.queryParamMap.subscribe((query) => {
           this.answer = query.get('answer') ? true : false;
+          this.callId = query.get('callId') || undefined;
           console.log("🟢 Answer Mode:", this.answer);
           
           this.getUser();
@@ -898,22 +903,22 @@ async emitWebSocketEvent(eventName: string, data: any) {
       if (!this.answered) {
         // Distinguish caller vs callee side: if answer=true, we're the callee rejecting
         if (this.answer) {
-          const base = { from: this.userId, to: this.authUser._id, at: Date.now() };
+          const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
           await this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'rejected' });
           await this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason: 'rejected' });
         } else {
-          const base = { from: this.authUser._id, to: this.userId, at: Date.now() };
+          const base = { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now() };
           await this.emitWebSocketEvent(VideoEvents.MISSED_CANCELED, { ...base, reason: 'cancel' });
           await this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason });
         }
         // Then emit cancel to drive teardown on peers
         const payload = this.answer
-          ? { from: this.userId, to: this.authUser._id, at: Date.now(), reason }
-          : { from: this.authUser._id, to: this.userId, at: Date.now(), reason };
+          ? { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now(), reason }
+          : { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now(), reason };
         try { this.socket.emit(VideoEvents.CANCELED, payload); } catch(_) {}
         try { this.socket.emit('cancel-video', this.userId); } catch(_) {}
       } else {
-        this.socket.emit(VideoEvents.ENDED, { from: this.authUser._id, to: this.userId });
+        this.socket.emit(VideoEvents.ENDED, { from: this.authUser._id, to: this.userId, callId: this.callId });
       }
     }
   
@@ -942,7 +947,7 @@ startUnansweredTimeout() {
       console.warn('⏱️ Call unanswered after 30 seconds. Closing...');
       // For inbound ringing that expires without answer: callee rejected (timeout)
       if (this.answer && this.userId && this.socket?.connected) {
-        const base = { from: this.userId, to: this.authUser._id, at: Date.now() };
+        const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
         this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'timeout' });
         this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason: 'timeout' });
       }

@@ -692,13 +692,39 @@ async function purgeUser(userId) {
   }
 }
 
+function buildCallInvitePayload(calleeId, callerId = null, options = {}) {
+  const now = Date.now();
+  const caller = callerId ? String(callerId) : '';
+  const receiver = calleeId ? String(calleeId) : '';
+  const callId = options.callId
+    ? String(options.callId)
+    : `call-${caller || 'unknown'}-${receiver || 'unknown'}-${now}`;
+
+  return {
+    type: 'incoming_call',
+    category: 'call',
+    event: 'call:invite',
+    status: 'ringing',
+    callId,
+    callType: options.callType || 'video',
+    callerId: caller,
+    fromUserId: caller,
+    receiverId: receiver,
+    toUserId: receiver,
+    callerName: options.callerName || '',
+    callerAvatar: options.callerAvatar || '',
+    timestamp: options.timestamp || now
+  };
+}
+
 /** Wake the callee: emit on socket if online, else push */
-function notifyPeerNeeded(calleeId, callerId = null) {
+function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
   if (!io) return console.warn('notifyPeerNeeded called before helpers.initSocket(io)');
+  const payload = buildCallInvitePayload(calleeId, callerId, options);
   const sockets = userSocketIds(String(calleeId));
   if (sockets.length > 0) {
-    const payload = callerId ? { callerId: String(callerId) } : {};
     sockets.forEach(sid => {
+      io.to(sid).emit('call:invite', payload);
       io.to(sid).emit('incoming-call', payload);
       io.to(sid).emit('called', payload);
     });
@@ -706,12 +732,7 @@ function notifyPeerNeeded(calleeId, callerId = null) {
     pushSvc.sendPush(calleeId, {
       title: 'Incoming video call',
       body: 'Tap to answer',
-      data: {
-        type: 'video-call',
-        category: 'call',
-        callerId: callerId ? String(callerId) : '',
-        fromUserId: callerId ? String(callerId) : ''
-      },
+      data: payload,
       android: {
         priority: 'high',
         ttl: 30 * 1000,
@@ -913,6 +934,7 @@ module.exports = {
   /* Socket bootstrap + helpers */
   initSocket,                  // 👈 NEW
   notifyPeerNeeded,
+  buildCallInvitePayload,
   connectedUsersMap,
   userSocketIds,               // 👈 now exported too
   isUserConnected,

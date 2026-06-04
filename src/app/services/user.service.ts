@@ -692,9 +692,19 @@ getCurrentUserId(): string | null {
     }, 500);
   }
 
-  getPartnerPeerId(userId: string, wake = false): Observable<string | null> {
+  getPartnerPeerId(
+    userId: string,
+    wake = false,
+    callMeta?: { callId?: string; callType?: string }
+  ): Observable<string | null> {
+    const params = new URLSearchParams();
+    if (wake) params.set('wake', '1');
+    if (callMeta?.callId) params.set('callId', callMeta.callId);
+    if (callMeta?.callType) params.set('callType', callMeta.callType);
+    const query = params.toString();
+
     return this.http.get<{ success: boolean; peerId?: string; message: string }>(
-      `${this.apiUrl}/${userId}/peer${wake ? '?wake=1' : ''}`
+      `${this.apiUrl}/${userId}/peer${query ? `?${query}` : ''}`
     ).pipe(
       map(response => {
         return response.success && response.peerId ? response.peerId : null;
