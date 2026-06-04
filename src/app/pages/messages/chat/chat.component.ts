@@ -1088,7 +1088,9 @@ onVideoButtonPressed() {
         this.groupMessagesByDate();
       }
     }
-    return this.router.navigateByUrl('/messages/video/' + this.user.id);
+    return this.router.navigate(['/messages/video', this.user.id], {
+      queryParams: { videoRequestId: this.activeVideoCall.messageId }
+    });
   }
 
   if (this.activeVideoCall.status === 'pending') {

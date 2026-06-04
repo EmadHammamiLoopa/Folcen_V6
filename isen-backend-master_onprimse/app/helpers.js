@@ -717,7 +717,7 @@ function buildCallInvitePayload(calleeId, callerId = null, options = {}) {
   };
 }
 
-/** Wake the callee: emit on socket if online, else push */
+/** Wake the callee: emit on socket and also push so backgrounded apps wake. */
 function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
   if (!io) return console.warn('notifyPeerNeeded called before helpers.initSocket(io)');
   const payload = buildCallInvitePayload(calleeId, callerId, options);
@@ -728,27 +728,26 @@ function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
       io.to(sid).emit('incoming-call', payload);
       io.to(sid).emit('called', payload);
     });
-  } else {
-    pushSvc.sendPush(calleeId, {
-      title: 'Incoming video call',
-      body: 'Tap to answer',
-      data: payload,
-      android: {
-        priority: 'high',
-        ttl: 30 * 1000,
-        notification: {
-          channelId: 'calls',
-          sound: 'default',
-          priority: 'max',
-          defaultSound: true
-        }
-      },
-      apns: {
-        headers: { 'apns-priority': '10' },
-        payload: { aps: { sound: 'default' } }
-      }
-    });
   }
+  pushSvc.sendPush(calleeId, {
+    title: 'Incoming video call',
+    body: 'Tap to answer',
+    data: payload,
+    android: {
+      priority: 'high',
+      ttl: 30 * 1000,
+      notification: {
+        channelId: 'calls',
+        sound: 'default',
+        priority: 'max',
+        defaultSound: true
+      }
+    },
+    apns: {
+      headers: { 'apns-priority': '10' },
+      payload: { aps: { sound: 'default' } }
+    }
+  });
 }
 
 /*──────────────────── Misc dashboard / admin helpers ───────────*/

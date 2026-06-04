@@ -23,7 +23,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FolcenFcmService";
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
-    private static final String CALL_CHANNEL_ID = "incoming_calls_v2";
+    private static final String CALL_CHANNEL_ID = "incoming_calls_v3";
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -31,6 +31,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Log.d(TAG, "FCM received data=" + data);
 
         if (isIncomingCall(data)) {
+            if (MainActivity.isInForeground()) {
+                Log.d(TAG, "App is foreground; socket UI will handle incoming call");
+                return;
+            }
             showIncomingCall(data);
             return;
         }
@@ -109,6 +113,13 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .addAction(R.mipmap.ic_launcher, "Answer", answerIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+        try {
+            Intent launchIntent = incomingCallIntent(callerId, callId, callerName, notificationId);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(launchIntent);
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to launch incoming call activity directly", e);
+        }
     }
 
     private Intent incomingCallIntent(String callerId, String callId, String callerName, int notificationId) {

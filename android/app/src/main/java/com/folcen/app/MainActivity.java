@@ -5,6 +5,23 @@ import android.content.res.Resources;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static boolean foreground = false;
+
+    public static boolean isInForeground() {
+        return foreground;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        foreground = true;
+    }
+
+    @Override
+    public void onStop() {
+        foreground = false;
+        super.onStop();
+    }
 
     /**
      * Lock the font scale to 1.0 so that Samsung / Android system "Large Font"
@@ -23,4 +40,3 @@ public class MainActivity extends BridgeActivity {
         return res;
     }
 }
-

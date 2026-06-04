@@ -37,6 +37,7 @@ export class VideoComponent implements OnInit, OnDestroy {
   public partnerId?: string;
   public userId?: string;
   public callId?: string;
+  public videoRequestId?: string;
   partner: User = new User();
   user: User = new User();
   answer = false;
@@ -173,6 +174,7 @@ async ngOnInit() {
       this.route.queryParamMap.subscribe(qp => {
         this.answer = qp.get('answer') === 'true';
         this.callId = qp.get('callId') || undefined;
+        this.videoRequestId = qp.get('videoRequestId') || undefined;
         if (!this.answer) {
           console.log('🔄 Caller mode — call will start on view enter');
         } else {
@@ -431,6 +433,7 @@ getUserId() {
       this.route.queryParamMap.subscribe((query) => {
           this.answer = query.get('answer') ? true : false;
           this.callId = query.get('callId') || undefined;
+          this.videoRequestId = query.get('videoRequestId') || undefined;
           console.log("🟢 Answer Mode:", this.answer);
           
           this.getUser();
@@ -609,8 +612,9 @@ listenForVideoCallEvents() {
   this.socket.off('leave-call');
 
   this.socket.on('video-call-started', () => {
-    this.ringer.stop();
-    this.calling = false;
+    // Signaling has started, but the callee may not have answered yet.
+    // Keep caller tone playing until WebRTC reports a real connection.
+    console.log('[video] signaling started');
   });
 
   const onCanceled = async (ev?: any) => {
@@ -976,6 +980,7 @@ async placeCall() {
     this.placingCall = true;
     this.calling     = true;
     this.ringer.start('calling.mp3');
+    await this.consumeOneTimeVideoRequest();
   // start the missed-call timeout immediately so PeerJS delays don't prevent it
   try { this.startMissedCallTimeout(); } catch(e) {}
 
@@ -1017,6 +1022,17 @@ async placeCall() {
     this.placingCall = false;
     // ensure no dangling timeout remains if placeCall failed
     try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
+  }
+}
+
+private async consumeOneTimeVideoRequest() {
+  if (!this.videoRequestId || !this.socket?.connected) return;
+  try {
+    this.socket.emit('video-call-used', { messageId: this.videoRequestId });
+    console.log('[video] consumed one-time video request', this.videoRequestId);
+    this.videoRequestId = undefined;
+  } catch (e) {
+    console.warn('[video] failed to consume one-time video request', e);
   }
 }
 
