@@ -248,8 +248,9 @@ export class SocketService {
       // Create socket
       SocketService.socketInstance = io(environment.socketUrl, {
         path: environment.socketPath || '/socket.io',
-        // Prefer websocket on mobile; keep polling fallback for restrictive proxies.
-        transports: [ 'websocket', 'polling' ],
+        // Railway currently rejects websocket upgrades with "Invalid frame
+        // header". Use polling-only until the production proxy supports WS.
+        transports: [ 'polling' ],
         withCredentials: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
@@ -316,6 +317,17 @@ export class SocketService {
       });
       SocketService.socketInstance.on('connect_error', onConnectError);
       SocketService.socketInstance.on('disconnect', onDisconnect);
+
+      const forwardIncomingCallInvite = (payload: any) => {
+        try {
+          window.dispatchEvent(new CustomEvent('folcen-incoming-call', { detail: payload }));
+        } catch (e) {
+          console.warn('Error forwarding incoming call invite', e);
+        }
+      };
+      ['call:invite', 'incoming-call', 'called'].forEach((eventName) => {
+        SocketService.socketInstance!.on(eventName, forwardIncomingCallInvite);
+      });
 
       // ✅ Safe listener for presence updates from the server
       SocketService.socketInstance.on('user-status-changed', (payload: any) => {

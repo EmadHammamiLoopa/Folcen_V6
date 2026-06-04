@@ -120,10 +120,17 @@
 
   <ion-button fill="outline" size="small" color="danger"
               (click)="cancelVideoCallRequest(message)">
-    Cancel
+    {{ message?.from === authUser?.id ? 'Cancel' : 'Reject' }}
   </ion-button>
 </div>
 
+    <div *ngIf="message?.status === 'pending' && message?.from === authUser?.id" class="resolved-text">
+      Waiting for {{ user?.fullName }} to accept. This request is valid for one call only.
+    </div>
+
+    <div *ngIf="message?.status === 'pending' && message?.from !== authUser?.id && !isActionableCall(message)" class="resolved-text">
+      Video call request pending.
+    </div>
 
     <!-- Accepted: resolved text -->
     <div *ngIf="message?.status === 'accepted'" class="resolved-text">

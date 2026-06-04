@@ -769,7 +769,7 @@ async getMessages(event?: any) {
 // helper: recompute the header state, but ignore calls from earlier sessions
 private recomputeActiveCall() {
   const last = [...this.messages]
-    .filter(m => m.type === 'video-call-request')
+    .filter(m => m.type === 'video-call-request' && ['pending', 'accepted'].includes(String(m.status || 'pending')))
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt))
     .pop();
 
@@ -778,12 +778,10 @@ private recomputeActiveCall() {
     return;
   }
 
-  const lastTs = +new Date(last.createdAt);
-  const isThisSession = !!this.sessionStart && lastTs >= this.sessionStart;
-
-  this.activeVideoCall = isThisSession
-    ? { status: (last.status as any) ?? 'pending', messageId: last.id }
-    : { status: null, messageId: undefined };
+  this.activeVideoCall = {
+    status: (last.status as any) ?? 'pending',
+    messageId: last.id
+  };
 }
 
 
@@ -1094,7 +1092,7 @@ onVideoButtonPressed() {
   }
 
   if (this.activeVideoCall.status === 'pending') {
-    return this.toastService.presentSuccessToastr('Waiting for a response…');
+    return this.toastService.presentSuccessToastr(`Waiting for ${this.user?.fullName || 'this user'} to accept your one-time video request.`);
   }
 
   // no active request -> open confirm and send a request
@@ -1541,10 +1539,9 @@ showUproduct() {
   }
   
   async requestVideoCall() {
-    // Ensure conversation is started and the user can still send messages (if non-friend)
-    if (!this.conversationStarted() || !this.nonFriendsChatEnabled()) {
-      console.log("Cannot request video call: conversation not started or message limit reached.");
-      this.toastService.presentErrorToastr('Please start a conversation first');
+    if (!this.nonFriendsChatEnabled()) {
+      console.log("Cannot request video call: message limit reached.");
+      this.toastService.presentErrorToastr('You have reached the message limit for non-friends.');
       return;
     }
   
@@ -1566,7 +1563,7 @@ showUproduct() {
   
     const alert = await this.alertController.create({
       header: 'Request Video Call',
-      message: `Do you want to request a video call with ${this.user.fullName}?`,
+      message: `Send a one-time video call request to ${this.user.fullName}? If accepted, you can start one call. After that, request again if needed.`,
       buttons: [
         {
           text: 'Cancel',
@@ -1613,14 +1610,39 @@ private async sendVideoCallRequest() {
   };
 
   // 3️⃣ Emit to server
+  const markFailed = (message = 'Video call request could not be sent. Please try again.') => {
+    const i = this.messages.findIndex(m => m.id === tempId || m.tempId === tempId);
+    if (i !== -1) {
+      this.messages[i].state = 'failed';
+      this.groupMessagesByDate();
+      this.changeDetection.detectChanges();
+    }
+    this.toastService.presentErrorToastr(message);
+  };
+
+  try {
+    if (!this.socket?.connected) {
+      await SocketService.initializeSocket();
+      SocketService.bindToAuthUser();
+      this.socket = await SocketService.getSocket();
+      await SocketService.ensureConnected();
+    }
+  } catch (e) {
+    console.warn('Video request socket connect failed:', e);
+  }
+
   if (this.socket?.connected) {
-    this.socket.emit('video-call-request', payload, (ack: any) => {
+    const timedSocket = this.socket.timeout ? this.socket.timeout(12000) : null;
+    const emitWithAck = timedSocket ? timedSocket.emit.bind(timedSocket) : this.socket.emit.bind(this.socket);
+    emitWithAck('video-call-request', payload, (errOrAck: any, maybeAck?: any) => {
+      const ack = maybeAck === undefined ? errOrAck : maybeAck;
+      const err = maybeAck === undefined ? null : errOrAck;
+      if (err) {
+        markFailed('Video call request timed out. Please try again.');
+        return;
+      }
       if (!ack?.success) {
-        // fallback: mark as failed
-        const i = this.messages.findIndex(m => m.id === tempId);
-        if (i !== -1) this.messages[i].state = 'failed';
-        this.groupMessagesByDate();
-        this.changeDetection.detectChanges();
+        markFailed(ack?.error || 'Video call request could not be sent. Please try again.');
         return;
       }
 
@@ -1629,6 +1651,7 @@ private async sendVideoCallRequest() {
       if (i !== -1) {
         const existing: any = this.messages[i];
         existing._id = realId || existing._id || existing.id;
+        existing.id = realId || existing.id;
         existing.state = 'sent';
         existing.status = 'pending';
         existing.tempId = tempId;
@@ -1639,7 +1662,7 @@ private async sendVideoCallRequest() {
       }
     });
   } else {
-    SocketService.emit('video-call-request', payload);
+    markFailed('Video call request needs a live connection. Please try again.');
   }
 }
 

@@ -309,7 +309,7 @@ stopCallTimer() {
 // video.component.ts
 async ionViewWillEnter() {
   try {
-    this.pageLoading = true;
+    this.pageLoading = !this.answer;
     this.cdr.detectChanges();
 
     await this.waitForVideoElements();
@@ -317,6 +317,8 @@ async ionViewWillEnter() {
     this.webRTC.setVideoElements(this.myEl, this.partnerEl);
 
     if (this.answer) {
+      this.pageLoading = false;
+      this.cdr.detectChanges();
       // Incoming side: DO NOT open camera yet
       await this.ensureIncomingPeerReady();
       this.ringer.start('ringing.mp3');
@@ -1052,7 +1054,7 @@ this.hasAnswered = true;
       this.showSelfPreview(this.localStream);        // local tile
     }
 
-    const incoming = WebrtcService.call;
+    const incoming = await this.waitForIncomingCall();
     if (!incoming) { throw new Error('No incoming call'); }
 
     incoming.answer(this.localStream);
@@ -1068,6 +1070,15 @@ this.hasAnswered = true;
     this.answeringCall = false;
     this.cdr.detectChanges();
   }
+}
+
+private async waitForIncomingCall(timeoutMs = 12000): Promise<MediaConnection | null> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (WebrtcService.call) return WebrtcService.call;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return WebrtcService.call || null;
 }
 
 

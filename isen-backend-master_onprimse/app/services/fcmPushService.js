@@ -68,7 +68,14 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
       body:  body  || '',
     };
   }
-  if (android) message.android = android;
+  if (android) {
+    message.android = isIncomingCall
+      ? {
+          priority: android.priority || 'high',
+          ttl: android.ttl
+        }
+      : android;
+  }
   if (apns) message.apns = apns;
 
   let successCount  = 0;

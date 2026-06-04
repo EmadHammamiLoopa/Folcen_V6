@@ -69,6 +69,7 @@ export class AppComponent implements OnDestroy {
   private forceLogoutHandler: any = null;
   private forceLogoutMessageHandler: any = null;
   private announcementTapHandler: any = null;
+  private incomingCallHandler: any = null;
   private destroy$ = new Subject<void>();
   private incomingCallKeys = new Set<string>();
   private pendingIncomingCallUrl: string | null = null;
@@ -136,6 +137,11 @@ export class AppComponent implements OnDestroy {
         }, 300);
       };
       window.addEventListener('announcement-notification-tapped', this.announcementTapHandler as any);
+
+      this.incomingCallHandler = (ev: any) => {
+        this.handleIncomingCallInvite(ev?.detail || ev);
+      };
+      window.addEventListener('folcen-incoming-call', this.incomingCallHandler as any);
     } catch (e) {}
     // Subscribe to central user store so this.user stays in sync across pages
     try {
@@ -301,6 +307,7 @@ export class AppComponent implements OnDestroy {
     try { if (this.forceLogoutHandler) window.removeEventListener('force-logout', this.forceLogoutHandler); } catch (e) {}
     try { if (this.forceLogoutMessageHandler) window.removeEventListener('message', this.forceLogoutMessageHandler); } catch (e) {}
     try { if (this.announcementTapHandler) window.removeEventListener('announcement-notification-tapped', this.announcementTapHandler); } catch (e) {}
+    try { if (this.incomingCallHandler) window.removeEventListener('folcen-incoming-call', this.incomingCallHandler); } catch (e) {}
     try { if (this.connectionMonitorInterval) { clearInterval(this.connectionMonitorInterval); this.connectionMonitorInterval = null; } } catch (e) {}
   }
 

@@ -1,18 +1,15 @@
-<app-header title="Friends Chat" [back]="true">
-</app-header>
+<app-header title="Friends Chat" [back]="true"></app-header>
 
-<ion-buttons slot="end">
-  <div class="header-bell-wrap">
-    <button class="fancy-bell" (click)="showMissedCalls()" aria-label="Missed calls">
-      <ion-icon name="notifications-outline"></ion-icon>
-      <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
-        <span *ngIf="(missedCalls?.length || 0) > 0" class="fancy-badge">
-          {{ missedCalls.length > 99 ? '99+' : missedCalls.length }}
-        </span>
-      </ng-container>
-    </button>
-  </div>
-</ion-buttons>
+<div class="header-bell-wrap" style="position: fixed; top: 6px; right: 12px; z-index: 10001; width: 44px; min-width: 44px; height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; visibility: visible;">
+  <button class="fancy-bell" style="width: 40px; min-width: 40px; height: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; visibility: visible;" (click)="showMissedCalls()" aria-label="Missed calls">
+    <ion-icon name="notifications-outline"></ion-icon>
+    <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
+      <span *ngIf="(missedCalls?.length || 0) > 0" class="fancy-badge">
+        {{ missedCalls.length > 99 ? '99+' : missedCalls.length }}
+      </span>
+    </ng-container>
+  </button>
+</div>
 
 <ion-content class="list-content">
   <div class="mesh-bg"></div>

@@ -23,7 +23,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FolcenFcmService";
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
-    private static final String CALL_CHANNEL_ID = "calls";
+    private static final String CALL_CHANNEL_ID = "incoming_calls_v2";
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -71,9 +71,16 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String body = firstNonEmpty(data.get("body"), "Tap to answer");
         int notificationId = stableNotificationId(callId);
 
-        PendingIntent answerIntent = PendingIntent.getActivity(
+        PendingIntent fullScreenIntent = PendingIntent.getActivity(
                 this,
                 notificationId,
+                incomingCallIntent(callerId, callId, callerName, notificationId),
+                pendingIntentFlags()
+        );
+
+        PendingIntent answerIntent = PendingIntent.getActivity(
+                this,
+                notificationId + 2,
                 callIntent(callerId, callId, true),
                 pendingIntentFlags()
         );
@@ -96,12 +103,23 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setAutoCancel(false)
                 .setSound(Settings.System.DEFAULT_RINGTONE_URI)
                 .setVibrate(new long[] { 0, 700, 400, 700, 400, 700 })
-                .setFullScreenIntent(answerIntent, true)
-                .setContentIntent(answerIntent)
+                .setFullScreenIntent(fullScreenIntent, true)
+                .setContentIntent(fullScreenIntent)
                 .addAction(R.mipmap.ic_launcher, "Reject", rejectIntent)
                 .addAction(R.mipmap.ic_launcher, "Answer", answerIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+    }
+
+    private Intent incomingCallIntent(String callerId, String callId, String callerName, int notificationId) {
+        Intent intent = new Intent(this, IncomingCallActivity.class);
+        intent.putExtra("callerId", callerId != null ? callerId : "");
+        intent.putExtra("fromUserId", callerId != null ? callerId : "");
+        intent.putExtra("callId", callId != null ? callId : "");
+        intent.putExtra("callerName", callerName != null ? callerName : "");
+        intent.putExtra("notificationId", notificationId);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return intent;
     }
 
     private Intent callIntent(String callerId, String callId, boolean answer) {
