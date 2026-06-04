@@ -46,14 +46,28 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     stringData[k] = v === null || v === undefined ? '' : String(v);
   }
 
+  const isIncomingCall =
+    stringData.type === 'incoming_call' ||
+    stringData.event === 'call:invite' ||
+    stringData.category === 'call';
+
   const message = {
-    notification: {
+    data: {
+      ...stringData,
       title: title || 'Notification',
-      body:  body  || '',
+      body: body || ''
     },
-    data: stringData,
     tokens,
   };
+
+  // Android call pushes must be data-only so the native Firebase service can
+  // build the full-screen incoming-call UI even when the WebView is killed.
+  if (!isIncomingCall) {
+    message.notification = {
+      title: title || 'Notification',
+      body:  body  || '',
+    };
+  }
   if (android) message.android = android;
   if (apns) message.apns = apns;
 

@@ -71,6 +71,7 @@ export class AppComponent implements OnDestroy {
   private announcementTapHandler: any = null;
   private destroy$ = new Subject<void>();
   private incomingCallKeys = new Set<string>();
+  private pendingIncomingCallUrl: string | null = null;
 
   constructor(
     private platform: Platform,
@@ -422,6 +423,14 @@ export class AppComponent implements OnDestroy {
         },
       );
 
+      CapacitorApp.addListener('appUrlOpen', (event: any) => {
+        this.handleIncomingCallUrl(event?.url);
+      });
+
+      CapacitorApp.getLaunchUrl().then((launch: any) => {
+        this.handleIncomingCallUrl(launch?.url);
+      }).catch(() => {});
+
       CapacitorApp.addListener('resume', () => {
         console.log('📱 App resumed - checking connections...');
         if (this.user?.id) {
@@ -679,6 +688,27 @@ export class AppComponent implements OnDestroy {
     return hash % 2147483647;
   }
 
+  private handleIncomingCallUrl(url?: string) {
+    if (!url || !url.startsWith('folcen://incoming-call')) return;
+    if (!this.user?.id) {
+      this.pendingIncomingCallUrl = url;
+      return;
+    }
+    try {
+      const parsed = new URL(url);
+      const callerId = parsed.searchParams.get('callerId') || parsed.searchParams.get('fromUserId');
+      const callId = parsed.searchParams.get('callId') || undefined;
+      if (!callerId) return;
+      this.zone.run(() => {
+        this.router.navigate(['/messages/video', callerId], {
+          queryParams: { answer: true, callId },
+        });
+      });
+    } catch (e) {
+      console.warn('Failed to handle incoming call url:', e);
+    }
+  }
+
   async connectUser() {
     try {
       const socket = await SocketService.getSocket();
@@ -798,6 +828,11 @@ export class AppComponent implements OnDestroy {
 
     setTimeout(() => this.initWebrtc(), 2500);
     this.connectUser();
+    if (this.pendingIncomingCallUrl) {
+      const pendingUrl = this.pendingIncomingCallUrl;
+      this.pendingIncomingCallUrl = null;
+      setTimeout(() => this.handleIncomingCallUrl(pendingUrl), 100);
+    }
     this.changeDetectorRef.detectChanges();
 
   }

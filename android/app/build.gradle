@@ -56,6 +56,7 @@ dependencies {
 
     // Firebase dependencies
     implementation 'com.google.firebase:firebase-analytics'  // Add other Firebase dependencies here as needed
+    implementation 'com.google.firebase:firebase-messaging'
 
     // Capacitor plugins and dependencies
     implementation project(':capacitor-android')
