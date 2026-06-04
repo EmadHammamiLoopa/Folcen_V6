@@ -23,7 +23,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FolcenFcmService";
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
-    private static final String CALL_CHANNEL_ID = "incoming_calls_v3";
+    private static final String CALL_CHANNEL_ID = "incoming_calls_v4";
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -141,6 +141,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
                 .appendQueryParameter("callId", callId != null ? callId : "")
                 .appendQueryParameter("answer", answer ? "true" : "false")
+                .appendQueryParameter("action", answer ? "answer" : "reject")
+                .appendQueryParameter("autoAnswer", answer ? "true" : "false")
                 .build();
 
         Intent intent = new Intent(this, MainActivity.class);

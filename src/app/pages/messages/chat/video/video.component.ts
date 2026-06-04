@@ -38,6 +38,7 @@ export class VideoComponent implements OnInit, OnDestroy {
   public userId?: string;
   public callId?: string;
   public videoRequestId?: string;
+  public autoAnswer = false;
   partner: User = new User();
   user: User = new User();
   answer = false;
@@ -175,6 +176,7 @@ async ngOnInit() {
         this.answer = qp.get('answer') === 'true';
         this.callId = qp.get('callId') || undefined;
         this.videoRequestId = qp.get('videoRequestId') || undefined;
+        this.autoAnswer = qp.get('autoAnswer') === 'true';
         if (!this.answer) {
           console.log('🔄 Caller mode — call will start on view enter');
         } else {
@@ -323,7 +325,10 @@ async ionViewWillEnter() {
       this.cdr.detectChanges();
       // Incoming side: DO NOT open camera yet
       await this.ensureIncomingPeerReady();
-      this.ringer.start('ringing.mp3');
+      this.ringer.start('calling.mp3');
+      if (this.autoAnswer) {
+        setTimeout(() => this.answerCall(), 250);
+      }
       // keep your startUnansweredTimeout() from ngOnInit or call here
     } else {
       await this.ensurePartnerLoaded();
@@ -434,6 +439,7 @@ getUserId() {
           this.answer = query.get('answer') ? true : false;
           this.callId = query.get('callId') || undefined;
           this.videoRequestId = query.get('videoRequestId') || undefined;
+          this.autoAnswer = query.get('autoAnswer') === 'true';
           console.log("🟢 Answer Mode:", this.answer);
           
           this.getUser();
@@ -979,7 +985,7 @@ async placeCall() {
     this.lastPlaceCallAt = now;
     this.placingCall = true;
     this.calling     = true;
-    this.ringer.start('calling.mp3');
+    this.ringer.start('ringing.mp3');
     await this.consumeOneTimeVideoRequest();
   // start the missed-call timeout immediately so PeerJS delays don't prevent it
   try { this.startMissedCallTimeout(); } catch(e) {}
@@ -1082,6 +1088,11 @@ this.hasAnswered = true;
     this.answered = true;
     this.countVideoCalls();
 
+  } catch (err: any) {
+    this.hasAnswered = false;
+    this.stopCallTimer();
+    this.ringer.start('calling.mp3');
+    this.toastService.presentErrorToastr(err?.message || 'Unable to answer call yet. Please try again.');
   } finally {
     this.answeringCall = false;
     this.cdr.detectChanges();

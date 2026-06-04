@@ -66,6 +66,7 @@ private loadingMessages = false;
   private listenersBound = false;
 
   private lastLoadedPeerId: string | null = null;
+  private relationshipChangedAt = 0;
 
   image: string | null = null;
   imageFile: ImageFileObject | null = null;
@@ -191,6 +192,7 @@ isLatestCall(message: Message): boolean {
       )
       .subscribe((user: User) => {
         this.authUser = user;
+        this.applyFriendshipState();
         console.log('✅ Authenticated user (stream):', this.authUser);
         this.initializeSocket();
       });
@@ -301,7 +303,19 @@ isLatestCall(message: Message): boolean {
         if (!peerId || (changedUserId && changedUserId !== peerId)) return;
 
         this.lastLoadedPeerId = null;
+        this.relationshipChangedAt = Date.now();
         this.activeVideoCall = { status: null, messageId: undefined };
+        if (this.authUser?.id) {
+          this.userService.getUserProfile(this.authUser.id, { forceRefresh: true })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(u => {
+              if (u && u._id) {
+                this.userService.setCurrentUser(u, { force: true });
+                this.authUser = u;
+                this.applyFriendshipState();
+              }
+            }, () => {});
+        }
         if (this.user?.id) this.getUserProfile(this.user.id, true);
       });
     } catch (e) {}
@@ -541,6 +555,7 @@ getUserProfile(userId: string, forceRefresh = false) {
       const freshUser = new User().initialize(raw);
       const wasFriend = !!this.user?.isFriend;
       this.user = freshUser;
+      this.applyFriendshipState();
       if (wasFriend && !this.user.isFriend) {
         this.activeVideoCall = { status: null, messageId: undefined };
       }
@@ -769,7 +784,16 @@ async getMessages(event?: any) {
 // helper: recompute the header state, but ignore calls from earlier sessions
 private recomputeActiveCall() {
   const last = [...this.messages]
-    .filter(m => m.type === 'video-call-request' && ['pending', 'accepted'].includes(String(m.status || 'pending')))
+    .filter(m => {
+      if (m.type !== 'video-call-request') return false;
+      const status = String(m.status || 'pending');
+      if (!['pending', 'accepted'].includes(status)) return false;
+      if (!this.user?.isFriend && this.relationshipChangedAt) {
+        const created = m.createdAt ? +new Date(m.createdAt) : 0;
+        if (created && created < this.relationshipChangedAt) return false;
+      }
+      return true;
+    })
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt))
     .pop();
 
@@ -782,6 +806,31 @@ private recomputeActiveCall() {
     status: (last.status as any) ?? 'pending',
     messageId: last.id
   };
+}
+
+private applyFriendshipState() {
+  if (!this.user) return;
+  const peerId = this.idOf(this.user);
+  const authId = this.idOf(this.authUser);
+  if (!peerId || !authId) return;
+
+  const myFriends = Array.isArray(this.authUser?.friends) ? this.authUser.friends : null;
+  const localSaysFriend = myFriends
+    ? myFriends.some((friend: any) => String(this.idOf(friend)) === String(peerId))
+    : undefined;
+
+  const resolved = localSaysFriend === undefined ? !!this.user.isFriend : !!localSaysFriend;
+  this.user.isFriend = resolved;
+  this.user.friend = resolved;
+  if (!resolved) {
+    this.activeVideoCall = { status: null, messageId: undefined };
+  }
+}
+
+private idOf(value: any): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return String(value._id || value.id || '');
 }
 
 

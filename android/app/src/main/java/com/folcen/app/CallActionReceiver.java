@@ -4,6 +4,7 @@ import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 
 public class CallActionReceiver extends BroadcastReceiver {
     public static final String ACTION_REJECT_CALL = "com.folcen.app.REJECT_CALL";
@@ -19,6 +20,23 @@ public class CallActionReceiver extends BroadcastReceiver {
         if (manager != null && notificationId != 0) {
             manager.cancel(notificationId);
         }
+        String callerId = intent.getStringExtra(EXTRA_CALLER_ID);
+        String callId = intent.getStringExtra(EXTRA_CALL_ID);
+        Uri uri = new Uri.Builder()
+                .scheme("folcen")
+                .authority("incoming-call")
+                .appendQueryParameter("callerId", callerId != null ? callerId : "")
+                .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
+                .appendQueryParameter("callId", callId != null ? callId : "")
+                .appendQueryParameter("answer", "false")
+                .appendQueryParameter("action", "reject")
+                .build();
+
+        Intent launch = new Intent(context, MainActivity.class);
+        launch.setAction(Intent.ACTION_VIEW);
+        launch.setData(uri);
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        context.startActivity(launch);
     }
 
     public static Intent rejectIntent(Context context, int notificationId, String callerId, String callId) {

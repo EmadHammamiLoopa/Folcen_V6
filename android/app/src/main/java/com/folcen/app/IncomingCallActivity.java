@@ -101,6 +101,8 @@ public class IncomingCallActivity extends Activity {
                 .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
                 .appendQueryParameter("callId", callId != null ? callId : "")
                 .appendQueryParameter("answer", "true")
+                .appendQueryParameter("action", "answer")
+                .appendQueryParameter("autoAnswer", "true")
                 .build();
 
         Intent intent = new Intent(this, MainActivity.class);
@@ -113,6 +115,21 @@ public class IncomingCallActivity extends Activity {
 
     private void rejectCall() {
         cancelNotification();
+        Uri uri = new Uri.Builder()
+                .scheme("folcen")
+                .authority("incoming-call")
+                .appendQueryParameter("callerId", callerId != null ? callerId : "")
+                .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
+                .appendQueryParameter("callId", callId != null ? callId : "")
+                .appendQueryParameter("answer", "false")
+                .appendQueryParameter("action", "reject")
+                .build();
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setAction(Intent.ACTION_VIEW);
+        intent.setData(uri);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
         finish();
     }
 

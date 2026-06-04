@@ -705,14 +705,49 @@ export class AppComponent implements OnDestroy {
       const parsed = new URL(url);
       const callerId = parsed.searchParams.get('callerId') || parsed.searchParams.get('fromUserId');
       const callId = parsed.searchParams.get('callId') || undefined;
+      const action = parsed.searchParams.get('action') || (parsed.searchParams.get('answer') === 'false' ? 'reject' : 'answer');
+      const autoAnswer = parsed.searchParams.get('autoAnswer') === 'true' || action === 'answer';
       if (!callerId) return;
+      if (action === 'reject') {
+        this.rejectIncomingCallFromUrl(callerId, callId);
+        return;
+      }
       this.zone.run(() => {
         this.router.navigate(['/messages/video', callerId], {
-          queryParams: { answer: true, callId },
+          queryParams: { answer: true, callId, autoAnswer },
         });
       });
     } catch (e) {
       console.warn('Failed to handle incoming call url:', e);
+    }
+  }
+
+  private async rejectIncomingCallFromUrl(callerId: string, callId?: string) {
+    try {
+      await SocketService.initializeSocket();
+      SocketService.bindToAuthUser();
+      const socket = await SocketService.getSocket();
+      const payload = {
+        from: callerId,
+        to: this.user?.id || (this.user as any)?._id,
+        callId,
+        reason: 'rejected',
+        at: Date.now(),
+      };
+      if (socket?.connected) {
+        socket.emit('video-call-missed-rejected', payload);
+        socket.emit('missed-call', payload);
+        socket.emit('video-canceled', payload);
+        socket.emit('cancel-video', callerId);
+      }
+    } catch (e) {
+      console.warn('Failed to reject incoming call from notification:', e);
+    } finally {
+      this.zone.run(() => {
+        if (this.router.url.includes('/messages/video')) {
+          this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
+        }
+      });
     }
   }
 
