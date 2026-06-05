@@ -247,8 +247,12 @@ isLatestCall(message: Message): boolean {
           const peerId = this.user && (this.user._id || this.user.id || this.user.id);
           const authId = this.authUser && (this.authUser._id || this.authUser.id);
           if (String(uid) === String(peerId)) {
+            if (payload?.fields?.allowVideoRequestsFromNonFriends !== undefined && this.user) {
+              this.user.allowVideoRequestsFromNonFriends = payload.fields.allowVideoRequestsFromNonFriends !== false;
+              this.changeDetection.detectChanges();
+            }
             this.userService.getUserProfile(uid, { forceRefresh: true }).pipe(takeUntil(this.destroy$)).subscribe(u => {
-              if (u && u._id) { this.user = u; this.changeDetection.detectChanges(); }
+              if (u && u._id) { this.user = u; this.applyFriendshipState(); this.changeDetection.detectChanges(); }
             }, () => {});
           }
           if (String(uid) === String(authId)) {
@@ -262,12 +266,32 @@ isLatestCall(message: Message): boolean {
 
       SocketService.friendRequestsUpdated$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
         const peerId = String((this.user as any)?._id || this.user?.id || '');
+        const authId = String((this.authUser as any)?._id || this.authUser?.id || '');
+        const userIds = Array.isArray(payload?.userIds) ? payload.userIds.map((id: any) => String(id)) : [];
         const changedUserId = String(payload?.userId || payload?.from || payload?.to || '');
-        if (!peerId || (changedUserId && changedUserId !== peerId)) return;
+        const appliesToThread = userIds.length
+          ? userIds.includes(peerId) && (!authId || userIds.includes(authId))
+          : (!changedUserId || changedUserId === peerId);
+        if (!peerId || !appliesToThread) return;
 
         this.lastLoadedPeerId = null;
         this.relationshipChangedAt = Date.now();
         this.activeVideoCall = { status: null, messageId: undefined };
+        if (payload?.friend === false || payload?.type === 'removed' || payload?.action === 'unfriend') {
+          this.user.isFriend = false;
+          this.user.friend = false;
+          if (Array.isArray(this.authUser?.friends)) {
+            this.authUser.friends = this.authUser.friends.filter((friend: any) => String(this.idOf(friend)) !== peerId);
+            this.userService.setCurrentUser(this.authUser, { force: true });
+          }
+          this.recomputeActiveCall();
+          this.groupMessagesByDate();
+          this.changeDetection.detectChanges();
+        } else if (payload?.friend === true || payload?.type === 'accepted') {
+          this.user.isFriend = true;
+          this.user.friend = true;
+          this.changeDetection.detectChanges();
+        }
         if (this.authUser?.id) {
           this.userService.getUserProfile(this.authUser.id, { forceRefresh: true })
             .pipe(takeUntil(this.destroy$))

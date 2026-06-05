@@ -31,6 +31,7 @@ public class IncomingCallActivity extends Activity {
         callId = firstNonEmpty(intent.getStringExtra("callId"), "call-" + System.currentTimeMillis());
         notificationId = intent.getIntExtra("notificationId", 0);
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
+        cancelNotification();
 
         setContentView(buildView(callerName));
     }

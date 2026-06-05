@@ -139,7 +139,14 @@ export class AppComponent implements OnDestroy {
       window.addEventListener('announcement-notification-tapped', this.announcementTapHandler as any);
 
       this.incomingCallHandler = (ev: any) => {
-        this.handleIncomingCallInvite(ev?.detail || ev);
+        const detail = ev?.detail || ev;
+        if (typeof detail === 'string') {
+          this.handleIncomingCallUrl(detail);
+        } else if (detail?.url) {
+          this.handleIncomingCallUrl(detail.url);
+        } else {
+          this.handleIncomingCallInvite(detail);
+        }
       };
       window.addEventListener('folcen-incoming-call', this.incomingCallHandler as any);
     } catch (e) {}
@@ -188,6 +195,9 @@ export class AppComponent implements OnDestroy {
         if (fields.firstName)  this.user.firstName  = fields.firstName;
         if (fields.lastName)   this.user.lastName   = fields.lastName;
         if (fields.avatar)     this.user.avatar     = fields.avatar;
+        if (fields.allowVideoRequestsFromNonFriends !== undefined) {
+          this.user.allowVideoRequestsFromNonFriends = fields.allowVideoRequestsFromNonFriends !== false;
+        }
         this.userService.setCurrentUser(this.user);
         this.changeDetectorRef.detectChanges();
       } catch (e) {}
@@ -423,9 +433,7 @@ export class AppComponent implements OnDestroy {
           const extra: any = notification.notification.extra || {};
           const callerId = extra.callerId || extra.fromUserId;
           if (callerId) {
-            this.router.navigate(['/messages/video', callerId], {
-              queryParams: { answer: true, callId: extra.callId || undefined, autoAnswer: true },
-            });
+            this.handleIncomingCallUrl(this.buildIncomingCallUrl(callerId, extra.callId, 'answer'));
           }
         },
       );
@@ -695,12 +703,38 @@ export class AppComponent implements OnDestroy {
     return hash % 2147483647;
   }
 
+  private isIncomingCallUrl(url?: string): boolean {
+    return !!url && url.startsWith('folcen://incoming-call');
+  }
+
+  private prepareIncomingCallLaunch(url?: string) {
+    if (!this.isIncomingCallUrl(url)) return;
+    this.pendingIncomingCallUrl = url;
+    this.showSplash = false;
+    try { this.changeDetectorRef.detectChanges(); } catch (_) {}
+  }
+
+  private buildIncomingCallUrl(callerId: string, callId?: string, action: 'answer' | 'reject' = 'answer'): string {
+    const answer = action === 'answer';
+    const params = new URLSearchParams({
+      callerId: callerId || '',
+      fromUserId: callerId || '',
+      callId: callId || '',
+      answer: answer ? 'true' : 'false',
+      action,
+      autoAnswer: answer ? 'true' : 'false'
+    });
+    return `folcen://incoming-call?${params.toString()}`;
+  }
+
   private handleIncomingCallUrl(url?: string) {
-    if (!url || !url.startsWith('folcen://incoming-call')) return;
+    if (!this.isIncomingCallUrl(url)) return;
+    this.prepareIncomingCallLaunch(url);
     if (!this.user?.id) {
       this.pendingIncomingCallUrl = url;
       return;
     }
+    this.pendingIncomingCallUrl = null;
     try {
       const parsed = new URL(url);
       const callerId = parsed.searchParams.get('callerId') || parsed.searchParams.get('fromUserId');
@@ -714,7 +748,7 @@ export class AppComponent implements OnDestroy {
       }
       this.zone.run(() => {
         this.router.navigate(['/messages/video', callerId], {
-          queryParams: { answer: true, callId, autoAnswer },
+          queryParams: { answer: true, callId, autoAnswer, directCall: '1' },
         });
       });
     } catch (e) {
@@ -870,7 +904,7 @@ export class AppComponent implements OnDestroy {
     if (this.pendingIncomingCallUrl) {
       const pendingUrl = this.pendingIncomingCallUrl;
       this.pendingIncomingCallUrl = null;
-      setTimeout(() => this.handleIncomingCallUrl(pendingUrl), 100);
+      this.handleIncomingCallUrl(pendingUrl);
     }
     this.changeDetectorRef.detectChanges();
 

@@ -111,10 +111,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 pendingIntentFlags()
         );
 
-        PendingIntent answerIntent = PendingIntent.getActivity(
+        PendingIntent answerIntent = PendingIntent.getBroadcast(
                 this,
                 notificationId + 2,
-                callIntent(callerId, callId, true),
+                CallActionReceiver.answerIntent(this, notificationId, callerId, callId),
                 pendingIntentFlags()
         );
 

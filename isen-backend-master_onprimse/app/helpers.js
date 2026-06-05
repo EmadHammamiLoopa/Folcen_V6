@@ -426,7 +426,8 @@ const realtime = {
             firstName: user.firstName,
             lastName: user.lastName,
             avatar: user.avatar,
-            online: user.online
+            online: user.online,
+            allowVideoRequestsFromNonFriends: user.allowVideoRequestsFromNonFriends
         }
     });
   },

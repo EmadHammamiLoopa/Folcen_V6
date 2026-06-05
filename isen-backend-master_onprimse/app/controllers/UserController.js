@@ -2461,6 +2461,15 @@ exports.removeFriendship = async(req, res) => {
 
         // 🔁 Notify both sides to refresh friends list
         emitFriendRequestsUpdated(authUser._id, user._id);
+        try {
+            emitToUsers([authUser._id, user._id], 'friend-requests-updated', {
+                type: 'removed',
+                action: 'unfriend',
+                friend: false,
+                userIds: [String(authUser._id), String(user._id)],
+                at: Date.now()
+            });
+        } catch (e) {}
 
         return Response.sendResponse(res, true, 'Friendship is removed');
     }catch(err){
@@ -2610,6 +2619,10 @@ exports.updateNonFriendVideoRequests = async (req, res) => {
             logger.warn(`[UserController] updateNonFriendVideoRequests: User not found for ID ${userId}`);
             return Response.sendError(res, 404, 'User not found');
         }
+
+        try {
+            realtime.emitProfileUpdate(user);
+        } catch (e) {}
 
         return Response.sendResponse(res, user.publicInfo(true), 'Video request setting updated');
     } catch (error) {

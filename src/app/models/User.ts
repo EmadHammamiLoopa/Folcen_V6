@@ -107,7 +107,8 @@ export class User {
       payload.mainAvatar || '',
       Array.isArray(payload.avatar) ? payload.avatar.join(',') : (payload.avatar || '')
     ].join('|');
-    return [id, updated, payload.email || '', payload.birthDate || '', followersLen, followingLen, friendsLen, interestsStr, languagesStr, avatarFields].join('|');
+    const videoRequests = payload.allowVideoRequestsFromNonFriends === false ? 'videoRequests:false' : 'videoRequests:true';
+    return [id, updated, payload.email || '', payload.birthDate || '', followersLen, followingLen, friendsLen, interestsStr, languagesStr, avatarFields, videoRequests].join('|');
   }
 
   private static decodeMaybeEncodedList(value: string): string[] | null {
