@@ -803,19 +803,12 @@ export class AppComponent implements OnDestroy {
         console.log('🚫 Call canceled.', data);
         this.audio?.pause();
         localStorage.removeItem('partnerId');
-        // If I'm the callee and this is a cancel/timeout, register missed call
-        if (data && data.notify && this.user?.id) {
-          this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'video-canceled');
-        }
       });
 
       socket.off('video-call-timeout').on('video-call-timeout', (data) => {
         console.log('⏰ Call timed out.', data);
         this.audio?.pause();
         localStorage.removeItem('partnerId');
-        if (this.user?.id) {
-          this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'video-call-timeout');
-        }
       });
 
       socket.off('missed-call').on('missed-call', (data) => {

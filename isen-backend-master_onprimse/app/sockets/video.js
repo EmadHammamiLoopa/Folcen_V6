@@ -305,6 +305,10 @@ module.exports = (io, socket) => {   // ✅ no extra param
       const to   = payload.to   || payload.calleeId;
       const at   = Number(payload.at) || Date.now();
       if (!from || !to) return; // invalid
+      if (reason !== 'timeout' && reason !== 'missed') {
+        console.log('[sockets][video] ignored non-timeout missed event', { from, to, reason, callId: payload.callId });
+        return;
+      }
 
       // Dedup key per attempt to avoid double processing
       const dedupKey = `${from}|${to}|${Math.floor(at/1000)}|${reason}`;
@@ -323,13 +327,11 @@ module.exports = (io, socket) => {   // ✅ no extra param
       } catch (e) { console.warn('Failed to increment missedCallBudget', e); }
 
       // Include callerName if provided by the emitter
-      const payloadOut = { from, to, at, reason, callerName: payload.callerName || payload.fromName || null };
+      const payloadOut = { from, to, at, reason: 'timeout', callerName: payload.callerName || payload.fromName || null };
 
       // Emit explicit event matching frontend names for stronger compatibility
       try {
-        if (reason === 'timeout') emitToUser(to, 'video-call-missed-timeout', payloadOut);
-        else if (reason === 'cancel') emitToUser(to, 'video-call-missed-canceled', payloadOut);
-        else if (reason === 'rejected') emitToUser(to, 'video-call-missed-rejected', payloadOut);
+        emitToUser(to, 'video-call-missed-timeout', payloadOut);
       } catch (e) { console.warn('Failed to emit explicit missed event', e); }
 
       // Always broadcast the legacy event as well (UI listens to this too)

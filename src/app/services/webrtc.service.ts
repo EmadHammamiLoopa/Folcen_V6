@@ -371,25 +371,16 @@ export class WebrtcService {
    */
   private async emitMissedOutcomeOnce(callerId: string, calleeId: string, why: 'timeout'|'cancel'|'rejected'): Promise<void> {
     try {
+      if (why !== 'timeout') return;
       const key = `${callerId}|${calleeId}`;
       if (this.lastMissedEmitKey === key) return; // already emitted for this attempt
       this.lastMissedEmitKey = key;
       const sock = await SocketService.getSocket();
       if (!sock?.connected) return;
       const base = { from: callerId, to: calleeId, at: Date.now() };
-      switch (why) {
-        case 'timeout':
-          sock.emit(VideoEvents.MISSED_TIMEOUT,  { ...base, reason: 'timeout' });
-          break;
-        case 'cancel':
-          sock.emit(VideoEvents.MISSED_CANCELED, { ...base, reason: 'cancel'  });
-          break;
-        case 'rejected':
-          sock.emit(VideoEvents.MISSED_REJECTED, { ...base, reason: 'rejected'});
-          break;
-      }
+      sock.emit(VideoEvents.MISSED_TIMEOUT,  { ...base, reason: 'timeout' });
       // For older servers that only understand generic 'missed-call'
-      sock.emit(VideoEvents.MISSED, { ...base, reason: why });
+      sock.emit(VideoEvents.MISSED, { ...base, reason: 'timeout' });
     } catch(e) { console.warn('[webrtc] emitMissedOutcomeOnce failed', e); }
   }
 
@@ -671,14 +662,10 @@ export class WebrtcService {
     const isExplicitByEvent = [
       VideoEvents.MISSED as any,
       VideoEvents.MISSED_TIMEOUT as any,
-      VideoEvents.MISSED_CANCELED as any,
-      VideoEvents.MISSED_REJECTED as any,
-      'missed-call',
-      'video-canceled',
-      'video-call-timeout'
+      'missed-call'
     ].includes(eventName as any);
 
-    const isExplicitByReason = reasonPayload === 'missed' || reasonPayload === 'missed-call' || reasonPayload === 'timeout' || reasonPayload === 'cancel';
+    const isExplicitByReason = reasonPayload === 'missed' || reasonPayload === 'missed-call' || reasonPayload === 'timeout';
 
     if (!(iAmCallee && (isExplicitByEvent || isExplicitByReason))) {
       console.log('[webrtc] addMissedCallFromSignaling -> ignored (not callee or not explicit)', { iAmCallee, isExplicitByEvent, isExplicitByReason });

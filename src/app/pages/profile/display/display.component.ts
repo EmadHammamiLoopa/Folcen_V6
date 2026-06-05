@@ -201,6 +201,34 @@ export class DisplayComponent implements OnInit, OnDestroy {
             // backend to the current user), NOT the viewed user's stats.  Applying them to
             // this.user would corrupt the viewed user's counters and cause the flicker.
             // Only process relationship-type flags here.
+            const currentId = String(this.authUser?._id || this.authUser?.id || this.userService.currentUserValue?._id || this.userService.currentUserValue?.id || '');
+            const viewedIdForPair = String(this.user._id || this.user.id || '');
+            const payloadUserIds = Array.isArray(payload?.userIds) ? payload.userIds.map((id: any) => String(id)) : [];
+            const removedByPair = (payload?.type === 'removed' || payload?.action === 'unfriend' || payload?.friend === false)
+              && currentId && viewedIdForPair
+              && payloadUserIds.includes(currentId)
+              && payloadUserIds.includes(viewedIdForPair);
+
+            if (removedByPair) {
+              this.user.isFriend = false;
+              this.user.friend   = false;
+              this.user.request  = null;
+              this.isFriend      = false;
+              this.notFriendOrMe = !this.myProfile;
+              const currentUser = this.userService.currentUserValue;
+              const peerId = viewedIdForPair;
+              if (currentUser?.friends && peerId) {
+                currentUser.friends = currentUser.friends.filter((friend: any) => {
+                  const id = typeof friend === 'string' ? friend : (friend?._id || friend?.id);
+                  return String(id) !== peerId;
+                });
+                this.userService.setCurrentUser(currentUser, { force: true });
+              }
+              this.userService.triggerFriendsRefresh();
+              this.changeDetectorRef.detectChanges();
+              return;
+            }
+
             if (payload?.userId) {
               const viewedId = String(this.user._id || this.user.id || '');
               const eventUid = String(payload.userId);

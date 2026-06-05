@@ -1029,13 +1029,6 @@ this.socket.on('video-call-cancelled', (data: any) => {
           this.groupMessagesByDate();
           this.changeDetection.detectChanges();
 
-          // If I'm the callee and this is a cancel/timeout, register missed call immediately
-          const toId = data?.to || data?.calleeId || null;
-          const reason = data?.reason || data?.type || null;
-          if (toId && this.authUser && toId === this.authUser.id && (reason === 'cancel' || reason === 'timeout' || reason === 'video-canceled')) {
-            try { this.webRTC.addMissedCallFromSignaling(data, this.authUser.id); } catch(e) { console.warn('missed-call registration failed', e); }
-          }
-
           return;
         }
 
@@ -1048,11 +1041,6 @@ this.socket.on('video-call-cancelled', (data: any) => {
           this.groupMessagesByDate();
           this.changeDetection.detectChanges();
 
-          const toId = data?.to || data?.calleeId || null;
-          const reason = data?.reason || data?.type || null;
-          if (toId && this.authUser && toId === this.authUser.id && (reason === 'cancel' || reason === 'timeout' || reason === 'video-canceled')) {
-            try { this.webRTC.addMissedCallFromSignaling(data, this.authUser.id); } catch(e) { console.warn('missed-call registration failed', e); }
-          }
         }
       } catch (e) {
         console.warn('handleCanceledEvent failed', e, data);

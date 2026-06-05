@@ -78,115 +78,217 @@
   // FIXED OVERLAP: Put self-video at the bottom right during a call
   .pip-video {
     position: absolute;
-    bottom: 180px; // Sits above the controls
-    right: 20px;
-    width: 110px;
-    height: 160px;
-    border-radius: 16px;
+    top: calc(env(safe-area-inset-top, 0px) + 112px);
+    right: 16px;
+    width: min(31vw, 132px);
+    aspect-ratio: 3 / 4;
+    height: auto;
+    border-radius: 18px;
     object-fit: cover;
     transform: none !important;
     -webkit-transform: none !important;
-    z-index: 10;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    z-index: 18;
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    background: #111827;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.48);
   }
 
   // TOP INFO
   .top-overlay {
     position: absolute;
-    top: 60px;
-    left: 20px;
-    z-index: 20;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left: 14px;
+    right: 14px;
+    z-index: 22;
 
-    .minimal-caller-card {
+    .call-hud {
       display: flex;
       align-items: center;
-      gap: 12px;
-      background: rgba(0, 0, 0, 0.3);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      padding: 8px 16px 8px 8px;
-      border-radius: 50px;
-      border: 1px solid rgba(255,255,255,0.1);
+      min-height: 64px;
+      gap: 10px;
+      background: rgba(10, 14, 24, 0.54);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      padding: 8px 10px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.28);
+      color: white;
+      overflow: hidden;
 
-      .mini-avatar { width: 40px; height: 40px; border-radius: 50%; }
-      h3 { margin: 0; font-size: 15px; color: white; font-weight: 600; }
-      .status { font-size: 12px; color: #34c759; display: block; }
+      .mini-avatar {
+        flex: 0 0 auto;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+      }
+
+      .info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      h3 {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.15;
+        color: white;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .status {
+        margin-top: 3px;
+        font-size: 12px;
+        color: rgba(255,255,255,0.72);
+        display: block;
+      }
+
+      .call-timer {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 72px;
+        justify-content: center;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.12);
+        font-size: 13px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .live-dot {
+        width: 7px;
+        height: 7px;
+        background: #34c759;
+        border-radius: 50%;
+        box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.16);
+        animation: blink 1.4s infinite;
+      }
     }
-  }
-
-  // TIMER PILL
-  .call-timer-pill {
-    position: absolute;
-    top: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 59, 48, 0.9); // Red pill for active call
-    padding: 6px 16px;
-    border-radius: 20px;
-    color: white;
-    font-weight: 700;
-    font-size: 14px;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    .dot { width: 6px; height: 6px; background: white; border-radius: 50%; animation: blink 1s infinite; }
   }
 
   // CONTROLS (Floating - no black box)
   .controls-overlay {
     position: absolute;
-    bottom: 40px;
-    left: 0;
-    right: 0;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+    left: 16px;
+    right: 16px;
     z-index: 30;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: 14px;
+    pointer-events: none;
 
     .utility-bar {
       display: flex;
-      gap: 15px;
-      background: rgba(255,255,255,0.1);
+      gap: 12px;
+      background: rgba(10,14,24,0.52);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      padding: 10px 20px;
-      border-radius: 30px;
-      border: 1px solid rgba(255,255,255,0.1);
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 14px 32px rgba(0,0,0,0.28);
+      pointer-events: auto;
     }
 
     .action-bar {
       display: flex;
-      gap: 40px;
+      justify-content: center;
+      gap: 22px;
+      pointer-events: auto;
     }
   }
 
   // BUTTON STYLES
   .blur-btn {
-    width: 46px;
-    height: 46px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     border: none;
-    background: transparent;
+    background: rgba(255,255,255,0.08);
     color: white;
     font-size: 18px;
+    display: grid;
+    place-items: center;
+    transition: transform 120ms ease, background 120ms ease, color 120ms ease;
     &.active { color: #ff3b30; }
+    &:active { transform: scale(0.94); }
   }
 
   .main-btn {
-    width: 72px;
-    height: 72px;
+    width: 70px;
+    height: 70px;
     border-radius: 50%;
     border: none;
     color: white;
     font-size: 28px;
     box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+    display: grid;
+    place-items: center;
+    transition: transform 120ms ease, filter 120ms ease;
+    &:active { transform: scale(0.94); }
     
     &.accept { background: #34c759; }
     &.hangup { background: #ff3b30; }
     &.call { background: #007aff; }
+  }
+}
+
+@media (max-width: 360px) {
+  .video-container {
+    .top-overlay {
+      left: 10px;
+      right: 10px;
+
+      .call-hud {
+        min-height: 58px;
+        border-radius: 20px;
+
+        .mini-avatar {
+          width: 42px;
+          height: 42px;
+        }
+
+        h3 { font-size: 14px; }
+
+        .call-timer {
+          min-width: 64px;
+          padding: 6px 8px;
+          font-size: 12px;
+        }
+      }
+    }
+
+    .pip-video {
+      top: calc(env(safe-area-inset-top, 0px) + 96px);
+      right: 10px;
+      width: 104px;
+    }
+
+    .controls-overlay {
+      left: 10px;
+      right: 10px;
+
+      .action-bar { gap: 18px; }
+    }
+
+    .blur-btn {
+      width: 44px;
+      height: 44px;
+    }
+
+    .main-btn {
+      width: 64px;
+      height: 64px;
+      font-size: 24px;
+    }
   }
 }
 

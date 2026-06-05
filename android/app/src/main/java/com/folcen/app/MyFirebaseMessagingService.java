@@ -111,20 +111,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 pendingIntentFlags()
         );
 
-        PendingIntent answerIntent = PendingIntent.getBroadcast(
-                this,
-                notificationId + 2,
-                CallActionReceiver.answerIntent(this, notificationId, callerId, callId),
-                pendingIntentFlags()
-        );
-
-        PendingIntent rejectIntent = PendingIntent.getBroadcast(
-                this,
-                notificationId + 1,
-                CallActionReceiver.rejectIntent(this, notificationId, callerId, callId),
-                pendingIntentFlags()
-        );
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CALL_CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title)
@@ -137,9 +123,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setSound(Settings.System.DEFAULT_RINGTONE_URI)
                 .setVibrate(new long[] { 0, 700, 400, 700, 400, 700 })
                 .setFullScreenIntent(fullScreenIntent, true)
-                .setContentIntent(fullScreenIntent)
-                .addAction(R.mipmap.ic_launcher, "Reject", rejectIntent)
-                .addAction(R.mipmap.ic_launcher, "Answer", answerIntent);
+                .setContentIntent(fullScreenIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
     }
