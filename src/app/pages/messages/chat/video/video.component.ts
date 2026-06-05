@@ -195,12 +195,7 @@ async ngOnInit() {
 private handleBackButton() {
   console.log('🔙 Handling back button');
   if (this.answer && !this.answered && this.userId && this.socket?.connected) {
-    // Callee rejecting: emit explicit MISSED_REJECTED before teardown
     const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
-    // canonical explicit event for deterministic accounting
-    this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'rejected' });
-    // legacy generic for older servers
-    this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason: 'rejected' });
     this.emitWebSocketEvent(VideoEvents.DECLINED, { ...base, reason: 'declined' });
   }
   
@@ -944,8 +939,6 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
         // Distinguish caller vs callee side: if answer=true, we're the callee rejecting
         if (this.answer) {
           const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
-          await this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'rejected' });
-          await this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason: 'rejected' });
           await this.emitWebSocketEvent(VideoEvents.DECLINED, { ...base, reason: 'declined' });
         } else {
           const base = { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now() };

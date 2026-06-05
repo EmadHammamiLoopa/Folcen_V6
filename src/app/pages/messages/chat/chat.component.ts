@@ -435,13 +435,8 @@ async cancelVideoCallRequest(message: Message) {
     reason
   });
 
-  // signal the active call UI to tear down immediately on the other side
-  try {
-    this.socket.emit('cancel-video', { from: this.authUser.id, to: other, messageId: realId, reason });
-    this.socket.emit('video-canceled', { from: this.authUser.id, to: other, messageId: realId, reason });
-  } catch(e) {
-    console.warn('Failed to emit cancel-video/video-canceled', e);
-  }
+  // This is a chat/video-request state change only. Do not emit real-call
+  // cleanup events here; those create missed-call entries for request rejects.
 }
 
 

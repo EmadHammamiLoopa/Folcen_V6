@@ -55,6 +55,7 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
   const message = {
     data: {
       ...stringData,
+      serverSentAt: stringData.serverSentAt || String(Date.now()),
       title: title || 'Notification',
       body: body || ''
     },
@@ -73,7 +74,8 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     message.android = isIncomingCall
       ? {
           priority: android.priority || 'high',
-          ttl: android.ttl
+          ttl: android.ttl || 30 * 1000,
+          collapseKey: stringData.callId || stringData.fromUserId || stringData.callerId || 'incoming_call'
         }
       : android;
   }

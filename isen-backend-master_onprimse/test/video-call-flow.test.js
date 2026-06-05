@@ -247,4 +247,49 @@ describe('video call request flow', function () {
       Message.findOneAndUpdate = originalFindOneAndUpdate;
     }
   });
+
+  it('rejects request-only video messages without emitting real-call missed cleanup', async function () {
+    const Message = require('../app/models/Message');
+    const { connectedUsers } = require('../app/utils/socketManager');
+    const registerChatSocket = require('../app/sockets/chat');
+
+    const originalFindByIdAndUpdate = Message.findByIdAndUpdate;
+    Message.findByIdAndUpdate = async () => ({
+      id: '64b000000000000000000099',
+      _id: new mongoose.Types.ObjectId('64b000000000000000000099'),
+      from: new mongoose.Types.ObjectId(callerId),
+      to: new mongoose.Types.ObjectId(calleeId),
+      type: 'video-call-request',
+      status: 'rejected'
+    });
+
+    connectedUsers.set(callerId, new Set(['caller-socket']));
+    connectedUsers.set(calleeId, new Set(['callee-socket']));
+
+    const emitted = [];
+    const socket = {
+      id: 'callee-socket',
+      userId: calleeId,
+      handlers: {},
+      on(event, handler) { this.handlers[event] = handler; }
+    };
+    const io = { to: sid => ({ emit: (event, payload) => emitted.push({ sid, event, payload }) }) };
+
+    try {
+      registerChatSocket(io, socket);
+      await socket.handlers['video-call-cancelled']({
+        from: calleeId,
+        to: callerId,
+        messageId: '64b000000000000000000099',
+        status: 'rejected',
+        reason: 'rejected'
+      });
+
+      assert.ok(emitted.some(e => e.event === 'video-call-cancelled' && e.payload.status === 'rejected'));
+      assert.ok(!emitted.some(e => e.event === 'video-canceled'));
+      assert.ok(!emitted.some(e => e.event === 'missed-call'));
+    } finally {
+      Message.findByIdAndUpdate = originalFindByIdAndUpdate;
+    }
+  });
 });

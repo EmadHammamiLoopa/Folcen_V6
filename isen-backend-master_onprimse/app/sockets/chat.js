@@ -284,14 +284,6 @@ socket.on("video-call-cancelled", async (data) => {
 
   emitToUser(data.to,   "video-call-cancelled", { messageId: msg.id, status: requestedStatus, reason });
   emitToUser(data.from, "video-call-cancelled", { messageId: msg.id, status: requestedStatus, reason });
-
-  // Canonical real-time signaling so video UI reliably tears down
-  const now = Date.now();
-  const canonical = { from: data.from, to: data.to, messageId: msg.id, reason, status: requestedStatus, at: now };
-  // Notify callee so they can register a missed call and close UI
-  emitToUser(data.to, 'video-canceled', { ...canonical, notify: true });
-  // Notify caller for local cleanup only (no missed call)
-  emitToUser(data.from, 'video-canceled', { ...canonical, notify: false });
   } catch (err) {
     console.error("❌ Error in video-call-cancelled:", err);
   }

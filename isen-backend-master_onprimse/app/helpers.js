@@ -746,7 +746,17 @@ function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
     },
     apns: {
       headers: { 'apns-priority': '10' },
-      payload: { aps: { sound: 'default' } }
+      payload: {
+        aps: {
+          alert: {
+            title: 'Incoming video call',
+            body: 'Tap to answer'
+          },
+          sound: 'default',
+          category: 'INCOMING_CALL',
+          'interruption-level': 'time-sensitive'
+        }
+      }
     }
   });
 }

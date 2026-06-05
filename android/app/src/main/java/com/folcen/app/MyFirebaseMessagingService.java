@@ -29,6 +29,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     public void onMessageReceived(RemoteMessage remoteMessage) {
         Map<String, String> data = remoteMessage.getData();
         Log.d(TAG, "FCM received data=" + data);
+        logDeliveryDelay(data);
 
         if (isIncomingCall(data)) {
             if (!isAnswerableCall(data)) {
@@ -67,6 +68,16 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         return "incoming_call".equals(data.get("type"))
                 || "call:invite".equals(data.get("event"))
                 || "call".equals(data.get("category"));
+    }
+
+    private void logDeliveryDelay(Map<String, String> data) {
+        if (data == null) return;
+        try {
+            String sentAt = data.get("serverSentAt");
+            if (sentAt == null || sentAt.length() == 0) return;
+            long delayMs = System.currentTimeMillis() - Long.parseLong(sentAt);
+            Log.d(TAG, "FCM delivery delayMs=" + delayMs + " type=" + firstNonEmpty(data.get("type"), data.get("event"), data.get("category")));
+        } catch (Exception ignored) {}
     }
 
     private boolean isAnswerableCall(Map<String, String> data) {
@@ -131,13 +142,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .addAction(R.mipmap.ic_launcher, "Answer", answerIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
-        try {
-            Intent launchIntent = incomingCallIntent(callerId, callId, callerName, notificationId);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(launchIntent);
-        } catch (Exception e) {
-            Log.w(TAG, "Unable to launch incoming call activity directly", e);
-        }
     }
 
     private Intent incomingCallIntent(String callerId, String callId, String callerName, int notificationId) {

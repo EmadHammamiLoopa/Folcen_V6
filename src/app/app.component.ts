@@ -681,17 +681,10 @@ export class AppComponent implements OnDestroy {
       return;
     }
 
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: Math.abs(this.hashCallId(invite.callId)) || 1,
-          title: invite.callerName ? `${invite.callerName} is calling` : 'Incoming video call',
-          body: 'Tap to answer',
-          schedule: { at: new Date(Date.now() + 250) },
-          extra: invite,
-        },
-      ],
-    }).catch(() => {});
+    // When the WebView is not active, Android FCM native code owns the
+    // full-screen call alert. Scheduling a second local notification here
+    // races with the native call notification and can create duplicates.
+    console.log('Incoming call received while inactive; native FCM alert will handle display.', invite.callId);
   }
 
   private hashCallId(callId: string): number {
@@ -742,8 +735,6 @@ export class AppComponent implements OnDestroy {
         at: Date.now(),
       };
       if (socket?.connected) {
-        socket.emit('video-call-missed-rejected', payload);
-        socket.emit('missed-call', payload);
         socket.emit('video-call-declined', { from: callerId, to: payload.to, callId, reason: 'declined' });
       }
     } catch (e) {

@@ -5,7 +5,6 @@ import { HttpClient } from '@angular/common/http';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { environment } from '../../environments/environment';
-import { LocalNotifications } from '@capacitor/local-notifications';
 
 /**
  * FcmPushService
