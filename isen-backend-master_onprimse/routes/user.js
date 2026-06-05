@@ -144,12 +144,52 @@ router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeU
 router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next) => {
   try {
     const { userId } = req.params;
+    const callerId = String(req.auth?._id || req.authUser?._id || '');
+    if (!callerId || !userId || callerId === String(userId)) {
+      return res.status(403).json({ success: false, code: 'invalid_call_target', message: 'Invalid call target' });
+    }
+
+    const [callerDoc, calleeDoc] = await Promise.all([
+      User.findById(callerId).select('friends').lean(),
+      User.findById(userId).select('friends allowVideoRequestsFromNonFriends').lean()
+    ]);
+    if (!callerDoc || !calleeDoc) {
+      return res.status(404).json({ success: false, code: 'user_not_found', message: 'User not found' });
+    }
+
+    const callerHasCallee = (callerDoc.friends || []).map(String).includes(String(userId));
+    const calleeHasCaller = (calleeDoc.friends || []).map(String).includes(callerId);
+    const isFriend = callerHasCallee && calleeHasCaller;
+    let validOneTimeRequest = false;
+
+    if (!isFriend && req.query?.videoRequestId) {
+      const request = await Message.findOne({
+        _id: req.query.videoRequestId,
+        type: 'video-call-request',
+        status: 'accepted',
+        $or: [
+          { from: callerId, to: userId },
+          { from: userId, to: callerId }
+        ]
+      }).select('_id').lean();
+      validOneTimeRequest = !!request;
+    }
+
+    if (!isFriend && !validOneTimeRequest) {
+      return res.status(403).json({
+        success: false,
+        code: 'not_friends',
+        message: 'Video calls are available only for friends or an accepted one-time request'
+      });
+    }
+
     const record = await peerStore.get(userId); // { peerId, lastUpdated } | null
     const caller = req.authUser || {};
     const callerName = [caller.firstName, caller.lastName].filter(Boolean).join(' ').trim();
     const callInvite = {
       callId: req.query?.callId,
       callType: req.query?.callType || 'video',
+      videoRequestId: req.query?.videoRequestId,
       callerName,
       callerAvatar: caller.mainAvatar || caller.avatar || ''
     };

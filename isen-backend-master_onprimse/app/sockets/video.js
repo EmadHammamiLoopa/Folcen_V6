@@ -263,10 +263,10 @@ module.exports = (io, socket) => {   // ✅ no extra param
     clearRingTimer(caller, callee);
     const callId = activeCallIds[`${caller}:${callee}`] || activeCallIds[`${callee}:${caller}`];
     setActivePair(caller, callee, callId);
-    if (callId) setCallState(callId, 'connected', { from: caller, to: callee });
+    if (callId) setCallState(callId, 'ringing', { from: caller, to: callee });
     emitToBoth(caller, callee, 'video-call-started', { from: caller, to: callee, at: Date.now() });
     // append lifecycle
-    try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'connected', at: new Date() }); } catch (e) {}
+    try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'started', at: new Date() }); } catch (e) {}
   });
 
   // Any side can emit this; we end it for both

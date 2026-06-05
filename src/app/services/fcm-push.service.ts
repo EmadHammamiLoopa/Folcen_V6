@@ -104,16 +104,10 @@ export class FcmPushService {
           console.log('[FcmPushService] Notification action performed:', data?.type || data?.event || data?.category);
 
           if (this.isCallNotification(data)) {
-            const callerId = data.callerId || data.fromUserId;
-            if (callerId) {
-              this.platform.ready().then(() => {
-                setTimeout(() => this.router.navigate(
-                  ['/messages/video', callerId],
-                  { queryParams: { answer: true, callId: data.callId || undefined, autoAnswer: true } }
-                ), 200);
-              });
-              return;
-            }
+            try {
+              window.dispatchEvent(new CustomEvent('folcen-incoming-call', { detail: data }));
+            } catch (_) {}
+            return;
           }
 
           if (data?.type === 'video-call-request' || data?.event === 'video-call-request') {

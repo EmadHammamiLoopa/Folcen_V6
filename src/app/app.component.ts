@@ -73,6 +73,7 @@ export class AppComponent implements OnDestroy {
   private destroy$ = new Subject<void>();
   private incomingCallKeys = new Set<string>();
   private pendingIncomingCallUrl: string | null = null;
+  private handledIncomingCallActions = new Set<string>();
 
   constructor(
     private platform: Platform,
@@ -742,6 +743,14 @@ export class AppComponent implements OnDestroy {
       const action = parsed.searchParams.get('action') || (parsed.searchParams.get('answer') === 'false' ? 'reject' : 'answer');
       const autoAnswer = parsed.searchParams.get('autoAnswer') === 'true' || action === 'answer';
       if (!callerId) return;
+      const actionKey = `${callId || callerId}:${action}`;
+      if (this.handledIncomingCallActions.has(actionKey)) {
+        console.log('Ignoring duplicate incoming call action:', actionKey);
+        return;
+      }
+      this.handledIncomingCallActions.add(actionKey);
+      setTimeout(() => this.handledIncomingCallActions.delete(actionKey), 45000);
+
       if (action === 'reject') {
         this.rejectIncomingCallFromUrl(callerId, callId);
         return;
@@ -749,6 +758,7 @@ export class AppComponent implements OnDestroy {
       this.zone.run(() => {
         this.router.navigate(['/messages/video', callerId], {
           queryParams: { answer: true, callId, autoAnswer, directCall: '1' },
+          replaceUrl: true,
         });
       });
     } catch (e) {

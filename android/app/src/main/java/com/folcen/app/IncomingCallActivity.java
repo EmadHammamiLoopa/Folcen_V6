@@ -20,6 +20,7 @@ public class IncomingCallActivity extends Activity {
     private String callerId;
     private String callId;
     private int notificationId;
+    private boolean actionTaken = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +35,17 @@ public class IncomingCallActivity extends Activity {
         cancelNotification();
 
         setContentView(buildView(callerName));
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        callerId = firstNonEmpty(intent.getStringExtra("callerId"), intent.getStringExtra("fromUserId"));
+        callId = firstNonEmpty(intent.getStringExtra("callId"), callId);
+        notificationId = intent.getIntExtra("notificationId", notificationId);
+        actionTaken = false;
+        cancelNotification();
     }
 
     private View buildView(String callerName) {
@@ -94,6 +106,8 @@ public class IncomingCallActivity extends Activity {
     }
 
     private void answerCall() {
+        if (actionTaken) return;
+        actionTaken = true;
         cancelNotification();
         Uri uri = new Uri.Builder()
                 .scheme("folcen")
@@ -115,6 +129,8 @@ public class IncomingCallActivity extends Activity {
     }
 
     private void rejectCall() {
+        if (actionTaken) return;
+        actionTaken = true;
         cancelNotification();
         Uri uri = new Uri.Builder()
                 .scheme("folcen")

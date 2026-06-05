@@ -208,7 +208,8 @@ export class WebrtcService {
    * */
   public async startCall(
     partnerUserId : string, // <-- pass USER-ID here
-    localStream : MediaStream // <-- already opened camera/mic
+    localStream : MediaStream, // <-- already opened camera/mic
+    options: { videoRequestId?: string } = {}
   ): Promise<MediaConnection> {
     // reset explicit-missed emission guard for a fresh attempt
     this.lastMissedEmitKey = null;
@@ -231,7 +232,7 @@ export class WebrtcService {
 
     /* 2 — look-up partner’s current peer-id ------------------------------ */
     const callId = this.createCallId(partnerUserId);
-    const partnerPeerId = await this.resolvePartnerPeerId(partnerUserId, callId);
+    const partnerPeerId = await this.resolvePartnerPeerId(partnerUserId, callId, options.videoRequestId);
     if (!partnerPeerId) {
       throw new Error('Partner is offline or has no peer-id');
     }
@@ -312,7 +313,7 @@ export class WebrtcService {
     return mc;
   }
 
-  private async resolvePartnerPeerId(partnerUserId: string, callId?: string): Promise<string | null> {
+  private async resolvePartnerPeerId(partnerUserId: string, callId?: string, videoRequestId?: string): Promise<string | null> {
     const delays = [0, 350, 700, 1200, 1800, 2500, 3200];
     let lastPeerId: string | null = null;
 
@@ -323,7 +324,7 @@ export class WebrtcService {
         lastPeerId = await this.userService.getPartnerPeerId(
           partnerUserId,
           i === 0,
-          callId ? { callId, callType: 'video' } : undefined
+          callId ? { callId, callType: 'video', videoRequestId } : undefined
         ).toPromise();
         if (lastPeerId) return lastPeerId;
       } catch (err) {

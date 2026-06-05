@@ -695,12 +695,13 @@ getCurrentUserId(): string | null {
   getPartnerPeerId(
     userId: string,
     wake = false,
-    callMeta?: { callId?: string; callType?: string }
+    callMeta?: { callId?: string; callType?: string; videoRequestId?: string }
   ): Observable<string | null> {
     const params = new URLSearchParams();
     if (wake) params.set('wake', '1');
     if (callMeta?.callId) params.set('callId', callMeta.callId);
     if (callMeta?.callType) params.set('callType', callMeta.callType);
+    if (callMeta?.videoRequestId) params.set('videoRequestId', callMeta.videoRequestId);
     const query = params.toString();
 
     return this.http.get<{ success: boolean; peerId?: string; message: string }>(

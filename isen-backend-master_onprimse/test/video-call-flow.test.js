@@ -292,4 +292,159 @@ describe('video call request flow', function () {
       Message.findByIdAndUpdate = originalFindByIdAndUpdate;
     }
   });
+
+  it('keeps caller and receiver in ringing state until the receiver accepts', async function () {
+    const Message = require('../app/models/Message');
+    const User = require('../app/models/User');
+    const eventLogger = require('../app/utils/eventLogger');
+    const { connectedUsers } = require('../app/utils/socketManager');
+    const videoPath = require.resolve('../app/sockets/video');
+
+    const originalFindById = User.findById;
+    const originalSave = Message.prototype.save;
+    const originalCreateCallRequest = eventLogger.createCallRequest;
+    const originalAppendCallLifecycle = eventLogger.appendCallLifecycle;
+    delete require.cache[videoPath];
+
+    User.findById = async id => ({ _id: id, friends: [String(id) === callerId ? calleeId : callerId] });
+    Message.prototype.save = async function () { return this; };
+    eventLogger.createCallRequest = async () => ({ callId: 'call-state-1' });
+    eventLogger.appendCallLifecycle = async () => {};
+
+    connectedUsers.set(callerId, new Set(['caller-socket']));
+    connectedUsers.set(calleeId, new Set(['callee-socket']));
+
+    const emitted = [];
+    const socket = {
+      id: 'caller-socket',
+      userId: callerId,
+      handlers: {},
+      on(event, handler) { this.handlers[event] = handler; }
+    };
+    const io = { to: sid => ({ emit: (event, payload) => emitted.push({ sid, event, payload }) }) };
+
+    try {
+      const registerVideoSocket = require('../app/sockets/video');
+      registerVideoSocket(io, socket);
+
+      let requestAck;
+      await socket.handlers['video-call-request']({
+        to: calleeId,
+        text: 'Call me',
+        messageId: 'call-message-1'
+      }, value => { requestAck = value; });
+
+      assert.strictEqual(requestAck.success, true);
+      assert.strictEqual(requestAck.callId, 'call-state-1');
+
+      socket.handlers['video-call-started']({ from: callerId, to: calleeId });
+
+      let stateAfterStarted;
+      socket.handlers['call-state-check']({ callId: 'call-state-1' }, value => { stateAfterStarted = value; });
+      assert.strictEqual(stateAfterStarted.status, 'ringing');
+      assert.strictEqual(stateAfterStarted.answerable, true);
+
+      socket.userId = calleeId;
+      socket.handlers['video-call-accepted']({ from: callerId, to: calleeId });
+
+      let stateAfterAccepted;
+      socket.handlers['call-state-check']({ callId: 'call-state-1' }, value => { stateAfterAccepted = value; });
+      assert.strictEqual(stateAfterAccepted.status, 'connected');
+      assert.strictEqual(stateAfterAccepted.answerable, false);
+      assert.ok(emitted.some(e => e.event === 'video-call-accepted'));
+    } finally {
+      User.findById = originalFindById;
+      Message.prototype.save = originalSave;
+      eventLogger.createCallRequest = originalCreateCallRequest;
+      eventLogger.appendCallLifecycle = originalAppendCallLifecycle;
+      delete require.cache[videoPath];
+    }
+  });
+
+  it('rejects non-friend peer lookup without an accepted one-time video request', async function () {
+    const User = require('../app/models/User');
+    const peerStore = require('../app/utils/peerStorage');
+    const router = require('../routes/user');
+    const originalFindById = User.findById;
+    const originalPeerGet = peerStore.get;
+
+    let peerLookupCalled = false;
+    User.findById = id => ({
+      select: () => ({
+        lean: async () => ({ _id: id, friends: [] })
+      })
+    });
+    peerStore.get = async () => {
+      peerLookupCalled = true;
+      return { peerId: 'should-not-return' };
+    };
+
+    try {
+      const layer = router.stack.find(item => item.route?.path === '/:userId/peer' && item.route?.methods?.get);
+      const handler = layer.route.stack[layer.route.stack.length - 1].handle;
+      let statusCode = 200;
+      let body;
+      await handler(
+        { params: { userId: calleeId }, query: {}, auth: { _id: callerId }, authUser: { _id: callerId } },
+        { status(code) { statusCode = code; return this; }, json(value) { body = value; return value; } },
+        err => { throw err; }
+      );
+
+      assert.strictEqual(statusCode, 403);
+      assert.strictEqual(body.code, 'not_friends');
+      assert.strictEqual(peerLookupCalled, false);
+    } finally {
+      User.findById = originalFindById;
+      peerStore.get = originalPeerGet;
+    }
+  });
+
+  it('allows non-friend peer lookup only with an accepted one-time video request', async function () {
+    const Message = require('../app/models/Message');
+    const User = require('../app/models/User');
+    const peerStore = require('../app/utils/peerStorage');
+    const router = require('../routes/user');
+    const originalFindById = User.findById;
+    const originalFindOne = Message.findOne;
+    const originalPeerGet = peerStore.get;
+
+    User.findById = id => ({
+      select: () => ({
+        lean: async () => ({ _id: id, friends: [] })
+      })
+    });
+    Message.findOne = query => ({
+      select: () => ({
+        lean: async () => {
+          assert.strictEqual(String(query._id), '64b000000000000000000099');
+          assert.strictEqual(query.status, 'accepted');
+          return { _id: query._id };
+        }
+      })
+    });
+    peerStore.get = async () => ({ peerId: `${calleeId}-peer-live` });
+
+    try {
+      const layer = router.stack.find(item => item.route?.path === '/:userId/peer' && item.route?.methods?.get);
+      const handler = layer.route.stack[layer.route.stack.length - 1].handle;
+      let body;
+      await handler(
+        {
+          params: { userId: calleeId },
+          query: { videoRequestId: '64b000000000000000000099' },
+          auth: { _id: callerId },
+          authUser: { _id: callerId }
+        },
+        { status() { return this; }, json(value) { body = value; return value; } },
+        err => { throw err; }
+      );
+
+      assert.strictEqual(body.success, true);
+      assert.strictEqual(body.peerId, `${calleeId}-peer-live`);
+    } finally {
+      User.findById = originalFindById;
+      Message.findOne = originalFindOne;
+      peerStore.get = originalPeerGet;
+    }
+  });
 });

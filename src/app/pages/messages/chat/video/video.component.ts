@@ -114,6 +114,7 @@ ngAfterViewInit() {
 /* ─── and always deregister on leave/destroy —───────────────────────────── */
 ionViewWillLeave() { this.webRTC.clearVideoElements(); }
 ngOnDestroy() {
+  this.clearFinishedCallState();
   this.webRTC.clearVideoElements();
   this.callStateSubscription?.unsubscribe();
   this.backButtonSubscription?.unsubscribe();
@@ -200,10 +201,21 @@ private handleBackButton() {
   }
   
   this.clearUnansweredTimeout();
+  this.clearFinishedCallState();
   this.stopCallTimer();
   this.ringer.stop();
   this.webRTC.close({ silent: true });
   this.router.navigate(['/tabs/messages/list'], { replaceUrl: true }); // ← key line
+}
+
+private clearFinishedCallState(): void {
+  try { localStorage.removeItem('partnerId'); } catch (_) {}
+  try { localStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
+  try { sessionStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
+  try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch (_) {}
+  this.clearUnansweredTimeout();
+  this.calling = false;
+  this.placingCall = false;
 }
 
 
@@ -311,6 +323,11 @@ async ionViewWillEnter() {
       // keep your startUnansweredTimeout() from ngOnInit or call here
     } else {
       await this.ensurePartnerLoaded();
+      if (!this.canStartOutgoingCall()) {
+        this.toastService.presentErrorToastr('Video calls are available only for friends or an accepted one-time request.');
+        this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
+        return;
+      }
       // Outgoing side: we can open camera
       const ok = await this.webRTC.init(this.myEl, this.partnerEl);
       if (!ok) throw new Error('Media init failed');
@@ -324,6 +341,12 @@ async ionViewWillEnter() {
     this.pageLoading = false;
     this.cdr.detectChanges();
   }
+}
+
+private canStartOutgoingCall(): boolean {
+  if (this.answer) return true;
+  if (this.videoRequestId) return true;
+  return !!(this.partner?.isFriend || (this.partner as any)?.friend || this.user?.isFriend || (this.user as any)?.friend);
 }
 
 private async ensureIncomingPeerReady(): Promise<void> {
@@ -621,6 +644,7 @@ listenForVideoCallEvents() {
       try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
       this.stopCallTimer();
       this.ringer.stop();
+      this.clearFinishedCallState();
 
       // close peer connections and local streams
       await this.webRTC.close({ silent: true });
@@ -657,6 +681,7 @@ listenForVideoCallEvents() {
     try { this.clearUnansweredTimeout(); } catch(_) {}
     try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(_) {}
     try { this.stopCallTimer(); } catch(_) {}
+    this.clearFinishedCallState();
     this.ringer.stop();
     try { await this.webRTC.close({ silent: true }); } catch(_) {}
     if (this.myEl)      { this.myEl.srcObject = null; this.myEl.pause(); }
@@ -682,6 +707,7 @@ listenForVideoCallEvents() {
     this.clearUnansweredTimeout();
   try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
   this.stopCallTimer();
+    this.clearFinishedCallState();
     this.ringer.stop();
     await this.webRTC.close({ silent: true });
     this.leaveCallRoom();
@@ -699,6 +725,7 @@ listenForVideoCallEvents() {
     try { this.clearUnansweredTimeout(); } catch(_) {}
     try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(_) {}
     try { this.stopCallTimer(); } catch(_) {}
+    this.clearFinishedCallState();
     this.ringer.stop();
     try { await this.webRTC.close({ silent: true }); } catch(_) {}
     if (this.myEl)      { this.myEl.srcObject = null; this.myEl.pause(); }
@@ -883,6 +910,7 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
     this.clearUnansweredTimeout();
     this.stopCallTimer();
     this.ringer.stop();
+    this.clearFinishedCallState();
     // Tell peer ONLY if we initiated the hangup
     if (!this.isRemoteEnd && this.socket?.connected) {
       await this.emitWebSocketEvent(VideoEvents.ENDED, {
@@ -915,6 +943,7 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
     this.stopCallTimer();
     this.ringer.stop();
     this.messengerService.sendMessage({ event: 'stop-audio' });
+    this.clearFinishedCallState();
   
     if (this.socket?.connected) {
       if (!this.answered) {
@@ -977,6 +1006,7 @@ clearUnansweredTimeout() {
 }
 
 async placeCall() {
+  let started = false;
   try {
     const now = Date.now();
     if (now - this.lastPlaceCallAt < 2000) {
@@ -1016,7 +1046,8 @@ async placeCall() {
       open:   WebrtcService.peer?.open
     });
     
-    const mc = await this.webRTC.startCall(this.userId!, this.localStream);
+    const mc = await this.webRTC.startCall(this.userId!, this.localStream, { videoRequestId: this.videoRequestId });
+    started = true;
     this.wireHangup(mc);
     mc.on('stream', (remote) => this.attachRemoteStream(remote));
     mc.on('error',  (e) => console.error('[call] error', e));
@@ -1028,7 +1059,9 @@ async placeCall() {
   } finally {
     this.placingCall = false;
     // ensure no dangling timeout remains if placeCall failed
-    try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
+    if (!started) {
+      try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
+    }
   }
 }
 

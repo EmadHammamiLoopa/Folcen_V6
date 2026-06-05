@@ -32,8 +32,8 @@
         <div *ngIf="activeVideoCall.status !== 'accepted'" class="request-badge">?</div>
       </ion-button>
 
-      <ion-button *ngIf="user?.isFriend"
-                  [routerLink]="['/messages/video', user?.id]"
+      <ion-button *ngIf="canStartFriendVideoCall()"
+                  (click)="startFriendVideoCall()"
                   shape="round" fill="clear" class="video-btn">
         <ion-icon name="videocam"></ion-icon>
       </ion-button>

@@ -1096,7 +1096,7 @@ hasCancelledCall(): boolean {
 onVideoButtonPressed() {
   // friends go straight to call UI
   if (this.user?.isFriend) {
-    return this.router.navigateByUrl('/messages/video/' + this.user.id);
+    return this.startFriendVideoCall();
   }
 
   if (this.user?.allowVideoRequestsFromNonFriends === false) {
@@ -1126,6 +1126,18 @@ onVideoButtonPressed() {
 
   // no active request -> open confirm and send a request
   this.requestVideoCall();
+}
+
+canStartFriendVideoCall(): boolean {
+  return !!(!this.isAdminChat() && this.features.friendVideoCall && this.user?.isFriend);
+}
+
+startFriendVideoCall() {
+  if (!this.canStartFriendVideoCall()) {
+    this.activeVideoCall = { status: null, messageId: undefined };
+    return this.toastService.presentErrorToastr('Video calls are available only for friends.');
+  }
+  return this.router.navigate(['/messages/video', this.user.id]);
 }
 
 private handleIncomingVideoCall(message: Message) {
