@@ -90,7 +90,7 @@ private loadingMessages = false;
   allowToChat = false;
   business = false;
   showMediaOptions: boolean = false;
-activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'used' | null, messageId?: string } = { status: null };
+activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'rejected' | 'expired' | 'used' | null, messageId?: string } = { status: null };
 
 
   
@@ -425,17 +425,20 @@ async cancelVideoCallRequest(message: Message) {
   if (!realId) { (message as any)['busy'] = false; return this.toastService.presentErrorToastr('Still preparing… try again'); }
 
   const other = message.from === this.authUser.id ? message.to : message.from;
+  const status = message.from === this.authUser.id ? 'cancelled' : 'rejected';
+  const reason = status === 'rejected' ? 'rejected' : 'cancel';
   this.socket.emit('video-call-cancelled', {
     from: this.authUser.id,
     to: other,
     messageId: realId,
-    status: 'cancelled'
+    status,
+    reason
   });
 
   // signal the active call UI to tear down immediately on the other side
   try {
-    this.socket.emit('cancel-video', { from: this.authUser.id, to: other, messageId: realId, reason: 'cancel' });
-    this.socket.emit('video-canceled', { from: this.authUser.id, to: other, messageId: realId, reason: 'cancel' });
+    this.socket.emit('cancel-video', { from: this.authUser.id, to: other, messageId: realId, reason });
+    this.socket.emit('video-canceled', { from: this.authUser.id, to: other, messageId: realId, reason });
   } catch(e) {
     console.warn('Failed to emit cancel-video/video-canceled', e);
   }
@@ -1090,10 +1093,6 @@ onVideoButtonPressed() {
   }
 
   // non-friends:
-  if (!this.user?.isFriend && this.user?.allowVideoRequestsFromNonFriends === false && !this.activeVideoCall.status) {
-    return this.toastService.presentErrorToastr(`${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`);
-  }
-
   if (this.activeVideoCall.status === 'accepted') {
     // already accepted -> consume the one-time approval and jump to call UI
     if (this.activeVideoCall.messageId && this.socket?.connected) {
@@ -1698,7 +1697,6 @@ canRequestVideoCall(): boolean {
   if (!this.user) return false;
   if (this.user.isFriend) return true;  // Always allow friends
   if (this.activeVideoCall.status === 'pending' || this.activeVideoCall.status === 'accepted') return true;
-  if (this.user.allowVideoRequestsFromNonFriends === false) return false;
   if (this.videoCallDeclined) return false;  // Block after declined
   return true;  // Allow a fresh request when there is no accepted one-time approval
 }

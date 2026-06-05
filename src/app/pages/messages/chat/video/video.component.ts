@@ -201,6 +201,7 @@ private handleBackButton() {
     this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'rejected' });
     // legacy generic for older servers
     this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason: 'rejected' });
+    this.emitWebSocketEvent(VideoEvents.DECLINED, { ...base, reason: 'declined' });
   }
   
   this.clearUnansweredTimeout();
@@ -814,6 +815,32 @@ async emitWebSocketEvent(eventName: string, data: any) {
   
 }
 
+private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: string; error?: string }> {
+  if (!this.callId) return { answerable: true };
+  try {
+    if (!this.socket) this.socket = await SocketService.getSocket();
+    if (!this.socket?.connected) await this.initializeSocket(this.userId);
+    if (!this.socket?.connected) return { answerable: true };
+
+    return await new Promise(resolve => {
+      const timedSocket: any = (this.socket as any).timeout ? (this.socket as any).timeout(5000) : this.socket;
+      timedSocket.emit('call-state-check', { callId: this.callId }, (errOrAck: any, maybeAck?: any) => {
+        const ack = maybeAck === undefined ? errOrAck : maybeAck;
+        const err = maybeAck === undefined ? null : errOrAck;
+        if (err) return resolve({ answerable: true });
+        resolve({
+          answerable: ack?.answerable !== false,
+          status: ack?.status || ack?.state,
+          error: ack?.error
+        });
+      });
+    });
+  } catch (e: any) {
+    console.warn('[video] call-state-check failed; falling back to local answer flow', e);
+    return { answerable: true };
+  }
+}
+
 
 
 
@@ -919,17 +946,15 @@ async emitWebSocketEvent(eventName: string, data: any) {
           const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
           await this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'rejected' });
           await this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason: 'rejected' });
+          await this.emitWebSocketEvent(VideoEvents.DECLINED, { ...base, reason: 'declined' });
         } else {
           const base = { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now() };
           await this.emitWebSocketEvent(VideoEvents.MISSED_CANCELED, { ...base, reason: 'cancel' });
           await this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason });
+          const payload = { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now(), reason };
+          try { this.socket.emit(VideoEvents.CANCELED, payload); } catch(_) {}
+          try { this.socket.emit('cancel-video', this.userId); } catch(_) {}
         }
-        // Then emit cancel to drive teardown on peers
-        const payload = this.answer
-          ? { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now(), reason }
-          : { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now(), reason };
-        try { this.socket.emit(VideoEvents.CANCELED, payload); } catch(_) {}
-        try { this.socket.emit('cancel-video', this.userId); } catch(_) {}
       } else {
         this.socket.emit(VideoEvents.ENDED, { from: this.authUser._id, to: this.userId, callId: this.callId });
       }
@@ -1075,6 +1100,10 @@ this.hasAnswered = true;
 
   try {
     this.answeringCall = true;
+    const state = await this.validateAnswerableCall();
+    if (!state.answerable) {
+      throw new Error(state.status === 'timeout' ? 'This call has expired.' : 'This call is no longer available.');
+    }
     this.ringer.stop(); // ✅ Stop 'calling' sound on receiver
     this.startCallTimer();
     /* ── grab cam/mic only once ───────────────────────────── */
@@ -1090,6 +1119,7 @@ this.hasAnswered = true;
     }
 
     incoming.answer(this.localStream);
+    await this.emitWebSocketEvent(VideoEvents.ACCEPTED, { from: this.userId, to: this.authUser._id, callId: this.callId });
     this.wireHangup(incoming); 
     incoming.on('stream',  (remote) => this.attachRemoteStream(remote));
     incoming.on('error',   (e)      => console.error('[answer] error', e));

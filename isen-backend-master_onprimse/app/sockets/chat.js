@@ -253,12 +253,16 @@ socket.on("video-call-used", async (data) => {
 socket.on("video-call-cancelled", async (data) => {
   try {
     let msg = null;
+    const requestedStatus = ['cancelled', 'rejected', 'expired'].includes(String(data?.status))
+      ? String(data.status)
+      : (String(data?.reason) === 'rejected' ? 'rejected' : String(data?.reason) === 'timeout' ? 'expired' : 'cancelled');
+    const reason = requestedStatus === 'rejected' ? 'rejected' : requestedStatus === 'expired' ? 'timeout' : 'cancel';
 
     if (mongoose.Types.ObjectId.isValid(data.messageId)) {
       // normal path: real id
       msg = await Message.findByIdAndUpdate(
         data.messageId,
-        { status: "cancelled" },
+        { status: requestedStatus },
         { new: true }
       );
     }
@@ -272,18 +276,18 @@ socket.on("video-call-cancelled", async (data) => {
           type: "video-call-request",
           status: "pending",
         },
-        { $set: { status: "cancelled" } },
+        { $set: { status: requestedStatus } },
         { sort: { createdAt: -1 }, new: true }
       );
       if (!msg) return; // nothing to cancel
     }
 
-  emitToUser(data.to,   "video-call-cancelled", { messageId: msg.id, status: "cancelled" });
-  emitToUser(data.from, "video-call-cancelled", { messageId: msg.id, status: "cancelled" });
+  emitToUser(data.to,   "video-call-cancelled", { messageId: msg.id, status: requestedStatus, reason });
+  emitToUser(data.from, "video-call-cancelled", { messageId: msg.id, status: requestedStatus, reason });
 
   // Canonical real-time signaling so video UI reliably tears down
   const now = Date.now();
-  const canonical = { from: data.from, to: data.to, messageId: msg.id, reason: 'cancel', at: now };
+  const canonical = { from: data.from, to: data.to, messageId: msg.id, reason, status: requestedStatus, at: now };
   // Notify callee so they can register a missed call and close UI
   emitToUser(data.to, 'video-canceled', { ...canonical, notify: true });
   // Notify caller for local cleanup only (no missed call)

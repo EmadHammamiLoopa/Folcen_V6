@@ -450,6 +450,7 @@ export class SettingsPage implements OnInit, OnDestroy {
           this.user.allowVideoRequestsFromNonFriends = newValue;
           this.userService.setCurrentUser(this.user);
         }
+        this.userService.refreshCurrentUser({ forceRefresh: true }).subscribe(() => {}, () => {});
         this.toastService.presentSuccessToastr(resp.message || 'Video request setting updated');
         this.loading = false;
         setTimeout(() => {

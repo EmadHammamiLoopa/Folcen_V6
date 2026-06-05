@@ -31,6 +31,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Log.d(TAG, "FCM received data=" + data);
 
         if (isIncomingCall(data)) {
+            if (!isAnswerableCall(data)) {
+                Log.d(TAG, "Ignoring stale/non-ringing call push");
+                return;
+            }
             if (MainActivity.isInForeground()) {
                 Log.d(TAG, "App is foreground; socket UI will handle incoming call");
                 return;
@@ -63,6 +67,20 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         return "incoming_call".equals(data.get("type"))
                 || "call:invite".equals(data.get("event"))
                 || "call".equals(data.get("category"));
+    }
+
+    private boolean isAnswerableCall(Map<String, String> data) {
+        if (data == null) return false;
+        String status = firstNonEmpty(data.get("status"), "ringing");
+        if (!"ringing".equals(status)) return false;
+        String expiresAtValue = firstNonEmpty(data.get("expiresAt"), data.get("expiry"));
+        if (expiresAtValue.length() == 0) return true;
+        try {
+            long expiresAt = Long.parseLong(expiresAtValue);
+            return expiresAt == 0 || System.currentTimeMillis() <= expiresAt;
+        } catch (Exception ignored) {
+            return true;
+        }
     }
 
     private void showIncomingCall(Map<String, String> data) {

@@ -649,13 +649,20 @@ export class AppComponent implements OnDestroy {
       callerId: String(callerId),
       fromUserId: String(callerId),
       callId: String(callId),
-      timestamp: data.timestamp || Date.now()
+      timestamp: data.timestamp || Date.now(),
+      expiresAt: data.expiresAt || data.expiry || undefined
     };
   }
 
   private async handleIncomingCallInvite(data: any) {
     const invite = this.normalizeCallInvite(data);
     if (!invite) return;
+    const status = String(invite.status || 'ringing');
+    const expiresAt = invite.expiresAt ? Number(invite.expiresAt) : 0;
+    if (status !== 'ringing' || (expiresAt && Date.now() > expiresAt)) {
+      console.log('Ignoring stale incoming call invite:', { callId: invite.callId, status, expiresAt });
+      return;
+    }
 
     const key = invite.callId || `${invite.callerId}-${invite.timestamp}`;
     if (this.incomingCallKeys.has(key)) return;
@@ -737,8 +744,7 @@ export class AppComponent implements OnDestroy {
       if (socket?.connected) {
         socket.emit('video-call-missed-rejected', payload);
         socket.emit('missed-call', payload);
-        socket.emit('video-canceled', payload);
-        socket.emit('cancel-video', callerId);
+        socket.emit('video-call-declined', { from: callerId, to: payload.to, callId, reason: 'declined' });
       }
     } catch (e) {
       console.warn('Failed to reject incoming call from notification:', e);

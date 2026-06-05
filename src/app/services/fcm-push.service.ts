@@ -90,14 +90,9 @@ export class FcmPushService {
           console.log('[FcmPushService] Notification received in foreground:', notification.title);
           const data: any = notification.data || {};
           if (this.isCallNotification(data)) {
-            LocalNotifications.schedule({
-              notifications: [{
-                id: Date.now() % 2147483647,
-                title: notification.title || 'Incoming video call',
-                body: notification.body || 'Tap to answer',
-                extra: data
-              }]
-            }).catch(() => {});
+            try {
+              window.dispatchEvent(new CustomEvent('folcen-incoming-call', { detail: data }));
+            } catch (_) {}
           } else if (data?.type === 'video-call-request' || data?.event === 'video-call-request') {
             try {
               window.dispatchEvent(new CustomEvent('folcen-video-request', { detail: data }));

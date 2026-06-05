@@ -713,7 +713,8 @@ function buildCallInvitePayload(calleeId, callerId = null, options = {}) {
     toUserId: receiver,
     callerName: options.callerName || '',
     callerAvatar: options.callerAvatar || '',
-    timestamp: options.timestamp || now
+    timestamp: options.timestamp || now,
+    expiresAt: options.expiresAt || (now + 30 * 1000)
   };
 }
 

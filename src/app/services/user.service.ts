@@ -792,7 +792,12 @@ getCurrentUserId(): string | null {
   }
 
   updateNonFriendVideoRequests(allowed: boolean): Observable<any> {
-    return this.http.put(`${this.apiUrl}/nonFriendVideoRequests`, { allowed });
+    return this.http.put(`${this.apiUrl}/nonFriendVideoRequests`, { allowed }).pipe(
+      tap((resp: any) => {
+        const user = resp?.data || resp?.user;
+        if (user) this.setCurrentUser(user, { force: true });
+      })
+    );
   }
 
   updatePrivacy(isPrivate: boolean): Observable<any> {

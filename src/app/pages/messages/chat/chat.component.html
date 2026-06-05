@@ -151,6 +151,19 @@
         ❌ {{ user?.fullName }} cancelled the request
       </ng-container>
     </div>
+
+    <div *ngIf="message?.status === 'rejected'" class="resolved-text">
+      <ng-container *ngIf="message?.from === authUser?.id">
+        Request rejected
+      </ng-container>
+      <ng-container *ngIf="message?.from !== authUser?.id">
+        You rejected the request
+      </ng-container>
+    </div>
+
+    <div *ngIf="message?.status === 'expired'" class="resolved-text">
+      Video request expired
+    </div>
   </div>
 </div>
 

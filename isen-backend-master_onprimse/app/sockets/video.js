@@ -8,7 +8,10 @@ const activeVideoCalls = Object.create(null);
 // Map to store active callId per pair: key `${from}:${to}` -> callId
 const activeCallIds = Object.create(null);
 const ringTimers = new Map();
+const callStates = new Map();
 const RING_TIMEOUT_MS = 30_000;
+
+const FINAL_STATES = new Set(['cancelled', 'declined', 'timeout', 'ended', 'failed', 'disconnect']);
 
 module.exports = (io, socket) => {   // ✅ no extra param
   // ─────────────────────────────── helpers ───────────────────────────────
@@ -51,6 +54,42 @@ module.exports = (io, socket) => {   // ✅ no extra param
     }
   }
 
+  function setCallState(callId, state, data = {}) {
+    if (!callId) return null;
+    const previous = callStates.get(String(callId)) || {};
+    const next = {
+      ...previous,
+      ...data,
+      callId: String(callId),
+      state,
+      status: state,
+      updatedAt: Date.now(),
+      expiresAt: data.expiresAt || previous.expiresAt || Date.now() + RING_TIMEOUT_MS
+    };
+    callStates.set(String(callId), next);
+    const ttl = FINAL_STATES.has(state) ? 120_000 : Math.max(120_000, Number(next.expiresAt) - Date.now() + 120_000);
+    clearTimeout(next.cleanupTimer);
+    next.cleanupTimer = setTimeout(() => callStates.delete(String(callId)), ttl);
+    callStates.set(String(callId), next);
+    return next;
+  }
+
+  function getCallState(callId) {
+    if (!callId) return null;
+    const state = callStates.get(String(callId));
+    if (!state) return null;
+    if (!FINAL_STATES.has(state.state) && state.expiresAt && Date.now() > Number(state.expiresAt)) {
+      return setCallState(callId, 'timeout', { ...state, reason: 'timeout' });
+    }
+    return state;
+  }
+
+  function emitCallCleanup(from, to, callId, reason) {
+    const payload = { from, to, callId, reason, status: reason, at: Date.now() };
+    emitToBoth(from, to, 'call:state', payload);
+    emitToBoth(from, to, 'video-call-ended', payload);
+  }
+
   function clearActivePair(from, to) {
     if (from) delete activeVideoCalls[from];
     if (to)   delete activeVideoCalls[to];
@@ -62,9 +101,11 @@ module.exports = (io, socket) => {   // ✅ no extra param
 
   function forceEndCall(from, to, reason = 'ended') {
     try {
+      const callId = activeCallIds[`${from}:${to}`] || activeCallIds[`${to}:${from}`];
       clearRingTimer(from, to);
       clearActivePair(from, to);
-      emitToBoth(from, to, 'video-call-ended', { from, to, reason, at: Date.now() });
+      if (callId) setCallState(callId, reason, { from, to, reason });
+      emitCallCleanup(from, to, callId, reason);
     } catch (err) {
       console.error('❌ forceEndCall error:', err);
     }
@@ -116,8 +157,15 @@ module.exports = (io, socket) => {   // ✅ no extra param
     if (!caller || !callee) return;
     // Ensure accepter is callee
     if (String(accepter) !== String(callee)) return;
+    const callId = activeCallIds[`${caller}:${callee}`] || activeCallIds[`${callee}:${caller}`];
+    const state = getCallState(callId);
+    if (state && FINAL_STATES.has(state.state)) {
+      emitToUser(callee, 'call:state', { ...state, answerable: false });
+      return;
+    }
     clearRingTimer(caller, callee);
-    setActivePair(caller, callee);
+    setActivePair(caller, callee, callId);
+    if (callId) setCallState(callId, 'connected', { from: caller, to: callee });
     // Append lifecycle
     try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'matched', at: new Date() }); } catch (e) {}
     try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'connected', at: new Date() }); } catch (e) {}
@@ -127,8 +175,11 @@ module.exports = (io, socket) => {   // ✅ no extra param
 
   socket.on('video-call-declined', ({ from, to }) => {
     if (!from || !to) return;
+    const callId = activeCallIds[`${from}:${to}`] || activeCallIds[`${to}:${from}`];
     clearRingTimer(from, to);
-    emitToBoth(from, to, 'video-call-declined', { from, to, at: Date.now() });
+    if (callId) setCallState(callId, 'declined', { from, to, reason: 'declined' });
+    try { if (callId) appendCallLifecycle(callId, { event: 'declined', at: new Date() }); } catch (e) {}
+    emitToBoth(from, to, 'video-call-declined', { from, to, callId, reason: 'declined', status: 'declined', at: Date.now() });
     // end for both
     forceEndCall(from, to, 'declined');
   });
@@ -160,10 +211,13 @@ module.exports = (io, socket) => {   // ✅ no extra param
       let callEvent = null;
       try { callEvent = await createCallRequest({ initiatedBy: from, participants: [from, to], initialEvent: 'requested' }); } catch (e) { console.warn('call event create failed', e); }
       // mark pair active during ringing (prevents duplicates while ringing)
-      setActivePair(from, to, callEvent ? callEvent.callId : null);
+      const callId = callEvent ? callEvent.callId : null;
+      const expiresAt = Date.now() + RING_TIMEOUT_MS;
+      setActivePair(from, to, callId);
+      if (callId) setCallState(callId, 'ringing', { from, to, expiresAt });
 
       // deliver ring
-      const delivered = emitToUser(to, 'incoming-video-call', { from, to, text, messageId, at: Date.now() });
+      const delivered = emitToUser(to, 'incoming-video-call', { from, to, text, messageId, callId, status: 'ringing', expiresAt, at: Date.now() });
       if (!delivered) {
         console.warn(`⚠️ Receiver ${to} offline—cannot deliver call request.`);
       }
@@ -188,13 +242,14 @@ module.exports = (io, socket) => {   // ✅ no extra param
         emitToUser(from, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now, notify: false });
 
         // end for both
+        if (callId) setCallState(callId, 'timeout', { from, to, reason: 'timeout' });
         forceEndCall(from, to, 'timeout');
         // append lifecycle timeout
         try { if (callEvent && callEvent.callId) appendCallLifecycle(callEvent.callId, { event: 'timeout', at: new Date(now) }); } catch (e) {}
       }, RING_TIMEOUT_MS);
       ringTimers.set(keyOf(from, to), timerId);
 
-      callback?.({ success: true, messageId, callId: callEvent ? callEvent.callId : null });
+      callback?.({ success: true, messageId, callId, expiresAt });
     } catch (err) {
       console.error('❌ Error in video-call-request:', err);
       callback?.({ success: false, error: 'Server error' });
@@ -206,7 +261,9 @@ module.exports = (io, socket) => {   // ✅ no extra param
     const caller = from; const callee = to;
     if (!caller || !callee) return;
     clearRingTimer(caller, callee);
-    setActivePair(caller, callee);
+    const callId = activeCallIds[`${caller}:${callee}`] || activeCallIds[`${callee}:${caller}`];
+    setActivePair(caller, callee, callId);
+    if (callId) setCallState(callId, 'connected', { from: caller, to: callee });
     emitToBoth(caller, callee, 'video-call-started', { from: caller, to: callee, at: Date.now() });
     // append lifecycle
     try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'connected', at: new Date() }); } catch (e) {}
@@ -219,6 +276,18 @@ module.exports = (io, socket) => {   // ✅ no extra param
     forceEndCall(caller, callee, reason || 'ended');
     // append lifecycle with duration if provided via reason.meta (optional)
     try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'ended', at: new Date(), durationSeconds: null }); } catch (e) {}
+  });
+
+  socket.on('call-state-check', (payload = {}, ack) => {
+    try {
+      const callId = payload.callId;
+      const state = getCallState(callId);
+      if (!state) return ack?.({ success: true, answerable: true, status: 'unknown' });
+      const answerable = state.state === 'ringing' && (!state.expiresAt || Date.now() <= Number(state.expiresAt));
+      ack?.({ success: true, answerable, status: state.state, state: state.state, expiresAt: state.expiresAt, reason: state.reason });
+    } catch (err) {
+      ack?.({ success: false, answerable: false, error: err.message });
+    }
   });
 
   socket.on('video-call-failed', ({ from, to, error }) => {
