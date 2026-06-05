@@ -53,6 +53,7 @@ const {
   verifyUser,
   changeRole,
   updateRandomVisibility,
+  updateNonFriendVideoRequests,
   deleteAccount,
   updateAgeVisibility,
   updatePrivacy,
@@ -87,6 +88,7 @@ console.log('DEBUG: withAuthUser type:', typeof withAuthUser);
 router.put('/email', [requireSignin, updateEmailValidator, withAuthUser], updateEmail);
 router.put('/password', [requireSignin, updatePasswordValidator, withAuthUser], updatePassword);
 router.put('/randomVisibility', [requireSignin], updateRandomVisibility);
+router.put('/nonFriendVideoRequests', [requireSignin, withAuthUser], updateNonFriendVideoRequests);
 router.put('/ageVisibility', [requireSignin, withAuthUser], updateAgeVisibility);
 router.put('/privacy', [requireSignin, withAuthUser], updatePrivacy);
 router.get('/friends', [requireSignin, withAuthUser], getFriends);

@@ -791,6 +791,10 @@ getCurrentUserId(): string | null {
     return this.http.put(`${this.apiUrl}/ageVisibility`, { visible });
   }
 
+  updateNonFriendVideoRequests(allowed: boolean): Observable<any> {
+    return this.http.put(`${this.apiUrl}/nonFriendVideoRequests`, { allowed });
+  }
+
   updatePrivacy(isPrivate: boolean): Observable<any> {
     return this.http.put(`${this.apiUrl}/privacy`, { isPrivate });
   }

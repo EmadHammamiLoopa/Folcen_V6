@@ -49,6 +49,7 @@ export class FcmPushService {
     await this.platform.ready();
 
     if (this.currentToken) {
+      console.log('[FcmPushService] Re-registering existing FCM token for user', userId);
       await this.sendTokenToBackend(this.currentToken);
       return;
     }
@@ -97,11 +98,16 @@ export class FcmPushService {
                 extra: data
               }]
             }).catch(() => {});
+          } else if (data?.type === 'video-call-request' || data?.event === 'video-call-request') {
+            try {
+              window.dispatchEvent(new CustomEvent('folcen-video-request', { detail: data }));
+            } catch (_) {}
           }
         });
 
         PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
           const data: any = action.notification?.data || {};
+          console.log('[FcmPushService] Notification action performed:', data?.type || data?.event || data?.category);
 
           if (this.isCallNotification(data)) {
             const callerId = data.callerId || data.fromUserId;
@@ -109,8 +115,18 @@ export class FcmPushService {
               this.platform.ready().then(() => {
                 setTimeout(() => this.router.navigate(
                   ['/messages/video', callerId],
-                  { queryParams: { answer: true, callId: data.callId || undefined } }
+                  { queryParams: { answer: true, callId: data.callId || undefined, autoAnswer: true } }
                 ), 200);
+              });
+              return;
+            }
+          }
+
+          if (data?.type === 'video-call-request' || data?.event === 'video-call-request') {
+            const fromId = data.fromUserId || data.callerId || data.from;
+            if (fromId) {
+              this.platform.ready().then(() => {
+                setTimeout(() => this.router.navigate(['/messages/chat', fromId]), 200);
               });
               return;
             }
@@ -140,8 +156,10 @@ export class FcmPushService {
 
       // 1. Request permission
       let permStatus = await PushNotifications.checkPermissions();
+      console.log('[FcmPushService] Push permission state:', permStatus.receive);
       if (permStatus.receive === 'prompt') {
         permStatus = await PushNotifications.requestPermissions();
+        console.log('[FcmPushService] Push permission requested:', permStatus.receive);
       }
       if (permStatus.receive !== 'granted') {
         console.warn('[FcmPushService] Push permission denied');
@@ -167,7 +185,7 @@ export class FcmPushService {
           deviceId: null
         })
         .toPromise();
-      console.log('[FcmPushService] Token registered on backend');
+      console.log('[FcmPushService] Token registered on backend', { platform: this.platform.is('ios') ? 'ios' : 'android' });
     } catch (err) {
       console.error('[FcmPushService] Failed to register token on backend:', err);
     }

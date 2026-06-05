@@ -464,6 +464,10 @@ export class WebrtcService {
   public setVideoElements(my: HTMLVideoElement, partner: HTMLVideoElement) {
     this.myEl = my;
     this.partnerEl = partner;
+    this.myEl.muted = true;
+    this.myEl.volume = 0;
+    this.partnerEl.muted = false;
+    this.partnerEl.volume = 1;
 
     /* replay local stream (after navigation) */
     if (this.myStream) this.myEl.srcObject = this.myStream;
@@ -847,6 +851,10 @@ public async bindMissedCallSocketHandlers() {
       if (!this.myStream) return false;
 
       this.myEl.srcObject = this.myStream;
+      this.myEl.muted = true;
+      this.myEl.volume = 0;
+      this.partnerEl.muted = false;
+      this.partnerEl.volume = 1;
       console.log("✅ Media stream initialized with device:",
         this.myStream.getVideoTracks()[0]?.label || 'No video',
         this.myStream.getAudioTracks()[0]?.label || 'No audio'
@@ -1275,7 +1283,13 @@ WebrtcService.peer.once('open', async () => {
     stream: MediaStream,
     afterConnected: () => void,
   ) {
+    if (this.myStream && stream && stream.id === this.myStream.id) {
+      console.warn('[webrtc] ignoring local stream attached as remote stream');
+      return;
+    }
     el.srcObject = stream;
+    el.muted = false;
+    el.volume = 1;
 
     /* Kick off playback */
     const resume = () => {
@@ -1489,76 +1503,56 @@ WebrtcService.peer.once('open', async () => {
    * webrtc.service.ts ▸ replace the whole answer() with this function
    *────────────────────────────────────────────────────────────────────────────*/
   async answer(call?: MediaConnection) {
-    if (!this.myStream || !this.myStream.getVideoTracks().length){
-      console.warn('[answer] no video – grabbing camera');
-      this.myStream = await this.getOptimalMediaStream();
-      if (!this.myStream) return console.error('[answer] still no cam');
+    if (!this.myStream || !this.myStream.getTracks().some(t => t.readyState === 'live')) {
+      console.warn('[answer] no live local stream; grabbing camera');
+      this.myStream = await this.getUserMedia();
+      if (!this.myStream) return console.error('[answer] still no local media');
     }
 
     const activeCall = call || WebrtcService.call;
     if (!activeCall) return console.error('[answer] no call object');
+    if (typeof (activeCall as any).answer !== 'function') {
+      WebrtcService.call = null;
+      return console.error('[answer] call object is not answerable');
+    }
 
-    console.log('📞 [answer] answering', activeCall.peer);
     activeCall.answer(this.myStream);
-    this.callState.next({connected:false, type:'receiver'});
+    this.callState.next({ connected: false, type: 'receiver' });
 
-    activeCall.peerConnection.addEventListener(
-      'iceconnectionstatechange',
-      () => console.log('🌐 [ICE-RX] →', activeCall.peerConnection.iceConnectionState)
-    );
+    try {
+      activeCall.peerConnection?.addEventListener('iceconnectionstatechange', () => {
+        console.log('[ICE-RX]', activeCall.peerConnection?.iceConnectionState);
+      });
+    } catch (_) {}
 
-    /* attach once */
     let remoteAttached = false;
     const attach = (remote: MediaStream, src: 'stream' | 'track') => {
-      this.latestRemoteStream = remote; // ① remember it
-      if (!this.partnerEl) return; // ② maybe page not ready yet
-
-      this.partnerEl.srcObject = remote;
-      if (remoteAttached) return;
+      if (!remote) return;
+      if (this.myStream && remote.id === this.myStream.id) {
+        console.warn('[answer] ignoring local stream attached as remote stream');
+        return;
+      }
+      this.latestRemoteStream = remote;
+      if (!this.partnerEl || remoteAttached) return;
       remoteAttached = true;
-
-      console.log(`🎬 [RX ${src}] tracks=`, remote.getTracks().map(t=>`${t.kind}:${t.readyState}`).join(', '));
-
-      const wait = () => this.partnerEl ? start() : setTimeout(wait, 50);
-      const start = () => {
-        console.log('🖇 [receiver] set srcObject');
-        this.partnerEl!.srcObject = remote;
-        this.partnerEl!.muted = true;
-
-        const play = () => this.partnerEl!.play()
-          .then(()=>console.log('▶️ [receiver] video playing (muted)'))
-          .catch(e=>{
-            console.warn('⏸ retry play()',e);
-            setTimeout(play,120);
-          });
-
-        this.partnerEl!.onloadedmetadata = play;
-        play();
-
-        const unmute = () => {
-          this.partnerEl!.muted = false;
-          this.partnerEl!.play().catch(()=>{});
-          console.log('🔊 [receiver] un-muted by user');
-          document.removeEventListener('click', unmute);
-        };
-        document.addEventListener('click', unmute, {once:true});
-
-        this.callState.next({connected:true, type:'receiver'});
-      };
-      wait();
+      this.partnerEl.srcObject = remote;
+      this.partnerEl.muted = false;
+      this.partnerEl.volume = 1;
+      console.log(`[RX ${src}] tracks=`, remote.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
+      const play = () => this.partnerEl?.play().catch(() => setTimeout(play, 120));
+      if (this.partnerEl.readyState >= 1) play();
+      else this.partnerEl.onloadedmetadata = play;
+      this.callState.next({ connected: true, type: 'receiver' });
     };
 
-    activeCall.on('track', (e:any)=>attach(e.streams[0],'track'));
-    activeCall.on('stream', s =>attach(s, 'stream'));
-    activeCall.on('close', ()=>{
-      console.log('🔚 [answer] closed');
+    activeCall.on('track', (e: any) => attach(e.streams?.[0], 'track'));
+    activeCall.on('stream', (s: MediaStream) => attach(s, 'stream'));
+    activeCall.on('close', () => {
+      console.log('[answer] closed');
       this.callState.next(null);
     });
-    activeCall.on('error', e=>{
-      console.error(e);
-    });
+    activeCall.on('error', e => console.error(e));
   }
-
   public async close(opts?: { silent?: boolean }): Promise<void> {
     if (this.isClosed) return;
     this.isClosed = true;

@@ -39,6 +39,7 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
   }
 
   const tokens = tokenDocs.map(d => d.token);
+  console.log(`[fcmPushService] preparing push userId=${userId} tokens=${tokens.length} type=${data.type || data.event || data.category || 'notification'}`);
 
   // Convert all data values to strings (FCM requirement)
   const stringData = {};
@@ -92,6 +93,7 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     response.responses.forEach((res, idx) => {
       if (!res.success) {
         const code = res.error && res.error.code;
+        console.warn(`[fcmPushService] tokenTail=${String(tokens[idx]).slice(-8)} failed code=${code || 'unknown'} message=${res.error?.message || ''}`);
         if (
           code === 'messaging/registration-token-not-registered' ||
           code === 'messaging/invalid-registration-token'

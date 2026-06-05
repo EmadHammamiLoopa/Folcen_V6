@@ -424,7 +424,7 @@ export class AppComponent implements OnDestroy {
           const callerId = extra.callerId || extra.fromUserId;
           if (callerId) {
             this.router.navigate(['/messages/video', callerId], {
-              queryParams: { answer: true, callId: extra.callId || undefined },
+              queryParams: { answer: true, callId: extra.callId || undefined, autoAnswer: true },
             });
           }
         },

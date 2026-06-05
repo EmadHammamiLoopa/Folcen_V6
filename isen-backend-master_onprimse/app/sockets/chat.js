@@ -75,6 +75,26 @@ socket.on("video-call-request", async (data, ack) => {
   try {
     const callerId = socket.userId; // use server-authoritative ID
     if (!callerId) { if (ack) ack({ success: false, error: 'not_authenticated' }); return; }
+    if (!mongoose.Types.ObjectId.isValid(data?.to)) {
+      if (ack) ack({ success: false, error: 'invalid_recipient' });
+      return;
+    }
+
+    const [caller, receiver] = await Promise.all([
+      User.findById(callerId).select('friends firstName lastName').lean(),
+      User.findById(data.to).select('friends firstName lastName allowVideoRequestsFromNonFriends').lean()
+    ]);
+    if (!receiver) {
+      if (ack) ack({ success: false, error: 'recipient_not_found' });
+      return;
+    }
+    const isFriend =
+      (caller?.friends || []).some(id => String(id) === String(data.to)) ||
+      (receiver?.friends || []).some(id => String(id) === String(callerId));
+    if (!isFriend && receiver.allowVideoRequestsFromNonFriends === false) {
+      if (ack) ack({ success: false, error: 'video_requests_disabled' });
+      return;
+    }
 
     // Cancel any previous pending requests in this thread
     await Message.updateMany(
@@ -113,6 +133,35 @@ socket.on("video-call-request", async (data, ack) => {
 
     emitToUser(data.to,   "new-message",   safeCallPayload);
     emitToUser(callerId,  "message-sent",  { ...safeCallPayload, tempId: data.messageId });
+    const callerName = [caller?.firstName, caller?.lastName].filter(Boolean).join(" ") || "Someone";
+    sendPushToUser(String(data.to), {
+      title: "Video request",
+      body: `${callerName} sent you a one-time video request`,
+      data: {
+        ...safeCallPayload,
+        type: "video-call-request",
+        category: "message",
+        event: "video-call-request",
+        fromUserId: String(callerId),
+        callerId: String(callerId),
+        messageId: String(saved._id),
+        link: `/messages/chat/${String(callerId)}`
+      },
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "default",
+          sound: "default",
+          defaultSound: true
+        }
+      },
+      apns: {
+        headers: { "apns-priority": "10" },
+        payload: { aps: { sound: "default" } }
+      }
+    }).then(result => {
+      console.log(`[chat] video request push to ${data.to}:`, result);
+    }).catch(err => console.warn("[chat] video request push failed:", err.message));
 
     if (ack) ack({ success: true, messageId: saved._id });
   } catch (err) {
@@ -183,9 +232,9 @@ socket.on("video-call-used", async (data) => {
     const msg = await Message.findOneAndUpdate(
       {
         _id: data.messageId,
-        from: authUser,
         type: "video-call-request",
-        status: "accepted"
+        status: "accepted",
+        $or: [{ from: authUser }, { to: authUser }]
       },
       { status: "used" },
       { new: true }

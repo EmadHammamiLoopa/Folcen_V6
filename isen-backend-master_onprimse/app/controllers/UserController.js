@@ -932,7 +932,7 @@ exports.updateUser = async (req, res) => {
         const allowed = [
             'firstName','lastName','phone','city','country','gender','birthDate',
             'education','profession','interests','languages','bio','aboutMe','website','socialLinks',
-            'studyCountry','isPrivate', 'settings', 'school', 'genderVisible', 'ageVisible', 'randomVisible',
+            'studyCountry','isPrivate', 'settings', 'school', 'genderVisible', 'ageVisible', 'randomVisible', 'allowVideoRequestsFromNonFriends',
             'avatarStyle', 'avatarSeed', 'avatarVariant', 'avatarOverrides', 'fcmToken', 'themePreference'
         ];
 
@@ -2589,6 +2589,31 @@ exports.updateAgeVisibility = async (req, res) => {
         return Response.sendResponse(res, user.publicInfo(true), 'Age visibility updated');
     } catch (error) {
         logger.error('[UserController] updateAgeVisibility error:', error);
+        return Response.sendError(res, 500, 'Internal server error');
+    }
+};
+
+exports.updateNonFriendVideoRequests = async (req, res) => {
+    try {
+        const { allowed } = req.body;
+        const userId = req.authUser ? req.authUser._id : req.auth._id;
+        const value = allowed !== false;
+        logger.info(`[UserController] updateNonFriendVideoRequests: allowed=${value}, userId=${userId}`);
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $set: { allowVideoRequestsFromNonFriends: value } },
+            { new: true }
+        );
+
+        if (!user) {
+            logger.warn(`[UserController] updateNonFriendVideoRequests: User not found for ID ${userId}`);
+            return Response.sendError(res, 404, 'User not found');
+        }
+
+        return Response.sendResponse(res, user.publicInfo(true), 'Video request setting updated');
+    } catch (error) {
+        logger.error('[UserController] updateNonFriendVideoRequests error:', error);
         return Response.sendError(res, 500, 'Internal server error');
     }
 };

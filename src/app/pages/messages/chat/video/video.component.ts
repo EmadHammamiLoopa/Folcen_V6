@@ -219,6 +219,7 @@ private showSelfPreview(stream: MediaStream): void {
 
   if (!el.srcObject)  { el.srcObject = stream; }
   el.muted = true;                           // autoplay allow-list
+  el.volume = 0;
 
   const playNow = () => el.play().catch(() => {});
   if (el.readyState >= 1)           { playNow(); }      // metadata present
@@ -1046,8 +1047,14 @@ private async consumeOneTimeVideoRequest() {
 
 
 private attachRemoteStream(remote: MediaStream): void {
+  if (this.localStream && remote && remote.id === this.localStream.id) {
+    console.warn('[video] ignoring local stream attached as remote stream');
+    return;
+  }
   const el = this.partnerVideoRef.nativeElement;
   el.srcObject = remote;
+  el.muted = false;
+  el.volume = 1;
 
   const playNow = () => el.play().catch(() => {});
   if (el.readyState >= 1) { playNow(); }
@@ -1077,7 +1084,10 @@ this.hasAnswered = true;
     }
 
     const incoming = await this.waitForIncomingCall();
-    if (!incoming) { throw new Error('No incoming call'); }
+    if (!incoming || typeof (incoming as any).answer !== 'function') {
+      WebrtcService.call = null;
+      throw new Error('This call is no longer answerable');
+    }
 
     incoming.answer(this.localStream);
     this.wireHangup(incoming); 
@@ -1102,10 +1112,10 @@ this.hasAnswered = true;
 private async waitForIncomingCall(timeoutMs = 12000): Promise<MediaConnection | null> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    if (WebrtcService.call) return WebrtcService.call;
+    if (WebrtcService.call && typeof (WebrtcService.call as any).answer === 'function') return WebrtcService.call;
     await new Promise(resolve => setTimeout(resolve, 250));
   }
-  return WebrtcService.call || null;
+  return WebrtcService.call && typeof (WebrtcService.call as any).answer === 'function' ? WebrtcService.call : null;
 }
 
 

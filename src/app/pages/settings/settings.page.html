@@ -52,7 +52,7 @@
     <div class="settings-section">
       <h3 class="section-title">Privacy & Visibility</h3>
       <div class="settings-card">
-        <ion-item lines="none">
+        <ion-item lines="none" *ngIf="false">
           <div class="icon-box">
             <ion-icon name="people-outline"></ion-icon>
           </div>
@@ -61,6 +61,19 @@
             <p>Accept requests from random users</p>
           </ion-label>
           <ion-toggle slot="end" [checked]="randomVisibility" (ionChange)="toggleRandomVisibility($event)"></ion-toggle>
+        </ion-item>
+
+        <div class="divider" *ngIf="false"></div>
+
+        <ion-item lines="none">
+          <div class="icon-box">
+            <ion-icon name="videocam-outline"></ion-icon>
+          </div>
+          <ion-label>
+            <h2>Video Requests</h2>
+            <p>Allow non-friends to request one-time video access</p>
+          </ion-label>
+          <ion-toggle slot="end" [checked]="allowVideoRequestsFromNonFriends" (ionChange)="toggleNonFriendVideoRequests($event)"></ion-toggle>
         </ion-item>
 
         <div class="divider"></div>

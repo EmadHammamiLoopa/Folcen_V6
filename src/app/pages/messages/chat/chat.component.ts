@@ -123,10 +123,6 @@ activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'used' | null,
 ionViewWillLeave() {
   // Reset so re-entering this conversation always reloads messages from the server
   this.lastLoadedPeerId = null;
-  // tell server to cancel any pendings in this thread
-  if (this.socket?.connected && this.user?.id) {
-    this.socket.emit('leave-chat', { withUser: this.user.id });
-  }
   this.teardownCallSession();
 }
 
@@ -135,42 +131,9 @@ private teardownCallSession() {
   this.inSession = false;
   this.sessionStart = 0;
   this.activeVideoCall = { status: null, messageId: undefined };
-
-  // cancel any still-pending requests (UI + notify peer)
-  const pendings = this.messages.filter(m => m.type === 'video-call-request' && m.status === 'pending');
-  for (const m of pendings) {
-    const realId = (m as any)._id || m.id;
-    const other = m.from === this.authUser.id ? m.to : m.from;
-    if (this.socket && realId) {
-      // notify server/chat thread that the request was cancelled
-      this.socket.emit('video-call-cancelled', {
-        from: this.authUser.id,
-        to: other,
-        messageId: realId,
-        status: 'cancelled'
-      });
-
-      // also emit the signaling/call cancellation events so any open
-      // incoming call UI (video.component) reacts immediately and
-      // missed-call handling (receiver only) can run in real time.
-        try {
-          const payload = { from: this.authUser.id, to: other, messageId: realId, reason: 'cancel', at: Date.now() };
-          // Legacy shorthand (server keeps supporting it) — but prefer structured payloads
-          try { this.socket.emit('cancel-video', payload); } catch(e) {}
-          this.socket.emit('video-canceled', payload);
-        } catch (e) {
-          // best-effort: server may not expect both events; ignore errors
-          console.warn('emit cancel-video/video-canceled failed', e);
-        }
-    }
-    (m as any).busy = false;
-    m.status = 'cancelled';
-  }
-
   this.recomputeActiveCall();
   this.changeDetection.detectChanges();
 }
-
 isActionableCall(m: Message): boolean {
   return this.inSession
       && m.type === 'video-call-request'
@@ -364,9 +327,6 @@ isLatestCall(message: Message): boolean {
 ngOnDestroy() {
   this.destroy$.next();
   this.destroy$.complete();
-  if (this.socket?.connected && this.user?.id) {
-    this.socket.emit('leave-chat', { withUser: this.user.id });
-  }
   this.teardownCallSession();
   this.removeActivityListeners();
 }
@@ -788,6 +748,10 @@ private recomputeActiveCall() {
       if (m.type !== 'video-call-request') return false;
       const status = String(m.status || 'pending');
       if (!['pending', 'accepted'].includes(status)) return false;
+      if (status === 'accepted') {
+        const created = m.createdAt ? +new Date(m.createdAt) : 0;
+        if (created && Date.now() - created > 15 * 60 * 1000) return false;
+      }
       if (!this.user?.isFriend && this.relationshipChangedAt) {
         const created = m.createdAt ? +new Date(m.createdAt) : 0;
         if (created && created < this.relationshipChangedAt) return false;
@@ -1126,6 +1090,10 @@ onVideoButtonPressed() {
   }
 
   // non-friends:
+  if (!this.user?.isFriend && this.user?.allowVideoRequestsFromNonFriends === false && !this.activeVideoCall.status) {
+    return this.toastService.presentErrorToastr(`${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`);
+  }
+
   if (this.activeVideoCall.status === 'accepted') {
     // already accepted -> consume the one-time approval and jump to call UI
     if (this.activeVideoCall.messageId && this.socket?.connected) {
@@ -1693,7 +1661,12 @@ private async sendVideoCallRequest() {
         return;
       }
       if (!ack?.success) {
-        markFailed(ack?.error || 'Video call request could not be sent. Please try again.');
+        const errorMap: any = {
+          video_requests_disabled: `${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`,
+          recipient_not_found: 'This user is not available anymore.',
+          invalid_recipient: 'Unable to identify this user.'
+        };
+        markFailed(errorMap[ack?.error] || ack?.error || 'Video call request could not be sent. Please try again.');
         return;
       }
 
@@ -1724,6 +1697,8 @@ private async sendVideoCallRequest() {
 canRequestVideoCall(): boolean {
   if (!this.user) return false;
   if (this.user.isFriend) return true;  // Always allow friends
+  if (this.activeVideoCall.status === 'pending' || this.activeVideoCall.status === 'accepted') return true;
+  if (this.user.allowVideoRequestsFromNonFriends === false) return false;
   if (this.videoCallDeclined) return false;  // Block after declined
   return true;  // Allow a fresh request when there is no accepted one-time approval
 }

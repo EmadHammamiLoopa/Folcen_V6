@@ -98,6 +98,7 @@ describe('video call request flow', function () {
 
     const originalUpdateMany = Message.updateMany;
     const originalSave = Message.prototype.save;
+    const originalFindById = User.findById;
     const originalFindByIdAndUpdate = User.findByIdAndUpdate;
 
     Message.updateMany = async () => ({ modifiedCount: 0 });
@@ -105,6 +106,17 @@ describe('video call request flow', function () {
       this._id = new mongoose.Types.ObjectId('64b000000000000000000099');
       return this;
     };
+    User.findById = id => ({
+      select: () => ({
+        lean: async () => ({
+          _id: id,
+          firstName: String(id) === callerId ? 'Caller' : 'Callee',
+          lastName: 'One',
+          friends: [],
+          allowVideoRequestsFromNonFriends: true
+        })
+      })
+    });
     User.findByIdAndUpdate = async () => ({});
 
     connectedUsers.set(callerId, new Set(['caller-socket']));
@@ -137,7 +149,102 @@ describe('video call request flow', function () {
     } finally {
       Message.updateMany = originalUpdateMany;
       Message.prototype.save = originalSave;
+      User.findById = originalFindById;
       User.findByIdAndUpdate = originalFindByIdAndUpdate;
+    }
+  });
+
+  it('rejects non-friend video requests when the receiver disables them', async function () {
+    const Message = require('../app/models/Message');
+    const User = require('../app/models/User');
+    const registerChatSocket = require('../app/sockets/chat');
+
+    const originalUpdateMany = Message.updateMany;
+    const originalFindById = User.findById;
+
+    let wroteMessage = false;
+    Message.updateMany = async () => { wroteMessage = true; return { modifiedCount: 0 }; };
+    User.findById = id => ({
+      select: () => ({
+        lean: async () => ({
+          _id: id,
+          firstName: String(id) === callerId ? 'Caller' : 'Callee',
+          lastName: 'One',
+          friends: [],
+          allowVideoRequestsFromNonFriends: String(id) === calleeId ? false : true
+        })
+      })
+    });
+
+    const socket = {
+      id: 'caller-socket',
+      userId: callerId,
+      handlers: {},
+      on(event, handler) { this.handlers[event] = handler; }
+    };
+    const io = { to: () => ({ emit: () => {} }) };
+
+    try {
+      registerChatSocket(io, socket);
+
+      let ack;
+      await socket.handlers['video-call-request']({
+        requestOnly: true,
+        to: calleeId,
+        text: 'A requested a video call.',
+        messageId: 'temp-disabled'
+      }, value => { ack = value; });
+
+      assert.strictEqual(ack.success, false);
+      assert.strictEqual(ack.error, 'video_requests_disabled');
+      assert.strictEqual(wroteMessage, false);
+    } finally {
+      Message.updateMany = originalUpdateMany;
+      User.findById = originalFindById;
+    }
+  });
+
+  it('marks an accepted one-time video request used when either participant starts it', async function () {
+    const Message = require('../app/models/Message');
+    const { connectedUsers } = require('../app/utils/socketManager');
+    const registerChatSocket = require('../app/sockets/chat');
+
+    const originalFindOneAndUpdate = Message.findOneAndUpdate;
+    let query;
+    Message.findOneAndUpdate = async (q) => {
+      query = q;
+      return {
+        id: '64b000000000000000000099',
+        _id: new mongoose.Types.ObjectId('64b000000000000000000099'),
+        from: new mongoose.Types.ObjectId(callerId),
+        to: new mongoose.Types.ObjectId(calleeId),
+        status: 'used'
+      };
+    };
+
+    connectedUsers.set(callerId, new Set(['caller-socket']));
+    connectedUsers.set(calleeId, new Set(['callee-socket']));
+
+    const emitted = [];
+    const socket = {
+      id: 'callee-socket',
+      userId: calleeId,
+      handlers: {},
+      on(event, handler) { this.handlers[event] = handler; }
+    };
+    const io = { to: sid => ({ emit: (event, payload) => emitted.push({ sid, event, payload }) }) };
+
+    try {
+      registerChatSocket(io, socket);
+      await socket.handlers['video-call-used']({ messageId: '64b000000000000000000099' });
+
+      assert.strictEqual(query.type, 'video-call-request');
+      assert.strictEqual(query.status, 'accepted');
+      assert.deepStrictEqual(query.$or.map(item => Object.keys(item)[0]).sort(), ['from', 'to']);
+      assert.ok(emitted.some(e => e.sid === 'caller-socket' && e.event === 'video-call-used'));
+      assert.ok(emitted.some(e => e.sid === 'callee-socket' && e.event === 'video-call-used'));
+    } finally {
+      Message.findOneAndUpdate = originalFindOneAndUpdate;
     }
   });
 });

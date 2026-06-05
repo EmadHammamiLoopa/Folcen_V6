@@ -104,6 +104,7 @@ const userSchema = new mongoose.Schema({
         expireDate: Date
     },
     randomVisible: { type: Boolean, default: true },
+    allowVideoRequestsFromNonFriends: { type: Boolean, default: true },
     ageVisible: { type: Boolean, default: true },
     loggedIn: { type: Boolean, default: false },
     visitProfile: { type: Boolean, default: false },
@@ -357,6 +358,7 @@ userSchema.methods.publicInfo = function(isLoggedInUser = false) {
         languages: Array.isArray(decodedLanguages) ? decodedLanguages : (decodedLanguages ? [decodedLanguages] : []),
         randomVisible: this.randomVisible,
         ageVisible: this.ageVisible,
+        allowVideoRequestsFromNonFriends: this.allowVideoRequestsFromNonFriends !== false,
         loggedIn: this.loggedIn,
         online: this.online,
         visitProfile: this.visitProfile,

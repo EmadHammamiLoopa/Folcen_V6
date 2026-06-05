@@ -30,6 +30,7 @@ export class SettingsPage implements OnInit, OnDestroy {
   pageLoading = false;
   ageVisibility = false;
   randomVisibility: boolean;
+  allowVideoRequestsFromNonFriends = true;
   isPrivate = false;
   loading = false;
   isUpdating = false;
@@ -166,6 +167,7 @@ export class SettingsPage implements OnInit, OnDestroy {
         // Only update local toggle states if we are not currently in the middle of an update
         if (!this.isUpdating) {
           this.randomVisibility = this.user.randomVisible;
+          this.allowVideoRequestsFromNonFriends = this.user.allowVideoRequestsFromNonFriends !== false;
           this.ageVisibility = this.user.ageVisible;
           this.isPrivate = this.user.isPrivate;
         }
@@ -429,6 +431,37 @@ export class SettingsPage implements OnInit, OnDestroy {
         this.isUpdating = false;
         this.ageVisibility = this.user.ageVisible; // Revert on error
         this.toastService.presentErrorToastr(err.message || 'Error updating age visibility');
+      }
+    );
+  }
+
+  toggleNonFriendVideoRequests(event) {
+    const newValue = event.detail.checked;
+    if (newValue === this.user.allowVideoRequestsFromNonFriends) return;
+
+    this.allowVideoRequestsFromNonFriends = newValue;
+    this.loading = true;
+    this.isUpdating = true;
+    this.userService.updateNonFriendVideoRequests(newValue).subscribe(
+      (resp: any) => {
+        if (resp && resp.data) {
+          this.userService.setCurrentUser(resp.data);
+        } else {
+          this.user.allowVideoRequestsFromNonFriends = newValue;
+          this.userService.setCurrentUser(this.user);
+        }
+        this.toastService.presentSuccessToastr(resp.message || 'Video request setting updated');
+        this.loading = false;
+        setTimeout(() => {
+          this.isUpdating = false;
+          this.changeDetectorRef.detectChanges();
+        }, 500);
+      },
+      (err) => {
+        this.loading = false;
+        this.isUpdating = false;
+        this.allowVideoRequestsFromNonFriends = this.user.allowVideoRequestsFromNonFriends !== false;
+        this.toastService.presentErrorToastr(err.message || 'Error updating video request setting');
       }
     );
   }

@@ -49,6 +49,7 @@ export class User {
   private _messages: Message[];
   private _subscription: UserSubscription | null;
   private _randomVisible: boolean;
+  private _allowVideoRequestsFromNonFriends: boolean;
   private _ageVisible: boolean;
   private _genderVisible: boolean;
   private _loggedIn: boolean;
@@ -168,6 +169,7 @@ export class User {
     messages: Message[] = [],
     subscription: UserSubscription | null = null,
     randomVisible: boolean = false,
+    allowVideoRequestsFromNonFriends: boolean = true,
     ageVisible: boolean = false,
     genderVisible: boolean = false,
     loggedIn: boolean = false,
@@ -231,6 +233,7 @@ export class User {
     this._messages = messages;
     this._subscription = subscription;
     this._randomVisible = randomVisible;
+    this._allowVideoRequestsFromNonFriends = allowVideoRequestsFromNonFriends;
     this._ageVisible = ageVisible;
     this._genderVisible = genderVisible;
     this._loggedIn = loggedIn;
@@ -400,6 +403,7 @@ export class User {
   get requests(): Request[] { return this._requests; }
   get subscription(): UserSubscription | null { return this._subscription; }
   get randomVisible(): boolean { return this._randomVisible; }
+  get allowVideoRequestsFromNonFriends(): boolean { return this._allowVideoRequestsFromNonFriends; }
   get ageVisible(): boolean { return this._ageVisible; }
   get genderVisible(): boolean { return this._genderVisible; }
   get loggedIn(): boolean { return this._loggedIn; }
@@ -492,6 +496,7 @@ set peerId(peerId: string | null) {
     this._subscription = subscription;
   }
   set randomVisible(randomVisible: boolean) { this._randomVisible = randomVisible; }
+  set allowVideoRequestsFromNonFriends(value: boolean) { this._allowVideoRequestsFromNonFriends = value; }
   set ageVisible(ageVisible: boolean) { this._ageVisible = ageVisible; }
   set genderVisible(genderVisible: boolean) { this._genderVisible = genderVisible; }
   set loggedIn(loggedIn: boolean) { this._loggedIn = loggedIn; }
@@ -843,6 +848,7 @@ set peerId(peerId: string | null) {
       expireDate: this.safeDate(user.subscription.expireDate)
     } : null;
     this._randomVisible = user.randomVisible || false;
+    this._allowVideoRequestsFromNonFriends = user.allowVideoRequestsFromNonFriends !== false;
     this._ageVisible = user.ageVisible !== undefined ? !!user.ageVisible : true;
     this._genderVisible = user.genderVisible !== undefined ? !!user.genderVisible : true;
     this._loggedIn = !!user.loggedIn;
@@ -971,6 +977,7 @@ set peerId(peerId: string | null) {
         expireDate: this._subscription.expireDate
       } : null,
       randomVisible: this._randomVisible,
+      allowVideoRequestsFromNonFriends: this._allowVideoRequestsFromNonFriends,
       ageVisible: this._ageVisible,
       genderVisible: this._genderVisible,
       loggedIn: this._loggedIn,

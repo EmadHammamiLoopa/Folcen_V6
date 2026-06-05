@@ -11,7 +11,7 @@
   </div>
 
   <div class="video-stage" [class.hidden-stage]="!answered">
-    <video #partnerVideo id="partner-video" autoplay playsinline muted 
+    <video #partnerVideo id="partner-video" autoplay playsinline
            (click)="swapVideo('my-video')"
            [ngClass]="topVideoFrame === 'partner-video' ? 'main-video' : 'pip-video'">
     </video>
