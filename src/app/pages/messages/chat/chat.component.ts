@@ -342,7 +342,7 @@ ngOnDestroy() {
       this.page = 0;
       this.messages = [];
       this.groupedMessages = [];
-      this.getUserProfile(this.user.id);
+      this.getUserProfile(this.user.id, true);
     }
 
     console.log("ionViewWillEnter called");
@@ -1087,6 +1087,10 @@ onVideoButtonPressed() {
     return this.router.navigateByUrl('/messages/video/' + this.user.id);
   }
 
+  if (this.user?.allowVideoRequestsFromNonFriends === false) {
+    return this.toastService.presentErrorToastr(`${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`);
+  }
+
   // non-friends:
   if (this.activeVideoCall.status === 'accepted') {
     // already accepted -> consume the one-time approval and jump to call UI
@@ -1691,6 +1695,7 @@ private async sendVideoCallRequest() {
 canRequestVideoCall(): boolean {
   if (!this.user) return false;
   if (this.user.isFriend) return true;  // Always allow friends
+  if (this.user.allowVideoRequestsFromNonFriends === false) return false;
   if (this.activeVideoCall.status === 'pending' || this.activeVideoCall.status === 'accepted') return true;
   if (this.videoCallDeclined) return false;  // Block after declined
   return true;  // Allow a fresh request when there is no accepted one-time approval

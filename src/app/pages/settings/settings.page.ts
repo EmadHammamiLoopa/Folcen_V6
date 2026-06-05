@@ -436,8 +436,12 @@ export class SettingsPage implements OnInit, OnDestroy {
   }
 
   toggleNonFriendVideoRequests(event) {
-    const newValue = event.detail.checked;
-    if (newValue === this.user.allowVideoRequestsFromNonFriends) return;
+    const checked = event?.detail?.checked;
+    if (typeof checked !== 'boolean' || this.isUpdating || !this.user) return;
+
+    const newValue = checked;
+    const previousValue = this.user.allowVideoRequestsFromNonFriends !== false;
+    if (newValue === previousValue) return;
 
     this.allowVideoRequestsFromNonFriends = newValue;
     this.loading = true;
@@ -445,10 +449,13 @@ export class SettingsPage implements OnInit, OnDestroy {
     this.userService.updateNonFriendVideoRequests(newValue).subscribe(
       (resp: any) => {
         if (resp && resp.data) {
-          this.userService.setCurrentUser(resp.data);
+          this.user = resp.data;
+          this.allowVideoRequestsFromNonFriends = this.user.allowVideoRequestsFromNonFriends !== false;
+          this.userService.setCurrentUser(resp.data, { force: true });
         } else {
           this.user.allowVideoRequestsFromNonFriends = newValue;
-          this.userService.setCurrentUser(this.user);
+          this.allowVideoRequestsFromNonFriends = newValue;
+          this.userService.setCurrentUser(this.user, { force: true });
         }
         this.userService.refreshCurrentUser({ forceRefresh: true }).subscribe(() => {}, () => {});
         this.toastService.presentSuccessToastr(resp.message || 'Video request setting updated');
@@ -461,7 +468,7 @@ export class SettingsPage implements OnInit, OnDestroy {
       (err) => {
         this.loading = false;
         this.isUpdating = false;
-        this.allowVideoRequestsFromNonFriends = this.user.allowVideoRequestsFromNonFriends !== false;
+        this.allowVideoRequestsFromNonFriends = previousValue;
         this.toastService.presentErrorToastr(err.message || 'Error updating video request setting');
       }
     );
