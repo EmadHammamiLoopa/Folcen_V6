@@ -107,20 +107,7 @@ export class User {
       payload.mainAvatar || '',
       Array.isArray(payload.avatar) ? payload.avatar.join(',') : (payload.avatar || '')
     ].join('|');
-    return [
-      id,
-      updated,
-      payload.email || '',
-      payload.birthDate || '',
-      followersLen,
-      followingLen,
-      friendsLen,
-      interestsStr,
-      languagesStr,
-      avatarFields,
-      payload.allowVideoRequestsFromNonFriends === false ? 'videoRequests:false' : 'videoRequests:true',
-      payload.missedCallBudget ?? ''
-    ].join('|');
+    return [id, updated, payload.email || '', payload.birthDate || '', followersLen, followingLen, friendsLen, interestsStr, languagesStr, avatarFields].join('|');
   }
 
   private static decodeMaybeEncodedList(value: string): string[] | null {

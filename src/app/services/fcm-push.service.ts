@@ -107,20 +107,10 @@ export class FcmPushService {
             const callerId = data.callerId || data.fromUserId;
             if (callerId) {
               this.platform.ready().then(() => {
-                const params = new URLSearchParams({
-                  callerId,
-                  fromUserId: callerId,
-                  callId: data.callId || data.requestId || '',
-                  requestId: data.requestId || data.callId || '',
-                  answer: 'true',
-                  action: 'answer',
-                  autoAnswer: 'true'
-                });
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('folcen-incoming-call-url', {
-                    detail: `folcen://incoming-call?${params.toString()}`
-                  }));
-                }, 200);
+                setTimeout(() => this.router.navigate(
+                  ['/messages/video', callerId],
+                  { queryParams: { answer: true, callId: data.callId || undefined, autoAnswer: true } }
+                ), 200);
               });
               return;
             }

@@ -8,7 +8,6 @@ const mongoose = require('mongoose');
 const { recordAudit } = require('./utils/audit');
 const pushSvc  = require('.././app/utils/pushService');          // FCM push shim (via app/utils/pushService → services/fcmPushService)
 const socketManager = require('.././app/utils/socketManager');
-const callStateService = require('./services/callStateService');
 
 /*────────────────────────── CONSTANTS ──────────────────────────*/
 const manAvatarPath   = '/avatars/male.webp';
@@ -707,7 +706,6 @@ function buildCallInvitePayload(calleeId, callerId = null, options = {}) {
     event: 'call:invite',
     status: 'ringing',
     callId,
-    requestId: options.requestId ? String(options.requestId) : callId,
     callType: options.callType || 'video',
     callerId: caller,
     fromUserId: caller,
@@ -724,13 +722,6 @@ function buildCallInvitePayload(calleeId, callerId = null, options = {}) {
 function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
   if (!io) return console.warn('notifyPeerNeeded called before helpers.initSocket(io)');
   const payload = buildCallInvitePayload(calleeId, callerId, options);
-  callStateService.registerRinging({
-    callId: payload.callId,
-    from: payload.callerId,
-    to: payload.receiverId,
-    expiresAt: payload.expiresAt,
-    source: 'peer-wake'
-  });
   const sockets = userSocketIds(String(calleeId));
   if (sockets.length > 0) {
     sockets.forEach(sid => {

@@ -28,7 +28,7 @@ public class IncomingCallActivity extends Activity {
 
         Intent intent = getIntent();
         callerId = firstNonEmpty(intent.getStringExtra("callerId"), intent.getStringExtra("fromUserId"));
-        callId = firstNonEmpty(intent.getStringExtra("callId"), intent.getStringExtra("requestId"), "call-" + System.currentTimeMillis());
+        callId = firstNonEmpty(intent.getStringExtra("callId"), "call-" + System.currentTimeMillis());
         notificationId = intent.getIntExtra("notificationId", 0);
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
 
@@ -100,7 +100,6 @@ public class IncomingCallActivity extends Activity {
                 .appendQueryParameter("callerId", callerId != null ? callerId : "")
                 .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
                 .appendQueryParameter("callId", callId != null ? callId : "")
-                .appendQueryParameter("requestId", callId != null ? callId : "")
                 .appendQueryParameter("answer", "true")
                 .appendQueryParameter("action", "answer")
                 .appendQueryParameter("autoAnswer", "true")
@@ -122,7 +121,6 @@ public class IncomingCallActivity extends Activity {
                 .appendQueryParameter("callerId", callerId != null ? callerId : "")
                 .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
                 .appendQueryParameter("callId", callId != null ? callId : "")
-                .appendQueryParameter("requestId", callId != null ? callId : "")
                 .appendQueryParameter("answer", "false")
                 .appendQueryParameter("action", "reject")
                 .build();

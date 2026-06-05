@@ -112,28 +112,14 @@ ngAfterViewInit() {
 
 
 /* ─── and always deregister on leave/destroy —───────────────────────────── */
-ionViewWillLeave() {
-  this.clearUnansweredTimeout();
-  try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch (_) {}
-  this.stopCallTimer();
-  this.ringer.stop(this.callKey(), 'view-leave');
-  this.webRTC.clearVideoElements();
-}
+ionViewWillLeave() { this.webRTC.clearVideoElements(); }
 ngOnDestroy() {
-  this.clearUnansweredTimeout();
-  try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch (_) {}
-  this.stopCallTimer();
-  this.ringer.stop(this.callKey(), 'destroy');
   this.webRTC.clearVideoElements();
   this.callStateSubscription?.unsubscribe();
   this.backButtonSubscription?.unsubscribe();
   this.connectionSubscriptions.forEach(s => s?.unsubscribe());
   this.connectionSubscriptions = [];
   window.removeEventListener('partner-answered', this.partnerAnsweredListener);
-}
-
-private callKey(): string {
-  return this.callId || `${this.authUser?._id || 'me'}:${this.userId || 'peer'}`;
 }
 
 
@@ -289,9 +275,27 @@ startCallTimer() {
 startMissedCallTimeout() {
   this.callTimeout = setTimeout(() => {
     if (!this.answered) {
-      console.log('[video] no answer in 30 seconds; timing out call');
-      this.calling = false;
-      this.cancel(false, 'timeout');
+      console.log('⏰ No answer in 30 sec — cancelling call');
+      this.calling = false; // ensure UI reflects ended state immediately
+      // Emit explicit missed outcome for callee before teardown
+      if (this.socket?.connected) {
+        this.emitWebSocketEvent(VideoEvents.MISSED_TIMEOUT, {
+          from: this.authUser._id,
+          to: this.userId,
+          callId: this.callId,
+          at: Date.now(),
+          reason: 'timeout'
+        });
+        // also emit legacy generic for older servers
+        this.emitWebSocketEvent(VideoEvents.MISSED, {
+          from: this.authUser._id,
+          to: this.userId,
+          callId: this.callId,
+          at: Date.now(),
+          reason: 'timeout'
+        });
+      }
+      this.cancel(false, 'timeout');   // ⬅ reason
     }
   }, 30000);
 }
@@ -318,9 +322,7 @@ async ionViewWillEnter() {
       this.cdr.detectChanges();
       // Incoming side: DO NOT open camera yet
       await this.ensureIncomingPeerReady();
-      if (!this.autoAnswer) {
-        this.ringer.start('calling.mp3', this.callKey(), 'incoming-screen');
-      }
+      this.ringer.start('calling.mp3');
       if (this.autoAnswer) {
         setTimeout(() => this.answerCall(), 250);
       }
@@ -934,22 +936,17 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
   
     if (this.socket?.connected) {
       if (!this.answered) {
+        // Distinguish caller vs callee side: if answer=true, we're the callee rejecting
         if (this.answer) {
           const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
-          if (reason === 'timeout') {
-            await this.emitWebSocketEvent(VideoEvents.TIMEOUT, { ...base, reason: 'timeout' });
-          } else {
-            await this.emitWebSocketEvent(VideoEvents.DECLINED, { ...base, reason: 'declined' });
-          }
+          await this.emitWebSocketEvent(VideoEvents.DECLINED, { ...base, reason: 'declined' });
         } else {
           const base = { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now() };
-          if (reason === 'timeout') {
-            await this.emitWebSocketEvent(VideoEvents.TIMEOUT, { ...base, reason: 'timeout' });
-          } else {
-            const payload = { ...base, reason: 'cancel' };
-            try { this.socket.emit(VideoEvents.CANCELED, payload); } catch(_) {}
-            try { this.socket.emit('cancel-video', { to: this.userId, callId: this.callId }); } catch(_) {}
-          }
+          await this.emitWebSocketEvent(VideoEvents.MISSED_CANCELED, { ...base, reason: 'cancel' });
+          await this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason });
+          const payload = { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now(), reason };
+          try { this.socket.emit(VideoEvents.CANCELED, payload); } catch(_) {}
+          try { this.socket.emit('cancel-video', this.userId); } catch(_) {}
         }
       } else {
         this.socket.emit(VideoEvents.ENDED, { from: this.authUser._id, to: this.userId, callId: this.callId });
@@ -979,7 +976,13 @@ startUnansweredTimeout() {
   this.unansweredTimeout = setTimeout(() => {
     if (!this.answered) {
       console.warn('⏱️ Call unanswered after 30 seconds. Closing...');
-      this.cancel(false, 'timeout');
+      // For inbound ringing that expires without answer: callee rejected (timeout)
+      if (this.answer && this.userId && this.socket?.connected) {
+        const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
+        this.emitWebSocketEvent(VideoEvents.MISSED_REJECTED, { ...base, reason: 'timeout' });
+        this.emitWebSocketEvent(VideoEvents.MISSED, { ...base, reason: 'timeout' });
+      }
+      this.closeCall();
     }
   }, 30000); // 30 seconds
 }
@@ -1001,7 +1004,7 @@ async placeCall() {
     this.lastPlaceCallAt = now;
     this.placingCall = true;
     this.calling     = true;
-    this.ringer.start('ringing.mp3', this.callKey(), 'outgoing-call');
+    this.ringer.start('ringing.mp3');
     await this.consumeOneTimeVideoRequest();
   // start the missed-call timeout immediately so PeerJS delays don't prevent it
   try { this.startMissedCallTimeout(); } catch(e) {}
@@ -1121,12 +1124,7 @@ this.hasAnswered = true;
   } catch (err: any) {
     this.hasAnswered = false;
     this.stopCallTimer();
-    const msg = err?.message || '';
-    if (!this.autoAnswer && !this.tearingDown && !/expired|no longer|answerable/i.test(msg)) {
-      this.ringer.start('calling.mp3', this.callKey(), 'answer-failed-still-ringing');
-    } else {
-      this.ringer.markFinal(this.callKey(), 'answer-failed-final');
-    }
+    this.ringer.start('calling.mp3');
     this.toastService.presentErrorToastr(err?.message || 'Unable to answer call yet. Please try again.');
   } finally {
     this.answeringCall = false;

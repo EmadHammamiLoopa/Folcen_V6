@@ -2,16 +2,16 @@ const User = require("../models/User");
 const Message = require("../models/Message");
 const { connectedUsers, isUserOnline } = require("../utils/socketManager"); // ✅ import only
 const { createCallRequest, appendCallLifecycle } = require('../utils/eventLogger');
-const callStateService = require('../services/callStateService');
 
 // Track ongoing 1:1 calls
 const activeVideoCalls = Object.create(null);
 // Map to store active callId per pair: key `${from}:${to}` -> callId
 const activeCallIds = Object.create(null);
 const ringTimers = new Map();
+const callStates = new Map();
 const RING_TIMEOUT_MS = 30_000;
 
-const FINAL_STATES = callStateService.FINAL_STATES;
+const FINAL_STATES = new Set(['cancelled', 'declined', 'timeout', 'ended', 'failed', 'disconnect']);
 
 module.exports = (io, socket) => {   // ✅ no extra param
   // ─────────────────────────────── helpers ───────────────────────────────
@@ -55,11 +55,33 @@ module.exports = (io, socket) => {   // ✅ no extra param
   }
 
   function setCallState(callId, state, data = {}) {
-    return callStateService.setCallState(callId, state, data);
+    if (!callId) return null;
+    const previous = callStates.get(String(callId)) || {};
+    const next = {
+      ...previous,
+      ...data,
+      callId: String(callId),
+      state,
+      status: state,
+      updatedAt: Date.now(),
+      expiresAt: data.expiresAt || previous.expiresAt || Date.now() + RING_TIMEOUT_MS
+    };
+    callStates.set(String(callId), next);
+    const ttl = FINAL_STATES.has(state) ? 120_000 : Math.max(120_000, Number(next.expiresAt) - Date.now() + 120_000);
+    clearTimeout(next.cleanupTimer);
+    next.cleanupTimer = setTimeout(() => callStates.delete(String(callId)), ttl);
+    callStates.set(String(callId), next);
+    return next;
   }
 
   function getCallState(callId) {
-    return callStateService.getCallState(callId);
+    if (!callId) return null;
+    const state = callStates.get(String(callId));
+    if (!state) return null;
+    if (!FINAL_STATES.has(state.state) && state.expiresAt && Date.now() > Number(state.expiresAt)) {
+      return setCallState(callId, 'timeout', { ...state, reason: 'timeout' });
+    }
+    return state;
   }
 
   function emitCallCleanup(from, to, callId, reason) {
@@ -104,7 +126,6 @@ module.exports = (io, socket) => {   // ✅ no extra param
       const canonical = {
         from: callerId,
         to: calleeId,
-        callId: payload?.callId || activeCallIds[`${callerId}:${calleeId}`] || activeCallIds[`${calleeId}:${callerId}`] || null,
         reason: 'cancel',
         at: now,
         callerName: payload?.callerName || null,
@@ -152,9 +173,9 @@ module.exports = (io, socket) => {   // ✅ no extra param
     emitToUser(callee, 'video-call-accepted', { from: caller, to: callee, at: Date.now() });
   });
 
-  socket.on('video-call-declined', ({ from, to, callId: payloadCallId }) => {
+  socket.on('video-call-declined', ({ from, to }) => {
     if (!from || !to) return;
-    const callId = payloadCallId || activeCallIds[`${from}:${to}`] || activeCallIds[`${to}:${from}`];
+    const callId = activeCallIds[`${from}:${to}`] || activeCallIds[`${to}:${from}`];
     clearRingTimer(from, to);
     if (callId) setCallState(callId, 'declined', { from, to, reason: 'declined' });
     try { if (callId) appendCallLifecycle(callId, { event: 'declined', at: new Date() }); } catch (e) {}
@@ -211,14 +232,18 @@ module.exports = (io, socket) => {   // ✅ no extra param
         const now = Date.now();
 
         // canonical timeout signaling so callee UI closes and registers missed call
-        const canonical = { from, to, callId, reason: 'timeout', at: now };
+        const canonical = { from, to, reason: 'timeout', at: now };
         emitToUser(to, 'video-canceled', { ...canonical, notify: true });
+        // keep backward-compatible timeout event (existing handlers)
+        emitToUser(to, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now });
 
         // caller cleanup only
         emitToUser(from, 'video-canceled', { ...canonical, notify: false });
+        emitToUser(from, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now, notify: false });
 
-        // end for both and account one missed call for the receiver
-        handleMissed('timeout', { from, to, callId, at: now, reason: 'timeout' });
+        // end for both
+        if (callId) setCallState(callId, 'timeout', { from, to, reason: 'timeout' });
+        forceEndCall(from, to, 'timeout');
         // append lifecycle timeout
         try { if (callEvent && callEvent.callId) appendCallLifecycle(callEvent.callId, { event: 'timeout', at: new Date(now) }); } catch (e) {}
       }, RING_TIMEOUT_MS);
@@ -256,9 +281,10 @@ module.exports = (io, socket) => {   // ✅ no extra param
   socket.on('call-state-check', (payload = {}, ack) => {
     try {
       const callId = payload.callId;
-      const result = callStateService.isAnswerable(callId);
-      if (result.status === 'unknown') return ack?.({ success: true, answerable: false, status: 'unknown' });
-      ack?.({ success: true, ...result });
+      const state = getCallState(callId);
+      if (!state) return ack?.({ success: true, answerable: true, status: 'unknown' });
+      const answerable = state.state === 'ringing' && (!state.expiresAt || Date.now() <= Number(state.expiresAt));
+      ack?.({ success: true, answerable, status: state.state, state: state.state, expiresAt: state.expiresAt, reason: state.reason });
     } catch (err) {
       ack?.({ success: false, answerable: false, error: err.message });
     }
@@ -275,30 +301,18 @@ module.exports = (io, socket) => {   // ✅ no extra param
   // Frontend emits these BEFORE any cleanup; backend should update budget & record here.
   async function handleMissed(reason, payload = {}) {
     try {
-      if (reason !== 'timeout' && reason !== 'missed') {
-        console.log('[sockets][video] ignored non-missed final state for missed counter', { reason, callId: payload.callId });
-        return;
-      }
       const from = payload.from || payload.callerId;
       const to   = payload.to   || payload.calleeId;
       const at   = Number(payload.at) || Date.now();
       if (!from || !to) return; // invalid
 
-      const callId = payload.callId || activeCallIds[`${from}:${to}`] || activeCallIds[`${to}:${from}`] || null;
-      const state = getCallState(callId);
-      if (state && ['declined', 'rejected', 'cancelled', 'canceled', 'ended', 'failed', 'connected', 'missed'].includes(state.state)) {
-        console.log('[sockets][video] skipped missed counter because call is final non-missed', { callId, state: state.state });
-        return;
-      }
-
       // Dedup key per attempt to avoid double processing
-      const dedupKey = callId ? `call:${callId}:missed` : `${from}|${to}|${Math.floor(at/30000)}|missed`;
+      const dedupKey = `${from}|${to}|${Math.floor(at/1000)}|${reason}`;
       // Cheap in-memory dedupe bucket; auto-expire after 60s
       handleMissed._seen = handleMissed._seen || new Map();
       if (handleMissed._seen.has(dedupKey)) return;
       handleMissed._seen.set(dedupKey, true);
       setTimeout(() => handleMissed._seen.delete(dedupKey), 60_000);
-      if (callId) setCallState(callId, 'missed', { from, to, reason: 'timeout' });
 
       // Increment missedCallBudget in DB
       try {
@@ -309,23 +323,18 @@ module.exports = (io, socket) => {   // ✅ no extra param
       } catch (e) { console.warn('Failed to increment missedCallBudget', e); }
 
       // Include callerName if provided by the emitter
-      const payloadOut = { from, to, callId, at, reason: 'timeout', callerName: payload.callerName || payload.fromName || null };
-
-      try {
-        emitToBoth(from, to, 'video-call-timeout', payloadOut);
-        emitCallCleanup(from, to, callId, 'timeout');
-        clearRingTimer(from, to);
-        clearActivePair(from, to);
-      } catch (e) { console.warn('Failed to emit timeout cleanup', e); }
+      const payloadOut = { from, to, at, reason, callerName: payload.callerName || payload.fromName || null };
 
       // Emit explicit event matching frontend names for stronger compatibility
       try {
-        emitToUser(to, 'video-call-missed-timeout', payloadOut);
+        if (reason === 'timeout') emitToUser(to, 'video-call-missed-timeout', payloadOut);
+        else if (reason === 'cancel') emitToUser(to, 'video-call-missed-canceled', payloadOut);
+        else if (reason === 'rejected') emitToUser(to, 'video-call-missed-rejected', payloadOut);
       } catch (e) { console.warn('Failed to emit explicit missed event', e); }
 
       // Always broadcast the legacy event as well (UI listens to this too)
       emitToUser(to, 'missed-call', payloadOut);
-      console.log('[sockets][video] handleMissed -> emitted missed for', to, 'from', from, 'callId', callId);
+      console.log('[sockets][video] handleMissed -> emitted missed for', to, 'from', from, 'reason', reason);
     } catch (err) {
       console.error('❌ handleMissed error', err);
     }
@@ -334,7 +343,6 @@ module.exports = (io, socket) => {   // ✅ no extra param
   socket.on('video-call-missed-timeout',  (payload) => handleMissed('timeout',  payload));
   socket.on('video-call-missed-canceled', (payload) => handleMissed('cancel',   payload));
   socket.on('video-call-missed-rejected', (payload) => handleMissed('rejected', payload));
-  socket.on('video-call-timeout', (payload) => handleMissed('timeout', payload));
   // Legacy generic event
   socket.on('missed-call', (payload = {}) => handleMissed(payload.reason || 'timeout', payload));
 

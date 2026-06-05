@@ -98,7 +98,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         createCallChannel();
 
         String callerId = firstNonEmpty(data.get("callerId"), data.get("fromUserId"), data.get("from"));
-        String callId = firstNonEmpty(data.get("callId"), data.get("requestId"), "call-" + System.currentTimeMillis());
+        String callId = firstNonEmpty(data.get("callId"), "call-" + System.currentTimeMillis());
         String callerName = firstNonEmpty(data.get("callerName"), "Incoming video call");
         String title = callerName.equals("Incoming video call") ? callerName : callerName + " is calling";
         String body = firstNonEmpty(data.get("body"), "Tap to answer");
@@ -111,10 +111,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 pendingIntentFlags()
         );
 
-        PendingIntent answerIntent = PendingIntent.getBroadcast(
+        PendingIntent answerIntent = PendingIntent.getActivity(
                 this,
                 notificationId + 2,
-                CallActionReceiver.answerIntent(this, notificationId, callerId, callId),
+                callIntent(callerId, callId, true),
                 pendingIntentFlags()
         );
 
@@ -149,7 +149,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         intent.putExtra("callerId", callerId != null ? callerId : "");
         intent.putExtra("fromUserId", callerId != null ? callerId : "");
         intent.putExtra("callId", callId != null ? callId : "");
-        intent.putExtra("requestId", callId != null ? callId : "");
         intent.putExtra("callerName", callerName != null ? callerName : "");
         intent.putExtra("notificationId", notificationId);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -163,7 +162,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .appendQueryParameter("callerId", callerId != null ? callerId : "")
                 .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
                 .appendQueryParameter("callId", callId != null ? callId : "")
-                .appendQueryParameter("requestId", callId != null ? callId : "")
                 .appendQueryParameter("answer", answer ? "true" : "false")
                 .appendQueryParameter("action", answer ? "answer" : "reject")
                 .appendQueryParameter("autoAnswer", answer ? "true" : "false")

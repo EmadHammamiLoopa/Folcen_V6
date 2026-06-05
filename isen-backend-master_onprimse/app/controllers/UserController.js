@@ -2140,7 +2140,6 @@ exports.getUserProfile = async (req, res) => {
           followedChannels: 1,
           messagedUsers: 1,
           randomVisible: 1,
-          allowVideoRequestsFromNonFriends: 1,
           ageVisible: 1,
           genderVisible: 1,
           visitProfile: 1,
