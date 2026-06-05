@@ -265,7 +265,7 @@ export class WebrtcService {
             if (sock?.connected) {
               sock.emit('video-call-timeout', { from: this.userId, to: partnerUserId, callId, at: Date.now() });
               // Explicit missed outcome for callee (authoritative)
-              this.emitMissedOutcomeOnce(this.userId!, partnerUserId, 'timeout');
+              this.emitMissedOutcomeOnce(this.userId!, partnerUserId, 'timeout', callId);
             }
           } catch (e) { console.warn('[webrtc] failed to emit video-call-timeout', e); }
 
@@ -369,14 +369,14 @@ export class WebrtcService {
    * and should be the only source the backend uses for budget updates.
    * Guarded by a key (callerId|calleeId) so duplicates from race-y paths are avoided.
    */
-  private async emitMissedOutcomeOnce(callerId: string, calleeId: string, why: 'timeout'|'cancel'|'rejected'): Promise<void> {
+  private async emitMissedOutcomeOnce(callerId: string, calleeId: string, why: 'timeout'|'cancel'|'rejected', callId?: string): Promise<void> {
     try {
       const key = `${callerId}|${calleeId}`;
       if (this.lastMissedEmitKey === key) return; // already emitted for this attempt
       this.lastMissedEmitKey = key;
       const sock = await SocketService.getSocket();
       if (!sock?.connected) return;
-      const base = { from: callerId, to: calleeId, at: Date.now() };
+      const base = { from: callerId, to: calleeId, callId, at: Date.now() };
       switch (why) {
         case 'timeout':
           sock.emit(VideoEvents.MISSED_TIMEOUT,  { ...base, reason: 'timeout' });
@@ -668,20 +668,16 @@ export class WebrtcService {
 
     // Determine "explicit missed" either by the socket event name
     // or by legacy payload markers ("missed", "missed-call").
-    const isExplicitByEvent = [
+    const isMissedTimeoutEvent = [
       VideoEvents.MISSED as any,
       VideoEvents.MISSED_TIMEOUT as any,
-      VideoEvents.MISSED_CANCELED as any,
-      VideoEvents.MISSED_REJECTED as any,
-      'missed-call',
-      'video-canceled',
-      'video-call-timeout'
+      'missed-call'
     ].includes(eventName as any);
 
-    const isExplicitByReason = reasonPayload === 'missed' || reasonPayload === 'missed-call' || reasonPayload === 'timeout' || reasonPayload === 'cancel';
+    const isMissedTimeoutReason = reasonPayload === 'missed' || reasonPayload === 'missed-call' || reasonPayload === 'timeout';
 
-    if (!(iAmCallee && (isExplicitByEvent || isExplicitByReason))) {
-      console.log('[webrtc] addMissedCallFromSignaling -> ignored (not callee or not explicit)', { iAmCallee, isExplicitByEvent, isExplicitByReason });
+    if (!(iAmCallee && (isMissedTimeoutEvent || isMissedTimeoutReason))) {
+      console.log('[webrtc] addMissedCallFromSignaling -> ignored (not callee or not timeout missed)', { iAmCallee, isMissedTimeoutEvent, isMissedTimeoutReason });
       return;
     }
 

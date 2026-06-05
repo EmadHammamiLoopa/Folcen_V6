@@ -27,6 +27,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { SessionStoreService } from './services/session-store.service';
 import { DataService } from './services/data.service';
 import { PerformanceMonitorService } from './services/performance-monitor.service';
+import { RingerService } from './services/ringer.service';
 
 import { AnnouncementModalComponent } from './components/announcement-modal/announcement-modal.component';
 
@@ -73,6 +74,7 @@ export class AppComponent implements OnDestroy {
   private destroy$ = new Subject<void>();
   private incomingCallKeys = new Set<string>();
   private pendingIncomingCallUrl: string | null = null;
+  private directIncomingCallLaunch = false;
 
   constructor(
     private platform: Platform,
@@ -99,7 +101,8 @@ export class AppComponent implements OnDestroy {
     private sessionStore: SessionStoreService,
     private dataService: DataService,
     public webRTC: WebrtcService,
-    private perfMonitor: PerformanceMonitorService
+    private perfMonitor: PerformanceMonitorService,
+    private ringer: RingerService
   ) {
     // Expose performance monitor globally for debugging
     (window as any).__perfMonitor = this.perfMonitor;
@@ -139,17 +142,25 @@ export class AppComponent implements OnDestroy {
       window.addEventListener('announcement-notification-tapped', this.announcementTapHandler as any);
 
       this.incomingCallHandler = (ev: any) => {
-        this.handleIncomingCallInvite(ev?.detail || ev);
+        const detail = ev?.detail || ev;
+        if (typeof detail === 'string') {
+          this.handleIncomingCallUrl(detail);
+        } else if (detail?.url) {
+          this.handleIncomingCallUrl(detail.url);
+        } else {
+          this.handleIncomingCallInvite(detail);
+        }
       };
       window.addEventListener('folcen-incoming-call', this.incomingCallHandler as any);
+      window.addEventListener('folcen-incoming-call-url', this.incomingCallHandler as any);
     } catch (e) {}
     // Subscribe to central user store so this.user stays in sync across pages
     try {
       this.userSub = this.userService.currentUser.subscribe((u) => {
         if (u) {
           this.user = u;
-          this.checkAnnouncements();
-          if (this.requestsLoadedForUser !== u.id) {
+          if (!this.directIncomingCallLaunch) this.checkAnnouncements();
+          if (!this.directIncomingCallLaunch && this.requestsLoadedForUser !== u.id) {
             this.requestsLoadedForUser = u.id;
             this.loadRequests();
           }
@@ -308,6 +319,7 @@ export class AppComponent implements OnDestroy {
     try { if (this.forceLogoutMessageHandler) window.removeEventListener('message', this.forceLogoutMessageHandler); } catch (e) {}
     try { if (this.announcementTapHandler) window.removeEventListener('announcement-notification-tapped', this.announcementTapHandler); } catch (e) {}
     try { if (this.incomingCallHandler) window.removeEventListener('folcen-incoming-call', this.incomingCallHandler); } catch (e) {}
+    try { if (this.incomingCallHandler) window.removeEventListener('folcen-incoming-call-url', this.incomingCallHandler); } catch (e) {}
     try { if (this.connectionMonitorInterval) { clearInterval(this.connectionMonitorInterval); this.connectionMonitorInterval = null; } } catch (e) {}
   }
 
@@ -396,6 +408,16 @@ export class AppComponent implements OnDestroy {
         }
       } catch (e) { /* ignore */ }
 
+      CapacitorApp.addListener('appUrlOpen', (event: any) => {
+        this.handleIncomingCallUrl(event?.url);
+      });
+
+      const launch = await CapacitorApp.getLaunchUrl().catch(() => null as any);
+      if (this.isIncomingCallUrl(launch?.url)) {
+        this.prepareDirectIncomingCallLaunch(launch.url);
+        this.fetchUserFromLocalStorage();
+      }
+
       // Initialize session/user once per app boot (deduped)
       console.log('⏳ Initializing session store...');
       try {
@@ -423,20 +445,10 @@ export class AppComponent implements OnDestroy {
           const extra: any = notification.notification.extra || {};
           const callerId = extra.callerId || extra.fromUserId;
           if (callerId) {
-            this.router.navigate(['/messages/video', callerId], {
-              queryParams: { answer: true, callId: extra.callId || undefined, autoAnswer: true },
-            });
+            this.handleIncomingCallUrl(this.buildIncomingCallUrl(callerId, extra.callId, 'answer'));
           }
         },
       );
-
-      CapacitorApp.addListener('appUrlOpen', (event: any) => {
-        this.handleIncomingCallUrl(event?.url);
-      });
-
-      CapacitorApp.getLaunchUrl().then((launch: any) => {
-        this.handleIncomingCallUrl(launch?.url);
-      }).catch(() => {});
 
       CapacitorApp.addListener('resume', () => {
         console.log('📱 App resumed - checking connections...');
@@ -488,7 +500,7 @@ export class AppComponent implements OnDestroy {
 
       setTimeout(() => {
         console.log('✨ Hiding splash screen');
-        this.showSplash = false;
+        if (!this.directIncomingCallLaunch) this.showSplash = false;
       }, 1200);
     });
 
@@ -638,7 +650,7 @@ export class AppComponent implements OnDestroy {
   private normalizeCallInvite(data: any = {}) {
     const callerId = data.callerId || data.fromUserId || data.from;
     if (!callerId) return null;
-    const callId = data.callId || `legacy-${callerId}-${data.timestamp || Date.now()}`;
+    const callId = data.callId || data.requestId || `legacy-${callerId}-${data.timestamp || Date.now()}`;
     return {
       ...data,
       type: data.type || 'incoming_call',
@@ -669,6 +681,13 @@ export class AppComponent implements OnDestroy {
     this.incomingCallKeys.add(key);
     setTimeout(() => this.incomingCallKeys.delete(key), 45000);
 
+    const validation = await this.validateIncomingCallAction(invite.callId);
+    if (!validation.answerable) {
+      console.log('Ignoring non-answerable incoming call invite:', { callId: invite.callId, validation });
+      this.cleanupIncomingCall(invite.callId, `invite-invalid:${validation.status || 'unknown'}`);
+      return;
+    }
+
     console.log('Incoming call invite:', invite);
     localStorage.setItem('partnerId', invite.callerId);
 
@@ -695,31 +714,116 @@ export class AppComponent implements OnDestroy {
     return hash % 2147483647;
   }
 
-  private handleIncomingCallUrl(url?: string) {
-    if (!url || !url.startsWith('folcen://incoming-call')) return;
+  private isIncomingCallUrl(url?: string): boolean {
+    return !!url && url.startsWith('folcen://incoming-call');
+  }
+
+  private prepareDirectIncomingCallLaunch(url?: string) {
+    if (!this.isIncomingCallUrl(url)) return;
+    this.directIncomingCallLaunch = true;
+    this.pendingIncomingCallUrl = url;
+    this.showSplash = false;
+    try { this.changeDetectorRef.detectChanges(); } catch (_) {}
+  }
+
+  private buildIncomingCallUrl(callerId: string, callId?: string, action: 'answer' | 'reject' = 'answer'): string {
+    const answer = action === 'answer';
+    const params = new URLSearchParams({
+      callerId: callerId || '',
+      fromUserId: callerId || '',
+      callId: callId || '',
+      requestId: callId || '',
+      answer: answer ? 'true' : 'false',
+      action,
+      autoAnswer: answer ? 'true' : 'false'
+    });
+    return `folcen://incoming-call?${params.toString()}`;
+  }
+
+  private async handleIncomingCallUrl(url?: string) {
+    if (!this.isIncomingCallUrl(url)) return;
+    this.prepareDirectIncomingCallLaunch(url);
     if (!this.user?.id) {
       this.pendingIncomingCallUrl = url;
       return;
     }
+    this.pendingIncomingCallUrl = null;
     try {
       const parsed = new URL(url);
       const callerId = parsed.searchParams.get('callerId') || parsed.searchParams.get('fromUserId');
-      const callId = parsed.searchParams.get('callId') || undefined;
+      const callId = parsed.searchParams.get('callId') || parsed.searchParams.get('requestId') || undefined;
       const action = parsed.searchParams.get('action') || (parsed.searchParams.get('answer') === 'false' ? 'reject' : 'answer');
       const autoAnswer = parsed.searchParams.get('autoAnswer') === 'true' || action === 'answer';
       if (!callerId) return;
+
+      console.log('[incoming-call] action clicked', { action, callerId, callId });
+      const validation = await this.validateIncomingCallAction(callId);
+      console.log('[incoming-call] backend validation result', validation);
+      if (!validation.answerable) {
+        this.toastService.presentErrorToastr('This call is no longer available.');
+        this.cleanupIncomingCall(callId, `invalid:${validation.status || 'unknown'}`);
+        return;
+      }
+
       if (action === 'reject') {
         this.rejectIncomingCallFromUrl(callerId, callId);
         return;
       }
       this.zone.run(() => {
         this.router.navigate(['/messages/video', callerId], {
-          queryParams: { answer: true, callId, autoAnswer },
+          queryParams: { answer: true, callId, autoAnswer, directCall: '1' },
+        }).finally(() => {
+          this.directIncomingCallLaunch = false;
         });
       });
     } catch (e) {
       console.warn('Failed to handle incoming call url:', e);
     }
+  }
+
+  private async validateIncomingCallAction(callId?: string): Promise<{ answerable: boolean; status?: string; error?: string }> {
+    if (!callId) return { answerable: true, status: 'legacy-no-call-id' };
+    try {
+      await SocketService.initializeSocket();
+      SocketService.bindToAuthUser();
+      await Promise.race([
+        SocketService.ensureConnected(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('socket validation timeout')), 5000))
+      ]);
+      const socket = await SocketService.getSocket();
+      if (!socket?.connected) return { answerable: false, status: 'socket-not-ready' };
+
+      return await new Promise(resolve => {
+        const timedSocket: any = (socket as any).timeout ? (socket as any).timeout(5000) : socket;
+        timedSocket.emit('call-state-check', { callId }, (errOrAck: any, maybeAck?: any) => {
+          const ack = maybeAck === undefined ? errOrAck : maybeAck;
+          const err = maybeAck === undefined ? null : errOrAck;
+          if (err) return resolve({ answerable: false, status: 'validation-timeout' });
+          resolve({
+            answerable: ack?.answerable === true,
+            status: ack?.status || ack?.state,
+            error: ack?.error
+          });
+        });
+      });
+    } catch (e: any) {
+      console.warn('[incoming-call] backend validation failed; blocking stale call action', e);
+      return { answerable: false, status: 'validation-error', error: e?.message };
+    }
+  }
+
+  private cleanupIncomingCall(callId?: string, reason = 'cleanup') {
+    console.log('[incoming-call] cleanup', { callId, reason });
+    try { if (callId) this.incomingCallKeys.add(callId); } catch (_) {}
+    this.directIncomingCallLaunch = false;
+    try { this.audio?.pause(); } catch (_) {}
+    try { this.ringer.stop(callId, reason); } catch (_) {}
+    try { localStorage.removeItem('partnerId'); } catch (_) {}
+    this.zone.run(() => {
+      if (this.router.url.includes('/messages/video')) {
+        this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
+      }
+    });
   }
 
   private async rejectIncomingCallFromUrl(callerId: string, callId?: string) {
@@ -735,16 +839,13 @@ export class AppComponent implements OnDestroy {
         at: Date.now(),
       };
       if (socket?.connected) {
+        console.log('[incoming-call] reject handler executed', payload);
         socket.emit('video-call-declined', { from: callerId, to: payload.to, callId, reason: 'declined' });
       }
     } catch (e) {
       console.warn('Failed to reject incoming call from notification:', e);
     } finally {
-      this.zone.run(() => {
-        if (this.router.url.includes('/messages/video')) {
-          this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
-        }
-      });
+      this.cleanupIncomingCall(callId, 'reject');
     }
   }
 
@@ -769,19 +870,12 @@ export class AppComponent implements OnDestroy {
         console.log('🚫 Call canceled.', data);
         this.audio?.pause();
         localStorage.removeItem('partnerId');
-        // If I'm the callee and this is a cancel/timeout, register missed call
-        if (data && data.notify && this.user?.id) {
-          this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'video-canceled');
-        }
       });
 
       socket.off('video-call-timeout').on('video-call-timeout', (data) => {
         console.log('⏰ Call timed out.', data);
         this.audio?.pause();
         localStorage.removeItem('partnerId');
-        if (this.user?.id) {
-          this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'video-call-timeout');
-        }
       });
 
       socket.off('missed-call').on('missed-call', (data) => {
@@ -799,6 +893,7 @@ export class AppComponent implements OnDestroy {
   }
 
   getUserData() {
+    if (this.user?.id) return;
     if (this.platform.is('cordova')) {
       // prefer new 'currentUser' key, fallback to legacy 'user'
       this.nativeStorage
@@ -865,13 +960,14 @@ export class AppComponent implements OnDestroy {
       console.error('WebSocket initialization failed:', err);
     }
 
-    setTimeout(() => this.initWebrtc(), 2500);
-    this.connectUser();
     if (this.pendingIncomingCallUrl) {
       const pendingUrl = this.pendingIncomingCallUrl;
       this.pendingIncomingCallUrl = null;
-      setTimeout(() => this.handleIncomingCallUrl(pendingUrl), 100);
+      this.handleIncomingCallUrl(pendingUrl);
     }
+
+    setTimeout(() => this.initWebrtc(), 2500);
+    this.connectUser();
     this.changeDetectorRef.detectChanges();
 
   }

@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
-import { Resolve } from '@angular/router';
+import { ActivatedRouteSnapshot, Resolve } from '@angular/router';
 import { from, Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { SessionStoreService } from '../services/session-store.service';
 import { User } from '../models/User';
+import { UserService } from '../services/user.service';
 
 /**
  * Idempotent resolver that ensures the session/user initialization has run
@@ -12,9 +13,20 @@ import { User } from '../models/User';
  */
 @Injectable({ providedIn: 'root' })
 export class SessionInitResolver implements Resolve<User | null> {
-  constructor(private sessionStore: SessionStoreService) {}
+  constructor(
+    private sessionStore: SessionStoreService,
+    private userService: UserService
+  ) {}
 
-  resolve(): Observable<User | null> {
+  resolve(route: ActivatedRouteSnapshot): Observable<User | null> {
+    if (
+      route.queryParamMap.get('directCall') === '1' &&
+      route.queryParamMap.get('answer') === 'true' &&
+      route.queryParamMap.get('callId')
+    ) {
+      return of(this.userService.currentUserValue || null);
+    }
+
     return from(this.sessionStore.init()).pipe(
       tap(() => {
         // Expose metrics for verification without altering logic
