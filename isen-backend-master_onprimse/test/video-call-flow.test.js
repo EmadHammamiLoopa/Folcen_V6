@@ -447,4 +447,39 @@ describe('video call request flow', function () {
       peerStore.get = originalPeerGet;
     }
   });
+
+  it('allows peer lookup when either side still has the friendship during sync', async function () {
+    const User = require('../app/models/User');
+    const peerStore = require('../app/utils/peerStorage');
+    const router = require('../routes/user');
+    const originalFindById = User.findById;
+    const originalPeerGet = peerStore.get;
+
+    User.findById = id => ({
+      select: () => ({
+        lean: async () => ({
+          _id: id,
+          friends: String(id) === callerId ? [calleeId] : []
+        })
+      })
+    });
+    peerStore.get = async () => ({ peerId: `${calleeId}-peer-live` });
+
+    try {
+      const layer = router.stack.find(item => item.route?.path === '/:userId/peer' && item.route?.methods?.get);
+      const handler = layer.route.stack[layer.route.stack.length - 1].handle;
+      let body;
+      await handler(
+        { params: { userId: calleeId }, query: {}, auth: { _id: callerId }, authUser: { _id: callerId } },
+        { status() { return this; }, json(value) { body = value; return value; } },
+        err => { throw err; }
+      );
+
+      assert.strictEqual(body.success, true);
+      assert.strictEqual(body.peerId, `${calleeId}-peer-live`);
+    } finally {
+      User.findById = originalFindById;
+      peerStore.get = originalPeerGet;
+    }
+  });
 });

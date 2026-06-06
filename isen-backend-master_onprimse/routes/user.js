@@ -159,7 +159,7 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
 
     const callerHasCallee = (callerDoc.friends || []).map(String).includes(String(userId));
     const calleeHasCaller = (calleeDoc.friends || []).map(String).includes(callerId);
-    const isFriend = callerHasCallee && calleeHasCaller;
+    const isFriend = callerHasCallee || calleeHasCaller;
     let validOneTimeRequest = false;
 
     if (!isFriend && req.query?.videoRequestId) {

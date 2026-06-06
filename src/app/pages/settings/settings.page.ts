@@ -159,6 +159,7 @@ export class SettingsPage implements OnInit, OnDestroy {
   }
 
   async getUser() {
+    try { this.userService.refreshCurrentUser({ forceRefresh: true }).subscribe(() => {}, () => {}); } catch (e) {}
     this.userService.currentUser.pipe(takeUntil(this.destroy$)).subscribe(user => {
       if (user) {
         this.user = user;
@@ -448,16 +449,15 @@ export class SettingsPage implements OnInit, OnDestroy {
     this.isUpdating = true;
     this.userService.updateNonFriendVideoRequests(newValue).subscribe(
       (resp: any) => {
+        const updatedUser = resp?.data || resp?.user || null;
         if (resp && resp.data) {
-          this.user = resp.data;
-          this.allowVideoRequestsFromNonFriends = this.user.allowVideoRequestsFromNonFriends !== false;
-          this.userService.setCurrentUser(resp.data, { force: true });
+          this.user = new User().initialize(updatedUser);
         } else {
           this.user.allowVideoRequestsFromNonFriends = newValue;
-          this.allowVideoRequestsFromNonFriends = newValue;
-          this.userService.setCurrentUser(this.user, { force: true });
         }
-        this.userService.refreshCurrentUser({ forceRefresh: true }).subscribe(() => {}, () => {});
+        this.user.allowVideoRequestsFromNonFriends = newValue;
+        this.allowVideoRequestsFromNonFriends = newValue;
+        this.userService.setCurrentUser(this.user, { force: true });
         this.toastService.presentSuccessToastr(resp.message || 'Video request setting updated');
         this.loading = false;
         setTimeout(() => {

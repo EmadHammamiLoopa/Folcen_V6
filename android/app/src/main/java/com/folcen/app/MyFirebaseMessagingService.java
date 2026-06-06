@@ -40,7 +40,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 Log.d(TAG, "App is foreground; socket UI will handle incoming call");
                 return;
             }
-            showIncomingCall(data);
+            openIncomingCallScreen(data);
             return;
         }
 
@@ -126,6 +126,22 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setContentIntent(fullScreenIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+    }
+
+    private void openIncomingCallScreen(Map<String, String> data) {
+        String callerId = firstNonEmpty(data.get("callerId"), data.get("fromUserId"), data.get("from"));
+        String callId = firstNonEmpty(data.get("callId"), "call-" + System.currentTimeMillis());
+        String callerName = firstNonEmpty(data.get("callerName"), "Incoming video call");
+        int notificationId = stableNotificationId(callId);
+
+        Intent intent = incomingCallIntent(callerId, callId, callerName, notificationId);
+        try {
+            startActivity(intent);
+            Log.d(TAG, "Opened full-screen incoming call activity directly for callId=" + callId);
+        } catch (Exception e) {
+            Log.w(TAG, "Direct incoming call activity launch failed; falling back to full-screen notification", e);
+            showIncomingCall(data);
+        }
     }
 
     private Intent incomingCallIntent(String callerId, String callId, String callerName, int notificationId) {
