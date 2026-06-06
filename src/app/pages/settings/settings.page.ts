@@ -16,6 +16,7 @@ import { Socket } from 'socket.io-client';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { environment } from 'src/environments/environment';
+import { GuidedTourService } from 'src/app/services/guided-tour.service';
 
 @Component({
   selector: 'app-settings',
@@ -49,7 +50,8 @@ export class SettingsPage implements OnInit, OnDestroy {
     private modalCtrl: ModalController,
     private themeService: ThemeService,
     private changeDetectorRef: ChangeDetectorRef
-    , private idService: IdService
+    , private idService: IdService,
+    private guidedTour: GuidedTourService
   ) {}
 
   async ngOnInit() {
@@ -520,6 +522,10 @@ export class SettingsPage implements OnInit, OnDestroy {
     });
 
     await modal.present();
+  }
+
+  async replayGuideTour() {
+    await this.guidedTour.replay();
   }
 
   async deleteAccount() {

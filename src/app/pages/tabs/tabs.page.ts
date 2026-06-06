@@ -9,6 +9,7 @@ import { AppEventsService, TabKey } from 'src/app/services/app-events.service';
 import { SocketService } from 'src/app/services/socket.service';
 import { UserService } from 'src/app/services/user.service';
 import { environment } from 'src/environments/environment';
+import { GuidedTourService } from 'src/app/services/guided-tour.service';
 
 @Component({
   selector: 'app-tabs',
@@ -45,7 +46,8 @@ export class TabsPage implements OnInit, OnDestroy {
     private router: Router,
     private badges: AppEventsService,
     private requestService: RequestService,
-    private userService: UserService
+    private userService: UserService,
+    private guidedTour: GuidedTourService
   ) {}
 
   async ngOnInit() {
@@ -171,7 +173,10 @@ export class TabsPage implements OnInit, OnDestroy {
         if (this.currentUrl.includes('/tabs/friends')) {
           this.badges.reset('friends');
         }
+        setTimeout(() => this.guidedTour.maybeStartAfterSignup(), 450);
       });
+
+    setTimeout(() => this.guidedTour.maybeStartAfterSignup(), 900);
   }
 
   ngOnDestroy() {

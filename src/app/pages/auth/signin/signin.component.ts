@@ -457,7 +457,9 @@ export class SigninComponent implements OnInit {
 
   // Google Sign-in method
   async googleSignin() {
+    this.pageLoading = true;
     try {
+      await this.clearStaleAuthData();
       const resp = await this.auth.googleSignIn();
       console.log('Google Sign-In response:', resp);
       this.pageLoading = false;

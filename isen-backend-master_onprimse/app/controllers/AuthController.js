@@ -523,6 +523,26 @@ exports.firebaseLogin = async (req, res) => {
 
         const { uid, email, email_verified } = decodedToken;
         logger.info(`[firebaseLogin] Verified UID: ${uid}, Email: ${email}`);
+        const profileInput = (profile && typeof profile === 'object') ? profile : {};
+        const identities = decodedToken.firebase && decodedToken.firebase.identities ? decodedToken.firebase.identities : {};
+        const googleIds = Array.isArray(identities['google.com']) ? identities['google.com'] : [];
+        const googleId = profileInput.googleId || googleIds[0];
+        const tokenName = String(decodedToken.name || profileInput.name || '').trim();
+        const nameParts = tokenName.split(/\s+/).filter(Boolean);
+        const tokenPicture = decodedToken.picture || profileInput.photoURL || '';
+        const fallbackName = email ? String(email).split('@')[0] : 'Google';
+        const socialProfile = {
+            ...profileInput,
+            firstName: profileInput.firstName || nameParts[0] || fallbackName,
+            lastName: profileInput.lastName || nameParts.slice(1).join(' ') || '',
+            email: email ? String(email).toLowerCase() : profileInput.email,
+            mainAvatar: profileInput.mainAvatar || tokenPicture || '',
+            avatar: Array.isArray(profileInput.avatar) && profileInput.avatar.length
+                ? profileInput.avatar
+                : (tokenPicture ? [tokenPicture] : []),
+            googleId: googleId || profileInput.googleId,
+            emailVerified: email_verified || profileInput.emailVerified || false
+        };
 
         // Find or create user
         let user = await User.findOne({ 
@@ -534,10 +554,10 @@ exports.firebaseLogin = async (req, res) => {
 
         if (!user) {
             // If user doesn't exist and profile is provided, create new user (Sign-up flow)
-            if (profile) {
+            if (profile || email) {
                 user = new User({
-                    ...profile,
-                    email: email.toLowerCase(),
+                    ...socialProfile,
+                    email: String(email || socialProfile.email).toLowerCase(),
                     firebaseUid: uid,
                     enabled: true,
                     emailVerified: email_verified || false
@@ -547,6 +567,9 @@ exports.firebaseLogin = async (req, res) => {
                 if (!user.mainAvatar) {
                     user.mainAvatar = user.getDefaultAvatar();
                 }
+                if (!Array.isArray(user.avatar) || user.avatar.length === 0) {
+                    user.avatar = [user.mainAvatar];
+                }
 
                 await autoFollowStaticChannels(user);
                 await addLocalChannels(user);
@@ -554,14 +577,14 @@ exports.firebaseLogin = async (req, res) => {
                 await user.save();
                 
                 // Record legal acceptance if provided in profile
-                if (profile.acceptedTerms) {
+                if (socialProfile.acceptedTerms) {
                     try {
                         const LegalAcceptance = require("../models/LegalAcceptance");
                         await LegalAcceptance.create({
                             userId: user._id,
                             documentType: 'terms_and_privacy',
                             documentVersion: process.env.TERMS_VERSION || '1.0.0',
-                            acceptanceContext: 'firebase_signup',
+                            acceptanceContext: socialProfile.acceptanceContext || 'firebase_signup',
                             meta: { ip: req.ip, userAgent: req.get('User-Agent') }
                         });
                     } catch (e) {
@@ -632,6 +655,19 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
             // Always sync emailVerified from Firebase (covers legacy users and re-logins)
             if (email_verified && !user.emailVerified) {
                 user.emailVerified = true;
+            }
+            if (googleId && !user.googleId) {
+                user.googleId = googleId;
+            }
+            if ((!user.firstName || user.firstName === 'undefined') && socialProfile.firstName) {
+                user.firstName = socialProfile.firstName;
+            }
+            if (!user.lastName && socialProfile.lastName) {
+                user.lastName = socialProfile.lastName;
+            }
+            if (tokenPicture && (!user.mainAvatar || !Array.isArray(user.avatar) || user.avatar.length === 0)) {
+                user.mainAvatar = tokenPicture;
+                user.avatar = [tokenPicture];
             }
             // If rawPassword is provided (MongoDB-fallback signin path) the caller has
             // already authenticated with Firebase, so we trust this password is correct.

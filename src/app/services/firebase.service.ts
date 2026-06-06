@@ -11,6 +11,10 @@ import {
   onAuthStateChanged,
   updateProfile,
   deleteUser,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   User as FirebaseUser
 } from 'firebase/auth';
 import { environment } from 'src/environments/environment';
@@ -20,19 +24,23 @@ import { environment } from 'src/environments/environment';
 })
 export class FirebaseService {
   private auth;
+  private googleProvider = new GoogleAuthProvider();
 
   constructor() {
-    const firebaseConfig = {
-      apiKey: "AIzaSyCswx6wNkbKdJ9ZQlw7WyEjSIqaAR66y0g",
-      authDomain: "folcen-8fd1c.firebaseapp.com",
-      projectId: "folcen-8fd1c",
-      storageBucket: "folcen-8fd1c.firebasestorage.app",
-      messagingSenderId: "309126815402",
-      appId: "1:309126815402:android:825e97660fdf00e09fbad3"
+    const firebaseConfig = (environment as any).firebase || {
+      apiKey: 'AIzaSyDhsfCyHSsvwjhGLTSPP4lhMtgpFGv2lsI',
+      authDomain: 'folcen-8fd1c.firebaseapp.com',
+      projectId: 'folcen-8fd1c',
+      storageBucket: 'folcen-8fd1c.firebasestorage.app',
+      messagingSenderId: '309126815402',
+      appId: '1:309126815402:android:825e97660fdf00e09fbad3'
     };
 
     const app = initializeApp(firebaseConfig);
     this.auth = getAuth(app);
+    this.googleProvider.addScope('profile');
+    this.googleProvider.addScope('email');
+    this.googleProvider.setCustomParameters({ prompt: 'select_account' });
   }
 
   getAuth() {
@@ -58,6 +66,30 @@ export class FirebaseService {
       devLogger.error('[DEBUG] FirebaseService: signInWithEmailAndPassword error:', error);
       throw error;
     }
+  }
+
+  async signInWithGoogle(): Promise<FirebaseUser> {
+    try {
+      const credential = await signInWithPopup(this.auth, this.googleProvider);
+      return credential.user;
+    } catch (error: any) {
+      const redirectCodes = new Set([
+        'auth/popup-blocked',
+        'auth/cancelled-popup-request',
+        'auth/operation-not-supported-in-this-environment'
+      ]);
+      if (redirectCodes.has(error?.code)) {
+        await signInWithRedirect(this.auth, this.googleProvider);
+        const result = await getRedirectResult(this.auth);
+        if (result?.user) return result.user;
+      }
+      throw error;
+    }
+  }
+
+  async getGoogleRedirectUser(): Promise<FirebaseUser | null> {
+    const result = await getRedirectResult(this.auth);
+    return result?.user || null;
   }
 
   async logout() {

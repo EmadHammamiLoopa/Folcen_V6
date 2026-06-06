@@ -64,89 +64,48 @@ export class AuthService extends DataService {
   }
 
   googleSignIn() {
-    if (this.platform.is('cordova')) {
-      return this.googlePlus.login({
-        'webClientId': '785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com',
-        'offline': true
-      }).then(response => {
-        console.log('Google login response:', response);
-        // Send the token to your backend for verification and user creation
-        return this.sendRequest({
-          method: 'post',
-          url: 'google-signin',
-          data: { token: response.idToken }
-        });
-      }).catch(error => {
-        console.error('Google login error:', error);
-        throw error;
-      });
-    } else {
-      // Fallback for web browser
-      return new Promise((resolve, reject) => {
-        this.loadGoogleAuthLibrary().then(() => {
-          const auth2 = gapi.auth2.getAuthInstance();
-          auth2.signIn().then((googleUser: any) => {
-            const idToken = googleUser.getAuthResponse().id_token;
-            console.log('Google login response:', googleUser);
-            // Send the token to your backend for verification and user creation
-            this.sendRequest({
-              method: 'post',
-              url: 'google-signin',
-              data: { token: idToken }
-            }).then(resolve).catch(reject);
-          }).catch((error: any) => {
-            console.error('Google login error:', error);
-            reject(error);
-          });
-        }).catch((error: any) => {
-          console.error('Google Auth Library load error:', error);
-          reject(error);
-        });
-      });
-    }
+    return this.firebaseGoogleLogin('google_signin');
   }
 
   googleSignUp() {
-    if (this.platform.is('cordova')) {
-      return this.googlePlus.login({
-        'webClientId': '785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com',
-        'offline': true
-      }).then(response => {
-        console.log('Google login response:', response);
-        // Send the token to your backend for verification and user creation
-        return this.sendRequest({
-          method: 'post',
-          url: 'google-signup',
-          data: { token: response.idToken }
-        });
-      }).catch(error => {
-        console.error('Google signup error:', error);
-        throw error;
+    return this.firebaseGoogleLogin('google_signup');
+  }
+
+  private async firebaseGoogleLogin(context: 'google_signin' | 'google_signup') {
+    try {
+      const fbUser = await this.firebaseSvc.signInWithGoogle();
+      const idToken = await fbUser.getIdToken();
+      return await this.sendRequest({
+        method: 'post',
+        url: 'firebase-login',
+        data: {
+          idToken,
+          profile: this.buildGoogleProfile(fbUser, context)
+        }
       });
-    } else {
-      // Fallback for web browser
-      return new Promise((resolve, reject) => {
-        this.loadGoogleAuthLibrary().then(() => {
-          const auth2 = gapi.auth2.getAuthInstance();
-          auth2.signIn().then((googleUser: any) => {
-            const idToken = googleUser.getAuthResponse().id_token;
-            console.log('Google login response:', googleUser);
-            // Send the token to your backend for verification and user creation
-            this.sendRequest({
-              method: 'post',
-              url: 'google-signup',
-              data: { token: idToken }
-            }).then(resolve).catch(reject);
-          }).catch((error: any) => {
-            console.error('Google signup error:', error);
-            reject(error);
-          });
-        }).catch((error: any) => {
-          console.error('Google Auth Library load error:', error);
-          reject(error);
-        });
-      });
+    } catch (err) {
+      throw this.handleAuthError(err);
     }
+  }
+
+  private buildGoogleProfile(fbUser: any, context: 'google_signin' | 'google_signup') {
+    const displayName = String(fbUser?.displayName || '').trim();
+    const nameParts = displayName.split(/\s+/).filter(Boolean);
+    const email = String(fbUser?.email || '').trim().toLowerCase();
+    const fallbackName = email ? email.split('@')[0] : 'Google';
+    const photoURL = fbUser?.photoURL || '';
+
+    return {
+      firstName: nameParts[0] || fallbackName,
+      lastName: nameParts.slice(1).join(' ') || '',
+      email,
+      mainAvatar: photoURL,
+      avatar: photoURL ? [photoURL] : [],
+      emailVerified: fbUser?.emailVerified === true,
+      acceptedTerms: true,
+      signupProvider: 'google',
+      acceptanceContext: context
+    };
   }
 
   async firebaseSignup(email: string, password: string, profile: any) {

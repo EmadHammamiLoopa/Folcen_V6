@@ -44,6 +44,17 @@
           Login
         </ion-button>
 
+        <ion-button
+          type="button"
+          expand="block"
+          fill="outline"
+          class="google-btn"
+          (click)="googleSignin()"
+        >
+          <ion-icon name="logo-google" slot="start"></ion-icon>
+          Continue with Google
+        </ion-button>
+
         <div class="register-link-container">
           <span>Don't have an account?</span>
           <ion-button fill="clear" routerLink="/auth/signup" class="register-link">
@@ -66,4 +77,3 @@
     Back
   </ion-button>
 </ion-footer>
-

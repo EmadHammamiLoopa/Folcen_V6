@@ -228,6 +228,28 @@ ion-item {
   @media (max-height: 667px) { height: 48px; font-size: 0.95rem; }
 }
 
+.google-auth-btn {
+  --border-color: rgba(var(--ion-color-primary-rgb), 0.45);
+  --color: var(--ion-color-primary);
+  --border-radius: 14px;
+  height: 52px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 18px;
+  text-transform: none;
+
+  ion-icon {
+    font-size: 18px;
+  }
+}
+
+.google-terms {
+  color: var(--folcen-text-muted, #888);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 10px 12px 0;
+}
+
 .back-btn {
   --color: var(--folcen-text-muted);
 }

@@ -15,6 +15,7 @@ import { UserService } from '../../../services/user.service';
 import { User } from '../../../models/User';
 import { SocketService } from '../../../services/socket.service';
 import { OneSignalService } from '../../../services/one-signal.service';
+import { GuidedTourService } from 'src/app/services/guided-tour.service';
 
 @Component({
   selector: 'app-signup',
@@ -83,7 +84,8 @@ export class SignupComponent implements OnInit, OnDestroy {
     private userService: UserService,
     private oneSignalService: OneSignalService,
     private platform: Platform,
-    private pickerCtrl: PickerController
+    private pickerCtrl: PickerController,
+    private guidedTour: GuidedTourService
   ) { }
 
   ionViewWillEnter() {
@@ -142,6 +144,7 @@ export class SignupComponent implements OnInit, OnDestroy {
         if (resp && resp.data && resp.data.token) {
           this.stopVerificationPolling();
           await this.storeUserData(resp.data.token, resp.data.user);
+          this.guidedTour.markPendingForUser(resp.data.user);
           SocketService.initializeSocket()
             .then(() => SocketService.bindToAuthUser())
             .catch(() => {});
@@ -231,8 +234,25 @@ export class SignupComponent implements OnInit, OnDestroy {
     await modal.present();
   }
 
-  googleSignUp() {
-    devLogger.log('Google sign-up triggered.');
+  async googleSignUp() {
+    this.pageLoading = true;
+    try {
+      const resp = await this.auth.googleSignUp();
+      if (resp && resp.data && resp.data.token) {
+        await this.storeUserData(resp.data.token, resp.data.user);
+        this.guidedTour.markPendingForUser(resp.data.user);
+      }
+      SocketService.initializeSocket()
+        .then(() => SocketService.bindToAuthUser())
+        .catch(() => {});
+      this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
+      await this.router.navigate(['/tabs/new-friends']);
+    } catch (err: any) {
+      devLogger.error('Google sign-up error:', err);
+      this.toastService.presentErrorToastr(err?.message || 'Google sign-up failed. Please try again.');
+    } finally {
+      this.pageLoading = false;
+    }
   }
 
   async loadCountries() {
@@ -501,6 +521,7 @@ export class SignupComponent implements OnInit, OnDestroy {
       if (resp && resp.data && resp.data.token) {
         // Success! User is verified and logged in.
         await this.storeUserData(resp.data.token, resp.data.user);
+        this.guidedTour.markPendingForUser(resp.data.user);
         
         SocketService.initializeSocket()
           .then(() => SocketService.bindToAuthUser())

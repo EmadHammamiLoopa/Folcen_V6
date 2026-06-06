@@ -4,6 +4,15 @@ export const environment = {
   socketUrl: 'https://folcenv6-production.up.railway.app',
   socketPath: '/socket.io',
   SELLER_DISCLAIMER_VERSION: 'v1.0',
+  firebase: {
+    apiKey: 'AIzaSyDhsfCyHSsvwjhGLTSPP4lhMtgpFGv2lsI',
+    authDomain: 'folcen-8fd1c.firebaseapp.com',
+    projectId: 'folcen-8fd1c',
+    storageBucket: 'folcen-8fd1c.firebasestorage.app',
+    messagingSenderId: '309126815402',
+    appId: '1:309126815402:android:825e97660fdf00e09fbad3',
+    androidApiKey: 'AIzaSyCswx6wNkbKdJ9ZQlw7WyEjSIqaAR66y0g'
+  },
 
   // ── Feature flags ──────────────────────────────────────────────────────────
   // v1.0 public launch: calls, marketplace, jobs, services all hidden.

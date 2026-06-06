@@ -44,6 +44,23 @@
               <span class="d-block text-danger" *ngIf="form.get('email')?.hasError('email')">Invalid email format.</span>
               <span class="d-block text-danger" *ngFor="let error of validationErrors['email']">{{ error }}</span>
             </div>
+
+            <ion-button
+              type="button"
+              expand="block"
+              fill="outline"
+              class="google-auth-btn"
+              (click)="googleSignUp()"
+            >
+              <ion-icon name="logo-google" slot="start"></ion-icon>
+              Continue with Google
+            </ion-button>
+            <p class="google-terms">
+              By continuing with Google, you agree to the
+              <a (click)="openTermsOfService()" class="link">Terms</a>
+              and
+              <a (click)="openPrivacyPolicy()" class="link">Privacy Policy</a>.
+            </p>
           </div>
 
           <div class="form-group" *ngIf="steps[step] == 'name'">

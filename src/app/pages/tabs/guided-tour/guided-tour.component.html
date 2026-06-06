@@ -1,0 +1,29 @@
+<div class="tour-root" *ngIf="active">
+  <div class="tour-scrim"></div>
+  <div class="tour-spotlight" *ngIf="spotlight" [ngStyle]="spotlightStyle"></div>
+
+  <section [class]="cardClass" *ngIf="step">
+    <button type="button" class="skip-btn" (click)="skip()">Skip</button>
+
+    <div class="tour-icon">
+      <ion-icon [name]="step.icon"></ion-icon>
+    </div>
+
+    <div class="progress-track">
+      <span [style.width.%]="progress"></span>
+    </div>
+
+    <p class="eyebrow">Step {{ state.index + 1 }} of {{ state.steps.length }}</p>
+    <h2>{{ step.title }}</h2>
+    <p class="body">{{ step.body }}</p>
+
+    <div class="tour-actions">
+      <ion-button fill="clear" class="back-btn" [disabled]="state.index === 0" (click)="back()">
+        Back
+      </ion-button>
+      <ion-button class="next-btn" (click)="next()">
+        {{ state.index + 1 === state.steps.length ? 'Finish' : 'Next' }}
+      </ion-button>
+    </div>
+  </section>
+</div>

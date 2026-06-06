@@ -51,7 +51,7 @@
     <!-- Privacy Section -->
     <div class="settings-section">
       <h3 class="section-title">Privacy & Visibility</h3>
-      <div class="settings-card">
+      <div class="settings-card" data-tour="settings-privacy">
         <ion-item lines="none" *ngIf="false">
           <div class="icon-box">
             <ion-icon name="people-outline"></ion-icon>
@@ -138,6 +138,19 @@
     <div class="settings-section">
       <h3 class="section-title">Support & Legal</h3>
       <div class="settings-card">
+        <ion-item lines="none" button="true" (click)="replayGuideTour()" data-tour="settings-guide">
+          <div class="icon-box">
+            <ion-icon name="sparkles-outline"></ion-icon>
+          </div>
+          <ion-label>
+            <h2>Replay guide tour</h2>
+            <p>Take the quick app walkthrough again</p>
+          </ion-label>
+          <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
+        </ion-item>
+
+        <div class="divider"></div>
+
         <ion-item lines="none" button="true" (click)="openPrivacyPolicy()">
           <div class="icon-box">
             <ion-icon name="document-text-outline"></ion-icon>
