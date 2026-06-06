@@ -1,15 +1,15 @@
-/*********************************************************************
- * helpers/index.js  – single source of truth for “generic” helpers
+﻿/*********************************************************************
+ * helpers/index.js  â€“ single source of truth for â€œgenericâ€ helpers
  *********************************************************************/
 
 const Response = require('./controllers/Response');
 const Report   = require('./models/Report');
 const mongoose = require('mongoose');
 const { recordAudit } = require('./utils/audit');
-const pushSvc  = require('.././app/utils/pushService');          // FCM push shim (via app/utils/pushService → services/fcmPushService)
+const pushSvc  = require('.././app/utils/pushService');          // FCM push shim (via app/utils/pushService â†’ services/fcmPushService)
 const socketManager = require('.././app/utils/socketManager');
 
-/*────────────────────────── CONSTANTS ──────────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ CONSTANTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 const manAvatarPath   = '/avatars/male.webp';
 const womenAvatarPath = '/avatars/female.webp';
 const othersAvatarPath = '/avatars/other.webp';
@@ -87,7 +87,7 @@ const normalizeLeanDoc = (doc) => {
     return normalized;
 };
 
-/*───────────────────── Socket-IO bootstrap & helpers ───────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Socket-IO bootstrap & helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 // Live Socket.IO reference (initialized in server bootstrap via initSocket)
 let io = null;
@@ -97,7 +97,7 @@ function initSocket(ioRef) {
   io = ioRef;
 }
 
-/** Build <userId → Set<socketId>> map from live Socket.IO server */
+/** Build <userId â†’ Set<socketId>> map from live Socket.IO server */
 function connectedUsersMap() {
   return socketManager.connectedUsers;
 }
@@ -368,7 +368,7 @@ async function createNotification({ recipientId, senderId, type, title, body, da
     // Notify user via socket immediately if online (NotificationService listens)
     emitToUser(recipientId, 'notification-received', notification);
 
-    // Trigger push — use 5-arg path when data.link is set so the FCM deep-link
+    // Trigger push â€” use 5-arg path when data.link is set so the FCM deep-link
     // points to the actual content (post/comment) not a chat thread.
     if (data && data.link) {
       sendNotification(
@@ -388,7 +388,7 @@ async function createNotification({ recipientId, senderId, type, title, body, da
   }
 }
 
-/*───────────────────── REAL-TIME SIGNALING HELPERS ───────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ REAL-TIME SIGNALING HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 const realtime = {
   /** Global or friend-based presence broadcast */
@@ -543,7 +543,7 @@ async function purgeUser(userId) {
   const Notification = require('./models/Notification');
   const PushToken = require('./models/PushToken');
   const UserActivityDaily = require('./models/UserActivityDaily');
-  // new GDPR models — safe to skip if not yet migrated
+  // new GDPR models â€” safe to skip if not yet migrated
   let UserInterestProfile, UserConsent, AnalyticsEvent;
   try { UserInterestProfile = require('./models/UserInterestProfile'); } catch (e) {}
   try { UserConsent = require('./models/UserConsent'); } catch (e) {}
@@ -715,7 +715,7 @@ function buildCallInvitePayload(calleeId, callerId = null, options = {}) {
     callerName: options.callerName || '',
     callerAvatar: options.callerAvatar || '',
     timestamp: options.timestamp || now,
-    expiresAt: options.expiresAt || (now + 30 * 1000)
+    expiresAt: options.expiresAt || (now + 90 * 1000)
   };
 }
 
@@ -737,7 +737,7 @@ function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
     data: payload,
     android: {
       priority: 'high',
-      ttl: 30 * 1000,
+      ttl: 90 * 1000,
       notification: {
         channelId: 'calls',
         sound: 'default',
@@ -762,7 +762,7 @@ function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
   });
 }
 
-/*──────────────────── Misc dashboard / admin helpers ───────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Misc dashboard / admin helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 function extractDashParams(req, searchFields) {
   let page          = req.query.page     ? +req.query.page     : 1;
   if (page < 1) page = 1; // Ensure page is at least 1
@@ -885,7 +885,7 @@ const adminCheck = (req) => {
   return role === 'ADMIN' || role === 'SUPER ADMIN';
 };
 
-/*────────────────────── Push / FCM helper ─────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Push / FCM helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 async function sendNotification(userIds, message, senderName, fromUserId, recipientsOverride) {
   // Handle the 5-argument signature used by some controllers:
   // sendNotification(headings, contents, data, buttons, recipients)
@@ -918,7 +918,7 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
     .map(id => id.trim());
 
   if (recipientIds.length === 0) {
-    return console.error('❌ No valid user IDs for notification.');
+    return console.error('âŒ No valid user IDs for notification.');
   }
 
   const { sendPushToUser } = require('./services/fcmPushService');
@@ -926,37 +926,37 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
   await Promise.all(
     recipientIds.map(uid =>
       sendPushToUser(uid, { title, body, data }).catch(err =>
-        console.error('❌ FCM push error for', uid, err.message)
+        console.error('âŒ FCM push error for', uid, err.message)
       )
     )
   );
 }
 
-/*──────────────────────── Module exports ───────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Module exports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 module.exports = {
   /* constants */
   normalizeId,
-  normalizeLeanDoc,            // 👈 NEW - prevents buffer serialization in lean queries
+  normalizeLeanDoc,            // ðŸ‘ˆ NEW - prevents buffer serialization in lean queries
   manAvatarPath,
   womenAvatarPath,
   othersAvatarPath,
   ERROR_CODES,
 
   /* Socket bootstrap + helpers */
-  initSocket,                  // 👈 NEW
+  initSocket,                  // ðŸ‘ˆ NEW
   notifyPeerNeeded,
   buildCallInvitePayload,
   connectedUsersMap,
-  userSocketIds,               // 👈 now exported too
+  userSocketIds,               // ðŸ‘ˆ now exported too
   isUserConnected,
   setOnlineUsers,
-  emitToUser,                  // 👈 NEW
-  replayOfflineEvents,         // 👈 NEW
-  checkRateLimit,              // 👈 NEW
-  emitToUsers,                 // 👈 NEW
-  emitToAll,                   // 👈 NEW
-  emitNewFriendRequest,        // 👈 NEW
-  emitFriendRequestsUpdated,   // 👈 NEW
+  emitToUser,                  // ðŸ‘ˆ NEW
+  replayOfflineEvents,         // ðŸ‘ˆ NEW
+  checkRateLimit,              // ðŸ‘ˆ NEW
+  emitToUsers,                 // ðŸ‘ˆ NEW
+  emitToAll,                   // ðŸ‘ˆ NEW
+  emitNewFriendRequest,        // ðŸ‘ˆ NEW
+  emitFriendRequestsUpdated,   // ðŸ‘ˆ NEW
   emitFriendRequestAccepted,
   emitFriendRequestDeclined,
   createNotification,
@@ -973,3 +973,4 @@ module.exports = {
   /* push */
   sendNotification
 };
+

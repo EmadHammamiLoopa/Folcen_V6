@@ -1,4 +1,4 @@
-/*********************************************************************
+﻿/*********************************************************************
  * app/services/fcmPushService.js
  * -------------------------------------------------------------------
  * Drop-in replacement for the OneSignal-based pushService.
@@ -28,7 +28,7 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
 
   // Firebase Admin SDK must be initialised
   if (!admin.apps || !admin.apps.length) {
-    console.warn('[fcmPushService] Firebase Admin not initialised — skipping push');
+    console.warn('[fcmPushService] Firebase Admin not initialised â€” skipping push');
     return { successCount: 0, failureCount: 0, removedInvalid: 0 };
   }
 
@@ -74,7 +74,7 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     message.android = isIncomingCall
       ? {
           priority: android.priority || 'high',
-          ttl: android.ttl || 30 * 1000,
+          ttl: android.ttl || 90 * 1000,
           collapseKey: stringData.callId || stringData.fromUserId || stringData.callerId || 'incoming_call'
         }
       : android;
@@ -123,3 +123,4 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
 }
 
 module.exports = { sendPushToUser };
+

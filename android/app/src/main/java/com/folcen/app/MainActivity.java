@@ -3,10 +3,14 @@ package com.folcen.app;
 import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -15,6 +19,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
+
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "FolcenMainActivity";
@@ -28,6 +34,14 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ensureNotificationCapabilities();
+        dispatchIncomingCallIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        setIntent(intent);
+        super.onNewIntent(intent);
+        dispatchIncomingCallIntent(intent);
     }
 
     @Override
@@ -37,11 +51,45 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        dispatchIncomingCallIntent(getIntent());
+        dispatchIncomingCallIntentDelayed(getIntent());
+    }
+
+    @Override
     public void onStop() {
         foreground = false;
         super.onStop();
     }
 
+    private void dispatchIncomingCallIntent(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data == null) return;
+        String url = data.toString();
+        if (!url.startsWith("folcen://incoming-call")) return;
+        try {
+            getSharedPreferences("folcen_call", MODE_PRIVATE)
+                    .edit()
+                    .putString("pendingIncomingCallUrl", url)
+                    .apply();
+        } catch (Exception ignored) {}
+        if (bridge != null) {
+            try {
+                bridge.triggerWindowJSEvent("folcen-incoming-call", "{\"url\":" + JSONObject.quote(url) + "}");
+            } catch (Exception e) {
+                Log.w(TAG, "Unable to dispatch incoming call URL to WebView", e);
+            }
+        }
+    }
+    private void dispatchIncomingCallIntentDelayed(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(() -> dispatchIncomingCallIntent(intent), 500);
+        handler.postDelayed(() -> dispatchIncomingCallIntent(intent), 1500);
+        handler.postDelayed(() -> dispatchIncomingCallIntent(intent), 3000);
+    }
     /**
      * Lock the font scale to 1.0 so that Samsung / Android system "Large Font"
      * accessibility settings do not inflate the Ionic/WebView UI elements.
@@ -79,3 +127,5 @@ public class MainActivity extends BridgeActivity {
         }
     }
 }
+
+

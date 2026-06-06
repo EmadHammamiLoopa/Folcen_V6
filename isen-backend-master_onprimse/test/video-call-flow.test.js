@@ -1,4 +1,4 @@
-const assert = require('assert');
+﻿const assert = require('assert');
 const mongoose = require('mongoose');
 
 describe('video call request flow', function () {
@@ -64,6 +64,8 @@ describe('video call request flow', function () {
       assert.strictEqual(push.payload.data.callerId, callerId);
       assert.strictEqual(push.payload.android.priority, 'high');
       assert.strictEqual(push.payload.android.notification.channelId, 'calls');
+      assert.strictEqual(push.payload.android.ttl, 90 * 1000);
+      assert.ok(Number(push.payload.data.expiresAt) - Number(push.payload.data.timestamp) >= 90 * 1000);
     } finally {
       pushSvc.sendPush = originalSendPush;
     }
@@ -483,3 +485,4 @@ describe('video call request flow', function () {
     }
   });
 });
+
