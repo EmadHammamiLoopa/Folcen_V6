@@ -37,7 +37,7 @@
           <app-avatar [profile]="user" [size]="200" class="main-avatar-img" (click)="viewPhoto(mainAvatar)"></app-avatar>
           <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
           
-          <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end">
+          <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end" data-tour="profile-avatar-tools">
             <ion-fab-button size="small">
               <ion-icon name="camera"></ion-icon>
             </ion-fab-button>

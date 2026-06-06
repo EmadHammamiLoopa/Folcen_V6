@@ -4,15 +4,44 @@
   z-index: 99999;
   pointer-events: auto;
   color: var(--ion-text-color, #111827);
+  box-sizing: border-box;
+
+  * {
+    box-sizing: border-box;
+  }
 }
 
 .tour-scrim {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 16%, rgba(52, 235, 215, 0.22), transparent 30%),
-    rgba(2, 6, 23, 0.64);
-  backdrop-filter: blur(8px);
+    radial-gradient(circle at 50% 18%, rgba(52, 235, 215, 0.14), transparent 34%),
+    rgba(2, 6, 23, 0.32);
+  backdrop-filter: blur(2px);
+}
+
+.tour-aurora {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  filter: blur(34px);
+  opacity: 0.24;
+  pointer-events: none;
+  animation: auroraFloat 7s ease-in-out infinite alternate;
+}
+
+.aurora-one {
+  left: -64px;
+  top: 12%;
+  background: #34ebd7;
+}
+
+.aurora-two {
+  right: -78px;
+  bottom: 10%;
+  background: #6366f1;
+  animation-delay: -2.5s;
 }
 
 .tour-spotlight {
@@ -22,39 +51,57 @@
   border-radius: 24px;
   border: 2px solid rgba(52, 235, 215, 0.95);
   box-shadow:
-    0 0 0 9999px rgba(2, 6, 23, 0.52),
-    0 16px 42px rgba(52, 235, 215, 0.28),
+    0 0 0 9999px rgba(2, 6, 23, 0.22),
+    0 16px 42px rgba(52, 235, 215, 0.34),
     inset 0 0 24px rgba(255, 255, 255, 0.24);
   transition: transform 240ms ease, width 240ms ease, height 240ms ease;
   pointer-events: none;
+  animation: spotlightPulse 1.8s ease-in-out infinite;
 }
 
 .tour-card {
-  position: absolute;
-  left: 16px;
-  right: 16px;
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
   max-width: 440px;
   margin: 0 auto;
   padding: 20px;
   border-radius: 28px;
-  background: rgba(var(--ion-background-color-rgb, 255, 255, 255), 0.9);
-  border: 1px solid rgba(var(--ion-color-primary-rgb, 56, 128, 255), 0.18);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
-  backdrop-filter: blur(18px);
-  animation: tourCardIn 260ms ease both;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background:
+    linear-gradient(145deg, rgba(var(--ion-background-color-rgb, 255, 255, 255), 0.94), rgba(var(--ion-background-color-rgb, 255, 255, 255), 0.82)),
+    radial-gradient(circle at 0% 0%, rgba(52, 235, 215, 0.16), transparent 42%);
+  border: 1px solid rgba(var(--ion-color-primary-rgb, 56, 128, 255), 0.2);
+  box-shadow: 0 18px 58px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(14px) saturate(1.15);
+  animation: tourCardIn 320ms cubic-bezier(.2,.8,.2,1) both;
 
   &.lower {
-    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
 
   &.upper {
-    top: calc(18px + env(safe-area-inset-top, 0px));
+    top: calc(14px + env(safe-area-inset-top, 0px));
   }
 
   &.centered {
     top: 50%;
     transform: translateY(-50%);
   }
+}
+
+.tour-sparkle {
+  position: absolute;
+  top: 16px;
+  right: 62px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #34ebd7;
+  box-shadow: 16px 18px 0 rgba(99, 102, 241, 0.75), -12px 28px 0 rgba(168, 85, 247, 0.65);
+  animation: sparkleDrift 2.6s ease-in-out infinite;
 }
 
 .skip-btn {
@@ -77,6 +124,7 @@
   color: #fff;
   background: linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-secondary, #34ebd7));
   box-shadow: 0 14px 30px rgba(var(--ion-color-primary-rgb, 56, 128, 255), 0.32);
+  animation: iconFloat 2.8s ease-in-out infinite;
 
   ion-icon {
     font-size: 27px;
@@ -145,8 +193,28 @@ h2 {
 }
 
 @keyframes tourCardIn {
-  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes auroraFloat {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(22px, -18px, 0) scale(1.08); }
+}
+
+@keyframes spotlightPulse {
+  0%, 100% { border-color: rgba(52, 235, 215, 0.9); }
+  50% { border-color: rgba(255, 255, 255, 0.98); }
+}
+
+@keyframes iconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes sparkleDrift {
+  0%, 100% { opacity: 0.55; transform: translateY(0) rotate(0deg); }
+  50% { opacity: 1; transform: translateY(-5px) rotate(12deg); }
 }
 
 @media (min-width: 720px) {
@@ -166,6 +234,7 @@ h2 {
   .tour-card {
     padding: 16px;
     border-radius: 22px;
+    max-height: calc(100dvh - 20px);
   }
 
   .tour-icon {

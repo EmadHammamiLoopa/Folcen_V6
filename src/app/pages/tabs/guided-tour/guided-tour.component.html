@@ -1,8 +1,11 @@
 <div class="tour-root" *ngIf="active">
   <div class="tour-scrim"></div>
+  <div class="tour-aurora aurora-one"></div>
+  <div class="tour-aurora aurora-two"></div>
   <div class="tour-spotlight" *ngIf="spotlight" [ngStyle]="spotlightStyle"></div>
 
   <section [class]="cardClass" *ngIf="step">
+    <div class="tour-sparkle"></div>
     <button type="button" class="skip-btn" (click)="skip()">Skip</button>
 
     <div class="tour-icon">

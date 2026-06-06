@@ -22,7 +22,7 @@ export interface GuidedTourState {
 
 @Injectable({ providedIn: 'root' })
 export class GuidedTourService {
-  private readonly version = 'v1';
+  private readonly version = 'v2';
   private readonly pendingPrefix = 'folcen.guide.pending.';
   private readonly donePrefix = 'folcen.guide.done.';
   private readonly stateSubject = new BehaviorSubject<GuidedTourState>({
@@ -129,6 +129,14 @@ export class GuidedTourService {
         target: '[data-tour="tab-profile"]'
       },
       {
+        id: 'avatar-customize',
+        title: 'Make It Yours',
+        body: 'Upload photos or design a custom avatar with your own Folcen style.',
+        icon: 'color-palette-outline',
+        route: '/tabs/profile',
+        target: '[data-tour="profile-avatar-tools"]'
+      },
+      {
         id: 'friends',
         title: 'Friends & Requests',
         body: 'Accept requests, keep your circle close, and stay in control.',
@@ -161,6 +169,44 @@ export class GuidedTourService {
         target: '[data-tour="tab-channels"]'
       },
       {
+        id: 'explore-channels',
+        title: 'Explore Channels',
+        body: 'Browse city, country, and global channels to find communities worth following.',
+        icon: 'globe-outline',
+        route: '/tabs/channels/list/followed',
+        target: '[data-tour="channels-explore"]'
+      },
+      {
+        id: 'follow-channel',
+        title: 'Follow What You Like',
+        body: 'Follow channels to bring their posts closer to your daily feed.',
+        icon: 'heart-outline',
+        route: '/tabs/channels/list/explore',
+        target: '[data-tour="channel-follow"]'
+      },
+      {
+        id: 'create-channel',
+        title: 'Create a Space',
+        body: 'Start your own channel for a topic, place, event, or local group.',
+        icon: 'add-circle-outline',
+        route: '/tabs/channels/list/mines',
+        target: '[data-tour="channels-create"]'
+      },
+      {
+        id: 'post-privacy',
+        title: 'Post With Control',
+        body: 'Choose Public, Friends, or Private before you publish.',
+        icon: 'eye-outline',
+        route: '/tabs/channels/list/followed'
+      },
+      {
+        id: 'anonymous-posts',
+        title: 'Anonymity When Needed',
+        body: 'Posts and comments can protect your identity when the moment calls for it.',
+        icon: 'person-circle-outline',
+        route: '/tabs/channels/list/followed'
+      },
+      {
         id: 'feed',
         title: 'The Feed',
         body: 'A familiar stream for what friends and communities are sharing.',
@@ -179,10 +225,18 @@ export class GuidedTourService {
       {
         id: 'privacy',
         title: 'Privacy Controls',
-        body: 'Tune visibility, video requests, blocked users, and your theme.',
+        body: 'Tune profile privacy, video requests, blocked users, and who can see you.',
         icon: 'shield-checkmark-outline',
         route: '/tabs/profile/settings',
         target: '[data-tour="settings-privacy"]'
+      },
+      {
+        id: 'theme',
+        title: 'Light or Dark',
+        body: 'Switch theme anytime so Folcen feels comfortable day or night.',
+        icon: 'contrast-outline',
+        route: '/tabs/profile/settings',
+        target: '[data-tour="settings-theme"]'
       },
       {
         id: 'settings',

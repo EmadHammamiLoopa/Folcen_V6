@@ -2,13 +2,15 @@
   <div id="end-buttons">
     <button class="header-action-btn create-btn" 
             routerLink="/tabs/channels/form" 
-            *ngIf="isMines()">
+            *ngIf="isMines()"
+            data-tour="channels-create">
       <ion-icon name="add-circle"></ion-icon>
     </button>
     
     <button class="header-action-btn explore-btn" 
             (click)="router.navigate(['/tabs/channels/list/explore'])" 
-            *ngIf="isFollowed()">
+            *ngIf="isFollowed()"
+            data-tour="channels-explore">
       <ion-icon name="globe-outline"></ion-icon>
     </button>
   </div>

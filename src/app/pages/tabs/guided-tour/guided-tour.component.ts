@@ -62,7 +62,8 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
 
   get cardClass() {
     if (!this.spotlight) return 'tour-card centered';
-    return this.spotlight.top < window.innerHeight * 0.48 ? 'tour-card lower' : 'tour-card upper';
+    const cardShouldBeLower = this.spotlight.top < window.innerHeight * 0.5;
+    return cardShouldBeLower ? 'tour-card lower' : 'tour-card upper';
   }
 
   next() {

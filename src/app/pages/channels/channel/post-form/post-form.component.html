@@ -28,7 +28,7 @@
         <ion-label>Who can see this?</ion-label>
       </div>
       
-      <div class="visibility-grid">
+      <div class="visibility-grid" data-tour="post-visibility">
         <div class="visibility-item" 
              [class.active]="visibility === 'public'" 
              (click)="visibility = 'public'"
@@ -62,7 +62,7 @@
 
       <div class="divider" [style]="{'background': postTextColor, 'opacity': 0.1}"></div>
 
-      <ion-item class="ion-item-clear anonymous-toggle" [style]="{'--color': postTextColor}">
+      <ion-item class="ion-item-clear anonymous-toggle" [style]="{'--color': postTextColor}" data-tour="post-anonymous">
         <ion-icon name="person-circle-outline" slot="start" class="mr-2"></ion-icon>
         <ion-label>Post Anonymously</ion-label>
         <ion-toggle [(ngModel)]="anonyme" slot="end"></ion-toggle>
@@ -243,4 +243,3 @@
   <!-- Hidden input for media selection -->
   <input type="file" #fileInput (change)="onMediaSelected($event)" hidden accept="image/*,video/*">
 </ion-content>
-

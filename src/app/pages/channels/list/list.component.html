@@ -164,7 +164,8 @@
               *ngIf="user && !isOwner(channel)"
               class="follow-btn"
               [class.followed]="channel.followedBy(authUserId)"
-              (click)="follow(channel); $event.stopPropagation()">
+              (click)="follow(channel); $event.stopPropagation()"
+              data-tour="channel-follow">
               <i class="fas" [class.fa-heart]="!channel.followedBy(authUserId)" [class.fa-heart-broken]="channel.followedBy(authUserId)"></i>
               {{ !channel.followedBy(authUserId) ? 'Follow' : 'Unfollow' }}
             </button>
