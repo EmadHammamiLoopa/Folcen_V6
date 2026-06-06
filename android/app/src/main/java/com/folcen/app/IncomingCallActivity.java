@@ -22,6 +22,9 @@ public class IncomingCallActivity extends Activity {
     private String callerId;
     private String callId;
     private int notificationId;
+    private String receiverId;
+    private String callType;
+    private String expiresAt;
     private boolean actionTaken = false;
 
     @Override
@@ -33,6 +36,9 @@ public class IncomingCallActivity extends Activity {
         callerId = firstNonEmpty(intent.getStringExtra("callerId"), intent.getStringExtra("fromUserId"));
         callId = firstNonEmpty(intent.getStringExtra("callId"), "call-" + System.currentTimeMillis());
         notificationId = intent.getIntExtra("notificationId", 0);
+        receiverId = firstNonEmpty(intent.getStringExtra("receiverId"), intent.getStringExtra("toUserId"));
+        callType = firstNonEmpty(intent.getStringExtra("callType"), "video");
+        expiresAt = firstNonEmpty(intent.getStringExtra("expiresAt"), "");
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
         cancelNotification();
 
@@ -46,6 +52,9 @@ public class IncomingCallActivity extends Activity {
         callerId = firstNonEmpty(intent.getStringExtra("callerId"), intent.getStringExtra("fromUserId"));
         callId = firstNonEmpty(intent.getStringExtra("callId"), callId);
         notificationId = intent.getIntExtra("notificationId", notificationId);
+        receiverId = firstNonEmpty(intent.getStringExtra("receiverId"), intent.getStringExtra("toUserId"), receiverId);
+        callType = firstNonEmpty(intent.getStringExtra("callType"), callType, "video");
+        expiresAt = firstNonEmpty(intent.getStringExtra("expiresAt"), expiresAt);
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
         actionTaken = false;
         cancelNotification();
@@ -202,6 +211,10 @@ public class IncomingCallActivity extends Activity {
                 .appendQueryParameter("callerId", callerId != null ? callerId : "")
                 .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
                 .appendQueryParameter("callId", callId != null ? callId : "")
+                .appendQueryParameter("receiverId", receiverId != null ? receiverId : "")
+                .appendQueryParameter("toUserId", receiverId != null ? receiverId : "")
+                .appendQueryParameter("callType", callType != null ? callType : "video")
+                .appendQueryParameter("expiresAt", expiresAt != null ? expiresAt : "")
                 .appendQueryParameter("answer", "true")
                 .appendQueryParameter("action", "answer")
                 .appendQueryParameter("autoAnswer", "true")
@@ -225,6 +238,10 @@ public class IncomingCallActivity extends Activity {
                 .appendQueryParameter("callerId", callerId != null ? callerId : "")
                 .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
                 .appendQueryParameter("callId", callId != null ? callId : "")
+                .appendQueryParameter("receiverId", receiverId != null ? receiverId : "")
+                .appendQueryParameter("toUserId", receiverId != null ? receiverId : "")
+                .appendQueryParameter("callType", callType != null ? callType : "video")
+                .appendQueryParameter("expiresAt", expiresAt != null ? expiresAt : "")
                 .appendQueryParameter("answer", "false")
                 .appendQueryParameter("action", "reject")
                 .build();

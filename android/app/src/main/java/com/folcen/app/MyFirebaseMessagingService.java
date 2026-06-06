@@ -100,6 +100,9 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String callerId = firstNonEmpty(data.get("callerId"), data.get("fromUserId"), data.get("from"));
         String callId = firstNonEmpty(data.get("callId"), "call-" + System.currentTimeMillis());
         String callerName = firstNonEmpty(data.get("callerName"), "Incoming video call");
+        String receiverId = firstNonEmpty(data.get("receiverId"), data.get("toUserId"), data.get("to"));
+        String callType = firstNonEmpty(data.get("callType"), "video");
+        String expiresAt = firstNonEmpty(data.get("expiresAt"), data.get("expiry"));
         String title = callerName.equals("Incoming video call") ? callerName : callerName + " is calling";
         String body = firstNonEmpty(data.get("body"), "Tap to answer");
         int notificationId = stableNotificationId(callId);
@@ -107,7 +110,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         PendingIntent fullScreenIntent = PendingIntent.getActivity(
                 this,
                 notificationId,
-                incomingCallIntent(callerId, callId, callerName, notificationId),
+                incomingCallIntent(callerId, callId, callerName, receiverId, callType, expiresAt, notificationId),
                 pendingIntentFlags()
         );
 
@@ -132,9 +135,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String callerId = firstNonEmpty(data.get("callerId"), data.get("fromUserId"), data.get("from"));
         String callId = firstNonEmpty(data.get("callId"), "call-" + System.currentTimeMillis());
         String callerName = firstNonEmpty(data.get("callerName"), "Incoming video call");
+        String receiverId = firstNonEmpty(data.get("receiverId"), data.get("toUserId"), data.get("to"));
+        String callType = firstNonEmpty(data.get("callType"), "video");
+        String expiresAt = firstNonEmpty(data.get("expiresAt"), data.get("expiry"));
         int notificationId = stableNotificationId(callId);
 
-        Intent intent = incomingCallIntent(callerId, callId, callerName, notificationId);
+        Intent intent = incomingCallIntent(callerId, callId, callerName, receiverId, callType, expiresAt, notificationId);
         try {
             startActivity(intent);
             Log.d(TAG, "Opened full-screen incoming call activity directly for callId=" + callId);
@@ -144,12 +150,16 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
-    private Intent incomingCallIntent(String callerId, String callId, String callerName, int notificationId) {
+    private Intent incomingCallIntent(String callerId, String callId, String callerName, String receiverId, String callType, String expiresAt, int notificationId) {
         Intent intent = new Intent(this, IncomingCallActivity.class);
         intent.putExtra("callerId", callerId != null ? callerId : "");
         intent.putExtra("fromUserId", callerId != null ? callerId : "");
         intent.putExtra("callId", callId != null ? callId : "");
         intent.putExtra("callerName", callerName != null ? callerName : "");
+        intent.putExtra("receiverId", receiverId != null ? receiverId : "");
+        intent.putExtra("toUserId", receiverId != null ? receiverId : "");
+        intent.putExtra("callType", callType != null ? callType : "video");
+        intent.putExtra("expiresAt", expiresAt != null ? expiresAt : "");
         intent.putExtra("notificationId", notificationId);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return intent;

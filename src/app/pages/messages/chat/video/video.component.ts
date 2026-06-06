@@ -1,4 +1,4 @@
-﻿import { Location } from '@angular/common';
+import { Location } from '@angular/common';
 import { ToastService } from './../../../../services/toast.service';
 import { UserService } from './../../../../services/user.service';
 import { User } from './../../../../models/User';
@@ -52,7 +52,7 @@ export class VideoComponent implements OnInit, OnDestroy {
   private callTimer: any; // For storing the timer reference
   partnerName: string;
   placingCall = false;
-  private hangupHandled = false; 
+  private hangupHandled = false;
   answeringCall = false;
 endingCall = false;
 switchingCamera = false;
@@ -92,7 +92,7 @@ private unansweredTimeout: any;
     private ngZone: NgZone,
     private ringer: RingerService
 
-    
+
   ) {    this.partnerAnsweredListener = () => {
     console.log("ðŸŽ‰ Partner has answered the call (class handler)");
     this.answered = true;
@@ -199,7 +199,7 @@ private handleBackButton() {
     const base = { from: this.userId, to: this.authUser._id, callId: this.callId, at: Date.now() };
     this.emitWebSocketEvent(VideoEvents.DECLINED, { ...base, reason: 'declined' });
   }
-  
+
   this.clearUnansweredTimeout();
   this.clearFinishedCallState();
   this.stopCallTimer();
@@ -237,20 +237,20 @@ private showSelfPreview(stream: MediaStream): void {
 
   private cleanupResources() {
     console.log('ðŸ§¹ Cleaning up resources');
-    
+
     // 1. Remove event listeners
     window.removeEventListener("partner-answered", this.partnerAnsweredListener);
-    
+
     // 2. Clean up audio
     if (this.audio) {
       this.audio.pause();
       this.audio.src = '';
       this.audio = null;
     }
-    
+
     // 3. Clean up WebRTC
     this.webRTC.close();
-    
+
     // 4. Clean up video elements
     if (this.myEl) {
       this.myEl.srcObject = null;
@@ -260,7 +260,7 @@ private showSelfPreview(stream: MediaStream): void {
       this.partnerEl.srcObject = null;
       this.partnerEl.pause();
     }
-    
+
     // 5. Clean up socket
     this.leaveCallRoom();            // ðŸ‘ˆ NEW (optional here)
 
@@ -409,16 +409,16 @@ private async waitForVideoElements(): Promise<void> {
   return new Promise((resolve, reject) => {
     const maxAttempts = 30; // Increased further
     let attempts = 0;
-    
+
     const checkElements = () => {
       attempts++;
-      
+
       // Use both ViewChild and direct DOM query with fallbacks
-      this.myEl = this.myVideoRef?.nativeElement || 
+      this.myEl = this.myVideoRef?.nativeElement ||
                  document.querySelector('#my-video') as HTMLVideoElement;
-      this.partnerEl = this.partnerVideoRef?.nativeElement || 
+      this.partnerEl = this.partnerVideoRef?.nativeElement ||
                       document.querySelector('#partner-video') as HTMLVideoElement;
-      
+
       if (this.myEl && this.partnerEl) {
         console.log('âœ… Video elements found after', attempts, 'attempts');
         resolve();
@@ -434,7 +434,7 @@ private async waitForVideoElements(): Promise<void> {
         setTimeout(checkElements, 150); // Slightly longer delay
       }
     };
-    
+
     // Initial check after a brief delay to allow rendering
     setTimeout(checkElements, 100);
   });
@@ -448,14 +448,14 @@ getUserId() {
   this.route.paramMap.subscribe((params) => {
       this.userId = params.get('id');
       console.log("ðŸŸ¢ Retrieved Parternrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr User ID:", this.userId);
-      
+
       this.route.queryParamMap.subscribe((query) => {
           this.answer = query.get('answer') ? true : false;
           this.callId = query.get('callId') || undefined;
           this.videoRequestId = query.get('videoRequestId') || undefined;
           this.autoAnswer = query.get('autoAnswer') === 'true';
           console.log("ðŸŸ¢ Answer Mode:", this.answer);
-          
+
           this.getUser();
       });
   });
@@ -498,7 +498,7 @@ getUser() {
   async getAuthUser(): Promise<void> {
     return new Promise((resolve) => {
       console.log('ðŸ” Starting authentication process...');
-  
+
   const getToken = async (): Promise<string | null> => {
     console.log('ðŸ”‘ Attempting to retrieve token...');
     if (this.isCordovaAvailable()) {
@@ -549,7 +549,7 @@ getUser() {
         lastName: decoded.lastName || '',
         mainAvatar: decoded.mainAvatar || ''
       });
-      
+
           console.log("ðŸ” Auth user initialized:", this.authUser._id);
           resolve();
         } catch (error) {
@@ -610,7 +610,7 @@ getUser() {
     }
 }
 
-  
+
 // video.component.ts
 private idOf = (x: any) => (x && typeof x === 'object') ? (x._id || x.id) : x;
 
@@ -649,7 +649,7 @@ listenForVideoCallEvents() {
     }
 
     // No implicit missed accounting here anymore; server will emit explicit MISSED_* from caller/callee
-  
+
     try {
       // always clear local timers/flags so caller UI updates immediately
       this.clearUnansweredTimeout();
@@ -777,7 +777,7 @@ listenForVideoCallEvents() {
 
 
 
-  
+
 private leaveCallRoom() {
   if (this.socket && this.socket.connected) {
     this.socket.emit('leave-call', {
@@ -828,7 +828,7 @@ async emitWebSocketEvent(eventName: string, data: any) {
 
   console.log(`ðŸ“¤ Emitting event: ${eventName}`, data);
   this.socket.emit(eventName, data);
-  
+
 }
 
 private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: string; error?: string }> {
@@ -891,7 +891,7 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
     this.getVideoCalls().then((calls) => {
         calls = Array.isArray(calls) ? calls : []; // âœ… Ensure it's an array
   calls = calls.filter((call) => call && typeof call.date === 'number' && (new Date().getTime() - call.date) < 24 * 60 * 60 * 1000);
-        
+
         calls.push({
           id: this.authUser._id, // Changed from this.user.id
           date: new Date().getTime(),
@@ -916,9 +916,9 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
   async closeCall(): Promise<void> {
     if (this.tearingDown) return;
     this.tearingDown = true;
-  
+
     console.log('ðŸ“´ Closing the call with full cleanupâ€¦');
-  
+
     this.clearUnansweredTimeout();
     this.stopCallTimer();
     this.ringer.stop();
@@ -934,29 +934,29 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
     // Silence re-emit when remote ended
     await this.webRTC.close({ silent: this.isRemoteEnd });
     this.localStream = null;
-  
+
     // Tidy up
     if (this.myEl)      { this.myEl.srcObject = null; this.myEl.pause(); }
     if (this.partnerEl) { this.partnerEl.srcObject = null; this.partnerEl.pause(); }
     this.leaveCallRoom();
-  
+
     this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
     this.tearingDown = false;
   }
-  
+
 
 
   async cancel(manualClose = false, reason: 'cancel' | 'timeout' = 'cancel'): Promise<void> {
     if (this.tearingDown) return;
     this.tearingDown = true;
-  
+
     console.log('âŒ Cancelling callâ€¦');
     this.clearUnansweredTimeout();
     this.stopCallTimer();
     this.ringer.stop();
     this.messengerService.sendMessage({ event: 'stop-audio' });
     this.clearFinishedCallState();
-  
+
     if (this.socket?.connected) {
       if (!this.answered) {
         // Distinguish caller vs callee side: if answer=true, we're the callee rejecting
@@ -981,22 +981,22 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
         this.socket.emit(VideoEvents.ENDED, { from: this.authUser._id, to: this.userId, callId: this.callId });
       }
     }
-  
+
     this.stopLocalStream();
     await this.webRTC.close({ silent: true });
-  
+
     if (this.myEl)      { this.myEl.srcObject = null; this.myEl.pause(); }
     if (this.partnerEl) { this.partnerEl.srcObject = null; this.partnerEl.pause(); }
     this.localStream = null;
-  
+
     if (!manualClose) this.router.navigate(['/tabs/messages/list']);
     this.tearingDown = false;
   }
-  
-  
-  
-  
-  
+
+
+
+
+
 
 
 
@@ -1033,6 +1033,7 @@ async placeCall() {
     }
     this.ringer.start('ringing.mp3');
     await this.consumeOneTimeVideoRequest();
+    const wakeAlreadySent = await this.primeIncomingCallWake();
   // start the missed-call timeout immediately so PeerJS delays don't prevent it
   try { this.startMissedCallTimeout(); } catch(e) {}
 
@@ -1060,8 +1061,8 @@ async placeCall() {
       peerId: WebrtcService.peer?.id,
       open:   WebrtcService.peer?.open
     });
-    
-    const mc = await this.webRTC.startCall(this.userId!, this.localStream, { callId: this.callId, videoRequestId: this.videoRequestId });
+
+    const mc = await this.webRTC.startCall(this.userId!, this.localStream, { callId: this.callId, videoRequestId: this.videoRequestId, wakeOnFirstLookup: !wakeAlreadySent });
     started = true;
     this.wireHangup(mc);
     mc.on('stream', (remote) => this.attachRemoteStream(remote));
@@ -1080,6 +1081,21 @@ async placeCall() {
   }
 }
 
+
+private async primeIncomingCallWake(): Promise<boolean> {
+  if (!this.userId || !this.callId) return false;
+  try {
+    await this.userService.getPartnerPeerId(this.userId, true, {
+      callId: this.callId,
+      callType: 'video',
+      videoRequestId: this.videoRequestId
+    }).toPromise();
+    return true;
+  } catch (e) {
+    console.warn('[video] early incoming-call wake failed; startCall will retry wake', e);
+    return false;
+  }
+}
 private async consumeOneTimeVideoRequest() {
   if (!this.videoRequestId || !this.socket?.connected) return;
   try {
@@ -1187,7 +1203,7 @@ private async waitForIncomingCall(timeoutMs = 12000): Promise<MediaConnection | 
     }
     this.audioEnabled = this.webRTC.toggleAudio();
   }
-  
+
   toggleCamera() {
     if (!this.webRTC.myStream) {
       console.error("âŒ Cannot toggle camera: Media stream is not initialized.");
@@ -1195,14 +1211,14 @@ private async waitForIncomingCall(timeoutMs = 12000): Promise<MediaConnection | 
     }
     this.cameraEnabled = this.webRTC.toggleCamera();
   }
-  
+
 
   toggleCameraDirection() {
     this.webRTC.toggleCameraDirection();
   }
 
 
-  
+
   isCordovaAvailable(): boolean {
     return !!(window.cordova && window.cordova.platformId !== 'browser');
   }

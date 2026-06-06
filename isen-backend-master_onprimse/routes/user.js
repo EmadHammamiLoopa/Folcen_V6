@@ -1,12 +1,12 @@
 const express = require('express');
-const User = require('../app/models/User');  // ✅ Import User model
-const Request = require('../app/models/Request');  // ✅ Import Request model
-const Report = require('../app/models/Report');  // ✅ Import Report model
-const Post = require('../app/models/Post');  // ✅ Import Post model
+const User = require('../app/models/User');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import User model
+const Request = require('../app/models/Request');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import Request model
+const Report = require('../app/models/Report');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import Report model
+const Post = require('../app/models/Post');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import Post model
 const fs = require('fs');  
 const fsp = fs.promises;
 const path = require('path');
-const { Parser } = require('json2csv');  // ✅ Import json2csv to handle CSV conversion
+const { Parser } = require('json2csv');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import json2csv to handle CSV conversion
 const Comment = require("../app/models/Comment");
 const Channel = require("../app/models//Channel");
 const Product = require("../app/models//Product");
@@ -24,6 +24,7 @@ const AuditLog = require('../app/models/AuditLog');
 const MessageEvent = require('../app/models/MessageEvent');
 const peerStore = require('.././app/utils/peerStorage');
 const { notifyPeerNeeded } = require('../app/helpers');   // <-- import once
+const callSessions = require('../app/utils/callSessionStore');
 const Response = require('../app/controllers/Response');
 
 const {
@@ -75,7 +76,7 @@ const { userUpdateValidator, updateEmailValidator, updatePasswordValidator, user
 const { requireLatestTermsPrivacy } = require('../app/middlewares/legal');
 const router = express.Router();
 const multer = require('multer');
-const Peer = require('../app/models/Peer');   // ← add this
+const Peer = require('../app/models/Peer');   // ÃƒÂ¢Ã¢â‚¬Â Ã‚Â add this
 const { upload, chatUpload } = require('../middlewares/upload');
 const { enqueueImageProcessing } = require('../app/utils/queue');
 
@@ -110,7 +111,7 @@ router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeU
 // Add PeerJS routes
 
 /**
- * ✅ Store Peer ID when a user connects
+ * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Store Peer ID when a user connects
  */router.post('/:userId/peer', [requireSignin, withAuthUser], async (req, res) => {
   const { userId } = req.params;
   const { peerId }  = req.body;
@@ -121,7 +122,7 @@ router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeU
 
   try {
     await peerStore.set(userId, peerId);                // <-- upsert + ttl refresh
-    console.log(`✅  stored peerId for ${userId}: ${peerId}`);
+    console.log(`ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦  stored peerId for ${userId}: ${peerId}`);
 
     return res.json({
       success : true,
@@ -130,16 +131,16 @@ router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeU
       peerId
     });
   } catch (err) {
-    console.error('❌  peerStore.set failed:', err);
+    console.error('ÃƒÂ¢Ã‚ÂÃ…â€™  peerStore.set failed:', err);
     return res.status(500).json({ success:false, message:'DB error', error:err.message });
   }
 });
 
 
-/* ───────────────────────── GET   /:userId/peer ──────────────────────────
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ GET   /:userId/peer ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
  * The caller hits this to find out whether the callee is online.
- *  – If a fresh record exists      → return {peerId, expires}
- *  – If missing/expired            → nudge callee + return {peerId:null}
+ *  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ If a fresh record exists      ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ return {peerId, expires}
+ *  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ If missing/expired            ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ nudge callee + return {peerId:null}
  */
 router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next) => {
   try {
@@ -187,18 +188,35 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
     const caller = req.authUser || {};
     const callerName = [caller.firstName, caller.lastName].filter(Boolean).join(' ').trim();
     const callInvite = {
-      callId: req.query?.callId,
+      callId: req.query?.callId || `call-${callerId}-${userId}-${Date.now()}`,
       callType: req.query?.callType || 'video',
       videoRequestId: req.query?.videoRequestId,
       callerName,
-      callerAvatar: caller.mainAvatar || caller.avatar || ''
+      callerAvatar: caller.mainAvatar || caller.avatar || '',
+      expiresAt: Date.now() + callSessions.RING_TIMEOUT_MS
     };
+
+    let didWake = false;
+    const registerRingingSession = (source) => {
+      callSessions.startRingingCall(callerId, userId, callInvite.callId, {
+        expiresAt: callInvite.expiresAt,
+        callType: callInvite.callType,
+        videoRequestId: callInvite.videoRequestId,
+        source
+      });
+    };
+
     if (req.query?.wake === '1' || req.query?.wake === 'true') {
-      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite); // wake callee for a real call attempt
+      registerRingingSession('peer-wake');
+      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite);
+      didWake = true;
     }
 
     if (!record) {
-      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite);
+      if (!didWake) {
+        registerRingingSession('peer-missing');
+        notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite);
+      }
       return res.json({ success: true, peerId: null });
     }
 
@@ -214,7 +232,7 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
 
 
 /**
- * ✅ Delete Peer ID
+ * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Delete Peer ID
  */
 router.delete('/:userId/peer', [requireSignin, withAuthUser], async (req, res) => {
     const userId = req.params.userId;
@@ -231,7 +249,7 @@ router.delete('/:userId/peer', [requireSignin, withAuthUser], async (req, res) =
         }
 
         await peerStore.delete(userId);
-        console.log(`❌ Removed peerId for userId: ${userId}`);
+        console.log(`ÃƒÂ¢Ã‚ÂÃ…â€™ Removed peerId for userId: ${userId}`);
         return res.json({
             success: true,
             message: "Peer ID removed successfully.",
@@ -239,7 +257,7 @@ router.delete('/:userId/peer', [requireSignin, withAuthUser], async (req, res) =
         });
 
     } catch (err) {
-        console.error("❌ Error deleting peerId:", err);
+        console.error("ÃƒÂ¢Ã‚ÂÃ…â€™ Error deleting peerId:", err);
         return res.status(500).json({
             success: false,
             message: "Failed to delete peer ID.",
@@ -259,13 +277,13 @@ router.patch('/:userId/peer/heartbeat', [requireSignin, withAuthUser], async (re
 
     return res.json({ success: true });
   } catch (err) {
-    console.error('❌ heartbeat error:', err);
+    console.error('ÃƒÂ¢Ã‚ÂÃ…â€™ heartbeat error:', err);
     return res.status(500).json({ success: false, message: 'DB error' });
   }
 });
 
 router.post('/:userId/upload', [requireSignin, withAuthUser, chatUpload.single('upload')], (req, res, next) => {
-  console.log('✅ Reached /:userId/upload route');
+  console.log('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Reached /:userId/upload route');
   console.log('Request params userId:', req.params.userId);
   console.log('Authenticated user from middleware:', req.auth);
   console.log('Uploaded file info:', req.file);
@@ -332,7 +350,7 @@ router.post('/:userId/unblock', [requireSignin], unblockUser);
 router.delete('/', [requireSignin, withAuthUser], deleteAccount);
 // Self-delete alias for dashboard / compatibility
 router.post('/me/delete', [requireSignin, withAuthUser], deleteAccount);
-// Self-restore alias — must NOT use withAuthUser, which blocks isDeleted users
+// Self-restore alias ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â must NOT use withAuthUser, which blocks isDeleted users
 router.post('/me/restore', [requireSignin], restoreAccount);
 router.delete('/:userId', [requireSignin, isAdmin], deleteUser);
 router.delete('/delete/:userId', [requireSignin, isAdmin], deleteUser);
@@ -354,9 +372,9 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
     try {
         const userId = req.params.userId;
         const mongoose = require('mongoose');
-        console.log(`🔍 Extracting data for user: ${userId}`);
+        console.log(`ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Extracting data for user: ${userId}`);
 
-        // ✅ Helper to clean and decode data
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Helper to clean and decode data
         const deepClean = (obj) => {
             if (obj === null || obj === undefined) return obj;
             
@@ -410,16 +428,16 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
             return obj;
         };
 
-        // ✅ Fetch user details
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Fetch user details
         const userRaw = await User.findById(userId).lean();
         if (!userRaw) {
-            console.log(`❌ User ${userId} not found.`);
+            console.log(`ÃƒÂ¢Ã‚ÂÃ…â€™ User ${userId} not found.`);
             return res.status(404).json({ error: 'User not found' });
         }
         const user = deepClean(userRaw);
-        console.log(`✅ User found: ${user.firstName} ${user.lastName} (${user.email})`);
+        console.log(`ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ User found: ${user.firstName} ${user.lastName} (${user.email})`);
 
-        // ✅ Fetch related data
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Fetch related data
         const [
             requests, reports, posts, products, jobs, services, 
             channels, comments, sentMessages, receivedMessages, 
@@ -475,9 +493,9 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
             }
         };
 
-        console.log(`📊 Data Counts - Requests: ${requests.length}, Reports: ${reports.length}, Posts: ${posts.length}, Products: ${products.length}, Jobs: ${jobs.length}, Services: ${services.length}, Channels: ${channels.length}, Comments: ${comments.length}, Messages: ${sentMessages.length + receivedMessages.length}`);
+        console.log(`ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  Data Counts - Requests: ${requests.length}, Reports: ${reports.length}, Posts: ${posts.length}, Products: ${products.length}, Jobs: ${jobs.length}, Services: ${services.length}, Channels: ${channels.length}, Comments: ${comments.length}, Messages: ${sentMessages.length + receivedMessages.length}`);
 
-        // ✅ Flatten user data into CSV-friendly format (Summary)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Flatten user data into CSV-friendly format (Summary)
         const flatData = {
             user_id: user._id,
             first_name: user.firstName,
@@ -514,23 +532,23 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
             audit_logs_count: auditLogs.length
         };
 
-        // ✅ Ensure logs directory exists
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ensure logs directory exists
         const logsDir = path.join(__dirname, '../logs');
         try { await fsp.mkdir(logsDir, { recursive: true }); } catch (e) {}
 
-        // ✅ Log extraction for GDPR compliance
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Log extraction for GDPR compliance
         const adminId = req.auth ? req.auth._id : (req.user ? req.user.id : 'unknown');
         const logMessage = `${new Date().toISOString()} - Admin ${adminId} extracted data for user ${userId}\n`;
         try {
             await fsp.appendFile(path.join(logsDir, 'extraction.log'), logMessage);
-            console.log(`📝 GDPR Log Updated: ${logMessage.trim()}`);
+            console.log(`ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â GDPR Log Updated: ${logMessage.trim()}`);
         } catch (e) {
             console.error('Failed to append GDPR log:', e);
         }
 
         const requestedFormat = (req.query.format || '').toLowerCase();
         if (requestedFormat === 'json') {
-            console.log('✅ Returning JSON extract for user', userId);
+            console.log('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Returning JSON extract for user', userId);
             return res.status(200).json({
                 success: true,
                 ...allData,
@@ -538,12 +556,12 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
             });
         }
 
-        // ✅ Convert summary to CSV (default)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Convert summary to CSV (default)
         const fields = Object.keys(flatData);
         const parser = new Parser({ fields });
         const csv = parser.parse([flatData]);
 
-        console.log("✅ CSV Generated Successfully!");
+        console.log("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CSV Generated Successfully!");
 
         res.status(200)
             .header('Content-Type', 'text/csv')
@@ -551,7 +569,7 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
             .send(csv);
 
     } catch (error) {
-        console.error('❌ Error extracting user data:', error);
+        console.error('ÃƒÂ¢Ã‚ÂÃ…â€™ Error extracting user data:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });

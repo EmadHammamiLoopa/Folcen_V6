@@ -1,4 +1,4 @@
-﻿const assert = require('assert');
+const assert = require('assert');
 const mongoose = require('mongoose');
 
 describe('video call request flow', function () {
@@ -10,6 +10,7 @@ describe('video call request flow', function () {
   afterEach(function () {
     const { connectedUsers } = require('../app/utils/socketManager');
     connectedUsers.clear();
+    require('../app/utils/callSessionStore').resetForTests();
   });
 
   it('emits a structured incoming call invite to an online receiver', async function () {
@@ -71,6 +72,100 @@ describe('video call request flow', function () {
     }
   });
 
+  it('creates an answerable ringing session from peer wake push and accepts by payload callId', async function () {
+    const User = require('../app/models/User');
+    const peerStore = require('../app/utils/peerStorage');
+    const pushSvc = require('../app/utils/pushService');
+    const router = require('../routes/user');
+    const callSessions = require('../app/utils/callSessionStore');
+    const registerVideoSocket = require('../app/sockets/video');
+
+    const originalFindById = User.findById;
+    const originalPeerGet = peerStore.get;
+    const originalSendPush = pushSvc.sendPush;
+    let pushCount = 0;
+
+    User.findById = id => ({
+      select: () => ({
+        lean: async () => ({
+          _id: id,
+          firstName: String(id) === callerId ? 'Caller' : 'Callee',
+          lastName: 'One',
+          emailVerified: true,
+          isEmailVerified: true,
+          friends: [String(id) === callerId ? calleeId : callerId]
+        })
+      })
+    });
+    peerStore.get = async () => null;
+    pushSvc.sendPush = () => { pushCount += 1; return Promise.resolve(); };
+
+    const req = {
+      params: { userId: calleeId },
+      query: { wake: '1', callId: 'call-peer-wake-1', callType: 'video' },
+      auth: { _id: callerId },
+      authUser: { _id: callerId, firstName: 'Caller', lastName: 'One', friends: [calleeId] }
+    };
+    let body;
+    let resolveResponse;
+    let resolveRoute;
+    const responsePromise = new Promise(resolve => { resolveResponse = resolve; });
+    const res = {
+      status(code) { this.statusCode = code; return this; },
+      json(value) { body = value; resolveResponse(value); if (resolveRoute) resolveRoute(value); return value; }
+    };
+
+    try {
+      const peerLayer = router.stack.find(layer => layer.route && layer.route.path === '/:userId/peer' && layer.route.methods.get);
+      const stack = peerLayer.route.stack;
+      await new Promise((resolve, reject) => {
+        resolveRoute = resolve;
+        const run = index => {
+          if (index >= stack.length) return resolve();
+          try {
+            const ret = stack[index].handle(req, res, err => err ? reject(err) : run(index + 1));
+            if (ret && typeof ret.catch === 'function') ret.catch(reject);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        run(0);
+      });
+      await responsePromise;
+      assert.deepStrictEqual(body, { success: true, peerId: null });
+      assert.strictEqual(pushCount, 1, 'peer wake should send exactly one push for the first lookup');
+
+      const state = callSessions.getCallState('call-peer-wake-1');
+      assert.ok(state, 'wake push should register a backend call session');
+      assert.strictEqual(state.status, 'ringing');
+      assert.strictEqual(state.from, callerId);
+      assert.strictEqual(state.to, calleeId);
+
+      const emitted = [];
+      const socket = { id: 'callee-socket', userId: calleeId, handlers: {}, on(event, handler) { this.handlers[event] = handler; } };
+      const io = { to: sid => ({ emit: (event, payload) => emitted.push({ sid, event, payload }) }) };
+      const { connectedUsers } = require('../app/utils/socketManager');
+      connectedUsers.set(callerId, new Set(['caller-socket']));
+      connectedUsers.set(calleeId, new Set(['callee-socket']));
+      registerVideoSocket(io, socket);
+
+      let beforeAccept;
+      socket.handlers['call-state-check']({ callId: 'call-peer-wake-1' }, value => { beforeAccept = value; });
+      assert.strictEqual(beforeAccept.answerable, true);
+      assert.strictEqual(beforeAccept.status, 'ringing');
+
+      socket.handlers['video-call-accepted']({ from: callerId, to: calleeId, callId: 'call-peer-wake-1' });
+      let afterAccept;
+      socket.handlers['call-state-check']({ callId: 'call-peer-wake-1' }, value => { afterAccept = value; });
+      assert.strictEqual(afterAccept.answerable, false);
+      assert.strictEqual(afterAccept.status, 'connected');
+      assert.ok(emitted.some(e => e.event === 'video-call-accepted' && e.payload.callId === 'call-peer-wake-1'));
+    } finally {
+      User.findById = originalFindById;
+      peerStore.get = originalPeerGet;
+      pushSvc.sendPush = originalSendPush;
+    }
+  });
   it('does not treat non-friend request messages as real ringing calls', async function () {
     const registerVideoSocket = require('../app/sockets/video');
     const socket = {
