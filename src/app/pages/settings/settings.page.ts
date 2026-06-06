@@ -176,7 +176,7 @@ export class SettingsPage implements OnInit, OnDestroy {
           this.randomVisibility = this.user.randomVisible;
           this.allowVideoRequestsFromNonFriends = savedVideoRequestValue !== null
             ? savedVideoRequestValue
-            : this.user.allowVideoRequestsFromNonFriends !== false;
+            : this.isVideoRequestAllowed(this.user.allowVideoRequestsFromNonFriends);
           this.user.allowVideoRequestsFromNonFriends = this.allowVideoRequestsFromNonFriends;
           this.ageVisibility = this.user.ageVisible;
           this.isPrivate = this.user.isPrivate;
@@ -452,7 +452,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     if (this.syncingToggleState || typeof checked !== 'boolean' || this.isUpdating || !this.user) return;
 
     const newValue = checked;
-    const previousValue = this.user.allowVideoRequestsFromNonFriends !== false;
+    const previousValue = this.isVideoRequestAllowed(this.user.allowVideoRequestsFromNonFriends);
     if (newValue === previousValue) return;
 
     this.allowVideoRequestsFromNonFriends = newValue;
@@ -490,6 +490,9 @@ export class SettingsPage implements OnInit, OnDestroy {
     );
   }
 
+  private isVideoRequestAllowed(value: any): boolean {
+    return !(value === false || value === 'false' || value === 0 || value === '0');
+  }
   private videoRequestSettingKey(userLike?: any): string {
     const id = userLike?._id || userLike?.id || this.user?._id || this.user?.id || this.userService.getCurrentUserId() || 'unknown';
     return `folcen.videoRequests.allow.${id}`;
@@ -510,7 +513,7 @@ export class SettingsPage implements OnInit, OnDestroy {
 
   private retryVideoRequestSettingIfNeeded(savedValue: boolean | null, userLike?: any): void {
     if (savedValue === null || this.retryingVideoRequestSetting) return;
-    const serverValue = userLike?.allowVideoRequestsFromNonFriends !== false;
+    const serverValue = this.isVideoRequestAllowed(userLike?.allowVideoRequestsFromNonFriends);
     if (serverValue === savedValue) return;
 
     this.retryingVideoRequestSetting = true;

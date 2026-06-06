@@ -9,7 +9,7 @@ const activeVideoCalls = Object.create(null);
 const activeCallIds = Object.create(null);
 const ringTimers = new Map();
 const callStates = new Map();
-const RING_TIMEOUT_MS = 30_000;
+const RING_TIMEOUT_MS = 60_000;
 
 const FINAL_STATES = new Set(['cancelled', 'declined', 'timeout', 'ended', 'failed', 'disconnect']);
 

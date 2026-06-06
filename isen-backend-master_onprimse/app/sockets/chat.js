@@ -91,7 +91,8 @@ socket.on("video-call-request", async (data, ack) => {
     const isFriend =
       (caller?.friends || []).some(id => String(id) === String(data.to)) ||
       (receiver?.friends || []).some(id => String(id) === String(callerId));
-    if (!isFriend && receiver.allowVideoRequestsFromNonFriends === false) {
+    const receiverAllowsVideoRequests = !(receiver.allowVideoRequestsFromNonFriends === false || receiver.allowVideoRequestsFromNonFriends === 'false' || receiver.allowVideoRequestsFromNonFriends === 0 || receiver.allowVideoRequestsFromNonFriends === '0');
+    if (!isFriend && !receiverAllowsVideoRequests) {
       if (ack) ack({ success: false, error: 'video_requests_disabled' });
       return;
     }

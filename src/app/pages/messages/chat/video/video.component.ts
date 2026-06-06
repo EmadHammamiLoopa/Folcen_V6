@@ -287,11 +287,11 @@ startCallTimer() {
 startMissedCallTimeout() {
   this.callTimeout = setTimeout(() => {
     if (!this.answered) {
-      console.log('⏰ No answer in 30 sec — cancelling call');
+      console.log('⏰ No answer in 60 sec — cancelling call');
       this.calling = false; // ensure UI reflects ended state immediately
       this.cancel(false, 'timeout');   // ⬅ reason
     }
-  }, 30000);
+  }, 60000);
 }
 
 stopCallTimer() {
@@ -1004,10 +1004,10 @@ startUnansweredTimeout() {
   this.clearUnansweredTimeout(); // cleanup if needed
   this.unansweredTimeout = setTimeout(() => {
     if (!this.answered) {
-      console.warn('⏱️ Call unanswered after 30 seconds. Closing...');
+      console.warn('⏱️ Call unanswered after 60 seconds. Closing...');
       this.cancel(false, 'timeout');
     }
-  }, 30000); // 30 seconds
+  }, 60000); // 60 seconds
 }
 
 clearUnansweredTimeout() {
@@ -1135,7 +1135,7 @@ this.hasAnswered = true;
       this.showSelfPreview(this.localStream);        // local tile
     }
 
-    const incoming = await this.waitForIncomingCall();
+    const incoming = await this.waitForIncomingCall(30000);
     if (!incoming || typeof (incoming as any).answer !== 'function') {
       WebrtcService.call = null;
       throw new Error('This call is no longer answerable');
@@ -1153,9 +1153,16 @@ this.hasAnswered = true;
 
   } catch (err: any) {
     this.hasAnswered = false;
+    this.answered = false;
     this.stopCallTimer();
-    this.ringer.start('calling.mp3');
-    this.toastService.presentErrorToastr(err?.message || 'Unable to answer call yet. Please try again.');
+    this.ringer.stop();
+    const message = err?.message || 'Unable to answer call yet. Please try again.';
+    this.toastService.presentErrorToastr(message);
+    if (/no longer|expired|answerable|available/i.test(message)) {
+      this.clearFinishedCallState();
+      try { await this.webRTC.close({ silent: true }); } catch (_) {}
+      this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
+    }
   } finally {
     this.answeringCall = false;
     this.cdr.detectChanges();

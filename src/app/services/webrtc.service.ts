@@ -274,7 +274,7 @@ export class WebrtcService {
           this.cleanupCallState('timeout');
         }
       } catch (e) { console.warn('[webrtc] outbound timeout handler error', e); }
-    }, 30000); // 30s outbound timeout
+    }, 60000); // 60s outbound timeout for cold-start/full-screen answer flow
 
     const connected = () => this.callState.next({ connected: true, type: 'caller' });
     let remoteAttached = false;
@@ -314,7 +314,7 @@ export class WebrtcService {
   }
 
   private async resolvePartnerPeerId(partnerUserId: string, callId?: string, videoRequestId?: string): Promise<string | null> {
-    const delays = [0, 350, 700, 1200, 1800, 2500, 3200];
+    const delays = [0, 500, 1000, 1500, 2500, 3500, 5000, 7000, 9000, 12000, 15000];
     let lastPeerId: string | null = null;
 
     for (let i = 0; i < delays.length; i++) {

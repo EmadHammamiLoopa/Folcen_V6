@@ -15,17 +15,19 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.2));
+    radial-gradient(circle at 50% 18%, rgba(20, 184, 166, 0.1), transparent 34%),
+    radial-gradient(circle at 86% 72%, rgba(99, 102, 241, 0.08), transparent 30%),
+    rgba(2, 6, 23, 0.12);
   backdrop-filter: none;
 }
 
 .tour-aurora {
   position: absolute;
-  width: 220px;
-  height: 220px;
+  width: 180px;
+  height: 180px;
   border-radius: 999px;
-  filter: blur(34px);
-  opacity: 0;
+  filter: blur(30px);
+  opacity: 0.12;
   pointer-events: none;
   animation: auroraFloat 7s ease-in-out infinite alternate;
 }
@@ -66,10 +68,10 @@
   top: auto;
   bottom: auto;
   width: auto;
-  max-width: 440px;
+  max-width: 380px;
   margin: 0 auto;
-  padding: 16px;
-  border-radius: 24px;
+  padding: 13px;
+  border-radius: 20px;
   max-height: calc(100vh - 28px);
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px);
   overflow-y: auto;
@@ -79,8 +81,8 @@
     radial-gradient(circle at 8% 0%, rgba(20, 184, 166, 0.14), transparent 38%),
     radial-gradient(circle at 96% 8%, rgba(99, 102, 241, 0.12), transparent 36%);
   border: 1px solid rgba(148, 163, 184, 0.22);
-  box-shadow: 0 16px 46px rgba(15, 23, 42, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(10px) saturate(1.08);
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(6px) saturate(1.04);
   transform: var(--tour-card-transform);
   animation: tourCardIn 320ms cubic-bezier(.2,.8,.2,1) both;
 
@@ -97,10 +99,14 @@
     --tour-card-transform: translate3d(0, -50%, 0);
   }
 
+  &.has-spotlight {
+    max-height: min(42vh, 310px);
+  }
+
   &.compact.has-spotlight {
-    max-height: 46vh;
-    padding: 12px;
-    border-radius: 20px;
+    max-height: min(38vh, 250px);
+    padding: 10px;
+    border-radius: 18px;
   }
 }
 
@@ -157,15 +163,15 @@
 
 .tour-stage {
   display: grid;
-  grid-template-columns: 94px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .mini-phone {
   position: relative;
-  width: 94px;
+  width: 72px;
   aspect-ratio: 0.74;
   overflow: hidden;
   border-radius: 24px;
@@ -269,15 +275,15 @@ h2 {
 .body {
   margin: 10px 0 0;
   color: var(--folcen-text-muted, #64748b);
-  font-size: 14px;
-  line-height: 1.35;
+  font-size: 13px;
+  line-height: 1.32;
 }
 
 .feature-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin-top: 14px;
+  margin-top: 10px;
 
   span {
     display: inline-flex;
@@ -297,7 +303,7 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .back-btn {
@@ -349,7 +355,7 @@ h2 {
   .tour-card {
     left: 50%;
     right: auto;
-    width: 440px;
+    width: 380px;
     --tour-card-transform: translate3d(-50%, 0, 0);
 
     &.centered {
@@ -428,4 +434,17 @@ h2 {
       font-size: 10px;
     }
   }
+}
+
+.tour-card.has-spotlight .feature-chips {
+  display: none;
+}
+
+.tour-card.compact.has-spotlight .mini-phone {
+  width: 50px;
+  border-radius: 16px;
+}
+
+.tour-card.compact.has-spotlight .tour-stage {
+  grid-template-columns: 50px minmax(0, 1fr);
 }
