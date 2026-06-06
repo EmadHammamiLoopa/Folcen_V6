@@ -37,6 +37,7 @@ export class SettingsPage implements OnInit, OnDestroy {
   isUpdating = false;
   isLightMode = false;
   private destroy$ = new Subject<void>();
+  private syncingToggleState = false;
   blockedUsers: any[] = [];
   blockedLoading = false;
 
@@ -169,10 +170,12 @@ export class SettingsPage implements OnInit, OnDestroy {
         
         // Only update local toggle states if we are not currently in the middle of an update
         if (!this.isUpdating) {
+          this.syncingToggleState = true;
           this.randomVisibility = this.user.randomVisible;
           this.allowVideoRequestsFromNonFriends = this.user.allowVideoRequestsFromNonFriends !== false;
           this.ageVisibility = this.user.ageVisible;
           this.isPrivate = this.user.isPrivate;
+          setTimeout(() => this.syncingToggleState = false, 0);
         }
         
         this.changeDetectorRef.detectChanges();
@@ -440,13 +443,15 @@ export class SettingsPage implements OnInit, OnDestroy {
 
   toggleNonFriendVideoRequests(event) {
     const checked = event?.detail?.checked;
-    if (typeof checked !== 'boolean' || this.isUpdating || !this.user) return;
+    if (this.syncingToggleState || typeof checked !== 'boolean' || this.isUpdating || !this.user) return;
 
     const newValue = checked;
     const previousValue = this.user.allowVideoRequestsFromNonFriends !== false;
     if (newValue === previousValue) return;
 
     this.allowVideoRequestsFromNonFriends = newValue;
+    this.user.allowVideoRequestsFromNonFriends = newValue;
+    this.userService.setCurrentUser(this.user, { force: true });
     this.loading = true;
     this.isUpdating = true;
     this.userService.updateNonFriendVideoRequests(newValue).subscribe(

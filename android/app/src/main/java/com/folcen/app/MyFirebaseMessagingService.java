@@ -40,7 +40,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 Log.d(TAG, "App is foreground; socket UI will handle incoming call");
                 return;
             }
-            openIncomingCallScreen(data);
+            showIncomingCall(data);
             return;
         }
 

@@ -7,6 +7,7 @@ import { DataService } from './data.service';
 import { Platform } from '@ionic/angular';
 import { GooglePlus } from '@ionic-native/google-plus/ngx';
 import { FirebaseService } from './firebase.service';
+import { environment } from 'src/environments/environment';
 
 declare const gapi: any; // Declare gapi for TypeScript
 
@@ -20,12 +21,12 @@ export class AuthService extends DataService {
     http: HTTP, 
     httpClient: HttpClient, 
     router: Router, 
-    platform: Platform,  
+    private platformRef: Platform,  
     private googlePlus: GooglePlus,
     private ngZone: NgZone, // Added NgZone
     private firebaseSvc: FirebaseService
   ) {
-    super('auth/', nativeStorage, http, httpClient, router, platform);
+    super('auth/', nativeStorage, http, httpClient, router, platformRef);
   //  this.loadGoogleAuthLibrary(); // Load Google Auth Library
   }
 
@@ -73,7 +74,9 @@ export class AuthService extends DataService {
 
   private async firebaseGoogleLogin(context: 'google_signin' | 'google_signup') {
     try {
-      const fbUser = await this.firebaseSvc.signInWithGoogle();
+      const fbUser = this.shouldUseNativeGoogle()
+        ? await this.nativeGoogleLogin()
+        : await this.firebaseSvc.signInWithGoogle();
       const idToken = await fbUser.getIdToken();
       return await this.sendRequest({
         method: 'post',
@@ -86,6 +89,21 @@ export class AuthService extends DataService {
     } catch (err) {
       throw this.handleAuthError(err);
     }
+  }
+
+  private shouldUseNativeGoogle(): boolean {
+    return this.platformRef.is('hybrid') || this.platformRef.is('cordova') || this.platformRef.is('capacitor');
+  }
+
+  private async nativeGoogleLogin() {
+    const webClientId = (environment as any)?.firebase?.webClientId;
+    const result = await this.googlePlus.login({
+      webClientId,
+      offline: false,
+      scopes: 'profile email'
+    });
+
+    return this.firebaseSvc.signInWithGoogleToken(result?.idToken, result?.accessToken);
   }
 
   private buildGoogleProfile(fbUser: any, context: 'google_signin' | 'google_signup') {

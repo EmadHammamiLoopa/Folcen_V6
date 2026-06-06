@@ -13,8 +13,8 @@ import {
   deleteUser,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
   getRedirectResult,
+  signInWithCredential,
   User as FirebaseUser
 } from 'firebase/auth';
 import { environment } from 'src/environments/environment';
@@ -69,22 +69,17 @@ export class FirebaseService {
   }
 
   async signInWithGoogle(): Promise<FirebaseUser> {
-    try {
-      const credential = await signInWithPopup(this.auth, this.googleProvider);
-      return credential.user;
-    } catch (error: any) {
-      const redirectCodes = new Set([
-        'auth/popup-blocked',
-        'auth/cancelled-popup-request',
-        'auth/operation-not-supported-in-this-environment'
-      ]);
-      if (redirectCodes.has(error?.code)) {
-        await signInWithRedirect(this.auth, this.googleProvider);
-        const result = await getRedirectResult(this.auth);
-        if (result?.user) return result.user;
-      }
-      throw error;
+    const credential = await signInWithPopup(this.auth, this.googleProvider);
+    return credential.user;
+  }
+
+  async signInWithGoogleToken(idToken?: string, accessToken?: string): Promise<FirebaseUser> {
+    if (!idToken && !accessToken) {
+      throw new Error('Google sign-in did not return a usable token.');
     }
+    const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
+    const userCredential = await signInWithCredential(this.auth, credential);
+    return userCredential.user;
   }
 
   async getGoogleRedirectUser(): Promise<FirebaseUser | null> {

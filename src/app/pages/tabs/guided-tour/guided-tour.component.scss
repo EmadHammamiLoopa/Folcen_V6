@@ -60,13 +60,18 @@
 }
 
 .tour-card {
+  --tour-card-transform: translate3d(0, 0, 0);
   position: fixed;
   left: max(12px, env(safe-area-inset-left, 0px));
   right: max(12px, env(safe-area-inset-right, 0px));
+  top: auto;
+  bottom: auto;
+  width: auto;
   max-width: 440px;
   margin: 0 auto;
   padding: 20px;
   border-radius: 28px;
+  max-height: calc(100vh - 28px);
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -76,6 +81,7 @@
   border: 1px solid rgba(var(--ion-color-primary-rgb, 56, 128, 255), 0.2);
   box-shadow: 0 18px 58px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.32);
   backdrop-filter: blur(14px) saturate(1.15);
+  transform: var(--tour-card-transform);
   animation: tourCardIn 320ms cubic-bezier(.2,.8,.2,1) both;
 
   &.lower {
@@ -88,7 +94,7 @@
 
   &.centered {
     top: 50%;
-    transform: translateY(-50%);
+    --tour-card-transform: translate3d(0, -50%, 0);
   }
 }
 
@@ -193,8 +199,8 @@ h2 {
 }
 
 @keyframes tourCardIn {
-  from { opacity: 0; transform: translateY(18px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: var(--tour-card-transform) translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: var(--tour-card-transform) translateY(0) scale(1); }
 }
 
 @keyframes auroraFloat {
@@ -222,10 +228,10 @@ h2 {
     left: 50%;
     right: auto;
     width: 440px;
-    transform: translateX(-50%);
+    --tour-card-transform: translate3d(-50%, 0, 0);
 
     &.centered {
-      transform: translate(-50%, -50%);
+      --tour-card-transform: translate3d(-50%, -50%, 0);
     }
   }
 }
@@ -234,6 +240,7 @@ h2 {
   .tour-card {
     padding: 16px;
     border-radius: 22px;
+    max-height: calc(100vh - 20px);
     max-height: calc(100dvh - 20px);
   }
 

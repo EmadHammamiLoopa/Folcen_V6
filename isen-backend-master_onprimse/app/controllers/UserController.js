@@ -2606,7 +2606,7 @@ exports.updateNonFriendVideoRequests = async (req, res) => {
     try {
         const { allowed } = req.body;
         const userId = req.authUser ? req.authUser._id : req.auth._id;
-        const value = allowed !== false;
+        const value = !(allowed === false || allowed === 'false' || allowed === 0 || allowed === '0');
         logger.info(`[UserController] updateNonFriendVideoRequests: allowed=${value}, userId=${userId}`);
 
         const user = await User.findByIdAndUpdate(

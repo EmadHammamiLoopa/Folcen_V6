@@ -11,7 +11,8 @@ export const environment = {
     storageBucket: 'folcen-8fd1c.firebasestorage.app',
     messagingSenderId: '309126815402',
     appId: '1:309126815402:android:825e97660fdf00e09fbad3',
-    androidApiKey: 'AIzaSyCswx6wNkbKdJ9ZQlw7WyEjSIqaAR66y0g'
+    androidApiKey: 'AIzaSyCswx6wNkbKdJ9ZQlw7WyEjSIqaAR66y0g',
+    webClientId: '785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com'
   },
 
   // ── Feature flags ──────────────────────────────────────────────────────────
