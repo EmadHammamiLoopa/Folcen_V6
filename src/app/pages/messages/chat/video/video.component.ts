@@ -1135,7 +1135,7 @@ this.hasAnswered = true;
       this.showSelfPreview(this.localStream);        // local tile
     }
 
-    const incoming = await this.waitForIncomingCall(30000);
+    const incoming = await this.waitForIncomingCall(this.autoAnswer ? 55000 : 30000);
     if (!incoming || typeof (incoming as any).answer !== 'function') {
       WebrtcService.call = null;
       throw new Error('This call is no longer answerable');

@@ -348,7 +348,7 @@
           </div>
           -->
 
-          <div *ngIf="steps[step] == 'ageVisibility'" class="privacy-step">>
+          <div *ngIf="steps[step] == 'ageVisibility'" class="privacy-step">
             <div class="step-icon-wrap">
               <div class="step-icon-ring">
                 <ion-icon name="shield-checkmark" class="step-icon"></ion-icon>
@@ -367,6 +367,19 @@
                   </div>
                 </div>
                 <ion-toggle formControlName="showAge" color="primary"></ion-toggle>
+              </div>
+
+              <div class="privacy-divider"></div>
+
+              <div class="privacy-toggle-row">
+                <div class="privacy-toggle-info">
+                  <ion-icon name="videocam-outline" class="toggle-icon"></ion-icon>
+                  <div>
+                    <div class="toggle-title">Allow video requests</div>
+                    <div class="toggle-desc">Non-friends can send a one-time video request</div>
+                  </div>
+                </div>
+                <ion-toggle formControlName="allowVideoRequestsFromNonFriends" color="primary"></ion-toggle>
               </div>
 
               <div class="privacy-divider"></div>

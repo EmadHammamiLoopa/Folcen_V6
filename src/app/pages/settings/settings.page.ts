@@ -37,8 +37,6 @@ export class SettingsPage implements OnInit, OnDestroy {
   isUpdating = false;
   isLightMode = false;
   private destroy$ = new Subject<void>();
-  private syncingToggleState = false;
-  private retryingVideoRequestSetting = false;
   blockedUsers: any[] = [];
   blockedLoading = false;
 
@@ -171,17 +169,10 @@ export class SettingsPage implements OnInit, OnDestroy {
         
         // Only update local toggle states if we are not currently in the middle of an update
         if (!this.isUpdating) {
-          this.syncingToggleState = true;
-          const savedVideoRequestValue = this.getSavedVideoRequestSetting(user);
           this.randomVisibility = this.user.randomVisible;
-          this.allowVideoRequestsFromNonFriends = savedVideoRequestValue !== null
-            ? savedVideoRequestValue
-            : this.isVideoRequestAllowed(this.user.allowVideoRequestsFromNonFriends);
-          this.user.allowVideoRequestsFromNonFriends = this.allowVideoRequestsFromNonFriends;
+          this.allowVideoRequestsFromNonFriends = this.user.allowVideoRequestsFromNonFriends;
           this.ageVisibility = this.user.ageVisible;
           this.isPrivate = this.user.isPrivate;
-          setTimeout(() => this.syncingToggleState = false, 0);
-          this.retryVideoRequestSettingIfNeeded(savedVideoRequestValue, user);
         }
         
         this.changeDetectorRef.detectChanges();
@@ -449,15 +440,14 @@ export class SettingsPage implements OnInit, OnDestroy {
 
   toggleNonFriendVideoRequests(event) {
     const checked = event?.detail?.checked;
-    if (this.syncingToggleState || typeof checked !== 'boolean' || this.isUpdating || !this.user) return;
+    if (typeof checked !== 'boolean' || this.isUpdating || !this.user) return;
 
     const newValue = checked;
-    const previousValue = this.isVideoRequestAllowed(this.user.allowVideoRequestsFromNonFriends);
+    const previousValue = this.user.allowVideoRequestsFromNonFriends;
     if (newValue === previousValue) return;
 
     this.allowVideoRequestsFromNonFriends = newValue;
     this.user.allowVideoRequestsFromNonFriends = newValue;
-    this.saveVideoRequestSetting(newValue, this.user);
     this.userService.setCurrentUser(this.user, { force: true });
     this.loading = true;
     this.isUpdating = true;
@@ -471,7 +461,6 @@ export class SettingsPage implements OnInit, OnDestroy {
         }
         this.user.allowVideoRequestsFromNonFriends = newValue;
         this.allowVideoRequestsFromNonFriends = newValue;
-        this.saveVideoRequestSetting(newValue, this.user);
         this.userService.setCurrentUser(this.user, { force: true });
         this.toastService.presentSuccessToastr(resp.message || 'Video request setting updated');
         this.loading = false;
@@ -484,44 +473,13 @@ export class SettingsPage implements OnInit, OnDestroy {
         this.loading = false;
         this.isUpdating = false;
         this.allowVideoRequestsFromNonFriends = previousValue;
-        this.saveVideoRequestSetting(previousValue, this.user);
+        this.user.allowVideoRequestsFromNonFriends = previousValue;
+        this.userService.setCurrentUser(this.user, { force: true });
         this.toastService.presentErrorToastr(err.message || 'Error updating video request setting');
       }
     );
   }
 
-  private isVideoRequestAllowed(value: any): boolean {
-    return !(value === false || value === 'false' || value === 0 || value === '0');
-  }
-  private videoRequestSettingKey(userLike?: any): string {
-    const id = userLike?._id || userLike?.id || this.user?._id || this.user?.id || this.userService.getCurrentUserId() || 'unknown';
-    return `folcen.videoRequests.allow.${id}`;
-  }
-
-  private getSavedVideoRequestSetting(userLike?: any): boolean | null {
-    try {
-      const raw = localStorage.getItem(this.videoRequestSettingKey(userLike));
-      if (raw === 'true') return true;
-      if (raw === 'false') return false;
-    } catch (_) {}
-    return null;
-  }
-
-  private saveVideoRequestSetting(value: boolean, userLike?: any): void {
-    try { localStorage.setItem(this.videoRequestSettingKey(userLike), value ? 'true' : 'false'); } catch (_) {}
-  }
-
-  private retryVideoRequestSettingIfNeeded(savedValue: boolean | null, userLike?: any): void {
-    if (savedValue === null || this.retryingVideoRequestSetting) return;
-    const serverValue = this.isVideoRequestAllowed(userLike?.allowVideoRequestsFromNonFriends);
-    if (serverValue === savedValue) return;
-
-    this.retryingVideoRequestSetting = true;
-    this.userService.updateNonFriendVideoRequests(savedValue).subscribe({
-      next: () => { this.retryingVideoRequestSetting = false; },
-      error: () => { this.retryingVideoRequestSetting = false; }
-    });
-  }
 
   togglePrivacy(event) {
     const newValue = event.detail.checked;

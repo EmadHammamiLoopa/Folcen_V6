@@ -179,6 +179,7 @@ export class SignupComponent implements OnInit, OnDestroy {
       birthDate: ['', [Validators.required]],
       receiveRandomRequests: [false],
       showAge: [true],
+      allowVideoRequestsFromNonFriends: [true],
       genderVisible: [true],
       gender: ['prefer not to say', [Validators.required]],
       studyCountry: [''],       
@@ -333,6 +334,7 @@ export class SignupComponent implements OnInit, OnDestroy {
       birthDate: this.form.get('birthDate')?.value,
       receiveRandomRequests: this.form.get('receiveRandomRequests')?.value,
       ageVisible: this.form.get('showAge')?.value,
+      allowVideoRequestsFromNonFriends: this.form.get('allowVideoRequestsFromNonFriends')?.value,
       genderVisible: this.form.get('genderVisible')?.value,
       school: String(this.form.get('school')?.value || ''), // Ensure it's a string
       education: String(this.form.get('education')?.value || ''), // Ensure it's a string
