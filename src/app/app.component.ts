@@ -197,7 +197,8 @@ export class AppComponent implements OnDestroy {
         if (fields.lastName)   this.user.lastName   = fields.lastName;
         if (fields.avatar)     this.user.avatar     = fields.avatar;
         if (fields.allowVideoRequestsFromNonFriends !== undefined) {
-          this.user.allowVideoRequestsFromNonFriends = fields.allowVideoRequestsFromNonFriends !== false;
+          const value = fields.allowVideoRequestsFromNonFriends;
+          this.user.allowVideoRequestsFromNonFriends = !(value === false || value === 'false' || value === 0 || value === '0');
         }
         this.userService.setCurrentUser(this.user);
         this.changeDetectorRef.detectChanges();

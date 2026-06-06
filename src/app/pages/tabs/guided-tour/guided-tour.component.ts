@@ -63,7 +63,8 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   get cardClass() {
     if (!this.spotlight) return 'tour-card centered';
     const cardShouldBeLower = this.spotlight.top < window.innerHeight * 0.5;
-    return cardShouldBeLower ? 'tour-card lower' : 'tour-card upper';
+    const compact = window.innerHeight < 700 ? ' compact' : '';
+    return (cardShouldBeLower ? 'tour-card lower has-spotlight' : 'tour-card upper has-spotlight') + compact;
   }
 
   next() {
@@ -92,6 +93,15 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
       return;
     }
 
+    target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+    setTimeout(() => this.updateSpotlightRect(target), 220);
+  }
+
+  private updateSpotlightRect(target: HTMLElement) {
+    if (!target || !this.isVisible(target)) {
+      this.zone.run(() => this.spotlight = null);
+      return;
+    }
     const rect = target.getBoundingClientRect();
     this.zone.run(() => this.spotlight = rect);
   }

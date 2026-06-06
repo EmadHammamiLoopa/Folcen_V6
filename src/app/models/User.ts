@@ -873,7 +873,7 @@ set peerId(peerId: string | null) {
       expireDate: this.safeDate(user.subscription.expireDate)
     } : null;
     this._randomVisible = user.randomVisible || false;
-    this._allowVideoRequestsFromNonFriends = user.allowVideoRequestsFromNonFriends !== false;
+    this._allowVideoRequestsFromNonFriends = !(user.allowVideoRequestsFromNonFriends === false || user.allowVideoRequestsFromNonFriends === 'false' || user.allowVideoRequestsFromNonFriends === 0 || user.allowVideoRequestsFromNonFriends === '0');
     this._ageVisible = user.ageVisible !== undefined ? !!user.ageVisible : true;
     this._genderVisible = user.genderVisible !== undefined ? !!user.genderVisible : true;
     this._loggedIn = !!user.loggedIn;

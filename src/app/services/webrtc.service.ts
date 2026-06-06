@@ -209,7 +209,7 @@ export class WebrtcService {
   public async startCall(
     partnerUserId : string, // <-- pass USER-ID here
     localStream : MediaStream, // <-- already opened camera/mic
-    options: { videoRequestId?: string } = {}
+    options: { callId?: string; videoRequestId?: string } = {}
   ): Promise<MediaConnection> {
     // reset explicit-missed emission guard for a fresh attempt
     this.lastMissedEmitKey = null;
@@ -231,7 +231,7 @@ export class WebrtcService {
     await this.waitForPeerOpen(); // throws after 10 s timeout
 
     /* 2 — look-up partner’s current peer-id ------------------------------ */
-    const callId = this.createCallId(partnerUserId);
+    const callId = options.callId || this.createCallId(partnerUserId);
     const partnerPeerId = await this.resolvePartnerPeerId(partnerUserId, callId, options.videoRequestId);
     if (!partnerPeerId) {
       throw new Error('Partner is offline or has no peer-id');

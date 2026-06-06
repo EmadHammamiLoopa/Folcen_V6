@@ -14,10 +14,8 @@
 .tour-scrim {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 50% 18%, rgba(52, 235, 215, 0.14), transparent 34%),
-    rgba(2, 6, 23, 0.32);
-  backdrop-filter: blur(2px);
+  background: rgba(2, 6, 23, 0.16);
+  backdrop-filter: none;
 }
 
 .tour-aurora {
@@ -26,7 +24,7 @@
   height: 220px;
   border-radius: 999px;
   filter: blur(34px);
-  opacity: 0.24;
+  opacity: 0;
   pointer-events: none;
   animation: auroraFloat 7s ease-in-out infinite alternate;
 }
@@ -51,8 +49,8 @@
   border-radius: 24px;
   border: 2px solid rgba(52, 235, 215, 0.95);
   box-shadow:
-    0 0 0 9999px rgba(2, 6, 23, 0.22),
-    0 16px 42px rgba(52, 235, 215, 0.34),
+    0 0 0 9999px rgba(2, 6, 23, 0.12),
+    0 12px 30px rgba(52, 235, 215, 0.2),
     inset 0 0 24px rgba(255, 255, 255, 0.24);
   transition: transform 240ms ease, width 240ms ease, height 240ms ease;
   pointer-events: none;
@@ -70,7 +68,7 @@
   max-width: 440px;
   margin: 0 auto;
   padding: 20px;
-  border-radius: 28px;
+  border-radius: 22px;
   max-height: calc(100vh - 28px);
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px);
   overflow-y: auto;
@@ -85,16 +83,22 @@
   animation: tourCardIn 320ms cubic-bezier(.2,.8,.2,1) both;
 
   &.lower {
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   &.upper {
-    top: calc(14px + env(safe-area-inset-top, 0px));
+    top: calc(10px + env(safe-area-inset-top, 0px));
   }
 
   &.centered {
     top: 50%;
     --tour-card-transform: translate3d(0, -50%, 0);
+  }
+
+  &.compact.has-spotlight {
+    max-height: 42vh;
+    padding: 12px;
+    border-radius: 18px;
   }
 }
 
@@ -163,7 +167,7 @@
 
 h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 900;
   letter-spacing: 0;
 }
@@ -171,8 +175,8 @@ h2 {
 .body {
   margin: 10px 0 0;
   color: var(--folcen-text-muted, #64748b);
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 .tour-actions {
@@ -242,19 +246,41 @@ h2 {
     border-radius: 22px;
     max-height: calc(100vh - 20px);
     max-height: calc(100dvh - 20px);
+
+    &.has-spotlight {
+      max-height: 42vh;
+      padding: 12px;
+    }
   }
 
   .tour-icon {
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     border-radius: 15px;
   }
 
+  .tour-icon ion-icon {
+    font-size: 21px;
+  }
+
   h2 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .body {
-    font-size: 14px;
+    font-size: 13px;
+  }
+
+  .progress-track {
+    margin: 12px 0 10px;
+  }
+
+  .tour-actions {
+    margin-top: 12px;
+  }
+
+  .next-btn {
+    height: 40px;
+    min-width: 96px;
   }
 }

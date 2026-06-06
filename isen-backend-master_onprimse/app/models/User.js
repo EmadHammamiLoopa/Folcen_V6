@@ -358,7 +358,7 @@ userSchema.methods.publicInfo = function(isLoggedInUser = false) {
         languages: Array.isArray(decodedLanguages) ? decodedLanguages : (decodedLanguages ? [decodedLanguages] : []),
         randomVisible: this.randomVisible,
         ageVisible: this.ageVisible,
-        allowVideoRequestsFromNonFriends: this.allowVideoRequestsFromNonFriends !== false,
+        allowVideoRequestsFromNonFriends: !(this.allowVideoRequestsFromNonFriends === false || this.allowVideoRequestsFromNonFriends === 'false' || this.allowVideoRequestsFromNonFriends === 0 || this.allowVideoRequestsFromNonFriends === '0'),
         loggedIn: this.loggedIn,
         online: this.online,
         visitProfile: this.visitProfile,

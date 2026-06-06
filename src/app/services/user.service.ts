@@ -796,7 +796,10 @@ getCurrentUserId(): string | null {
     return this.http.put(`${this.apiUrl}/nonFriendVideoRequests`, { allowed }).pipe(
       tap((resp: any) => {
         const user = resp?.data || resp?.user;
-        if (user) this.setCurrentUser(user, { force: true });
+        if (user) {
+          user.allowVideoRequestsFromNonFriends = allowed;
+          this.setCurrentUser(user, { force: true });
+        }
       })
     );
   }

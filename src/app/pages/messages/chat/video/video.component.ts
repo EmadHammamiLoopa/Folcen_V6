@@ -1016,6 +1016,9 @@ async placeCall() {
     this.lastPlaceCallAt = now;
     this.placingCall = true;
     this.calling     = true;
+    if (!this.callId) {
+      this.callId = `call-${this.authUser?._id || 'me'}-${this.userId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
     this.ringer.start('ringing.mp3');
     await this.consumeOneTimeVideoRequest();
   // start the missed-call timeout immediately so PeerJS delays don't prevent it
@@ -1046,7 +1049,7 @@ async placeCall() {
       open:   WebrtcService.peer?.open
     });
     
-    const mc = await this.webRTC.startCall(this.userId!, this.localStream, { videoRequestId: this.videoRequestId });
+    const mc = await this.webRTC.startCall(this.userId!, this.localStream, { callId: this.callId, videoRequestId: this.videoRequestId });
     started = true;
     this.wireHangup(mc);
     mc.on('stream', (remote) => this.attachRemoteStream(remote));

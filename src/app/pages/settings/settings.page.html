@@ -73,7 +73,7 @@
             <h2>Video Requests</h2>
             <p>Allow non-friends to request one-time video access</p>
           </ion-label>
-          <ion-toggle slot="end" [checked]="allowVideoRequestsFromNonFriends" (ionChange)="toggleNonFriendVideoRequests($event)"></ion-toggle>
+          <ion-toggle slot="end" [checked]="allowVideoRequestsFromNonFriends" [disabled]="loading || isUpdating" (ionChange)="toggleNonFriendVideoRequests($event)"></ion-toggle>
         </ion-item>
 
         <div class="divider"></div>

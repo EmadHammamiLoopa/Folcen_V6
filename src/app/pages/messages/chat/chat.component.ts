@@ -1672,43 +1672,62 @@ private async sendVideoCallRequest() {
     console.warn('Video request socket connect failed:', e);
   }
 
-  if (this.socket?.connected) {
-    const timedSocket = this.socket.timeout ? this.socket.timeout(12000) : null;
-    const emitWithAck = timedSocket ? timedSocket.emit.bind(timedSocket) : this.socket.emit.bind(this.socket);
-    emitWithAck('video-call-request', payload, (errOrAck: any, maybeAck?: any) => {
-      const ack = maybeAck === undefined ? errOrAck : maybeAck;
-      const err = maybeAck === undefined ? null : errOrAck;
-      if (err) {
-        markFailed('Video call request timed out. Please try again.');
-        return;
-      }
-      if (!ack?.success) {
-        const errorMap: any = {
-          video_requests_disabled: `${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`,
-          recipient_not_found: 'This user is not available anymore.',
-          invalid_recipient: 'Unable to identify this user.'
-        };
-        markFailed(errorMap[ack?.error] || ack?.error || 'Video call request could not be sent. Please try again.');
-        return;
-      }
+  const sendAttempt = async (attempt = 1) => {
+    if (!this.socket?.connected) {
+      await SocketService.initializeSocket();
+      SocketService.bindToAuthUser();
+      this.socket = await SocketService.getSocket();
+      await SocketService.ensureConnected();
+    }
 
-      const realId = String(ack.messageId || '');
-      const i = this.messages.findIndex(m => m.id === tempId || m.tempId === tempId);
-      if (i !== -1) {
-        const existing: any = this.messages[i];
-        existing._id = realId || existing._id || existing.id;
-        existing.id = realId || existing.id;
-        existing.state = 'sent';
-        existing.status = 'pending';
-        existing.tempId = tempId;
-        this.messages[i] = existing;
-        this.recomputeActiveCall();
-        this.groupMessagesByDate();
-        this.changeDetection.detectChanges();
-      }
+    return new Promise<any>((resolve) => {
+      if (!this.socket?.connected) return resolve({ success: false, retryable: true, error: 'socket_disconnected' });
+      const timedSocket = this.socket.timeout ? this.socket.timeout(12000) : null;
+      const emitWithAck = timedSocket ? timedSocket.emit.bind(timedSocket) : this.socket.emit.bind(this.socket);
+      emitWithAck('video-call-request', payload, (errOrAck: any, maybeAck?: any) => {
+        const ack = maybeAck === undefined ? errOrAck : maybeAck;
+        const err = maybeAck === undefined ? null : errOrAck;
+        if (err) return resolve({ success: false, retryable: true, error: 'timeout' });
+        resolve(ack || { success: false, retryable: attempt === 1, error: 'empty_ack' });
+      });
     });
-  } else {
-    markFailed('Video call request needs a live connection. Please try again.');
+  };
+
+  try {
+    let ack = await sendAttempt(1);
+    if (!ack?.success && ack?.retryable !== false) {
+      await new Promise(resolve => setTimeout(resolve, 900));
+      ack = await sendAttempt(2);
+    }
+
+    if (!ack?.success) {
+      const errorMap: any = {
+        video_requests_disabled: `${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`,
+        recipient_not_found: 'This user is not available anymore.',
+        invalid_recipient: 'Unable to identify this user.',
+        socket_disconnected: 'Video call request needs a live connection. Please try again.',
+        timeout: 'Video call request timed out. Please try again.'
+      };
+      markFailed(errorMap[ack?.error] || ack?.error || 'Video call request could not be sent. Please try again.');
+      return;
+    }
+
+    const realId = String(ack.messageId || '');
+    const i = this.messages.findIndex(m => m.id === tempId || m.tempId === tempId);
+    if (i !== -1) {
+      const existing: any = this.messages[i];
+      existing._id = realId || existing._id || existing.id;
+      existing.id = realId || existing.id;
+      existing.state = 'sent';
+      existing.status = 'pending';
+      existing.tempId = tempId;
+      this.messages[i] = existing;
+      this.recomputeActiveCall();
+      this.groupMessagesByDate();
+      this.changeDetection.detectChanges();
+    }
+  } catch (e) {
+    markFailed('Video call request could not be sent. Please try again.');
   }
 }
 

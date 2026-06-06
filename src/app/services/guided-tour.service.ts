@@ -179,10 +179,10 @@ export class GuidedTourService {
       {
         id: 'follow-channel',
         title: 'Follow What You Like',
-        body: 'Follow channels to bring their posts closer to your daily feed.',
+        body: 'Open Explore to find channels first. Follow the ones you want in your feed.',
         icon: 'heart-outline',
         route: '/tabs/channels/list/explore',
-        target: '[data-tour="channel-follow"]'
+        target: '[data-tour="channels-explore"]'
       },
       {
         id: 'create-channel',
