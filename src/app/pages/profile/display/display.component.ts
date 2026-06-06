@@ -1195,8 +1195,8 @@ export class DisplayComponent implements OnInit, OnDestroy {
           // Assume response.user contains the updated user data, including the new avatar URLs
           const updatedUser = new User().initialize(response.user);
   
-          // Update the avatar list
-          this.user.avatar = updatedUser.avatar;
+          this.user = updatedUser;
+          this.mainAvatar = updatedUser.mainAvatarPath;
   
           // Update the user in local storage or native storage
           this.updateUserInStorage(updatedUser.toObject());

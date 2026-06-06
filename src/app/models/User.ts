@@ -460,13 +460,15 @@ set peerId(peerId: string | null) {
   set address(address: string) { this._address = address; }
   set avatar(avatars: any) {
     if (Array.isArray(avatars)) {
-      this._avatar = avatars.map((avatar: string) => this.constructAvatarUrl(avatar));
+      this._avatar = avatars
+        .map((avatar: string) => this.normalizeStoredAvatarPath(avatar))
+        .filter(Boolean);
     } else {
       this._avatar = [];
     }
   }
 
-  set mainAvatar(mainAvatar: string) { this._mainAvatar = mainAvatar; }
+  set mainAvatar(mainAvatar: string) { this._mainAvatar = this.normalizeStoredAvatarPath(mainAvatar); }
   set avatarStyle(avatarStyle: string) { this._avatarStyle = avatarStyle; }
 
   set status(status: string) { this._status = status; }
@@ -518,7 +520,32 @@ set peerId(peerId: string | null) {
     return `${constants.DOMAIN_URL}${avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`}`;
   }
 
+  private normalizeStoredAvatarPath(avatarPath: any): string {
+    if (!avatarPath || avatarPath === 'undefined' || avatarPath === '[object Object]') return '';
+    let path = String(avatarPath).trim();
+    if (!path) return '';
+
+    if (path.startsWith('data:image')) return path;
+
+    try {
+      const url = new URL(path);
+      const backend = new URL(constants.DOMAIN_URL);
+      if (url.origin === backend.origin) {
+        path = url.pathname;
+      } else {
+        return path;
+      }
+    } catch (_) {
+      // Relative path, keep it as a stored path.
+    }
+
+    return path.split('?')[0].split('#')[0];
+  }
+
   public getMainAvatar(): string {
+    if (this._mainAvatar && !this.isDefaultAvatar(this._mainAvatar)) {
+      return this.constructAvatarUrl(this._mainAvatar);
+    }
     if (this._avatarStyle === 'avataaars') {
       return AvatarUrlUtil.buildAvataaarsUrl({
         avatarStyle: this._avatarStyle,
@@ -527,9 +554,6 @@ set peerId(peerId: string | null) {
         avatarOverrides: this._avatarOverrides,
         _id: this._id
       });
-    }
-    if (this._mainAvatar) {
-      return this._mainAvatar.startsWith('http') ? this._mainAvatar : `${constants.DOMAIN_URL}${this._mainAvatar}`;
     }
     return this.getDefaultAvatar(this._gender);
   }
@@ -961,8 +985,7 @@ set peerId(peerId: string | null) {
       gender: this._gender,
       address: this._address,
       avatar: this._avatar,
-      // provide a resolved, usable avatar URL for consumers
-      mainAvatar: this.getMainAvatar(),
+      mainAvatar: this._mainAvatar,
       status: this._status,
       education: this._education,
       profession: this._profession,
