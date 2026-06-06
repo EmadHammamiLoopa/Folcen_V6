@@ -248,7 +248,8 @@ isLatestCall(message: Message): boolean {
           const authId = this.authUser && (this.authUser._id || this.authUser.id);
           if (String(uid) === String(peerId)) {
             if (payload?.fields?.allowVideoRequestsFromNonFriends !== undefined && this.user) {
-              this.user.allowVideoRequestsFromNonFriends = payload.fields.allowVideoRequestsFromNonFriends !== false;
+              const value = payload.fields.allowVideoRequestsFromNonFriends;
+              this.user.allowVideoRequestsFromNonFriends = !(value === false || value === 'false' || value === 0 || value === '0');
               this.changeDetection.detectChanges();
             }
             this.userService.getUserProfile(uid, { forceRefresh: true }).pipe(takeUntil(this.destroy$)).subscribe(u => {

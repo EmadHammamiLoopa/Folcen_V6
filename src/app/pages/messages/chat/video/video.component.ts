@@ -304,6 +304,7 @@ stopCallTimer() {
 // video.component.ts
 async ionViewWillEnter() {
   try {
+    this.hydrateRouteStateFromSnapshot();
     this.pageLoading = !this.answer;
     this.cdr.detectChanges();
 
@@ -341,6 +342,17 @@ async ionViewWillEnter() {
     this.pageLoading = false;
     this.cdr.detectChanges();
   }
+}
+
+private hydrateRouteStateFromSnapshot(): void {
+  const id = this.route.snapshot.paramMap.get('id');
+  if (id) this.userId = id;
+
+  const query = this.route.snapshot.queryParamMap;
+  this.answer = query.get('answer') === 'true';
+  this.callId = query.get('callId') || this.callId || undefined;
+  this.videoRequestId = query.get('videoRequestId') || this.videoRequestId || undefined;
+  this.autoAnswer = query.get('autoAnswer') === 'true';
 }
 
 private canStartOutgoingCall(): boolean {

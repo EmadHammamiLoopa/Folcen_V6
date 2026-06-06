@@ -51,6 +51,37 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
     return ((this.state.index + 1) / this.state.steps.length) * 100;
   }
 
+  get stepLabel(): string {
+    if (!this.step) return 'Guide';
+    if (this.step.id.includes('privacy') || this.step.id.includes('anonymous')) return 'Your control';
+    if (this.step.id.includes('chat') || this.step.id.includes('call')) return 'Stay close';
+    if (this.step.id.includes('channel') || this.step.id.includes('post')) return 'Create and explore';
+    if (this.step.id.includes('profile') || this.step.id.includes('avatar')) return 'Your identity';
+    return 'Start here';
+  }
+
+  get visualClass(): string {
+    const id = this.step?.id || 'default';
+    if (id.includes('privacy') || id.includes('anonymous')) return 'privacy';
+    if (id.includes('chat') || id.includes('call')) return 'connect';
+    if (id.includes('channel') || id.includes('post') || id.includes('feed')) return 'create';
+    if (id.includes('profile') || id.includes('avatar')) return 'identity';
+    return 'discover';
+  }
+
+  get chips(): string[] {
+    const id = this.step?.id || '';
+    if (id.includes('avatar')) return ['Avatar', 'Photos', 'Style'];
+    if (id.includes('privacy')) return ['Public', 'Friends', 'Only me'];
+    if (id.includes('anonymous')) return ['Anonymous posts', 'Safer comments'];
+    if (id.includes('channel')) return ['Explore', 'Follow', 'Create'];
+    if (id.includes('post')) return ['Audience', 'Anonymity', 'Publish'];
+    if (id.includes('chat')) return ['Messages', 'Status', 'Friends'];
+    if (id.includes('call')) return ['Video', 'Audio', 'Friends'];
+    if (id.includes('theme')) return ['Light', 'Dark'];
+    return ['Discover', 'Connect', 'Share'];
+  }
+
   get spotlightStyle() {
     if (!this.spotlight) return {};
     return {

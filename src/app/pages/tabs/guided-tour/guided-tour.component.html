@@ -5,20 +5,44 @@
   <div class="tour-spotlight" *ngIf="spotlight" [ngStyle]="spotlightStyle"></div>
 
   <section [class]="cardClass" *ngIf="step">
-    <div class="tour-sparkle"></div>
-    <button type="button" class="skip-btn" (click)="skip()">Skip</button>
+    <button type="button" class="skip-btn" (click)="skip()">Skip tour</button>
 
-    <div class="tour-icon">
-      <ion-icon [name]="step.icon"></ion-icon>
+    <div class="tour-topline">
+      <div class="tour-brand">
+        <span class="brand-dot"></span>
+        <span>Folcen Guide</span>
+      </div>
+      <span class="step-count">{{ state.index + 1 }} / {{ state.steps.length }}</span>
+    </div>
+
+    <div class="tour-stage">
+      <div class="mini-phone" [class]="visualClass">
+        <div class="phone-top"></div>
+        <div class="phone-avatar">
+          <ion-icon [name]="step.icon"></ion-icon>
+        </div>
+        <div class="phone-lines">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="phone-action"></div>
+      </div>
+
+      <div class="tour-copy">
+        <p class="eyebrow">{{ stepLabel }}</p>
+        <h2>{{ step.title }}</h2>
+        <p class="body">{{ step.body }}</p>
+      </div>
+    </div>
+
+    <div class="feature-chips">
+      <span *ngFor="let chip of chips">{{ chip }}</span>
     </div>
 
     <div class="progress-track">
       <span [style.width.%]="progress"></span>
     </div>
-
-    <p class="eyebrow">Step {{ state.index + 1 }} of {{ state.steps.length }}</p>
-    <h2>{{ step.title }}</h2>
-    <p class="body">{{ step.body }}</p>
 
     <div class="tour-actions">
       <ion-button fill="clear" class="back-btn" [disabled]="state.index === 0" (click)="back()">
