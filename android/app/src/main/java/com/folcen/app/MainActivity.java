@@ -9,8 +9,6 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -24,7 +22,10 @@ import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "FolcenMainActivity";
+    private static final long INCOMING_URL_DEDUPE_MS = 45000L;
     private static boolean foreground = false;
+    private static String lastIncomingCallUrl = "";
+    private static long lastIncomingCallUrlAt = 0L;
 
     public static boolean isInForeground() {
         return foreground;
@@ -33,6 +34,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        installFolcenWebChromeClient();
         ensureNotificationCapabilities();
         dispatchIncomingCallIntent(getIntent());
     }
@@ -54,7 +56,6 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         dispatchIncomingCallIntent(getIntent());
-        dispatchIncomingCallIntentDelayed(getIntent());
     }
 
     @Override
@@ -69,6 +70,30 @@ public class MainActivity extends BridgeActivity {
         if (data == null) return;
         String url = data.toString();
         if (!url.startsWith("folcen://incoming-call")) return;
+        String callId = data.getQueryParameter("callId");
+        if (isExpiredIncomingCall(data)) {
+            Log.d(TAG, "expired incoming deeplink ignored callId=" + callId + " url=" + url);
+            MyFirebaseMessagingService.cancelIncomingCallNotifications(this, callId, 0);
+            try {
+                getSharedPreferences("folcen_call", MODE_PRIVATE)
+                        .edit()
+                        .remove("pendingIncomingCallUrl")
+                        .apply();
+            } catch (Exception ignored) {}
+            intent.setData(null);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (url.equals(lastIncomingCallUrl) && now - lastIncomingCallUrlAt < INCOMING_URL_DEDUPE_MS) {
+            Log.d(TAG, "duplicate incoming deeplink ignored url=" + url);
+            return;
+        }
+        lastIncomingCallUrl = url;
+        lastIncomingCallUrlAt = now;
+        Log.d(TAG, "incoming deeplink received url=" + url);
+        try {
+            MyFirebaseMessagingService.cancelIncomingCallNotifications(this, callId, 0);
+        } catch (Exception ignored) {}
         try {
             getSharedPreferences("folcen_call", MODE_PRIVATE)
                     .edit()
@@ -78,17 +103,25 @@ public class MainActivity extends BridgeActivity {
         if (bridge != null) {
             try {
                 bridge.triggerWindowJSEvent("folcen-incoming-call", "{\"url\":" + JSONObject.quote(url) + "}");
+                Log.d(TAG, "incoming deeplink dispatched to WebView");
             } catch (Exception e) {
                 Log.w(TAG, "Unable to dispatch incoming call URL to WebView", e);
             }
+        } else {
+            Log.d(TAG, "incoming deeplink stored; bridge not ready yet");
         }
     }
-    private void dispatchIncomingCallIntentDelayed(Intent intent) {
-        if (intent == null || intent.getData() == null) return;
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(() -> dispatchIncomingCallIntent(intent), 500);
-        handler.postDelayed(() -> dispatchIncomingCallIntent(intent), 1500);
-        handler.postDelayed(() -> dispatchIncomingCallIntent(intent), 3000);
+
+    private boolean isExpiredIncomingCall(Uri data) {
+        if (data == null) return false;
+        String expiresAtValue = data.getQueryParameter("expiresAt");
+        if (expiresAtValue == null || expiresAtValue.trim().length() == 0) return false;
+        try {
+            long expiresAt = Long.parseLong(expiresAtValue);
+            return expiresAt > 0 && System.currentTimeMillis() > expiresAt;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
     /**
      * Lock the font scale to 1.0 so that Samsung / Android system "Large Font"
@@ -124,6 +157,17 @@ public class MainActivity extends BridgeActivity {
                     Log.w(TAG, "Unable to inspect full-screen intent capability", e);
                 }
             }
+        }
+    }
+
+    private void installFolcenWebChromeClient() {
+        try {
+            if (bridge != null && bridge.getWebView() != null) {
+                bridge.getWebView().setWebChromeClient(new FolcenWebChromeClient(bridge));
+                Log.d(TAG, "Folcen WebChromeClient installed");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to install Folcen WebChromeClient", e);
         }
     }
 }

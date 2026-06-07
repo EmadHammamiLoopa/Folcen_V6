@@ -97,11 +97,18 @@ export class AuthService extends DataService {
 
   private async nativeGoogleLogin() {
     const webClientId = (environment as any)?.firebase?.webClientId;
+    if (!webClientId || !String(webClientId).includes('.apps.googleusercontent.com')) {
+      throw new Error('Google sign-in is missing the Web OAuth client ID.');
+    }
     const result = await this.googlePlus.login({
       webClientId,
       offline: false,
       scopes: 'profile email'
     });
+
+    if (!result?.idToken) {
+      throw new Error('Google sign-in did not return an ID token. Check Firebase OAuth client configuration for this Android app.');
+    }
 
     return this.firebaseSvc.signInWithGoogleToken(result?.idToken, result?.accessToken);
   }

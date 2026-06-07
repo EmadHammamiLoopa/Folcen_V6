@@ -126,7 +126,23 @@ export class UploadFileService {
       return map[ext] || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4');
     };
 
-    return this.camera.getPicture(options).then(async imageData => {
+    return this.platform.ready().then(async () => {
+      if (!this.platform.is('cordova')) {
+        return this.mockCordovaService.getPicture({ sourceType, mediaType: mediaTypeValue });
+      }
+
+      if (sourceType === this.camera.PictureSourceType.CAMERA) {
+        await this.permissionService.getPermission(this.androidPermission.PERMISSION.CAMERA);
+      } else {
+        const mediaImagesPermission = (this.androidPermission.PERMISSION as any).READ_MEDIA_IMAGES || 'android.permission.READ_MEDIA_IMAGES';
+        try {
+          await this.permissionService.getPermission(mediaImagesPermission);
+        } catch (_) {
+          await this.permissionService.getPermission(this.androidPermission.PERMISSION.READ_EXTERNAL_STORAGE);
+        }
+      }
+      return this.camera.getPicture(options);
+    }).then(async imageData => {
       let fileBlob: Blob = null;
 
       // Derive safe filename with extension from the URI

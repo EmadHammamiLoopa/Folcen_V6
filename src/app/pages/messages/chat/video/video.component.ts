@@ -13,6 +13,7 @@ import { Socket } from 'socket.io-client';
 import { JwtHelperService } from '@auth0/angular-jwt';
 import { Subscription } from 'rxjs';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Platform } from '@ionic/angular';
 import { MediaConnection } from 'peerjs';
 import { NgZone } from '@angular/core';
@@ -60,6 +61,16 @@ callTimeout: any = null;
 private tearingDown = false;
 private hasAnswered = false;
   private lastPlaceCallAt: number = 0;
+  private acceptedSignalSent = false;
+  private acceptedSignalStagesSent = new Set<string>();
+  private outgoingRetryAfterAccepted = false;
+  private autoAnswerScheduled = false;
+  private answerCallPromise: Promise<void> | null = null;
+  private acceptedRetryTimer: any = null;
+  private activeMediaCall: MediaConnection | null = null;
+  private wakeLock: any = null;
+  private appStateListener: any = null;
+  private terminalCallClosed = false;
 
 callDuration: string = '00:00';
 private callStartTime: number | null = null;
@@ -114,6 +125,8 @@ ngAfterViewInit() {
 /* â”€â”€â”€ and always deregister on leave/destroy â€”â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 ionViewWillLeave() { this.webRTC.clearVideoElements(); }
 ngOnDestroy() {
+  this.releaseWakeLock();
+  try { this.appStateListener?.remove?.(); } catch (_) {}
   this.clearFinishedCallState();
   this.webRTC.clearVideoElements();
   this.callStateSubscription?.unsubscribe();
@@ -136,8 +149,11 @@ async ngOnInit() {
         this.answered = true;
         this.calling  = false;
         this.startCallTimer();
+        this.requestWakeLock();
         this.ringer.stop();
+        this.clearCallTimeout();
         this.clearUnansweredTimeout();
+        this.clearAcceptedRetryTimer();
       } else if (state === null) {
         this.stopCallTimer();
         this.answered = false;
@@ -155,6 +171,7 @@ async ngOnInit() {
   try {
     await this.getAuthUser();                               // fills this.authUser
     await this.initializeSocket(this.authUser._id);         // sets up listeners
+    this.registerAppStateListener();
 
     this.route.paramMap.subscribe(params => {
       this.userId = params.get('id');
@@ -182,6 +199,10 @@ async ngOnInit() {
           console.log('ðŸ”„ Caller mode â€” call will start on view enter');
         } else {
           this.startUnansweredTimeout();    // ring-in side
+          // Native full-screen answer launches the route before Ionic has laid
+          // out the video elements. Auto-answer is scheduled from ionViewWillEnter
+          // after the elements and incoming peer are ready, preventing duplicate
+          // camera acquisition and stale incoming-call screens.
         }
       });
     });
@@ -216,6 +237,90 @@ private clearFinishedCallState(): void {
   this.clearUnansweredTimeout();
   this.calling = false;
   this.placingCall = false;
+  this.autoAnswerScheduled = false;
+  this.acceptedSignalStagesSent.clear();
+  this.clearAcceptedRetryTimer();
+  this.activeMediaCall = null;
+  this.hangupHandled = false;
+}
+
+private registerAppStateListener(): void {
+  if (this.appStateListener) return;
+  CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) {
+      if (this.isCallLocallyFinished()) {
+        console.log('[video] app resumed after finished call; leaving stale video route', { callId: this.callId });
+        this.ngZone.run(() => this.router.navigate(['/tabs/messages/list'], { replaceUrl: true }));
+        return;
+      }
+      if (this.answered || this.hasAnswered) {
+        this.requestWakeLock();
+      }
+    }
+  }).then(listener => this.appStateListener = listener).catch(err => {
+    console.warn('[video] app state listener failed', err);
+  });
+}
+
+private async requestWakeLock(): Promise<void> {
+  try {
+    const nav: any = navigator as any;
+    if (!nav?.wakeLock || this.wakeLock) return;
+    this.wakeLock = await nav.wakeLock.request('screen');
+    this.wakeLock.addEventListener?.('release', () => {
+      this.wakeLock = null;
+    });
+    console.log('[video] screen wake lock active');
+  } catch (e) {
+    console.warn('[video] screen wake lock unavailable', e);
+  }
+}
+
+private releaseWakeLock(): void {
+  try { this.wakeLock?.release?.(); } catch (_) {}
+  this.wakeLock = null;
+}
+
+private markCallLocallyFinished(): void {
+  this.terminalCallClosed = true;
+  if (!this.callId) return;
+  try {
+    const raw = localStorage.getItem('finishedVideoCallIds');
+    const ids = raw ? JSON.parse(raw) : [];
+    const next = Array.isArray(ids) ? ids.filter((item: any) => item?.callId !== this.callId) : [];
+    next.push({ callId: this.callId, at: Date.now() });
+    localStorage.setItem('finishedVideoCallIds', JSON.stringify(next.slice(-20)));
+  } catch (_) {}
+}
+
+private isCallLocallyFinished(): boolean {
+  if (this.terminalCallClosed) return true;
+  if (!this.callId) return false;
+  try {
+    const raw = localStorage.getItem('finishedVideoCallIds');
+    const ids = raw ? JSON.parse(raw) : [];
+    return Array.isArray(ids) && ids.some((item: any) => item?.callId === this.callId && Date.now() - Number(item.at || 0) < 2 * 60 * 60 * 1000);
+  } catch (_) {
+    return false;
+  }
+}
+
+private clearCallTimeout(): void {
+  try {
+    if (this.callTimeout) {
+      clearTimeout(this.callTimeout);
+      this.callTimeout = null;
+    }
+  } catch (_) {}
+}
+
+private clearAcceptedRetryTimer(): void {
+  try {
+    if (this.acceptedRetryTimer) {
+      clearTimeout(this.acceptedRetryTimer);
+      this.acceptedRetryTimer = null;
+    }
+  } catch (_) {}
 }
 
 
@@ -271,6 +376,7 @@ private showSelfPreview(stream: MediaStream): void {
 
 // Add these methods to your component
 startCallTimer() {
+  if (this.callTimerInterval) return;
   this.callStartTime = Date.now();
 
   this.callTimerInterval = setInterval(() => {
@@ -285,6 +391,7 @@ startCallTimer() {
 }
 
 startMissedCallTimeout() {
+  this.clearCallTimeout();
   this.callTimeout = setTimeout(() => {
     if (!this.answered) {
       console.log('â° No answer in 60 sec â€” cancelling call');
@@ -305,6 +412,11 @@ stopCallTimer() {
 async ionViewWillEnter() {
   try {
     this.hydrateRouteStateFromSnapshot();
+    if (this.isCallLocallyFinished()) {
+      console.log('[video] ignoring stale video route for finished call', { callId: this.callId });
+      this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
+      return;
+    }
     this.pageLoading = !this.answer;
     this.cdr.detectChanges();
 
@@ -313,14 +425,17 @@ async ionViewWillEnter() {
     this.webRTC.setVideoElements(this.myEl, this.partnerEl);
 
     if (this.answer) {
+      this.acceptedSignalSent = false;
       this.pageLoading = false;
       this.cdr.detectChanges();
+      if (this.autoAnswer) {
+        this.ringer.stop();
+      } else {
+        this.ringer.start('calling.mp3');
+      }
       // Incoming side: DO NOT open camera yet
       await this.ensureIncomingPeerReady();
-      this.ringer.start('calling.mp3');
-      if (this.autoAnswer) {
-        setTimeout(() => this.answerCall(), 250);
-      }
+      this.scheduleAutoAnswer('view-enter');
       // keep your startUnansweredTimeout() from ngOnInit or call here
     } else {
       await this.ensurePartnerLoaded();
@@ -355,6 +470,15 @@ private hydrateRouteStateFromSnapshot(): void {
   this.autoAnswer = query.get('autoAnswer') === 'true';
 }
 
+private scheduleAutoAnswer(source: string): void {
+  if (!this.answer || !this.autoAnswer || this.autoAnswerScheduled || this.hasAnswered) return;
+  this.autoAnswerScheduled = true;
+  this.answeringCall = true;
+  this.cdr.detectChanges();
+  console.log('[video] auto-answer scheduled from native incoming call', { source, callId: this.callId, caller: this.userId });
+  setTimeout(() => this.answerCall(), source === 'view-enter' ? 250 : 600);
+}
+
 private canStartOutgoingCall(): boolean {
   if (this.answer) return true;
   if (this.videoRequestId) return true;
@@ -365,7 +489,7 @@ private async ensureIncomingPeerReady(): Promise<void> {
   try {
     const myId = this.authUser?._id || this.authUser?.id;
     if (!myId) return;
-    await this.webRTC.createPeer(myId);
+    await this.webRTC.createPeer(myId, !!this.callId);
     await this.webRTC.waitForPeerOpen();
     await this.webRTC.wait();
   } catch (e) {
@@ -396,12 +520,22 @@ private async ensurePartnerLoaded(): Promise<void> {
 
 // video.component.ts  (somewhere near other helpers)
 private wireHangup(mc: MediaConnection) {
+  this.activeMediaCall = mc;
   mc.once('close', () => {
+    if (this.activeMediaCall !== mc) {
+      console.log('[video] ignoring stale media close event');
+      return;
+    }
     // Prevent re-entry if we fired the close ourselves
-    if (this.hangupHandled) return;
+    if (this.hangupHandled || this.tearingDown) return;
     this.hangupHandled = true;
     this.ngZone.run(() => this.closeCall());   // run inside Angular
   });
+}
+
+private hasActiveConnectedCall(): boolean {
+  const hasRemoteStream = !!(this.partnerEl?.srcObject || this.partnerVideoRef?.nativeElement?.srcObject);
+  return !!(this.answered || this.hasAnswered || this.callStartTime || hasRemoteStream);
 }
 
 
@@ -626,6 +760,7 @@ listenForVideoCallEvents() {
 
   this.socket.off('video-call-cancelled');
   this.socket.off('video-call-timeout');
+  this.socket.off(VideoEvents.ACCEPTED);
   this.socket.off(VideoEvents.ENDED);
   this.socket.off(VideoEvents.FAILED);
   this.socket.off('video-call-ended');
@@ -635,6 +770,32 @@ listenForVideoCallEvents() {
     // Signaling has started, but the callee may not have answered yet.
     // Keep caller tone playing until WebRTC reports a real connection.
     console.log('[video] signaling started');
+  });
+
+  this.socket.on(VideoEvents.ACCEPTED, async (ev: any) => {
+    try {
+      if (this.answer) return;
+      const evCallId = ev?.callId;
+      if (!evCallId || !this.callId || String(evCallId) !== String(this.callId)) return;
+      const caller = this.idOf(ev?.from);
+      const callee = this.idOf(ev?.to);
+      if (caller && this.authUser?._id && String(caller) !== String(this.authUser._id)) return;
+      if (callee && this.userId && String(callee) !== String(this.userId)) return;
+      const stage = ev?.stage || 'ready';
+      this.ringer.stop();
+      this.clearCallTimeout();
+      if (stage === 'answered') {
+        return;
+      }
+      this.clearAcceptedRetryTimer();
+      this.acceptedRetryTimer = setTimeout(() => {
+        if (!this.answered && !this.answer) {
+          this.retryOutgoingMediaCallAfterAccepted();
+        }
+      }, 3500);
+    } catch (err) {
+      console.warn('[video] accepted retry failed', err);
+    }
   });
 
   const onCanceled = async (ev?: any) => {
@@ -653,7 +814,7 @@ listenForVideoCallEvents() {
     try {
       // always clear local timers/flags so caller UI updates immediately
       this.clearUnansweredTimeout();
-      try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
+      this.clearCallTimeout();
       this.stopCallTimer();
       this.ringer.stop();
       this.clearFinishedCallState();
@@ -695,6 +856,7 @@ listenForVideoCallEvents() {
     try { this.stopCallTimer(); } catch(_) {}
     this.clearFinishedCallState();
     this.ringer.stop();
+    this.clearCallTimeout();
     try { await this.webRTC.close({ silent: true }); } catch(_) {}
     if (this.myEl)      { this.myEl.srcObject = null; this.myEl.pause(); }
     if (this.partnerEl) { this.partnerEl.srcObject = null; this.partnerEl.pause(); }
@@ -759,8 +921,12 @@ listenForVideoCallEvents() {
     try {
       const who = this.idOf(ev?.user);
       const room = this.idOf(ev?.room);
+      if (this.hasActiveConnectedCall()) {
+        console.log('[video] ignoring leave-call while active call is connected', { who, room, userId: this.userId, callId: this.callId });
+        return;
+      }
       // If the partner leaves or the room matches current partner, and we haven't answered, just teardown
-      if (!this.answered && (who === this.userId || room === this.userId)) {
+      if (!this.answered && !this.hasAnswered && (who === this.userId || room === this.userId)) {
         await onEnded(ev);
       }
     } catch (e) { /* ignore */ }
@@ -832,6 +998,7 @@ async emitWebSocketEvent(eventName: string, data: any) {
 }
 
 private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: string; error?: string }> {
+  if (this.isCallLocallyFinished()) return { answerable: false, status: 'ended' };
   if (!this.callId) return { answerable: true };
   try {
     if (!this.socket) this.socket = await SocketService.getSocket();
@@ -916,18 +1083,21 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
   async closeCall(): Promise<void> {
     if (this.tearingDown) return;
     this.tearingDown = true;
+    this.markCallLocallyFinished();
 
     console.log('ðŸ“´ Closing the call with full cleanupâ€¦');
 
     this.clearUnansweredTimeout();
     this.stopCallTimer();
     this.ringer.stop();
+    this.releaseWakeLock();
     this.clearFinishedCallState();
     // Tell peer ONLY if we initiated the hangup
     if (!this.isRemoteEnd && this.socket?.connected) {
       await this.emitWebSocketEvent(VideoEvents.ENDED, {
         from: this.authUser._id,
         to  : this.userId,
+        callId: this.callId,
       });
     }
     this.stopLocalStream();
@@ -949,11 +1119,13 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
   async cancel(manualClose = false, reason: 'cancel' | 'timeout' = 'cancel'): Promise<void> {
     if (this.tearingDown) return;
     this.tearingDown = true;
+    this.markCallLocallyFinished();
 
     console.log('âŒ Cancelling callâ€¦');
     this.clearUnansweredTimeout();
     this.stopCallTimer();
     this.ringer.stop();
+    this.releaseWakeLock();
     this.messengerService.sendMessage({ event: 'stop-audio' });
     this.clearFinishedCallState();
 
@@ -1026,12 +1198,17 @@ async placeCall() {
       return;
     }
     this.lastPlaceCallAt = now;
+    this.terminalCallClosed = false;
+    this.hangupHandled = false;
+    this.activeMediaCall = null;
+    this.outgoingRetryAfterAccepted = false;
     this.placingCall = true;
     this.calling     = true;
     if (!this.callId) {
       this.callId = `call-${this.authUser?._id || 'me'}-${this.userId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     }
     this.ringer.start('ringing.mp3');
+    this.requestWakeLock();
     await this.consumeOneTimeVideoRequest();
     const wakeAlreadySent = await this.primeIncomingCallWake();
   // start the missed-call timeout immediately so PeerJS delays don't prevent it
@@ -1078,6 +1255,53 @@ async placeCall() {
     if (!started) {
       try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
     }
+  }
+}
+
+private async retryOutgoingMediaCallAfterAccepted(): Promise<void> {
+  if (this.outgoingRetryAfterAccepted || this.answered || this.answer) return;
+  if (!this.userId || !this.callId) return;
+  this.outgoingRetryAfterAccepted = true;
+  console.log('[video] receiver accepted; retrying media call with fresh peer', { callId: this.callId, to: this.userId });
+
+  try {
+    if (!this.myEl || !this.partnerEl) await this.waitForVideoElements();
+    this.webRTC.setVideoElements(this.myEl, this.partnerEl);
+
+    if (this.localStream && !this.localStream.getTracks().some(t => t.readyState === 'live')) {
+      this.localStream = null;
+    }
+    if (!this.localStream) {
+      this.localStream = await this.webRTC.getUserMedia();
+      if (!this.localStream) throw new Error('Cannot access camera / mic');
+      this.showSelfPreview(this.localStream);
+    }
+
+    try {
+      const previousCall = WebrtcService.call;
+      if (previousCall && typeof (previousCall as any).close === 'function') {
+        if (this.activeMediaCall === previousCall) {
+          this.activeMediaCall = null;
+        }
+        previousCall.close();
+      }
+    } catch (_) {}
+    WebrtcService.call = null;
+
+    this.webRTC.partnerId = this.userId;
+    const mc = await this.webRTC.startCall(this.userId, this.localStream, {
+      callId: this.callId,
+      videoRequestId: this.videoRequestId,
+      wakeOnFirstLookup: false
+    });
+    this.wireHangup(mc);
+    mc.on('stream', (remote) => this.attachRemoteStream(remote));
+    mc.on('error', (e) => console.error('[call:accepted-retry] error', e));
+  } catch (err: any) {
+    this.outgoingRetryAfterAccepted = false;
+    const message = err?.message || 'Could not connect to the accepted call yet.';
+    console.warn('[video] accepted media retry failed', err);
+    this.toastService.presentErrorToastr(message);
   }
 }
 
@@ -1128,6 +1352,17 @@ private attachRemoteStream(remote: MediaStream): void {
 
 // In video.component.ts - modify the answerCall() method
 async answerCall(): Promise<void> {
+  if (this.answerCallPromise) return this.answerCallPromise;
+  this.answerCallPromise = this.performAnswerCall();
+  try {
+    await this.answerCallPromise;
+  } finally {
+    this.answerCallPromise = null;
+  }
+}
+
+private async performAnswerCall(): Promise<void> {
+console.log('[video] answerCall invoked', { callId: this.callId, autoAnswer: this.autoAnswer, hasAnswered: this.hasAnswered, answeringCall: this.answeringCall });
 
   /* make sure cached stream is still live */
 if (this.localStream &&
@@ -1135,20 +1370,29 @@ if (this.localStream &&
 this.localStream = null;
 }
 if (this.hasAnswered) return;
+this.hangupHandled = false;
+this.activeMediaCall = null;
+this.terminalCallClosed = false;
 this.hasAnswered = true;
 
   try {
     this.answeringCall = true;
+    this.cdr.detectChanges();
     const state = await this.validateAnswerableCall();
     if (!state.answerable) {
       throw new Error(state.status === 'timeout' ? 'This call has expired.' : 'This call is no longer available.');
     }
+    if (this.answer) {
+      await this.ensureIncomingPeerReady();
+    }
     this.ringer.stop();
+    this.requestWakeLock();
     /* â”€â”€ grab cam/mic only once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     if (!this.localStream) {
       this.localStream = await this.webRTC.getUserMedia();
       this.showSelfPreview(this.localStream);        // local tile
     }
+    await this.signalAcceptedToCaller('ready');
 
     const incoming = await this.waitForIncomingCall(this.autoAnswer ? 85000 : 45000);
     if (!incoming || typeof (incoming as any).answer !== 'function') {
@@ -1157,7 +1401,7 @@ this.hasAnswered = true;
     }
 
     incoming.answer(this.localStream);
-    await this.emitWebSocketEvent(VideoEvents.ACCEPTED, { from: this.userId, to: this.authUser._id, callId: this.callId });
+    await this.signalAcceptedToCaller('answered');
     this.wireHangup(incoming);
     this.startCallTimer();
     incoming.on('stream',  (remote) => this.attachRemoteStream(remote));
@@ -1183,6 +1427,15 @@ this.hasAnswered = true;
     this.answeringCall = false;
     this.cdr.detectChanges();
   }
+}
+
+private async signalAcceptedToCaller(stage: 'ready' | 'answered'): Promise<void> {
+  if (this.acceptedSignalStagesSent.has(stage)) return;
+  if (!this.userId || !this.authUser?._id) return;
+  this.acceptedSignalSent = true;
+  this.acceptedSignalStagesSent.add(stage);
+  console.log('[video] signaling accepted to caller', { stage, callId: this.callId, caller: this.userId, callee: this.authUser._id });
+  await this.emitWebSocketEvent(VideoEvents.ACCEPTED, { from: this.userId, to: this.authUser._id, callId: this.callId, stage });
 }
 
 private async waitForIncomingCall(timeoutMs = 12000): Promise<MediaConnection | null> {
@@ -1223,4 +1476,3 @@ private async waitForIncomingCall(timeoutMs = 12000): Promise<MediaConnection | 
     return !!(window.cordova && window.cordova.platformId !== 'browser');
   }
 }
-

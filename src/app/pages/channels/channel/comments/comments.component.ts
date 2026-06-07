@@ -4,6 +4,7 @@ import { Comment } from '../../../../models/Comment';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
 import { Post } from './../../../../models/Post';
+import { Channel } from 'src/app/models/Channel';
 import { Component, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
@@ -28,6 +29,7 @@ export class CommentsComponent implements OnInit, OnDestroy {
   
   @Output() addComment = new EventEmitter();
   post!: Post;
+  channel: Channel = new Channel().initialize({ type: 'user' } as any);
   postId!: string;
   user!: User;
   postError: boolean = false;
@@ -183,9 +185,25 @@ taggedUserIds: Set<string> = new Set();
     this.route.paramMap.subscribe(
       params => {
         this.postId = params.get('id') || '';
+        this.hydrateChannelFromRoute();
         this.getPost();
       }
     )
+  }
+
+  private hydrateChannelFromRoute(): void {
+    const rawChannel = this.route.snapshot.queryParamMap.get('channel');
+    if (!rawChannel) {
+      this.channel = new Channel().initialize({ type: 'user' } as any);
+      return;
+    }
+
+    try {
+      this.channel = new Channel().initialize(JSON.parse(rawChannel));
+    } catch (e) {
+      console.warn('[comments] failed to parse route channel payload', e);
+      this.channel = new Channel().initialize({ type: 'user' } as any);
+    }
   }
 
   getPost(){
@@ -290,7 +308,7 @@ isValidMedia(file: File): boolean {
   return allowedTypes.includes(file.type);
 }
 
-storeComment() {
+  storeComment() {
   if (!this.commentText.trim() && !this.mediaFile) {
     this.toastService.presentErrorToastr('Please add a comment or media before submitting.');
     return;
@@ -315,7 +333,12 @@ storeComment() {
       console.log('Comment added successfully:', resp);
 
       // Successfully added the comment
-      this.comments.unshift(new Comment().initialize(resp.data));
+      const newComment = new Comment().initialize(resp.data);
+      this.comments.unshift(newComment);
+      if (this.post) {
+        const current = Array.isArray(this.post.comments) ? this.post.comments : [];
+        this.post.comments = [newComment, ...current];
+      }
       this.commentText = ""; // Reset the comment text
       this.mediaFile = null; // Reset the media file
       this.mediaPreview = ""; // Clear media preview
@@ -332,8 +355,24 @@ storeComment() {
   );
 }
 
+reactToPost(vote: number) {
+  if (!this.post?.id) return;
+  this.channelService.voteOnPost(this.post.id, vote).then(
+    (resp: any) => {
+      this.post.voted = resp.data.voted;
+      this.post.votes = resp.data.votes;
+    },
+    err => {
+      this.toastService.presentErrorToastr(err);
+    }
+  );
+}
+
 onRemoveComment(index: number) {
   this.comments.splice(index, 1);
+  if (this.post && Array.isArray(this.post.comments)) {
+    this.post.comments = this.post.comments.filter((_comment, ind) => ind !== index);
+  }
   // Additional logic if required
 }
 

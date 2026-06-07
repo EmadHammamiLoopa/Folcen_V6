@@ -74,6 +74,7 @@ export class AppComponent implements OnDestroy {
   private incomingCallKeys = new Set<string>();
   private pendingIncomingCallUrl: string | null = null;
   private handledIncomingCallActions = new Set<string>();
+  private nativeIncomingCallActionUntil = new Map<string, number>();
 
   constructor(
     private platform: Platform,
@@ -458,22 +459,10 @@ export class AppComponent implements OnDestroy {
         }
       });
 
-      this.backgroundMode.on('activate').subscribe(() => {
-        console.log('🌙 App in background - rechecking WebSocket...');
-        if (this.user?.id) {
-          SocketService.initializeSocket().then(() => {
-            SocketService.bindToAuthUser();
-          });
-        } else {
-          console.warn('⚠️ Skipping background socket re-init: user not ready.');
-        }
-      });
-
       // ✅ Cordova-specific setup
       if (this.platform.is('cordova')) {
         this.statusBar.styleDefault();
         this.splashScreen.hide();
-        this.backgroundMode.enable();
         this.network.onDisconnect().subscribe(() => {
           this.onOffline();
         });
@@ -675,6 +664,14 @@ export class AppComponent implements OnDestroy {
     }
 
     const key = invite.callId || `${invite.callerId}-${invite.timestamp}`;
+    if (this.isNativeIncomingActionActive(invite.callId, invite.callerId)) {
+      console.log('Ignoring socket incoming call invite already handled by native call action:', invite.callId);
+      return;
+    }
+    if (this.router.url.includes('/messages/video') && this.router.url.includes(invite.callerId)) {
+      console.log('Ignoring socket incoming call invite while already on matching call screen:', invite.callId);
+      return;
+    }
     if (this.incomingCallKeys.has(key)) return;
     this.incomingCallKeys.add(key);
     setTimeout(() => this.incomingCallKeys.delete(key), 45000);
@@ -684,7 +681,8 @@ export class AppComponent implements OnDestroy {
 
     const queryParams = { answer: true, callId: invite.callId };
     const state = await CapacitorApp.getState().catch(() => ({ isActive: true }));
-    if (state.isActive) {
+    const webViewVisible = typeof document === 'undefined' || document.visibilityState === 'visible';
+    if (state.isActive && webViewVisible) {
       this.zone.run(() => {
         this.router.navigate(['/messages/video', invite.callerId], { queryParams });
       });
@@ -694,7 +692,7 @@ export class AppComponent implements OnDestroy {
     // When the WebView is not active, Android FCM native code owns the
     // full-screen call alert. Scheduling a second local notification here
     // races with the native call notification and can create duplicates.
-    console.log('Incoming call received while inactive; native FCM alert will handle display.', invite.callId);
+    console.log('Incoming call received while inactive/hidden; native FCM alert will handle display.', invite.callId);
   }
 
   private hashCallId(callId: string): number {
@@ -745,11 +743,13 @@ export class AppComponent implements OnDestroy {
       const autoAnswer = parsed.searchParams.get('autoAnswer') === 'true' || action === 'answer';
       if (!callerId) return;
       const actionKey = `${callId || callerId}:${action}`;
+      console.log('[incoming-call] handling url action', { actionKey, callerId, callId, action, autoAnswer });
       if (this.handledIncomingCallActions.has(actionKey)) {
         console.log('Ignoring duplicate incoming call action:', actionKey);
         return;
       }
       this.handledIncomingCallActions.add(actionKey);
+      this.markNativeIncomingAction(callId, callerId, action);
       setTimeout(() => this.handledIncomingCallActions.delete(actionKey), 45000);
 
       if (action === 'reject') {
@@ -765,6 +765,43 @@ export class AppComponent implements OnDestroy {
     } catch (e) {
       console.warn('Failed to handle incoming call url:', e);
     }
+  }
+
+  private markNativeIncomingAction(callId: string | undefined, callerId: string, action: string): void {
+    const until = Date.now() + 60000;
+    const keys = [
+      callId ? `${callId}:answer` : '',
+      callId ? `${callId}:reject` : '',
+      callId || '',
+      `${callerId}:answer`,
+      `${callerId}:reject`,
+      callerId,
+      `${callId || callerId}:${action}`,
+    ].filter(Boolean);
+
+    keys.forEach(key => this.nativeIncomingCallActionUntil.set(key, until));
+    setTimeout(() => {
+      const now = Date.now();
+      keys.forEach(key => {
+        if ((this.nativeIncomingCallActionUntil.get(key) || 0) <= now) {
+          this.nativeIncomingCallActionUntil.delete(key);
+        }
+      });
+    }, 61000);
+  }
+
+  private isNativeIncomingActionActive(callId?: string, callerId?: string): boolean {
+    const now = Date.now();
+    const keys = [
+      callId ? `${callId}:answer` : '',
+      callId ? `${callId}:reject` : '',
+      callId || '',
+      callerId ? `${callerId}:answer` : '',
+      callerId ? `${callerId}:reject` : '',
+      callerId || '',
+    ].filter(Boolean);
+
+    return keys.some(key => (this.nativeIncomingCallActionUntil.get(key) || 0) > now);
   }
 
   private async rejectIncomingCallFromUrl(callerId: string, callId?: string) {

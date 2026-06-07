@@ -12,7 +12,16 @@
           "package_name": "com.folcen.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "309126815402-una13j61s1q9t1saq9bss49b54ansfro.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.folcen.app",
+            "certificate_hash": "5F03F37D39AFDA347FBF5213F39062FC3072720B"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCswx6wNkbKdJ9ZQlw7WyEjSIqaAR66y0g"
@@ -20,7 +29,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

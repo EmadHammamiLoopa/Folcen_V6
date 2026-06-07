@@ -1,5 +1,68 @@
+.comments-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100%;
+  background: #f7f8ff;
+
+  ion-content {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
 .comments-page-container {
-  padding-bottom: 20px;
+  width: min(100%, 760px);
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 14px clamp(12px, 3vw, 18px) clamp(136px, 24vh, 184px);
+  overflow-x: hidden;
+}
+
+.post-detail-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.post-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  ::ng-deep app-post .jodel-card {
+    margin: 0;
+    border-radius: 22px;
+    box-shadow: 0 18px 46px rgba(30, 41, 59, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.42);
+  }
+}
+
+.thread-section {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
+  padding: 10px 0;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.comments-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 0.82rem;
+  font-weight: 900;
+
+  i {
+    font-size: 0.9rem;
+  }
 }
 
 .restricted-content-state {
@@ -10,7 +73,7 @@
   min-height: 400px;
 
   .restricted-card {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(12px);
     border-radius: 32px;
     padding: 40px 30px;
@@ -30,7 +93,7 @@
       justify-content: center;
       margin: 0 auto 24px;
       font-size: 36px;
-      color: white;
+      color: #111827;
       box-shadow: 0 10px 20px rgba(225, 29, 72, 0.3);
     }
 
@@ -102,7 +165,7 @@
     }
 
     p {
-      color: rgba(255, 255, 255, 0.5);
+      color: #64748b;
       font-size: 0.95rem;
       margin: 0;
       font-weight: 500;
@@ -113,21 +176,39 @@
 .comments-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: hidden;
+
+  ::ng-deep app-comment .comment-card {
+    width: calc(100% - 24px);
+    max-width: calc(100% - 24px);
+    margin: 0 12px;
+    box-sizing: border-box;
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
 }
 
 .comment-footer {
-  background: linear-gradient(to top, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.8));
-  backdrop-filter: blur(25px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 16px 16px calc(12px + env(safe-area-inset-bottom));
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(247, 248, 255, 0.86);
+  backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  padding: clamp(10px, 2.5vw, 14px) clamp(10px, 3vw, 16px) calc(8px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -12px 38px rgba(15, 23, 42, 0.12);
+  z-index: 20;
+  width: min(100%, 760px);
+  margin: 0 auto;
 
   .media-preview-container {
-    padding-bottom: 16px;
+    padding-bottom: 10px;
     display: flex;
     justify-content: center;
-    
+
     .preview-card {
       position: relative;
       width: 90px;
@@ -171,36 +252,36 @@
   .input-wrapper {
     display: flex;
     align-items: flex-end;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 28px;
-    padding: 8px 8px 8px 16px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.05);
+    gap: clamp(8px, 2.2vw, 12px);
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 22px;
+    padding: 6px 6px 6px 12px;
+    border: 1px solid rgba(99, 102, 241, 0.16);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.09);
     transition: all 0.3s ease;
 
     &:focus-within {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: #fff;
+      border-color: rgba(99, 102, 241, 0.36);
       box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
     }
 
     .input-actions-left {
-      padding-bottom: 8px;
+      padding-bottom: 5px;
       .action-btn {
-        background: rgba(255, 255, 255, 0.1);
+        background: #eef2ff;
         border: none;
-        color: white;
-        width: 36px;
-        height: 36px;
+        color: #4f46e5;
+        width: clamp(32px, 8vw, 36px);
+        height: clamp(32px, 8vw, 36px);
         border-radius: 50%;
         font-size: 18px;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
-        
-        &:active { 
+
+        &:active {
           background: var(--folcen-indigo);
           transform: scale(0.9);
         }
@@ -247,27 +328,27 @@
       }
 
       .comment-textarea {
-        --padding-top: 12px;
-        --padding-bottom: 12px;
+        --padding-top: 10px;
+        --padding-bottom: 10px;
         --padding-start: 0;
         --padding-end: 0;
-        font-size: 1rem;
-        color: white;
+        font-size: clamp(0.9rem, 3.8vw, 1rem);
+        color: #111827;
         font-weight: 500;
-        max-height: 150px;
-        
+        max-height: min(120px, 28vh);
+
         &::placeholder {
-          color: rgba(255, 255, 255, 0.5);
+          color: #94a3b8;
         }
       }
     }
 
     .input-actions-right {
       .send-btn {
-        width: 42px;
-        height: 42px;
+        width: clamp(38px, 9vw, 42px);
+        height: clamp(38px, 9vw, 42px);
         border-radius: 50%;
-        background: var(--folcen-gradient-primary);
+        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
         border: none;
         color: white;
         display: flex;
@@ -282,10 +363,10 @@
         }
 
         &:disabled {
-          background: rgba(255, 255, 255, 0.1);
+          background: #e2e8f0;
           box-shadow: none;
           opacity: 0.5;
-          color: rgba(255, 255, 255, 0.3);
+          color: #94a3b8;
         }
       }
     }
@@ -294,16 +375,21 @@
   .footer-options {
     display: flex;
     justify-content: flex-start;
-    padding-top: 10px;
-    padding-left: 8px;
+    padding-top: 8px;
+    padding-left: 6px;
 
     .option-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      color: rgba(255, 255, 255, 0.6);
+      color: #64748b;
       font-size: 0.8rem;
       font-weight: 700;
+      min-width: 0;
+
+      span {
+        white-space: nowrap;
+      }
 
       ion-icon {
         font-size: 18px;
@@ -317,6 +403,30 @@
         margin: 0;
       }
     }
+  }
+}
+
+@media (max-height: 700px) {
+  .comments-page-container {
+    padding-bottom: 128px;
+  }
+
+  .comment-footer {
+    .footer-options {
+      padding-top: 6px;
+    }
+
+    .media-preview-container .preview-card {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+    }
+  }
+}
+
+@media (max-width: 420px) {
+  .comment-footer .footer-options .option-item span {
+    white-space: normal;
   }
 }
 

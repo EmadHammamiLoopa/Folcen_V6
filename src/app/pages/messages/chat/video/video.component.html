@@ -7,7 +7,7 @@
       <app-avatar [profile]="partner" [size]="168"></app-avatar>
     </div>
     <div class="name">{{ partner?.fullName }}</div>
-    <div class="label">{{ answer ? 'Incoming video call' : 'Ringing...' }}</div>
+    <div class="label">{{ answeringCall ? 'Connecting...' : (answer ? 'Incoming video call' : 'Ringing...') }}</div>
   </div>
 
   <div class="video-stage" [class.hidden-stage]="!answered">
@@ -53,8 +53,8 @@
     </div>
 
     <div class="action-bar">
-      <button *ngIf="answer && !answered" class="main-btn accept" (click)="answerCall()" aria-label="Answer call">
-        <i class="fas fa-phone"></i>
+      <button *ngIf="answer && !answered && !autoAnswer" class="main-btn accept" [disabled]="answeringCall" (click)="answerCall()" aria-label="Answer call">
+        <i class="fas" [ngClass]="answeringCall ? 'fa-spinner fa-spin' : 'fa-phone'"></i>
       </button>
 
       <button *ngIf="!answered && !answer && !calling" class="main-btn call" (click)="placeCall()" aria-label="Start video call">

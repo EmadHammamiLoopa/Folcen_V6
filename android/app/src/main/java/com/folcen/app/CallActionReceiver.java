@@ -1,6 +1,5 @@
 package com.folcen.app;
 
-import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -18,12 +17,9 @@ public class CallActionReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         if (!ACTION_REJECT_CALL.equals(action) && !ACTION_ANSWER_CALL.equals(action)) return;
         int notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
-        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null && notificationId != 0) {
-            manager.cancel(notificationId);
-        }
         String callerId = intent.getStringExtra(EXTRA_CALLER_ID);
         String callId = intent.getStringExtra(EXTRA_CALL_ID);
+        MyFirebaseMessagingService.cancelIncomingCallNotifications(context, callId, notificationId);
         Uri uri = new Uri.Builder()
                 .scheme("folcen")
                 .authority("incoming-call")

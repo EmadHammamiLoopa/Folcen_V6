@@ -353,15 +353,59 @@ function emitFriendRequestDeclined(userAId, userBId) {
 /**
  * Create a persistent notification and optionally send push
  */
+function cleanNotificationText(value, fallback) {
+  const clean = String(value || '')
+    .replace(/\bundefined\b|\bnull\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean || fallback;
+}
+
+function getSafeDisplayName(user, fallback = 'Someone') {
+  if (!user) return fallback;
+  const direct = user.displayName || user.fullName || user.name;
+  const composed = `${user.firstName || ''} ${user.lastName || ''}`;
+  const emailName = user.email ? String(user.email).split('@')[0] : '';
+  return cleanNotificationText(direct || composed || emailName, fallback);
+}
+
+function isBroadActivityPush(type, data = {}) {
+  if (data.inAppOnly === true || data.push === false || data.externalPush === false) return true;
+  const key = String(type || data.type || '').toLowerCase();
+  return [
+    'followed_user_posted',
+    'followed_user_created_product',
+    'followed_user_created_service',
+    'followed_user_created_job',
+    'friend_activity',
+    'friend_posted',
+    'follower_activity',
+    'channel_activity'
+  ].some(token => key.includes(token));
+}
+
 async function createNotification({ recipientId, senderId, type, title, body, data = {} }) {
   try {
     const Notification = require('./models/Notification');
+    let safeTitle = cleanNotificationText(title, 'Folcen');
+    let safeBody = cleanNotificationText(body, 'You have a new notification');
+
+    if ((/^(Folcen|Someone)$/.test(safeTitle) || /undefined|null/i.test(String(title || body || ''))) && senderId) {
+      try {
+        const User = require('./models/User');
+        const sender = await User.findById(senderId).select('firstName lastName displayName fullName name email').lean();
+        const senderName = getSafeDisplayName(sender);
+        safeTitle = cleanNotificationText(title, senderName);
+        safeBody = cleanNotificationText(body, `${senderName} sent you a notification`);
+      } catch (_) {}
+    }
+
     const notification = await Notification.create({
       recipient: recipientId,
       sender: senderId,
       type,
-      title,
-      body,
+      title: safeTitle,
+      body: safeBody,
       data
     });
 
@@ -370,16 +414,20 @@ async function createNotification({ recipientId, senderId, type, title, body, da
 
     // Trigger push â€” use 5-arg path when data.link is set so the FCM deep-link
     // points to the actual content (post/comment) not a chat thread.
+    if (isBroadActivityPush(type, data)) {
+      return notification;
+    }
+
     if (data && data.link) {
       sendNotification(
-        { en: title },
-        { en: body },
+        { en: safeTitle },
+        { en: safeBody },
         { type: type || 'message', link: data.link },
         [],
         [String(recipientId)]
       ).catch(() => {});
     } else {
-      sendNotification([recipientId], body, title, senderId).catch(() => {});
+      sendNotification([recipientId], safeBody, safeTitle, senderId).catch(() => {});
     }
 
     return notification;
@@ -893,8 +941,8 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
 
   if (typeof userIds === 'object' && userIds.en && typeof message === 'object' && message.en) {
     // 5-argument signature
-    title = userIds.en;
-    body  = message.en;
+    title = cleanNotificationText(userIds.en, 'Folcen');
+    body  = cleanNotificationText(message.en, 'You have a new notification');
     data  = senderName || {}; // 3rd arg is data
     recipientIds = recipientsOverride || [];
   } else {
@@ -904,7 +952,8 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
     title = (senderName && typeof senderName === 'object' && senderName.en)
         ? String(senderName.en)
         : (senderName ? String(senderName) : 'New Message');
-    body  = String(message)    || 'You have a new message';
+    title = cleanNotificationText(title, 'Folcen');
+    body  = cleanNotificationText(message, 'You have a new message');
 
     data = {
       type: 'message',
@@ -919,6 +968,10 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
 
   if (recipientIds.length === 0) {
     return console.error('âŒ No valid user IDs for notification.');
+  }
+
+  if (isBroadActivityPush(data && data.type, data)) {
+    return;
   }
 
   const { sendPushToUser } = require('./services/fcmPushService');

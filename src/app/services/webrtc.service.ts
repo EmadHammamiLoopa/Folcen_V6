@@ -106,6 +106,53 @@ export class WebrtcService {
 
   private delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  private buildPreferredMediaConstraints(): MediaStreamConstraints {
+    return {
+      video: {
+        width: { ideal: 640, max: 640 },
+        height: { ideal: 480, max: 480 },
+        frameRate: { ideal: 15, max: 30 },
+        facingMode: { ideal: this.facingMode || 'user' }
+      },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    };
+  }
+
+  private buildFallbackMediaConstraints(): MediaStreamConstraints {
+    return {
+      video: true,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    };
+  }
+
+  private rememberLocalStream(stream: MediaStream): MediaStream {
+    this.myStream = stream;
+    this.localStream = stream;
+    this.activeStreams.set(this.tabId, stream);
+    this.activeDevices = {};
+
+    stream.getTracks().forEach(track => {
+      const id = track.getSettings().deviceId;
+      if (track.kind === 'video' && id) this.activeDevices.video = id;
+      if (track.kind === 'audio' && id) this.activeDevices.audio = id;
+      console.log(`[webrtc] active ${track.kind}`, {
+        deviceId: id,
+        label: track.label,
+        readyState: track.readyState
+      });
+    });
+
+    return stream;
+  }
+
   // Ã°Å¸â€Â Retry getUserMedia in case of temporary device lock
   private async tryGetMediaStreamWithRetries(
     constraints: MediaStreamConstraints,
@@ -387,69 +434,16 @@ export class WebrtcService {
 
   public async getOptimalMediaStream(): Promise<MediaStream> {
     try {
-      // Get available devices with locking
-      const videoDeviceId = await this.deviceManager.getAvailableDevice('videoinput', this.tabId);
-      const audioDeviceId = await this.deviceManager.getAvailableDevice('audioinput', this.tabId);
-      if (!videoDeviceId || !audioDeviceId) {
-        throw new Error('All devices are currently in use');
+      const stream = await this.getUserMedia();
+      if (!stream) {
+        throw new Error('Could not acquire any media devices');
       }
-
-      // Store the acquired device IDs
-      this.activeDevices = { video: videoDeviceId, audio: audioDeviceId };
-      console.log('Using devices:', { video: videoDeviceId, audio: audioDeviceId });
-
-      // Create stream with acquired devices
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640, max: 640 },
-          height: { ideal: 480, max: 480 },
-          frameRate: { ideal: 15, max: 30 },
-          deviceId: { exact: videoDeviceId }
-        },
-        audio: {
-          deviceId: { exact: audioDeviceId },
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-
-      // Log the actual devices being used
-      stream.getTracks().forEach(track => {
-        const settings = track.getSettings();
-        console.log(`Active ${track.kind}:`, {
-          deviceId: settings.deviceId,
-          label: track.label,
-          ...settings
-        });
-      });
-
       return stream;
     } catch (error) {
       console.error('Error acquiring optimal media stream:', error);
-
-      // Fallback strategy with device locking
-      try {
-        console.log('Attempting fallback with relaxed constraints');
-        const fallbackStream = await this.getFallbackMediaStream();
-
-        // Update active devices with whatever worked in fallback
-        fallbackStream.getTracks().forEach(track => {
-          const settings = track.getSettings();
-          if (track.kind === 'video') {
-            this.activeDevices.video = settings.deviceId;
-          } else if (track.kind === 'audio') {
-            this.activeDevices.audio = settings.deviceId;
-          }
-        });
-
-        return fallbackStream;
-      } catch (fallbackError) {
-        console.error('Fallback media acquisition failed:', fallbackError);
-        throw new Error(
-          'Could not acquire any media devices. Please check your camera and microphone permissions.'
-        );
-      }
+      throw new Error(
+        'Could not acquire any media devices. Please check your camera and microphone permissions.'
+      );
     }
   }
 
@@ -1116,9 +1110,22 @@ WebrtcService.peer.once('open', async () => {
     return `${baseStr}-${Math.random().toString(36).slice(2,6)}`;
   }
   
-  async createPeer(authUserId: string): Promise<void> {
-    if (this.creatingPeer) return;
-    if (WebrtcService.peer && WebrtcService.peer.open) return;
+  async createPeer(authUserId: string, forceRefresh = false): Promise<void> {
+    if (this.creatingPeer) {
+      const started = Date.now();
+      while (this.creatingPeer && Date.now() - started < 5000) {
+        await this.delay(100);
+      }
+      if (this.creatingPeer && !forceRefresh) return;
+    }
+    if (WebrtcService.peer && WebrtcService.peer.open && !forceRefresh) return;
+    if (forceRefresh) {
+      console.log('[webrtc] refreshing PeerJS session for incoming call');
+      try { WebrtcService.peer?.destroy(); } catch {}
+      WebrtcService.peer = null as any;
+      this.myPeerId = undefined as any;
+      try { localStorage.removeItem('peerId'); } catch {}
+    }
     // defensive: recover authUserId from localStorage if missing
     if (!authUserId) {
       try {
@@ -1180,14 +1187,35 @@ WebrtcService.peer.once('open', async () => {
   // Add to WebrtcService
   private callState = new BehaviorSubject<{connected: boolean, type: 'caller' | 'receiver'}>(null);
   public callState$ = this.callState.asObservable();
+  private mediaRequestInFlight: Promise<MediaStream | null> | null = null;
 
   async getUserMedia(): Promise<MediaStream | null> {
     // Reuse a live stream if we already have one
     if (this.myStream && this.myStream.getTracks().some(t => t.readyState === 'live')) {
       return this.myStream;
     }
+    if (this.mediaRequestInFlight) {
+      return this.mediaRequestInFlight;
+    }
+
+    this.mediaRequestInFlight = this.acquireUserMedia();
+    try {
+      return await this.mediaRequestInFlight;
+    } finally {
+      this.mediaRequestInFlight = null;
+    }
+  }
+
+  private async acquireUserMedia(): Promise<MediaStream | null> {
+    this.releaseCurrentStream();
   
     try {
+      const hasPermissions = await this.requestPermissions();
+      if (!hasPermissions) return null;
+
+      const preferredStream = await navigator.mediaDevices.getUserMedia(this.buildPreferredMediaConstraints());
+      return this.rememberLocalStream(preferredStream);
+
       // Acquire specific devices (with your locking)
       const videoDeviceId = await this.deviceManager.getAvailableDevice('videoinput', this.tabId);
       const audioDeviceId = await this.deviceManager.getAvailableDevice('audioinput', this.tabId);
@@ -1305,6 +1333,16 @@ WebrtcService.peer.once('open', async () => {
       }
       this.activeStreams.delete(this.tabId);
     }
+
+    if (this.myStream) {
+      this.myStream.getTracks().forEach(track => {
+        try { track.stop(); } catch {}
+        track.enabled = false;
+      });
+      this.myStream = null;
+    }
+
+    this.localStream = null;
 
     // Release any device locks
     if (this.activeDevices.video) {

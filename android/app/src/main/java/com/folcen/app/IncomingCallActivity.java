@@ -10,6 +10,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -19,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class IncomingCallActivity extends Activity {
+    private static final String TAG = "FolcenIncomingCall";
     private String callerId;
     private String callId;
     private int notificationId;
@@ -40,6 +42,13 @@ public class IncomingCallActivity extends Activity {
         callType = firstNonEmpty(intent.getStringExtra("callType"), "video");
         expiresAt = firstNonEmpty(intent.getStringExtra("expiresAt"), "");
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
+        if (isExpired()) {
+            Log.d(TAG, "expired incoming screen dismissed callId=" + callId + " expiresAt=" + expiresAt);
+            cancelNotification();
+            finish();
+            return;
+        }
+        Log.d(TAG, "display callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
         cancelNotification();
 
         setContentView(buildView(callerName));
@@ -56,7 +65,14 @@ public class IncomingCallActivity extends Activity {
         callType = firstNonEmpty(intent.getStringExtra("callType"), callType, "video");
         expiresAt = firstNonEmpty(intent.getStringExtra("expiresAt"), expiresAt);
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
+        if (isExpired()) {
+            Log.d(TAG, "expired incoming refresh dismissed callId=" + callId + " expiresAt=" + expiresAt);
+            cancelNotification();
+            finish();
+            return;
+        }
         actionTaken = false;
+        Log.d(TAG, "refresh callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
         cancelNotification();
         setContentView(buildView(callerName));
     }
@@ -203,7 +219,14 @@ public class IncomingCallActivity extends Activity {
 
     private void answerCall() {
         if (actionTaken) return;
+        if (isExpired()) {
+            Log.d(TAG, "expired answer ignored callId=" + callId + " expiresAt=" + expiresAt);
+            cancelNotification();
+            finish();
+            return;
+        }
         actionTaken = true;
+        Log.d(TAG, "answer tapped callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId);
         cancelNotification();
         Uri uri = new Uri.Builder()
                 .scheme("folcen")
@@ -225,12 +248,20 @@ public class IncomingCallActivity extends Activity {
         intent.setData(uri);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
+        Log.d(TAG, "answer launched MainActivity callId=" + callId);
         finish();
     }
 
     private void rejectCall() {
         if (actionTaken) return;
+        if (isExpired()) {
+            Log.d(TAG, "expired reject ignored callId=" + callId + " expiresAt=" + expiresAt);
+            cancelNotification();
+            finish();
+            return;
+        }
         actionTaken = true;
+        Log.d(TAG, "reject tapped callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId);
         cancelNotification();
         Uri uri = new Uri.Builder()
                 .scheme("folcen")
@@ -251,14 +282,12 @@ public class IncomingCallActivity extends Activity {
         intent.setData(uri);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
+        Log.d(TAG, "reject launched MainActivity callId=" + callId);
         finish();
     }
 
     private void cancelNotification() {
-        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null && notificationId != 0) {
-            manager.cancel(notificationId);
-        }
+        MyFirebaseMessagingService.cancelIncomingCallNotifications(this, callId, notificationId);
     }
 
     private void showOverLockScreen() {
@@ -281,5 +310,15 @@ public class IncomingCallActivity extends Activity {
             if (value != null && value.trim().length() > 0) return value;
         }
         return "";
+    }
+
+    private boolean isExpired() {
+        if (expiresAt == null || expiresAt.trim().length() == 0) return false;
+        try {
+            long expiry = Long.parseLong(expiresAt);
+            return expiry > 0 && System.currentTimeMillis() > expiry;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 }

@@ -1,10 +1,13 @@
 .comment-card {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
   border-radius: 24px;
   margin: 8px 16px;
-  padding: 12px 16px;
+  padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -36,6 +39,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
 
       .avatar-ring {
         width: 42px;
@@ -83,12 +87,17 @@
       }
 
       .meta {
+        min-width: 0;
+
         .username {
           margin: 0;
           font-size: 0.95rem;
           font-weight: 800;
           color: var(--text);
           letter-spacing: -0.3px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .timestamp {
           font-size: 0.75rem;
@@ -110,12 +119,16 @@
   }
 
   .card-body {
+    min-width: 0;
+
     .comment-text {
       margin: 0;
       font-size: 0.95rem;
       line-height: 1.4;
       color: var(--text);
       font-weight: 500;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .media-container {
@@ -125,7 +138,7 @@
       background: #000;
       border: 1px solid rgba(255, 255, 255, 0.1);
       transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      max-width: 240px;
+      max-width: min(240px, 100%);
       cursor: pointer;
       position: relative;
 
@@ -172,7 +185,7 @@
       .media-frame {
         position: relative;
         width: 100%;
-        
+
         .media-img {
           width: 100%;
           height: auto;
@@ -259,26 +272,30 @@
   .card-footer {
     margin-top: 10px;
     display: flex;
-    justify-content: flex-start;
+    justify-content: flex-end;
+    min-width: 0;
 
     .vote-widget {
       display: flex;
       align-items: center;
+      flex: 0 0 auto;
       background: rgba(255, 255, 255, 0.05);
-      border-radius: 14px;
-      padding: 4px;
+      border-radius: 999px;
+      padding: 3px;
       border: 1px solid rgba(255, 255, 255, 0.05);
+      max-width: 100%;
 
       .vote-btn {
         background: transparent;
         border: none;
         color: var(--text);
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        min-width: 30px;
+        height: 30px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 10px;
+        border-radius: 999px;
         transition: all 0.2s ease;
 
         &:active {
@@ -292,8 +309,38 @@
       .vote-val {
         font-size: 0.85rem;
         font-weight: 800;
-        padding: 0 10px;
+        min-width: 28px;
+        padding: 0 6px;
+        text-align: center;
         color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+    }
+  }
+}
+
+@media (max-width: 380px) {
+  .comment-card {
+    padding: 10px;
+
+    .card-header {
+      gap: 8px;
+
+      .user-info {
+        gap: 9px;
+      }
+    }
+
+    .card-footer .vote-widget {
+      .vote-btn {
+        width: 28px;
+        min-width: 28px;
+        height: 28px;
+      }
+
+      .vote-val {
+        min-width: 24px;
+        padding: 0 4px;
       }
     }
   }

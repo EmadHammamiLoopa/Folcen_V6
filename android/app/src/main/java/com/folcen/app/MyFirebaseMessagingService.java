@@ -3,6 +3,7 @@ package com.folcen.app;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.media.AudioAttributes;
@@ -11,6 +12,8 @@ import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 
+import android.service.notification.StatusBarNotification;
+
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -18,12 +21,15 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FolcenFcmService";
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
-    private static final String CALL_CHANNEL_ID = "incoming_calls_v4";
+    public static final String CALL_CHANNEL_ID = "incoming_calls_v4";
+    private static final long CALL_ALERT_DEDUPE_MS = 90000L;
+    private static final Map<String, Long> ACTIVE_CALL_ALERTS = new ConcurrentHashMap<>();
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -40,7 +46,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 Log.d(TAG, "App is foreground; socket UI will handle incoming call");
                 return;
             }
-            showIncomingCall(data);
+            openIncomingCallScreen(data);
             return;
         }
 
@@ -106,6 +112,21 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String title = callerName.equals("Incoming video call") ? callerName : callerName + " is calling";
         String body = firstNonEmpty(data.get("body"), "Tap to answer");
         int notificationId = stableNotificationId(callId);
+        long now = System.currentTimeMillis();
+        long timeoutMs = callNotificationTimeoutMs(expiresAt, now);
+        Long lastShown = ACTIVE_CALL_ALERTS.get(callId);
+        if (lastShown != null && now - lastShown < CALL_ALERT_DEDUPE_MS) {
+            Log.d(TAG, "Duplicate incoming call alert ignored callId=" + callId + " ageMs=" + (now - lastShown));
+            return;
+        }
+        cancelIncomingCallNotifications(this, null, 0);
+        ACTIVE_CALL_ALERTS.put(callId, now);
+        for (Map.Entry<String, Long> entry : ACTIVE_CALL_ALERTS.entrySet()) {
+            if (now - entry.getValue() > CALL_ALERT_DEDUPE_MS) {
+                ACTIVE_CALL_ALERTS.remove(entry.getKey());
+            }
+        }
+        Log.d(TAG, "Showing incoming call alert callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
 
         PendingIntent fullScreenIntent = PendingIntent.getActivity(
                 this,
@@ -121,14 +142,27 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setOngoing(true)
-                .setAutoCancel(false)
+                .setOngoing(false)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .setTimeoutAfter(timeoutMs)
                 .setSound(Settings.System.DEFAULT_RINGTONE_URI)
                 .setVibrate(new long[] { 0, 700, 400, 700, 400, 700 })
                 .setFullScreenIntent(fullScreenIntent, true)
                 .setContentIntent(fullScreenIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+    }
+
+    private long callNotificationTimeoutMs(String expiresAtValue, long now) {
+        try {
+            if (expiresAtValue != null && expiresAtValue.trim().length() > 0) {
+                long expiresAt = Long.parseLong(expiresAtValue);
+                long remaining = expiresAt - now;
+                if (remaining > 0) return Math.min(remaining, CALL_ALERT_DEDUPE_MS);
+            }
+        } catch (Exception ignored) {}
+        return CALL_ALERT_DEDUPE_MS;
     }
 
     private void openIncomingCallScreen(Map<String, String> data) {
@@ -245,9 +279,41 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         return flags;
     }
 
-    private int stableNotificationId(String value) {
+    public static void cancelIncomingCallNotifications(Context context, String callId, int notificationId) {
+        if (context == null) return;
+        try {
+            if (callId != null && callId.length() > 0) {
+                ACTIVE_CALL_ALERTS.remove(callId);
+            }
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null) return;
+            manager.cancelAll();
+            if (notificationId != 0) {
+                manager.cancel(notificationId);
+            }
+            if (callId != null && callId.length() > 0) {
+                manager.cancel(stableNotificationId(callId));
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                for (StatusBarNotification notification : manager.getActiveNotifications()) {
+                    if (notification == null || notification.getNotification() == null) continue;
+                    String channelId = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                            ? notification.getNotification().getChannelId()
+                            : "";
+                    if (CALL_CHANNEL_ID.equals(channelId)) {
+                        manager.cancel(notification.getId());
+                    }
+                }
+            }
+            Log.d(TAG, "Cancelled Folcen notifications for incoming call cleanup callId=" + callId + " notificationId=" + notificationId);
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to cancel incoming call notifications callId=" + callId, e);
+        }
+    }
+
+    public static int stableNotificationId(String value) {
         if (value == null || value.length() == 0) return 2001;
-        return Math.abs(value.hashCode());
+        return (value.hashCode() & 0x7fffffff) % 2000000000 + 2000;
     }
 
     private String firstNonEmpty(String... values) {

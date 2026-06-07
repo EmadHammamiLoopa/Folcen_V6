@@ -195,6 +195,14 @@ export class TabsPage implements OnInit, OnDestroy {
     return this.badgeCounts.get(tab) || 0;
   }
 
+  shouldShowTabs(): boolean {
+    return this.showTabs && !this.isTablessRoute(this.currentUrl || this.router.url || '');
+  }
+
+  private isTablessRoute(url: string): boolean {
+    return /\/tabs\/channels\/post\/[^/?#]+/.test(url || '');
+  }
+
   // ----- realtime / API -----
   private attachSocketListenersOnce() {}
 

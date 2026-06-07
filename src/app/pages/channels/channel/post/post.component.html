@@ -54,7 +54,7 @@
   </div>
 
   <!-- meta (events / dating) -->
-  <div *ngIf="channel.type === 'static_events'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
+  <div *ngIf="channel?.type === 'static_events'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
       <div class="meta-chip">
         <i class="far fa-calendar-alt"></i>
@@ -86,7 +86,7 @@
     </ng-container>
   </div>
 
-  <div *ngIf="channel.type === 'static_dating'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
+  <div *ngIf="channel?.type === 'static_dating'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
       <div class="meta-chip" *ngIf="post.relationshipGoals?.length">
         <i class="fas fa-heart"></i>
@@ -110,7 +110,7 @@
   </div>
 
   <!-- hint (dating only) -->
-  <ng-container *ngIf="channel.type === 'static_dating' && post.hintAboutMe">
+  <ng-container *ngIf="channel?.type === 'static_dating' && post.hintAboutMe">
     <div *ngIf="showCommentsBtn" class="jdl-hint-teaser" (click)="showComments()">
       <i class="fas fa-quote-left"></i>
       <span>{{ post.hintAboutMe | slice:0:60 }}{{ post.hintAboutMe?.length > 60 ? '...' : '' }}</span>
