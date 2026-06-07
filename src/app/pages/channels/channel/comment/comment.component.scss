@@ -3,13 +3,13 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
   backdrop-filter: blur(12px);
-  border-radius: 24px;
+  border-radius: 20px;
   margin: 8px 16px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
   overflow: hidden;
   transition: transform 0.3s ease, background 0.3s ease;
 
@@ -25,7 +25,7 @@
     width: 4px;
     background: var(--accent);
     border-radius: 0 4px 4px 0;
-    box-shadow: 0 0 15px var(--accent);
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.28);
     opacity: 0.8;
   }
 
@@ -45,7 +45,7 @@
         width: 42px;
         height: 42px;
         padding: 2px;
-        background: linear-gradient(45deg, var(--accent), transparent);
+        background: linear-gradient(135deg, var(--accent), rgba(255, 255, 255, 0.9));
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -76,7 +76,7 @@
           }
 
           &.is-anonyme {
-            background: var(--folcen-tabbar-background);
+            background: #eef2ff;
           }
 
           app-avatar {
@@ -279,10 +279,10 @@
       display: flex;
       align-items: center;
       flex: 0 0 auto;
-      background: rgba(255, 255, 255, 0.05);
+      background: #f8fafc;
       border-radius: 999px;
       padding: 3px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(148, 163, 184, 0.22);
       max-width: 100%;
 
       .vote-btn {

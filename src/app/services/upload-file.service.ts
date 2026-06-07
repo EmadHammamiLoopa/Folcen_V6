@@ -127,7 +127,8 @@ export class UploadFileService {
     };
 
     return this.platform.ready().then(async () => {
-      if (!this.platform.is('cordova')) {
+      const isNativeRuntime = this.platform.is('cordova') || this.platform.is('capacitor') || this.platform.is('hybrid');
+      if (!isNativeRuntime) {
         return this.mockCordovaService.getPicture({ sourceType, mediaType: mediaTypeValue });
       }
 
@@ -150,7 +151,7 @@ export class UploadFileService {
       const safeName = rawName.includes('.') ? rawName : rawName + (mediaType === 'image' ? '.jpg' : '.mp4');
       const mimeType = mimeFromName(safeName);
 
-      if (this.platform.is('cordova')) {
+      if (this.platform.is('cordova') || this.platform.is('capacitor') || this.platform.is('hybrid')) {
         try {
           const convertedPath = this.webView.convertFileSrc(imageData);
           const response = await fetch(convertedPath);

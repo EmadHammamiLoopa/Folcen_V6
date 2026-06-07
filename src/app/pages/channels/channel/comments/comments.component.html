@@ -63,7 +63,7 @@
             [id]="'comment-' + comment.id"
             (removeComment)="onRemoveComment(ind)"
             [backgroundColor]="post.backgroundColor"
-            [color]="post.color"
+            [color]="'#111827'"
             [comment]="comment"
             [user]="user"
             *ngFor="let comment of comments; let ind = index"
@@ -99,7 +99,7 @@
 
   <div class="input-wrapper">
     <div class="input-actions-left">
-      <button class="action-btn camera" (click)="mediaInput.click()">
+      <button class="action-btn camera" (click)="captureCommentMedia()">
         <ion-icon name="camera-outline"></ion-icon>
       </button>
     </div>

@@ -11,6 +11,8 @@ import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { getCommentUserName } from './comment-utils';
 import { DomSanitizer } from '@angular/platform-browser';
 import { AppEventsService } from 'src/app/services/app-events.service';
+import { UploadFileService } from 'src/app/services/upload-file.service';
+import { Camera } from '@ionic-native/camera/ngx';
 
 @Component({
   selector: 'app-comments',
@@ -50,7 +52,9 @@ export class CommentsComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private nativeStorage: NativeStorage,
     private sanitizer: DomSanitizer,
-    private events: AppEventsService
+    private events: AppEventsService,
+    private uploadFile: UploadFileService,
+    private camera: Camera
   ) { }
 
   ngOnInit() {
@@ -287,6 +291,23 @@ taggedUserIds: Set<string> = new Set();
       this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
     } else {
       this.toastService.presentErrorToastr('Invalid media file selected');
+    }
+  }
+
+  async captureCommentMedia() {
+    try {
+      const resp = await this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image');
+      if (!resp?.file) {
+        this.toastService.presentErrorToastr('Camera did not return a usable photo.');
+        return;
+      }
+      const file = new File([resp.file], resp.name || `comment-${Date.now()}.jpg`, {
+        type: resp.mimeType || resp.file.type || 'image/jpeg'
+      });
+      this.mediaFile = file;
+      this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
+    } catch (err: any) {
+      this.toastService.presentErrorToastr('Camera failed: ' + (err?.message || err));
     }
   }
   
