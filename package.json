@@ -208,8 +208,8 @@
       "call-number": {},
       "cordova-plugin-background-mode": {},
       "cordova-plugin-googleplus": {
-        "REVERSED_CLIENT_ID": "785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com",
-        "WEB_APPLICATION_CLIENT_ID": "785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com"
+        "REVERSED_CLIENT_ID": "com.googleusercontent.apps.309126815402-vnscbcqta4nluub7mviotq9c3ahf4605",
+        "WEB_APPLICATION_CLIENT_ID": "309126815402-vnscbcqta4nluub7mviotq9c3ahf4605.apps.googleusercontent.com"
       }
     },
     "platforms": [

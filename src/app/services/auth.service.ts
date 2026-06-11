@@ -34,7 +34,7 @@ export class AuthService extends DataService {
     return new Promise<void>((resolve, reject) => {
       gapi.load('auth2', () => {
         gapi.auth2.init({
-          client_id: '785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com'
+          client_id: '309126815402-vnscbcqta4nluub7mviotq9c3ahf4605.apps.googleusercontent.com'
         }).then(() => {
           resolve();
         }).catch((error: any) => {
@@ -72,13 +72,62 @@ export class AuthService extends DataService {
     return this.firebaseGoogleLogin('google_signup');
   }
 
+  async prepareGoogleSignUpProfile() {
+    const fbUser = this.shouldUseNativeGoogle()
+      ? await this.nativeGoogleLogin()
+      : await this.firebaseSvc.signInWithGoogle();
+    return this.buildGoogleProfile(fbUser, 'google_signup');
+  }
+
+  async completeGoogleSignUp(profile: any) {
+    try {
+      const fbUser: any = await this.firebaseSvc.waitForAuthReady();
+      if (!fbUser) {
+        throw new Error('Google session was not restored. Please tap Continue with Google again.');
+      }
+      const idToken = await fbUser.getIdToken(true);
+      return await this.sendRequest({
+        method: 'post',
+        url: 'firebase-login',
+        data: {
+          idToken,
+          profile: {
+            ...profile,
+            signupProvider: 'google',
+            acceptanceContext: 'google_signup',
+            emailVerified: true
+          }
+        }
+      });
+    } catch (err) {
+      console.error('[GoogleAuth] Complete signup failed', err);
+      throw this.handleAuthError(err);
+    }
+  }
+
   private async firebaseGoogleLogin(context: 'google_signin' | 'google_signup') {
     try {
+      console.info('[GoogleAuth] Starting flow', {
+        context,
+        native: this.shouldUseNativeGoogle(),
+        platform: {
+          hybrid: this.platformRef.is('hybrid'),
+          cordova: this.platformRef.is('cordova'),
+          capacitor: this.platformRef.is('capacitor'),
+          android: this.platformRef.is('android')
+        }
+      });
       const fbUser = this.shouldUseNativeGoogle()
         ? await this.nativeGoogleLogin()
         : await this.firebaseSvc.signInWithGoogle();
+      console.info('[GoogleAuth] Firebase credential resolved', {
+        context,
+        hasEmail: !!fbUser?.email,
+        emailVerified: fbUser?.emailVerified === true,
+        provider: fbUser?.providerData?.[0]?.providerId || 'unknown'
+      });
       const idToken = await fbUser.getIdToken();
-      return await this.sendRequest({
+      const response = await this.sendRequest({
         method: 'post',
         url: 'firebase-login',
         data: {
@@ -86,28 +135,66 @@ export class AuthService extends DataService {
           profile: this.buildGoogleProfile(fbUser, context)
         }
       });
+      console.info('[GoogleAuth] Backend login completed', { context });
+      return response;
     } catch (err) {
+      console.error('[GoogleAuth] Flow failed', { context, err });
       throw this.handleAuthError(err);
     }
   }
 
   private shouldUseNativeGoogle(): boolean {
-    return this.platformRef.is('hybrid') || this.platformRef.is('cordova') || this.platformRef.is('capacitor');
+    const win = window as any;
+    const capacitorNative =
+      win?.Capacitor?.isNativePlatform?.() === true ||
+      win?.Capacitor?.getPlatform?.() === 'android' ||
+      win?.Capacitor?.getPlatform?.() === 'ios';
+    const hasNativeBridge = !!win?.cordova || !!win?.cordova_iab || !!win?.Capacitor;
+    const androidWebView = this.platformRef.is('android') && hasNativeBridge;
+    return capacitorNative || androidWebView || this.platformRef.is('hybrid') || this.platformRef.is('cordova') || this.platformRef.is('capacitor');
   }
 
   private async nativeGoogleLogin() {
     const webClientId = (environment as any)?.firebase?.webClientId;
-    if (!webClientId || !String(webClientId).includes('.apps.googleusercontent.com')) {
-      throw new Error('Google sign-in is missing the Web OAuth client ID.');
-    }
-    const result = await this.googlePlus.login({
-      webClientId,
+    const androidClientId = (environment as any)?.firebase?.androidClientId;
+
+    const sameGoogleProject =
+      !!webClientId &&
+      !!androidClientId &&
+      String(webClientId).split('-')[0] === String(androidClientId).split('-')[0];
+
+    const loginOptions: any = {
       offline: false,
       scopes: 'profile email'
+    };
+
+    // Android may only request an idToken when the Web client belongs to the
+    // same Google project as the Android client. Otherwise Play Services fails
+    // before returning the selected account. Firebase can still sign in with
+    // the accessToken returned by the native Google plugin.
+    if (webClientId && String(webClientId).includes('.apps.googleusercontent.com') && sameGoogleProject) {
+      loginOptions.webClientId = webClientId;
+    }
+
+    if (androidClientId && String(androidClientId).includes('.apps.googleusercontent.com')) {
+      loginOptions.androidClientId = androidClientId;
+    }
+
+    console.info('[GoogleAuth] Native login options prepared', {
+      hasWebClientId: !!loginOptions.webClientId,
+      hasAndroidClientId: !!androidClientId,
+      sameGoogleProject,
+      android: this.platformRef.is('android')
+    });
+    const result = await this.googlePlus.login(loginOptions);
+    console.info('[GoogleAuth] Native plugin result', {
+      hasIdToken: !!result?.idToken,
+      hasAccessToken: !!result?.accessToken,
+      hasEmail: !!result?.email
     });
 
-    if (!result?.idToken) {
-      throw new Error('Google sign-in did not return an ID token. Check Firebase OAuth client configuration for this Android app.');
+    if (!result?.idToken && !result?.accessToken) {
+      throw new Error('Google sign-in did not return an ID token or access token. Check Firebase OAuth client configuration for this Android app.');
     }
 
     return this.firebaseSvc.signInWithGoogleToken(result?.idToken, result?.accessToken);
@@ -222,6 +309,14 @@ export class AuthService extends DataService {
     // Firebase-specific error codes
     if (err && err.code) {
       switch (err.code) {
+        case '10':
+        case 10:
+        case 'DEVELOPER_ERROR':
+          return { message: 'Google sign-in is not configured correctly for this Android build. Check the package name, SHA-1 certificate, and OAuth client IDs.' };
+        case '12501':
+        case 12501:
+        case 'SIGN_IN_CANCELLED':
+          return { message: 'Google sign-in was cancelled.' };
         case 'auth/user-not-found':
           return { message: 'No account found with this email. Please sign up first.' };
         case 'auth/wrong-password':
@@ -234,6 +329,15 @@ export class AuthService extends DataService {
           return { message: 'This account has been disabled. Please contact support.' };
         case 'auth/email-already-in-use':
           return { message: 'An account with this email already exists.', code: 'email-already-in-use' };
+        case 'auth/account-exists-with-different-credential':
+          return { message: 'This email already exists with a different sign-in method. Sign in with the original method first, then connect Google from your account.' };
+        case 'auth/operation-not-allowed':
+          return { message: 'Google sign-in is not enabled in Firebase Authentication for this project.' };
+        case 'auth/invalid-oauth-client-id':
+          return { message: 'Google sign-in is not connected to the correct Firebase OAuth client. Create a Web OAuth client in the same Google project as the Android client and add its client ID to the app.' };
+        case 'auth/invalid-idp-response':
+        case 'auth/missing-or-invalid-nonce':
+          return { message: 'Google returned a token Firebase could not accept. The Android and Web OAuth client IDs must be from the same Google/Firebase project.' };
         case 'auth/weak-password':
           return { message: 'Password too weak. Please use at least 8 characters.' };
         case 'auth/network-request-failed':

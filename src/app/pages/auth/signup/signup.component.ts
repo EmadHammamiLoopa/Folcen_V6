@@ -53,6 +53,8 @@ export class SignupComponent implements OnInit, OnDestroy {
   studyCountries: string[] = [];
   selectedStudyCountry: string = '';
   isLoadingSchools = false;
+  isGoogleSignup = false;
+  private googleProfileSeed: any = null;
   
   
   schools: string[] = [];
@@ -238,16 +240,25 @@ export class SignupComponent implements OnInit, OnDestroy {
   async googleSignUp() {
     this.pageLoading = true;
     try {
-      const resp = await this.auth.googleSignUp();
-      if (resp && resp.data && resp.data.token) {
-        await this.storeUserData(resp.data.token, resp.data.user);
-        this.guidedTour.markPendingForUser(resp.data.user);
+      const profile = await this.auth.prepareGoogleSignUpProfile();
+      this.googleProfileSeed = profile;
+      this.isGoogleSignup = true;
+
+      const email = String(profile?.email || '').trim().toLowerCase();
+      const firstName = String(profile?.firstName || '').trim();
+      const lastName = String(profile?.lastName || '').trim();
+      this.form.patchValue({
+        email,
+        firstName,
+        lastName,
+        acceptedTerms: true
+      });
+
+      const nameStepIndex = this.steps.indexOf('name');
+      if (nameStepIndex !== -1) {
+        this.step = nameStepIndex;
       }
-      SocketService.initializeSocket()
-        .then(() => SocketService.bindToAuthUser())
-        .catch(() => {});
-      this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
-      await this.router.navigate(['/tabs/new-friends']);
+      this.toastService.presentSuccessToastr('Google connected. Finish your profile to join Folcen.');
     } catch (err: any) {
       devLogger.error('Google sign-up error:', err);
       this.toastService.presentErrorToastr(err?.message || 'Google sign-up failed. Please try again.');
@@ -304,14 +315,46 @@ export class SignupComponent implements OnInit, OnDestroy {
     } else if (this.step < this.steps.length - 1) {
       this.validationErrors[currentStep] = undefined;
       this.isSubmitted = false;
-      this.step++;
+      this.step = this.nextStepIndex();
     }
   }
 
   back() {
     this.isSubmitted = false;
-    if (this.step > 0) this.step--;
+    if (this.isGoogleSignup && this.steps[this.step] === 'name') {
+      this.resetGoogleSignup();
+      this.step = 0;
+    } else if (this.step > 0) {
+      this.step = this.previousStepIndex();
+    }
     else this.router.navigate(['/auth/home']);
+  }
+
+  private nextStepIndex(): number {
+    let next = Math.min(this.step + 1, this.steps.length - 1);
+    if (this.isGoogleSignup && this.steps[next] === 'password') {
+      next++;
+    }
+    if (this.isGoogleSignup && this.steps[next] === 'verifyEmail') {
+      next++;
+    }
+    return Math.min(next, this.steps.length - 1);
+  }
+
+  private previousStepIndex(): number {
+    let previous = Math.max(this.step - 1, 0);
+    if (this.isGoogleSignup && this.steps[previous] === 'verifyEmail') {
+      previous--;
+    }
+    if (this.isGoogleSignup && this.steps[previous] === 'password') {
+      previous--;
+    }
+    return Math.max(previous, 0);
+  }
+
+  private resetGoogleSignup() {
+    this.isGoogleSignup = false;
+    this.googleProfileSeed = null;
   }
 
   adjustEmail() {
@@ -441,11 +484,28 @@ export class SignupComponent implements OnInit, OnDestroy {
     const password = this.form.get('password')?.value;
 
     try {
-      const resp = await this.auth.firebaseSignup(email, password, userInfo);
+      const resp = this.isGoogleSignup
+        ? await this.auth.completeGoogleSignUp({
+            ...this.googleProfileSeed,
+            ...userInfo,
+            password: undefined,
+            password_confirmation: undefined,
+            acceptedTerms: true
+          })
+        : await this.auth.firebaseSignup(email, password, userInfo);
       if (resp && resp.data && resp.data.token) {
         await this.storeUserData(resp.data.token, resp.data.user);
       }
       this.pageLoading = false;
+      if (this.isGoogleSignup) {
+        this.guidedTour.markPendingForUser(resp.data.user);
+        SocketService.initializeSocket()
+          .then(() => SocketService.bindToAuthUser())
+          .catch(() => {});
+        this.oneSignalService.open(resp.data.user?.id || resp.data.user?._id || '');
+        await this.router.navigate(['/tabs/new-friends']);
+        return;
+      }
       this.step++;
       // Start auto-polling so verification is detected without user interaction
       if (this.steps[this.step] === 'verifyEmail') {

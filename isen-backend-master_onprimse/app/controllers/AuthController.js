@@ -669,6 +669,42 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
                 user.mainAvatar = tokenPicture;
                 user.avatar = [tokenPicture];
             }
+            // Google signup can start with only the Google account, then finish
+            // the normal social profile questions in the app. If the first
+            // attempt created an incomplete user, merge the completed profile
+            // here without affecting the regular email signup path.
+            const applyTextField = (field) => {
+                const value = socialProfile[field];
+                if (typeof value === 'string' && value.trim()) {
+                    user[field] = value.trim();
+                }
+            };
+            const applyArrayField = (field) => {
+                if (Array.isArray(socialProfile[field])) {
+                    user[field] = socialProfile[field].map(v => String(v).trim()).filter(Boolean);
+                }
+            };
+
+            [
+                'country', 'city', 'birthDate', 'gender', 'school',
+                'education', 'profession', 'aboutMe'
+            ].forEach(applyTextField);
+            applyArrayField('interests');
+            applyArrayField('languages');
+
+            if (typeof socialProfile.ageVisible === 'boolean') {
+                user.ageVisible = socialProfile.ageVisible;
+            }
+            if (typeof socialProfile.genderVisible === 'boolean') {
+                user.genderVisible = socialProfile.genderVisible;
+            }
+            if (typeof socialProfile.allowVideoRequestsFromNonFriends === 'boolean') {
+                user.allowVideoRequestsFromNonFriends = socialProfile.allowVideoRequestsFromNonFriends;
+            }
+            if (socialProfile.acceptedTerms && !user.acceptedTerms) {
+                user.acceptedTerms = true;
+                user.acceptedTermsAt = new Date();
+            }
             // If rawPassword is provided (MongoDB-fallback signin path) the caller has
             // already authenticated with Firebase, so we trust this password is correct.
             // Re-hash it and store it in MongoDB so future MongoDB-only logins work.

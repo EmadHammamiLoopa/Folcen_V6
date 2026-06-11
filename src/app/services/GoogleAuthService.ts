@@ -9,7 +9,7 @@ export class GoogleAuthService {
   constructor(private ngZone: NgZone) {
     gapi.load('auth2', () => {
       gapi.auth2.init({
-        client_id: '785598983692-igiasirmagu9p3du2a04j67nfvkp81p7.apps.googleusercontent.com',
+        client_id: '309126815402-vnscbcqta4nluub7mviotq9c3ahf4605.apps.googleusercontent.com',
         cookiepolicy: 'single_host_origin',
       }).then(() => {
         console.log('Google Auth initialized');

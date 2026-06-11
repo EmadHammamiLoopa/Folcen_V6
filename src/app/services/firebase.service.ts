@@ -77,9 +77,19 @@ export class FirebaseService {
     if (!idToken && !accessToken) {
       throw new Error('Google sign-in did not return a usable token.');
     }
-    const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
-    const userCredential = await signInWithCredential(this.auth, credential);
-    return userCredential.user;
+    try {
+      const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
+      const userCredential = await signInWithCredential(this.auth, credential);
+      return userCredential.user;
+    } catch (error: any) {
+      console.error('[GoogleAuth] Firebase credential sign-in failed', {
+        code: error?.code,
+        message: error?.message,
+        hasIdToken: !!idToken,
+        hasAccessToken: !!accessToken
+      });
+      throw error;
+    }
   }
 
   async getGoogleRedirectUser(): Promise<FirebaseUser | null> {
