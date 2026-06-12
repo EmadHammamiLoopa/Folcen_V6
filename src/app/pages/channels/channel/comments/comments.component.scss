@@ -702,7 +702,7 @@ ion-toggle{
 
 /* Final mobile comments screen guard: compact feed-style spacing */
 .comments-page-container {
-  padding: 8px clamp(8px, 3vw, 12px) 94px !important;
+  padding: 8px clamp(8px, 3vw, 12px) 172px !important;
   overflow-x: hidden !important;
 }
 
@@ -724,6 +724,7 @@ ion-toggle{
 
 .comments-list {
   gap: 8px !important;
+  padding-bottom: 18px !important;
 }
 
 .comments-list ::ng-deep app-comment .comment-card {
@@ -779,7 +780,7 @@ ion-toggle{
 
 @media (max-width: 380px) {
   .comments-page-container {
-    padding-bottom: 90px !important;
+    padding-bottom: 178px !important;
   }
 
   .comment-footer .footer-options .option-item span {
@@ -881,4 +882,131 @@ ion-toggle{
   --placeholder-color: #94a3b8 !important;
   color: #f8fafc !important;
   -webkit-text-fill-color: #f8fafc !important;
+}
+
+/* Final comments palette lives on the list so it reliably reaches app-comment cards. */
+.comments-list ::ng-deep app-comment:nth-child(6n + 1) .comment-card {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.80), transparent 34%),
+    linear-gradient(145deg, #dffcf6, #c8f7ee) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 2) .comment-card {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #eee7ff, #ddd4ff) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 3) .comment-card {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #ffe7ed, #ffd3df) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 4) .comment-card {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #e1f3ff, #cde7ff) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 5) .comment-card {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #fff1d8, #ffe2b8) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n) .comment-card {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #ecfbd7, #daf5b3) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card {
+  border-color: rgba(100, 116, 139, 0.18) !important;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.10) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .username,
+.comments-list ::ng-deep app-comment .comment-card .card-body .comment-text {
+  color: #111827 !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .timestamp {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header .btn-more,
+.comments-list ::ng-deep app-comment .comment-card .card-footer,
+.comments-list ::ng-deep app-comment .comment-card .card-footer .interaction-group,
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget {
+  background: rgba(255, 255, 255, 0.56) !important;
+  border-color: rgba(100, 116, 139, 0.16) !important;
+  color: #334155 !important;
+  box-shadow: none !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer,
+.comments-list ::ng-deep app-comment .comment-card .card-footer .interaction-group {
+  background: transparent !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn,
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val {
+  color: #334155 !important;
+}
+
+/* Device-verified final palette. Keep this in the parent because parent ::ng-deep rules win on Android. */
+.comments-list ::ng-deep app-comment:nth-child(6n + 1) .comment-card {
+  background: linear-gradient(145deg, #baf4e7 0%, #eafffb 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 2) .comment-card {
+  background: linear-gradient(145deg, #d8cbff 0%, #f4efff 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 3) .comment-card {
+  background: linear-gradient(145deg, #ffc5d4 0%, #fff0f4 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 4) .comment-card {
+  background: linear-gradient(145deg, #b9ddff 0%, #eff8ff 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 5) .comment-card {
+  background: linear-gradient(145deg, #ffd89a 0%, #fff5e6 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n) .comment-card {
+  background: linear-gradient(145deg, #caef98 0%, #f4ffe4 100%) !important;
+}
+
+/* Device fix: keep composer actions tappable above Ionic textarea internals. */
+.comment-footer .input-wrapper {
+  position: relative !important;
+}
+
+.comment-footer .input-actions-left,
+.comment-footer .input-actions-right {
+  position: relative !important;
+  z-index: 4 !important;
+  flex: 0 0 auto !important;
+  pointer-events: auto !important;
+}
+
+.comment-footer .input-actions-left .action-btn,
+.comment-footer .input-actions-right .send-btn {
+  position: relative !important;
+  z-index: 5 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+.comment-footer .text-input-container {
+  min-width: 0 !important;
+  z-index: 1 !important;
+}
+
+.comment-footer .text-input-container .comment-textarea {
+  width: 100% !important;
 }

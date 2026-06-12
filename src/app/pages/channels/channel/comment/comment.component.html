@@ -1,4 +1,18 @@
-<div [id]="'comment-' + comment.id" class="comment-card" [style]="{'--accent': backgroundColor, '--text': color}">
+<div
+  *ngIf="(comment.text && comment.text.trim()) || (mediaUrl && !mediaFailed)"
+  [id]="'comment-' + comment.id"
+  class="comment-card"
+  [ngClass]="'theme-' + (cardThemeIndex % 6)"
+  [class.has-content]="(comment.text && comment.text.trim()) || (mediaUrl && !mediaFailed)"
+  [ngStyle]="{
+    '--accent': backgroundColor,
+    '--text': color,
+    '--comment-card-bg': cardBackground,
+    '--comment-card-text': cardTextColor,
+    '--comment-card-muted': cardMutedColor,
+    '--comment-card-control': cardControlBackground
+  }"
+>
   <div class="card-accent-line"></div>
   
   <div class="card-header">
@@ -20,8 +34,8 @@
     </button>
   </div>
 
-  <div class="card-body">
-    <p class="comment-text">{{ comment.text }}</p>
+  <div class="card-body" *ngIf="(comment.text && comment.text.trim()) || (mediaUrl && !mediaFailed)">
+    <p class="comment-text" *ngIf="comment.text && comment.text.trim()">{{ comment.text }}</p>
     
     <div *ngIf="mediaUrl && !mediaFailed" class="media-container" (click)="toggleImageSize()" [class.is-expanded]="isImageEnlarged">
       <div class="media-frame">

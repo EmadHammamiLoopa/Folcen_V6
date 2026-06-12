@@ -43,6 +43,44 @@ export class CommentsComponent implements OnInit, OnDestroy {
   mediaFile: File | null = null; // Store the selected media file
   mediaPreview: any = "";
   comments: Comment[] = [];
+  private readonly commentThemes = [
+    {
+      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.80), transparent 34%), linear-gradient(145deg, #dffcf6, #c8f7ee)',
+      text: '#111827',
+      muted: '#64748b',
+      control: 'rgba(255, 255, 255, 0.62)'
+    },
+    {
+      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #eee7ff, #ddd4ff)',
+      text: '#111827',
+      muted: '#64748b',
+      control: 'rgba(255, 255, 255, 0.62)'
+    },
+    {
+      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #ffe7ed, #ffd3df)',
+      text: '#111827',
+      muted: '#64748b',
+      control: 'rgba(255, 255, 255, 0.62)'
+    },
+    {
+      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #e1f3ff, #cde7ff)',
+      text: '#111827',
+      muted: '#64748b',
+      control: 'rgba(255, 255, 255, 0.62)'
+    },
+    {
+      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #fff1d8, #ffe2b8)',
+      text: '#111827',
+      muted: '#64748b',
+      control: 'rgba(255, 255, 255, 0.62)'
+    },
+    {
+      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #ecfbd7, #daf5b3)',
+      text: '#111827',
+      muted: '#64748b',
+      control: 'rgba(255, 255, 255, 0.62)'
+    }
+  ];
 
   page = 0;
   pageLoading = false;
@@ -230,6 +268,25 @@ taggedUserIds: Set<string> = new Set();
     );
   }
 
+  private hasCommentContent(comment: any): boolean {
+    const text = typeof comment?.text === 'string' ? comment.text.trim() : '';
+    const media = comment?.media;
+    const mediaUrl = typeof media === 'string'
+      ? media.trim()
+      : (typeof media?.url === 'string' ? media.url.trim() : '');
+    const cleanMediaUrl = mediaUrl.toLowerCase();
+    return !!text || (
+      !!mediaUrl &&
+      !cleanMediaUrl.includes('undefined') &&
+      !cleanMediaUrl.includes('null') &&
+      mediaUrl !== '[object Object]'
+    );
+  }
+
+  getCommentTheme(index: number) {
+    return this.commentThemes[index % this.commentThemes.length];
+  }
+
   getComments(event?: any, refresh?: boolean) {
     if (!event) this.pageLoading = true;
     if (refresh) this.page = 0;
@@ -255,6 +312,7 @@ taggedUserIds: Set<string> = new Set();
   
         // Push only new comments
         resp.data.comments.forEach((cmt: any) => {
+          if (!this.hasCommentContent(cmt)) return;
           const incomingId = cmt && (cmt._id || cmt.id);
           if (!incomingId) return;
           if (!this.comments.some(existingComment => String(existingComment.id) === String(incomingId))) {
@@ -299,6 +357,19 @@ taggedUserIds: Set<string> = new Set();
   }
 
   async captureCommentMedia() {
+    const isNativeRuntime = this.channelService.platform?.is('cordova')
+      || this.channelService.platform?.is('capacitor')
+      || this.channelService.platform?.is('hybrid');
+
+    if (!isNativeRuntime) {
+      const input = this.mediaInput && this.mediaInput.nativeElement;
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+      return;
+    }
+
     const alert = await this.alertController.create({
       header: 'Add media',
       buttons: [
@@ -386,10 +457,13 @@ isValidMedia(file: File): boolean {
 
       // Successfully added the comment
       const newComment = new Comment().initialize(resp.data);
-      this.comments.unshift(newComment);
+      if (this.hasCommentContent(newComment)) {
+        this.comments.unshift(newComment);
+      }
       if (this.post) {
         const current = Array.isArray(this.post.comments) ? this.post.comments : [];
-        this.post.comments = [newComment, ...current];
+        this.post.comments = this.hasCommentContent(newComment) ? [newComment, ...current] : current;
+        this.post.commentCount = Number(this.post.commentCount || current.length) + 1;
       }
       this.commentText = ""; // Reset the comment text
       this.mediaFile = null; // Reset the media file
@@ -424,6 +498,9 @@ onRemoveComment(index: number) {
   this.comments.splice(index, 1);
   if (this.post && Array.isArray(this.post.comments)) {
     this.post.comments = this.post.comments.filter((_comment, ind) => ind !== index);
+  }
+  if (this.post) {
+    this.post.commentCount = Math.max(Number(this.post.commentCount || 0) - 1, this.comments.length);
   }
   // Additional logic if required
 }

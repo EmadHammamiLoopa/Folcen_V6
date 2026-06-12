@@ -23,6 +23,11 @@ export class CommentComponent implements OnInit, OnChanges {
   @Input() comment: Comment;
   @Input() backgroundColor: string;
   @Input() color: string;
+  @Input() cardBackground: string;
+  @Input() cardTextColor: string;
+  @Input() cardMutedColor: string;
+  @Input() cardControlBackground: string;
+  @Input() cardThemeIndex = 0;
   @Input() user: User;
   @Input() userName: string;
   deleteLoading = false;

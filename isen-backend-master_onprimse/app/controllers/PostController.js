@@ -900,6 +900,23 @@ exports.getPosts = async (req, res) => {
 
         logger.info(`Posts filtered: ${posts.length} -> ${validPosts.length} (removed ${posts.length - validPosts.length} posts with missing users)`);
 
+        const visibleCommentCounts = await Comment.aggregate([
+            {
+                $match: {
+                    post: { $in: validPosts.map(post => post._id) },
+                    deletedAt: null,
+                    $or: [
+                        { text: { $exists: true, $nin: ['', null] } },
+                        { 'media.url': { $exists: true, $nin: ['', null, 'undefined', 'null', '[object Object]'] } }
+                    ]
+                }
+            },
+            { $group: { _id: '$post', count: { $sum: 1 } } }
+        ]);
+        const visibleCommentCountByPost = new Map(
+            visibleCommentCounts.map(item => [String(item._id), item.count])
+        );
+
         // 3. Lean Post Processing
         const postsWithVotes = validPosts.map(post => {
             if (post.anonyme && !post.anonymName) {
@@ -916,8 +933,8 @@ exports.getPosts = async (req, res) => {
             // Keep full text for frontend, send excerpt separately
             // Frontend can decide whether to show excerpt or full text
             
-            // Add comment count manually if not in projection
-            pw.commentCount = post.comments ? post.comments.length : 0;
+            // Count only comments that the mobile comments screen can render.
+            pw.commentCount = visibleCommentCountByPost.get(String(post._id)) || 0;
             delete pw.comments; // Remove the full array to keep payload lean
             
             return pw;
@@ -1076,4 +1093,3 @@ exports.destroyPost = async (res, postId, callback) => {
         }
     }
 };
-

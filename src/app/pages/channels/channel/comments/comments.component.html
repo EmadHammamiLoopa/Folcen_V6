@@ -64,6 +64,11 @@
             (removeComment)="onRemoveComment(ind)"
             [backgroundColor]="post.backgroundColor"
             [color]="'#111827'"
+            [cardBackground]="getCommentTheme(ind).bg"
+            [cardTextColor]="getCommentTheme(ind).text"
+            [cardMutedColor]="getCommentTheme(ind).muted"
+            [cardControlBackground]="getCommentTheme(ind).control"
+            [cardThemeIndex]="ind"
             [comment]="comment"
             [user]="user"
             *ngFor="let comment of comments; let ind = index"
@@ -99,7 +104,7 @@
 
   <div class="input-wrapper">
     <div class="input-actions-left">
-      <button class="action-btn camera" (click)="captureCommentMedia()">
+      <button type="button" class="action-btn camera" (click)="$event.preventDefault(); $event.stopPropagation(); captureCommentMedia()">
         <ion-icon name="camera-outline"></ion-icon>
       </button>
     </div>
@@ -126,7 +131,7 @@
     </div>
 
     <div class="input-actions-right">
-      <button class="send-btn" [disabled]="!commentText && !mediaFile" (click)="storeComment()">
+      <button type="button" class="send-btn" [disabled]="!commentText && !mediaFile" (click)="$event.preventDefault(); $event.stopPropagation(); storeComment()">
         <ion-icon name="send"></ion-icon>
       </button>
     </div>

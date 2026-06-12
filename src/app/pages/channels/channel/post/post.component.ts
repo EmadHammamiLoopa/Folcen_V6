@@ -99,6 +99,12 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     return (first + ' ' + last).trim() || '';
   }
 
+  getCommentCount(): number {
+    const count = Number((this.post as any)?.commentCount);
+    if (Number.isFinite(count) && count > 0) return count;
+    return Array.isArray(this.post?.comments) ? this.post.comments.length : 0;
+  }
+
   isAdminPost(): boolean {
     const role = (this.post?.user?.role || '').toUpperCase();
     return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN';

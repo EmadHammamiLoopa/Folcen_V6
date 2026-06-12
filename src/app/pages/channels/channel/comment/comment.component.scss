@@ -1040,3 +1040,336 @@
     }
   }
 }
+
+/* Device-verified layout guard: compact empty comments and pin actions to the edge. */
+.comment-card {
+  padding: 11px 54px 12px 12px !important;
+  min-height: 64px !important;
+
+  .card-header {
+    margin: 0 !important;
+    min-height: 38px !important;
+
+    .btn-more {
+      top: 11px !important;
+      right: 8px !important;
+      width: 32px !important;
+      height: 32px !important;
+      min-width: 32px !important;
+    }
+  }
+
+  .card-body {
+    padding-left: 44px !important;
+    margin-top: 4px !important;
+    min-height: 0 !important;
+  }
+
+  .card-footer {
+    right: 8px !important;
+    bottom: 10px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+
+    .interaction-group,
+    .vote-widget {
+      width: 32px !important;
+      min-width: 32px !important;
+      max-width: 32px !important;
+    }
+  }
+}
+
+.comment-card:not(.has-content) {
+  min-height: 64px !important;
+  padding-bottom: 11px !important;
+
+  .card-footer {
+    top: auto !important;
+    bottom: 8px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .comment-card {
+    padding-right: 50px !important;
+
+    .card-header .btn-more,
+    .card-footer {
+      right: 7px !important;
+    }
+  }
+}
+
+/* Palette variables come from the parent list and must win over theme defaults. */
+.comment-card {
+  background: var(--comment-card-bg, linear-gradient(145deg, #ffffff, #f6f9ff)) !important;
+  border-color: rgba(100, 116, 139, 0.18) !important;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.10) !important;
+  padding-right: 62px !important;
+  min-height: 96px !important;
+
+  .card-header {
+    padding-right: 40px !important;
+  }
+
+  .card-header .user-info .meta .username,
+  .card-body .comment-text {
+    color: var(--comment-card-text, #111827) !important;
+  }
+
+  .card-header .user-info .meta .timestamp {
+    color: var(--comment-card-muted, #64748b) !important;
+    opacity: 1 !important;
+  }
+
+  .card-header .btn-more {
+    background: var(--comment-card-control, rgba(255, 255, 255, 0.62)) !important;
+    border: 1px solid rgba(100, 116, 139, 0.16) !important;
+    color: #334155 !important;
+    top: 12px !important;
+    right: 10px !important;
+  }
+
+  .card-footer {
+    right: 10px !important;
+    bottom: 12px !important;
+  }
+
+  .card-footer .vote-widget {
+    background: var(--comment-card-control, rgba(255, 255, 255, 0.62)) !important;
+    border-color: rgba(100, 116, 139, 0.16) !important;
+    color: #334155 !important;
+  }
+
+  .card-footer .vote-widget .vote-btn,
+  .card-footer .vote-widget .vote-val {
+    color: #334155 !important;
+  }
+}
+
+.comment-card.theme-0 {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.80), transparent 34%),
+    linear-gradient(145deg, #dffcf6, #c8f7ee) !important;
+}
+
+.comment-card.theme-1 {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #eee7ff, #ddd4ff) !important;
+}
+
+.comment-card.theme-2 {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #ffe7ed, #ffd3df) !important;
+}
+
+.comment-card.theme-3 {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #e1f3ff, #cde7ff) !important;
+}
+
+.comment-card.theme-4 {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #fff1d8, #ffe2b8) !important;
+}
+
+.comment-card.theme-5 {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.78), transparent 34%),
+    linear-gradient(145deg, #ecfbd7, #daf5b3) !important;
+}
+
+/* Device pass: decisive mobile layout and visible soft-color cards. */
+.comment-card {
+  isolation: isolate !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 42px !important;
+  grid-template-areas:
+    "header menu"
+    "body vote" !important;
+  column-gap: 10px !important;
+  padding: 12px !important;
+  min-height: 112px !important;
+  overflow: hidden !important;
+
+  .card-accent-line {
+    top: 14px !important;
+    bottom: 14px !important;
+  }
+
+  .card-header {
+    grid-area: header !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+
+    .user-info {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 10px !important;
+      padding: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+
+      .avatar-ring {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+
+        .avatar-inner,
+        app-avatar {
+          width: 38px !important;
+          height: 38px !important;
+          min-width: 38px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border-radius: 50% !important;
+          overflow: hidden !important;
+        }
+      }
+
+      .meta {
+        min-width: 0 !important;
+        overflow: hidden !important;
+      }
+    }
+
+    .btn-more {
+      grid-area: menu !important;
+      position: absolute !important;
+      top: 0 !important;
+      right: -52px !important;
+      width: 38px !important;
+      height: 38px !important;
+      min-width: 38px !important;
+      border-radius: 50% !important;
+      background: rgba(255, 255, 255, 0.68) !important;
+      border: 1px solid rgba(15, 23, 42, 0.08) !important;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08) !important;
+    }
+  }
+
+  .card-body {
+    grid-area: body !important;
+    min-width: 0 !important;
+    padding: 6px 0 0 52px !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+
+    .comment-text {
+      margin: 0 !important;
+      color: #111827 !important;
+      font-size: clamp(0.92rem, 3.45vw, 1rem) !important;
+      line-height: 1.42 !important;
+      font-weight: 700 !important;
+    }
+  }
+
+  .card-footer {
+    grid-area: vote !important;
+    position: static !important;
+    transform: none !important;
+    align-self: end !important;
+    justify-self: end !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+
+    .interaction-group {
+      width: 38px !important;
+      min-width: 38px !important;
+      max-width: 38px !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .vote-widget {
+      width: 38px !important;
+      min-width: 38px !important;
+      max-width: 38px !important;
+      padding: 3px !important;
+      background: rgba(255, 255, 255, 0.72) !important;
+      border: 1px solid rgba(15, 23, 42, 0.08) !important;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08) !important;
+
+      .vote-btn {
+        width: 30px !important;
+        min-width: 30px !important;
+        height: 27px !important;
+      }
+    }
+  }
+}
+
+.comment-card.theme-0 {
+  background: linear-gradient(145deg, #bff4ea 0%, #ecfffb 100%) !important;
+}
+
+.comment-card.theme-1 {
+  background: linear-gradient(145deg, #d9ccff 0%, #f5f0ff 100%) !important;
+}
+
+.comment-card.theme-2 {
+  background: linear-gradient(145deg, #ffc6d5 0%, #fff1f5 100%) !important;
+}
+
+.comment-card.theme-3 {
+  background: linear-gradient(145deg, #baddff 0%, #f0f8ff 100%) !important;
+}
+
+.comment-card.theme-4 {
+  background: linear-gradient(145deg, #ffd899 0%, #fff6e7 100%) !important;
+}
+
+.comment-card.theme-5 {
+  background: linear-gradient(145deg, #c9ef96 0%, #f4ffe5 100%) !important;
+}
+
+@media (max-width: 360px) {
+  .comment-card {
+    grid-template-columns: minmax(0, 1fr) 38px !important;
+    column-gap: 8px !important;
+    padding: 10px !important;
+    min-height: 106px !important;
+
+    .card-header .btn-more {
+      right: -46px !important;
+      width: 34px !important;
+      height: 34px !important;
+      min-width: 34px !important;
+    }
+
+    .card-body {
+      padding-left: 48px !important;
+    }
+  }
+}

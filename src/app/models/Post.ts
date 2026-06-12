@@ -10,6 +10,7 @@ export class Post{
   private _votes: number;
   private _voted: number;
   private _comments: Comment[];
+  private _commentCount: number;
   private _anonyme: boolean;
   private _backgroundColor: string;
   private _color: string;
@@ -67,6 +68,9 @@ export class Post{
     } else {
       this.comments = [];
     }
+    this.commentCount = Number(
+      post.commentCount ?? post.commentsCount ?? post.comments_count ?? this.comments.length ?? 0
+    );
     this.anonyme = post.anonyme;
     this.backgroundColor = post.backgroundColor;
     this.color = post.color;
@@ -112,6 +116,7 @@ export class Post{
   get votes(): number{ return this._votes }
   get voted(): number{ return this._voted }
   get comments(): any[]{ return this._comments }
+  get commentCount(): number{ return this._commentCount }
   get anonyme(): boolean{ return this._anonyme }
   get backgroundColor(): string{ return this._backgroundColor }
   get color(): string{ return this._color }
@@ -144,6 +149,7 @@ export class Post{
   set votes(votes: number){ this._votes = votes }
   set voted(voted: number){ this._voted = voted }
   set comments(comments: any[]){ this._comments = comments }
+  set commentCount(commentCount: number){ this._commentCount = Number.isFinite(commentCount) ? commentCount : 0 }
   set anonyme(anonyme: boolean){ this._anonyme = anonyme }
   set backgroundColor(backgroundColor: string){ this._backgroundColor = backgroundColor }
   set color(color: string){ this._color = color }
