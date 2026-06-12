@@ -4,6 +4,7 @@ import { File as IonicFile } from '@ionic-native/file/ngx';
 import { WebView } from '@ionic-native/ionic-webview/ngx';
 import { Platform } from '@ionic/angular';
 import { Camera, CameraOptions, PictureSourceType, MediaType } from '@ionic-native/camera/ngx';
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { AndroidPermissions } from '@ionic-native/android-permissions/ngx';
 import { PermissionService } from './permission.service';
 import { MockCordovaService } from './mock-cordova.service';
@@ -126,10 +127,59 @@ export class UploadFileService {
       return map[ext] || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4');
     };
 
+    const dataUrlToBlob = (dataUrl: string, fallbackMime = 'image/jpeg'): Blob => {
+      const [meta, base64] = dataUrl.split(',');
+      const mime = /data:([^;]+)/.exec(meta || '')?.[1] || fallbackMime;
+      const binary = atob(base64 || dataUrl);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    };
+
+    const takeCapacitorImage = async () => {
+      const source = sourceType === this.camera.PictureSourceType.CAMERA
+        ? CameraSource.Camera
+        : CameraSource.Photos;
+      const photo = await CapacitorCamera.getPhoto({
+        quality: 75,
+        resultType: CameraResultType.Uri,
+        source,
+        correctOrientation: true,
+        saveToGallery: false
+      });
+      const uri = photo.webPath || photo.path;
+      if (!uri) throw new Error('No image returned');
+
+      let fileBlob: Blob = null;
+      try {
+        const response = await fetch(uri);
+        fileBlob = await response.blob();
+      } catch (_) {
+        if (photo.path) {
+          const response = await fetch(this.webView.convertFileSrc(photo.path));
+          fileBlob = await response.blob();
+        }
+      }
+
+      if (!fileBlob && (photo as any).base64String) {
+        fileBlob = dataUrlToBlob((photo as any).base64String, 'image/jpeg');
+      }
+
+      if (!fileBlob) throw new Error('Could not read selected image');
+      const ext = (photo.format || 'jpeg').replace('jpeg', 'jpg');
+      const name = `image-${Date.now()}.${ext}`;
+      const mimeType = fileBlob.type || (ext === 'png' ? 'image/png' : 'image/jpeg');
+      return { imageData: uri, file: new Blob([fileBlob], { type: mimeType }), name, mimeType };
+    };
+
     return this.platform.ready().then(async () => {
       const isNativeRuntime = this.platform.is('cordova') || this.platform.is('capacitor') || this.platform.is('hybrid');
       if (!isNativeRuntime) {
         return this.mockCordovaService.getPicture({ sourceType, mediaType: mediaTypeValue });
+      }
+
+      if (mediaType === 'image' && (this.platform.is('capacitor') || this.platform.is('hybrid'))) {
+        return takeCapacitorImage();
       }
 
       if (sourceType === this.camera.PictureSourceType.CAMERA) {
@@ -144,6 +194,9 @@ export class UploadFileService {
       }
       return this.camera.getPicture(options);
     }).then(async imageData => {
+      if (imageData && typeof imageData === 'object' && imageData.file) {
+        return imageData;
+      }
       let fileBlob: Blob = null;
 
       // Derive safe filename with extension from the URI

@@ -37,6 +37,16 @@ const storage = multer.diskStorage({
 // Create an upload instance with the storage settings
 const upload = multer({ storage: storage });
 
+const publicUploadUrl = (file) => {
+    if (!file) return '';
+    if (file.filename) return `/uploads/${file.filename}`;
+    const raw = String(file.path || '').replace(/\\/g, '/');
+    const idx = raw.lastIndexOf('/uploads/');
+    if (idx >= 0) return raw.slice(idx);
+    if (raw.startsWith('uploads/')) return `/${raw}`;
+    return raw;
+};
+
 
 exports.showComment = async (req, res) => {
     try {
@@ -258,7 +268,7 @@ exports.storeComment = async (req, res) => {
                     moderationStatus: req.body.moderationStatus || 'approved'
                 });
 
-                if (req.file) comment.media = { url: req.file.path, expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000) };
+                if (req.file) comment.media = { url: publicUploadUrl(req.file), expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000) };
 
                 const savedComment = await comment.save();
 

@@ -28,6 +28,7 @@ export class CommentComponent implements OnInit, OnChanges {
   deleteLoading = false;
   isImageEnlarged: boolean = false;
   mediaUrl: string = '';
+  mediaFailed = false;
   cachedStrokeOffset: string = '';
   cachedCircleColor: string = '';
   previousExpiryDate: string | null = null;
@@ -78,6 +79,7 @@ export class CommentComponent implements OnInit, OnChanges {
 
 
   updateMediaUrl() {
+    this.mediaFailed = false;
     this.mediaUrl = this.getMediaUrl(this.comment);
   }
 
@@ -107,12 +109,21 @@ export class CommentComponent implements OnInit, OnChanges {
       if (cleanUrl.startsWith('http') || cleanUrl.startsWith('data:') || cleanUrl.startsWith('blob:')) {
         return cleanUrl;
       }
+      const normalizedPath = cleanUrl
+        .replace(/\\/g, '/')
+        .replace(/^.*\/uploads\//, 'uploads/')
+        .replace(/^public\/uploads\//, 'uploads/');
       const baseUrl = environment.socketUrl.replace(/\/+$/, '') + '/';
-      const mediaUrl = baseUrl + cleanUrl.replace(/^\/+/, '').replace(/\\/g, '/');
+      const mediaUrl = baseUrl + normalizedPath.replace(/^\/+/, '');
       console.log("Generated Media URL:", mediaUrl);
       return mediaUrl;
     }
     return '';
+  }
+
+  onMediaError() {
+    this.mediaFailed = true;
+    this.mediaUrl = '';
   }
 
   // Function to calculate expiration progress
