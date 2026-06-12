@@ -255,7 +255,9 @@ taggedUserIds: Set<string> = new Set();
   
         // Push only new comments
         resp.data.comments.forEach((cmt: any) => {
-          if (!this.comments.some(existingComment => existingComment.id === cmt._id)) {
+          const incomingId = cmt && (cmt._id || cmt.id);
+          if (!incomingId) return;
+          if (!this.comments.some(existingComment => String(existingComment.id) === String(incomingId))) {
             this.comments.push(new Comment().initialize(cmt));
           }
         });

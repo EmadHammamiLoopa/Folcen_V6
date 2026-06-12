@@ -37,18 +37,29 @@ export class Comment{
     }
     console.log("Initializing Comment:", comment); // Log the entire comment object
 
-    this.id = comment._id;
-    this.text = comment.text;
-    this.anonyme = comment.anonyme; 
-    this.votes = comment.votes;
-    this.voted = comment.voted;
-    this.anonymName = comment.anonymName; // Initialize anonymName
-    this.isOwner = comment.isOwner;       // Initialize ownership
+    this.id = comment._id || comment.id || '';
+    this.text = comment.text || '';
+    this.anonyme = !!comment.anonyme;
+    this.votes = Number(comment.votes || 0);
+    this.voted = Number(comment.voted || 0);
+    this.anonymName = comment.anonymName || '';
+    this.isOwner = !!comment.isOwner;
 
     this.createdAt = this.safeDate(comment.createdAt) || new Date();
-    this.media = comment.media ? {
-      url: comment.media.url || '',
-      expiryDate: this.safeDate(comment.media.expiryDate)
+    const rawMedia = comment.media || {};
+    const rawMediaUrl = typeof rawMedia === 'string'
+      ? rawMedia
+      : (rawMedia.url || rawMedia.path || rawMedia.src || '');
+    const cleanMediaUrl = typeof rawMediaUrl === 'string'
+      && rawMediaUrl.trim()
+      && rawMediaUrl !== 'undefined'
+      && rawMediaUrl !== 'null'
+      && rawMediaUrl !== '[object Object]'
+      ? rawMediaUrl.trim()
+      : '';
+    this.media = cleanMediaUrl ? {
+      url: cleanMediaUrl,
+      expiryDate: this.safeDate(rawMedia.expiryDate)
     } : { url: '', expiryDate: null };
 
     this.post = comment.post ? new Post().initialize(comment.post) : null;

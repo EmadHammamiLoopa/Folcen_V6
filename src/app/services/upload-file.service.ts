@@ -4,7 +4,6 @@ import { File as IonicFile } from '@ionic-native/file/ngx';
 import { WebView } from '@ionic-native/ionic-webview/ngx';
 import { Platform } from '@ionic/angular';
 import { Camera, CameraOptions, PictureSourceType, MediaType } from '@ionic-native/camera/ngx';
-import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { AndroidPermissions } from '@ionic-native/android-permissions/ngx';
 import { PermissionService } from './permission.service';
 import { MockCordovaService } from './mock-cordova.service';
@@ -115,11 +114,6 @@ export class UploadFileService {
       correctOrientation: true
     };
 
-    const dataUrlOptions: CameraOptions = {
-      ...options,
-      destinationType: this.camera.DestinationType.DATA_URL
-    };
-
     // Infer MIME type from file extension; fallback to image/jpeg or video/mp4
     const mimeFromName = (name: string): string => {
       const ext = (name.split('.').pop() || '').toLowerCase();
@@ -132,38 +126,10 @@ export class UploadFileService {
       return map[ext] || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4');
     };
 
-    const blobFromBase64 = (base64: string, mimeType: string): Blob => {
-      const byteChars = atob(base64);
-      const byteArrays = [];
-      for (let offset = 0; offset < byteChars.length; offset += 512) {
-        const slice = byteChars.slice(offset, offset + 512);
-        const bytes = new Array(slice.length);
-        for (let i = 0; i < slice.length; i++) {
-          bytes[i] = slice.charCodeAt(i);
-        }
-        byteArrays.push(new Uint8Array(bytes));
-      }
-      return new Blob(byteArrays, { type: mimeType });
-    };
-
     return this.platform.ready().then(async () => {
       const isNativeRuntime = this.platform.is('cordova') || this.platform.is('capacitor') || this.platform.is('hybrid');
       if (!isNativeRuntime) {
         return this.mockCordovaService.getPicture({ sourceType, mediaType: mediaTypeValue });
-      }
-
-      if (mediaType === 'image') {
-        const source = sourceType === this.camera.PictureSourceType.CAMERA
-          ? CameraSource.Camera
-          : CameraSource.Photos;
-        const photo = await CapacitorCamera.getPhoto({
-          quality: 75,
-          resultType: CameraResultType.Uri,
-          source,
-          correctOrientation: true,
-          saveToGallery: false
-        });
-        return photo.webPath || photo.path || '';
       }
 
       if (sourceType === this.camera.PictureSourceType.CAMERA) {
@@ -204,22 +170,9 @@ export class UploadFileService {
             const buffer = await this.file.readAsArrayBuffer(dir, fileName);
             fileBlob = new Blob([buffer], { type: mimeType });
           } catch (e2) {
-            console.warn('File plugin fallback failed, trying direct URI fetch', e2);
-            try {
-              const response = await fetch(imageData);
-              const blob = await response.blob();
-              fileBlob = new Blob([blob], { type: blob.type || mimeType });
-            } catch (e3) {
-              console.error('All native media readbacks failed', e3);
-            }
+            console.error('File plugin fallback also failed', e2);
           }
         }
-      }
-
-      if (!fileBlob && mediaType === 'image' && sourceType === this.camera.PictureSourceType.CAMERA) {
-        console.warn('Native camera URI readback returned no file, retrying as DATA_URL');
-        const base64Image = await this.camera.getPicture(dataUrlOptions);
-        fileBlob = blobFromBase64(base64Image, 'image/jpeg');
       }
 
       return { imageData, file: fileBlob, name: safeName, mimeType };

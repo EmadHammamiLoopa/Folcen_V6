@@ -31,6 +31,7 @@ export class CommentComponent implements OnInit, OnChanges {
   cachedStrokeOffset: string = '';
   cachedCircleColor: string = '';
   previousExpiryDate: string | null = null;
+  isVoting = false;
 
   constructor(private alertCtrl: AlertController,   private cdr: ChangeDetectorRef, private channelService: ChannelService, private toastService:
              ToastService, private router: Router, private popoverController: PopoverController, private modalCtrl: ModalController) { }
@@ -39,13 +40,40 @@ export class CommentComponent implements OnInit, OnChanges {
     // Ensure comment exists to avoid template errors in tests
     if (!this.comment) this.comment = {} as any;
     if (!this.comment.user) this.comment.user = {} as any;
+    this.normalizeCommentUser();
     this.updateMediaUrl();
   }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['comment'] && changes['comment'].currentValue !== changes['comment'].previousValue) {
+      if (!this.comment) this.comment = {} as any;
+      if (!this.comment.user) this.comment.user = {} as any;
+      this.normalizeCommentUser();
       this.updateMediaUrl();
     }
+  }
+
+  private normalizeCommentUser() {
+    const raw: any = this.comment?.user || {};
+    if (!raw.id && raw._id) raw.id = raw._id;
+    if (!raw._id && raw.id) raw._id = raw.id;
+    if (!Array.isArray(raw.avatar)) {
+      raw.avatar = raw.avatar ? [raw.avatar] : [];
+    }
+    if (!raw.mainAvatar && raw.avatar.length) {
+      raw.mainAvatar = raw.avatar[0];
+    }
+    this.comment.user = raw;
+  }
+
+  get commentUser(): any {
+    this.normalizeCommentUser();
+    return this.comment.user || {};
+  }
+
+  get commentUserId(): string {
+    const user: any = this.commentUser;
+    return user.id || user._id || '';
   }
 
 
@@ -55,7 +83,11 @@ export class CommentComponent implements OnInit, OnChanges {
 
   commentUserName(comment: Comment) {
     if (this.isAdminComment()) return 'System';
-    return comment.anonymName || `${comment.user.firstName} ${comment.user.lastName}`;
+    if (comment?.anonymName) return comment.anonymName;
+    const user: any = this.commentUser;
+    const first = user.firstName || user._firstName || user.name || user.username || '';
+    const last = user.lastName || user._lastName || '';
+    return `${first} ${last}`.trim() || 'Member';
   }
 
   isAdminComment(): boolean {
@@ -66,9 +98,17 @@ export class CommentComponent implements OnInit, OnChanges {
 
   getMediaUrl(comment: Comment): string {
     if (!comment || !comment.media) return '';
-    if (comment.media && comment.media.url) {
-      const baseUrl = environment.socketUrl + '/';
-      const mediaUrl = baseUrl + comment.media.url.replace(/\\/g, '/');
+    const rawUrl = comment.media && comment.media.url;
+    if (typeof rawUrl === 'string') {
+      const cleanUrl = rawUrl.trim();
+      if (!cleanUrl || cleanUrl === 'undefined' || cleanUrl === 'null' || cleanUrl === '[object Object]') {
+        return '';
+      }
+      if (cleanUrl.startsWith('http') || cleanUrl.startsWith('data:') || cleanUrl.startsWith('blob:')) {
+        return cleanUrl;
+      }
+      const baseUrl = environment.socketUrl.replace(/\/+$/, '') + '/';
+      const mediaUrl = baseUrl + cleanUrl.replace(/^\/+/, '').replace(/\\/g, '/');
       console.log("Generated Media URL:", mediaUrl);
       return mediaUrl;
     }
@@ -191,13 +231,17 @@ getTimeRemaining(expiryDate: any): string {
   }
 
   voteOnComment(vote: number){
+    if (this.isVoting || !this.comment?.id) return;
+    this.isVoting = true;
     this.channelService.voteOnComment(this.comment.id, vote)
     .then(
       (resp: any) => {
         this.comment.voted = resp.data.voted;
         this.comment.votes = resp.data.votes;
+        this.isVoting = false;
       },
       err => {
+        this.isVoting = false;
         this.toastService.presentErrorToastr(err);
       }
     )
