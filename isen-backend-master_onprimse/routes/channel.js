@@ -24,7 +24,9 @@ const {
 
 const {
   getAllCommentsForAdmin,
-  
+  deleteComment,
+  voteOnComment,
+  reportComment,
 } = require('../app/controllers/CommentController');
 
 const { commentById, commentOwner } = require('../app/middlewares/comment');
@@ -64,6 +66,11 @@ router.get('/followed', [requireSignin, withAuthUser], followedChannels);
 // Explore Channels Route (handles city, country, and global exploration)
 router.get('/explore', [requireSignin, withAuthUser], exploreChannels); // Handles all exploration levels
 router.get('/post/all', [requireSignin, isAdmin], allPosts);
+
+// Compatibility routes for existing mobile clients whose ChannelService is rooted at /channel.
+router.delete('/comment/:commentId', [requireSignin, commentOwner], deleteComment);
+router.post('/comment/:commentId/vote', [requireSignin, withAuthUser], voteOnComment);
+router.post('/comment/:commentId/report', [requireSignin], reportComment);
 
 // Channel Management Routes
 router.delete('/:channelId', [requireSignin, channelOwner], deleteChannel);

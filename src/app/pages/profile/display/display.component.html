@@ -38,7 +38,7 @@
           <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
           
           <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end" data-tour="profile-avatar-tools">
-            <ion-fab-button size="small">
+            <ion-fab-button size="small" (click)="openCameraPicker()">
               <ion-icon name="camera"></ion-icon>
             </ion-fab-button>
             <ion-fab-list side="bottom">
@@ -252,7 +252,7 @@
           <ion-icon name="refresh-outline" slot="start"></ion-icon>
           Try Again
         </ion-button>
-        <ion-button fill="clear" color="medium" routerLink="/tabs/new-friends">
+        <ion-button fill="clear" color="medium" (click)="goToSafeProfileHome()">
           Go Back
         </ion-button>
       </div>

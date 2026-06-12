@@ -97,6 +97,7 @@ const userSchema = new mongoose.Schema({
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     followedChannels: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Channel' }],
+    unfollowedStaticChannels: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Channel' }],
     messagedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     messages: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Message' }],
     subscription: {

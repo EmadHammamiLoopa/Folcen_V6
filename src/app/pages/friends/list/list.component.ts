@@ -149,6 +149,28 @@ export class ListComponent implements OnInit {
       }
     );
   }
+
+  private usableImage(value: any): string {
+    if (typeof value !== 'string') return '';
+    const normalized = value.trim();
+    return normalized && normalized !== 'undefined' && normalized !== 'null' && normalized !== '[object Object]' ? normalized : '';
+  }
+
+  private mergeStableAvatars(userProfile: any, fallback: any) {
+    const profileMain = this.usableImage(userProfile?.mainAvatar);
+    const fallbackMain = this.usableImage(fallback?.mainAvatar);
+    const profileAvatars = Array.isArray(userProfile?.avatar)
+      ? userProfile.avatar.filter((avatar: any) => this.usableImage(avatar))
+      : [];
+    const fallbackAvatars = Array.isArray(fallback?.avatar)
+      ? fallback.avatar.filter((avatar: any) => this.usableImage(avatar))
+      : [];
+
+    return {
+      mainAvatar: profileMain || fallbackMain || fallbackAvatars[0] || profileAvatars[0] || '',
+      avatar: profileAvatars.length ? profileAvatars.slice() : fallbackAvatars.slice()
+    };
+  }
   
 
   getFriends(event?: any, refresh: boolean = false) {
@@ -171,12 +193,13 @@ export class ListComponent implements OnInit {
         const profileRequests = newFriendsRaw.map((usr: any) => 
           this.userService.getUserProfile(usr._id).pipe(
             map(userProfile => {
+              const stableAvatar = this.mergeStableAvatars(userProfile, usr);
               const safeProfile = {
                 _id: usr._id,
                 firstName: userProfile.firstName || usr.firstName,
                 lastName: userProfile.lastName || usr.lastName,
-                mainAvatar: userProfile.mainAvatar || usr.mainAvatar,
-                avatar: Array.isArray(userProfile.avatar) ? userProfile.avatar.slice() : (Array.isArray(usr.avatar) ? usr.avatar.slice() : []),
+                mainAvatar: stableAvatar.mainAvatar,
+                avatar: stableAvatar.avatar,
                 fullName: (userProfile.firstName || usr.firstName) + ' ' + (userProfile.lastName || usr.lastName),
                 country: userProfile.country || usr.country || '-',
                 city: userProfile.city || usr.city || '-',
@@ -187,12 +210,13 @@ export class ListComponent implements OnInit {
               return friend;
             }),
             catchError(() => {
+              const stableAvatar = this.mergeStableAvatars(null, usr);
               const friend = new User().initialize({ 
                 _id: usr._id, 
                 firstName: usr.firstName, 
                 lastName: usr.lastName, 
-                mainAvatar: usr.mainAvatar, 
-                avatar: Array.isArray(usr.avatar) ? usr.avatar : [], 
+                mainAvatar: stableAvatar.mainAvatar, 
+                avatar: stableAvatar.avatar, 
                 country: usr.country || '-', 
                 city: usr.city || '-' 
               });

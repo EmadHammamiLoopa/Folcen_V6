@@ -23,6 +23,7 @@ function recordAuthEvent(event) {
 
 const autoFollowStaticChannels = async (authUser) => {
     try {
+        const unfollowedStaticIds = new Set((Array.isArray(authUser.unfollowedStaticChannels) ? authUser.unfollowedStaticChannels : []).map(id => String(id)));
         // Fetch the predefined static channels that match the authenticated user's city and include the new type 'static_events'
         const staticChannels = await Channel.find({
             $or: [
@@ -35,6 +36,12 @@ const autoFollowStaticChannels = async (authUser) => {
 
         // Add the static channels to the authenticated user's followed channels only if the city matches
         staticChannels.forEach((channel) => {
+            if (unfollowedStaticIds.has(String(channel._id))) {
+                authUser.followedChannels = (authUser.followedChannels || []).filter(id => String(id) !== String(channel._id));
+                channel.followers = (channel.followers || []).filter(id => String(id) !== String(authUser._id));
+                channel.save();
+                return;
+            }
             // Check if the user is already following the channel
             if (!authUser.followedChannels.includes(channel._id)) {
                 authUser.followedChannels.push(channel._id); // Add the channel to the user's followed channels

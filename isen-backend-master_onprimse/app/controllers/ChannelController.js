@@ -406,7 +406,7 @@ exports.followedChannels = async (req, res) => {
         }
 
         // Fetch the full user document (not lean) so we can modify and save it
-        const user = await User.findById(req.authUser._id).select('_id city country followedChannels');
+        const user = await User.findById(req.authUser._id).select('_id city country followedChannels unfollowedStaticChannels');
         if (!user) {
             return Response.sendError(res, 404, 'User not found');
         }
@@ -572,6 +572,7 @@ const createStaticChannelsForCity = async (city, country, user) => {
     ];
 
     let userModified = false;
+    const unfollowedStaticIds = new Set((user && Array.isArray(user.unfollowedStaticChannels) ? user.unfollowedStaticChannels : []).map(id => String(id)));
     for (const channelData of staticChannels) {
         // Check if the static channel already exists in the database
         let channel = await Channel.findOne({ name: channelData.name, city });
@@ -587,17 +588,28 @@ const createStaticChannelsForCity = async (city, country, user) => {
             channelModified = true;
         }
 
-        // Ensure the user is following the static channel
-        if (!channel.followers || !channel.followers.some(f => String(f) === String(user._id))) {
-            if (!channel.followers) channel.followers = [];
-            channel.followers.push(user._id);  // Add user to channel's followers
-            channelModified = true;
-        }
+        const manuallyUnfollowed = unfollowedStaticIds.has(String(channel._id));
+        if (manuallyUnfollowed) {
+            if (channel.followers && channel.followers.some(f => String(f) === String(user._id))) {
+                channel.followers = channel.followers.filter(f => String(f) !== String(user._id));
+                channelModified = true;
+            }
+            if (user && user.followedChannels && user.followedChannels.some(c => String(c) === String(channel._id))) {
+                user.followedChannels = user.followedChannels.filter(c => String(c) !== String(channel._id));
+                userModified = true;
+            }
+        } else {
+            // Ensure the user is following default static channels unless they explicitly unfollowed them.
+            if (!channel.followers || !channel.followers.some(f => String(f) === String(user._id))) {
+                if (!channel.followers) channel.followers = [];
+                channel.followers.push(user._id);
+                channelModified = true;
+            }
 
-        // Ensure the channel is in the user's followedChannels array
-        if (user && user.followedChannels && !user.followedChannels.some(c => String(c) === String(channel._id))) {
-            user.followedChannels.push(channel._id);  // Add channel to user's followed channels
-            userModified = true;
+            if (user && user.followedChannels && !user.followedChannels.some(c => String(c) === String(channel._id))) {
+                user.followedChannels.push(channel._id);
+                userModified = true;
+            }
         }
 
         // Save the updated channel if changed
@@ -810,6 +822,8 @@ exports.followChannel = async (req, res) => {
 
         const userIdStr = String(user._id);
         const channelIdStr = String(channel._id);
+        const staticTypes = ['static', 'static_events', 'static_dating'];
+        const isStaticChannel = staticTypes.includes(channel.type);
 
         // Check if already following
         const isFollowing = channel.followers.some(f => String(f) === userIdStr);
@@ -817,7 +831,10 @@ exports.followChannel = async (req, res) => {
         if (!isFollowing) {
             // Follow
             await Channel.findByIdAndUpdate(channel._id, { $addToSet: { followers: user._id } });
-            await User.findByIdAndUpdate(user._id, { $addToSet: { followedChannels: channel._id } });
+            await User.findByIdAndUpdate(user._id, {
+                $addToSet: { followedChannels: channel._id },
+                ...(isStaticChannel ? { $pull: { unfollowedStaticChannels: channel._id } } : {})
+            });
             
             sendNotification({
                 en: channel.name
@@ -837,7 +854,10 @@ exports.followChannel = async (req, res) => {
             }
 
             await Channel.findByIdAndUpdate(channel._id, { $pull: { followers: user._id } });
-            await User.findByIdAndUpdate(user._id, { $pull: { followedChannels: channel._id } });
+            await User.findByIdAndUpdate(user._id, {
+                $pull: { followedChannels: channel._id },
+                ...(isStaticChannel ? { $addToSet: { unfollowedStaticChannels: channel._id } } : {})
+            });
 
             return Response.sendResponse(res, { followed: false }, 'Unfollowed successfully');
         }
@@ -883,4 +903,3 @@ exports.destroyChannel = async (res, channelId, callback) => {
         return Response.sendError(res, 500, 'Failed to delete channel');
     }
 };
-

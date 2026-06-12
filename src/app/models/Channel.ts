@@ -26,6 +26,12 @@ export class Channel {
 
   constructor() {}
 
+  private static isUsablePhoto(value: any): value is string {
+    if (typeof value !== 'string') return false;
+    const normalized = value.trim();
+    return !!normalized && normalized !== 'undefined' && normalized !== 'null' && normalized !== '[object Object]';
+  }
+
   initialize(channel: Partial<Channel>) {
     const c = channel as any;
     const baseUrl = constants.DOMAIN_URL;
@@ -36,7 +42,7 @@ export class Channel {
 
     // Handle photo normalization in initialize as well
     const photoData = c['photo'] || c['image'] || c['avatar'] || c['cover'] || c['picture'] || c['_photo'];
-    if (typeof photoData === 'string' && photoData.length > 0) {
+    if (Channel.isUsablePhoto(photoData)) {
       this._photo = (photoData.startsWith('http') || photoData.startsWith('assets/'))
         ? photoData
         : `${baseUrl}${photoData.startsWith('/') ? '' : '/'}${photoData}`;
@@ -89,7 +95,7 @@ export class Channel {
     channel._approved = d.approved ?? true;
 
     const photoData = d['photo'] || d['image'] || d['avatar'] || d['cover'] || d['picture'] || d['_photo'];
-    if (typeof photoData === 'string' && photoData.length > 0) {
+    if (Channel.isUsablePhoto(photoData)) {
       channel._photo = (photoData.startsWith('http') || photoData.startsWith('assets/'))
         ? photoData
         : `${baseUrl}${photoData.startsWith('/') ? '' : '/'}${photoData}`;
@@ -152,20 +158,21 @@ export class Channel {
 
   followedBy(userId: string): boolean {
     if (!userId) return false;
+    const uid = String(userId);
     // Owners are always considered followers
-    if (this.isOwner(userId)) return true;
+    if (this.isOwner(uid)) return true;
 
     try {
       if (!this._followers) return false;
       return this._followers.some((f: any) => {
         if (!f) return false;
-        if (typeof f === 'string') return f === userId;
+        if (typeof f === 'string') return String(f) === uid;
         if (typeof f === 'object') {
-          if (typeof f.getId === 'function') return f.getId() === userId;
-          if (f._id && String(f._id) === userId) return true;
-          if (f.id && String(f.id) === userId) return true;
+          if (typeof f.getId === 'function') return String(f.getId()) === uid;
+          if (f._id && String(f._id) === uid) return true;
+          if (f.id && String(f.id) === uid) return true;
           // sometimes followers may be ObjectId-like; try string conversion
-          try { if (String(f) === userId) return true; } catch(e) {}
+          try { if (String(f) === uid) return true; } catch(e) {}
         }
         return false;
       });
@@ -207,7 +214,7 @@ export class Channel {
     }
   }
   set photo(photo: string) {
-    if (!photo) {
+    if (!Channel.isUsablePhoto(photo)) {
       this._photo = 'assets/images/default-channel.png';
       return;
     }

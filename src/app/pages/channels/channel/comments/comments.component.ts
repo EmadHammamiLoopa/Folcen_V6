@@ -1,11 +1,11 @@
 import { User } from 'src/app/models/User';
-import { IonInfiniteScroll } from '@ionic/angular';
+import { AlertController, IonInfiniteScroll } from '@ionic/angular';
 import { Comment } from '../../../../models/Comment';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
 import { Post } from './../../../../models/Post';
 import { Channel } from 'src/app/models/Channel';
-import { Component, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, OnDestroy } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { getCommentUserName } from './comment-utils';
@@ -22,6 +22,7 @@ import { Camera } from '@ionic-native/camera/ngx';
 export class CommentsComponent implements OnInit, OnDestroy {
 
   @ViewChild('infinitScroll') infinitScroll!: IonInfiniteScroll;
+  @ViewChild('mediaInput') mediaInput!: ElementRef<HTMLInputElement>;
   @HostListener('document:click', ['$event'])
   onClickOutside(event: any) {
     if (!event.target.closest('.tag-dropdown')) {
@@ -54,7 +55,8 @@ export class CommentsComponent implements OnInit, OnDestroy {
     private sanitizer: DomSanitizer,
     private events: AppEventsService,
     private uploadFile: UploadFileService,
-    private camera: Camera
+    private camera: Camera,
+    private alertController: AlertController
   ) { }
 
   ngOnInit() {
@@ -295,6 +297,33 @@ taggedUserIds: Set<string> = new Set();
   }
 
   async captureCommentMedia() {
+    const alert = await this.alertController.create({
+      header: 'Add media',
+      buttons: [
+        {
+          text: 'Gallery',
+          handler: () => {
+            const input = this.mediaInput && this.mediaInput.nativeElement;
+            if (input) {
+              input.value = '';
+              input.click();
+            }
+          }
+        },
+        {
+          text: 'Camera',
+          handler: () => this.captureCommentFromCamera()
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  private async captureCommentFromCamera() {
     try {
       const resp = await this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image');
       if (!resp?.file) {
