@@ -322,6 +322,24 @@ exports.getFeed = async (req, res) => {
 
         // Filter out posts where the user was not populated (meaning they are inactive/deleted)
         const activePosts = posts.filter(p => p.user);
+        const visibleCommentCounts = activePosts.length
+            ? await Comment.aggregate([
+                {
+                    $match: {
+                        post: { $in: activePosts.map(post => post._id) },
+                        deletedAt: null,
+                        $or: [
+                            { text: { $exists: true, $nin: ['', null] } },
+                            { 'media.url': { $exists: true, $nin: ['', null, 'undefined', 'null', '[object Object]'] } }
+                        ]
+                    }
+                },
+                { $group: { _id: '$post', count: { $sum: 1 } } }
+            ])
+            : [];
+        const visibleCommentCountByPost = new Map(
+            visibleCommentCounts.map(item => [String(item._id), item.count])
+        );
 
         // 4. Fetch Other Activities (Products, Jobs, Services, Comments)
         // filter for other activity; we'll post-filter by follow timestamp to respect per-follow start times
@@ -380,6 +398,8 @@ exports.getFeed = async (req, res) => {
             if (p.anonyme) return;
             const name = p.user ? `${p.user.firstName} ${p.user.lastName}` : 'Unknown User';
             const pw = withVotesInfo(p, userId, p._id);
+            pw.commentCount = visibleCommentCountByPost.get(String(p._id)) || 0;
+            delete pw.comments;
             activities.push({
                 ...pw,
                 activityType: 'post',
