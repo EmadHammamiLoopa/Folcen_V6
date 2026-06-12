@@ -38,13 +38,13 @@
           <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
           
           <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end" data-tour="profile-avatar-tools">
-            <ion-fab-button size="small" (click)="openCameraPicker()">
+            <ion-fab-button size="small" (click)="openCameraPicker(); $event.stopPropagation()">
               <ion-icon name="camera"></ion-icon>
             </ion-fab-button>
             <ion-fab-list side="bottom">
-              <ion-fab-button (click)="openImagePicker()"><ion-icon name="images-outline"></ion-icon></ion-fab-button>
-              <ion-fab-button (click)="openCameraPicker()"><ion-icon name="camera-outline"></ion-icon></ion-fab-button>
-              <ion-fab-button (click)="openAvatarCustomize()"><ion-icon name="color-palette-outline"></ion-icon></ion-fab-button>
+              <ion-fab-button (click)="openImagePicker(); $event.stopPropagation()"><ion-icon name="images-outline"></ion-icon></ion-fab-button>
+              <ion-fab-button (click)="openCameraPicker(); $event.stopPropagation()"><ion-icon name="camera-outline"></ion-icon></ion-fab-button>
+              <ion-fab-button (click)="openAvatarCustomize(); $event.stopPropagation()"><ion-icon name="color-palette-outline"></ion-icon></ion-fab-button>
             </ion-fab-list>
           </ion-fab>
         </div>

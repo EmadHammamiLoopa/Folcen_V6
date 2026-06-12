@@ -48,7 +48,9 @@ export class Channel {
         : `${baseUrl}${photoData.startsWith('/') ? '' : '/'}${photoData}`;
     } else if (typeof photoData === 'object' && photoData !== null && (photoData['path'] || photoData['url'])) {
       const p = photoData['path'] || photoData['url'];
-      this._photo = p.startsWith('http') ? p : `${baseUrl}${p.startsWith('/') ? '' : '/'}${p}`;
+      this._photo = Channel.isUsablePhoto(p)
+        ? (p.startsWith('http') || p.startsWith('assets/') ? p : `${baseUrl}${p.startsWith('/') ? '' : '/'}${p}`)
+        : 'assets/images/default-channel.png';
     } else {
       this._photo = 'assets/images/default-channel.png';
     }
@@ -101,9 +103,11 @@ export class Channel {
         : `${baseUrl}${photoData.startsWith('/') ? '' : '/'}${photoData}`;
     } else if (typeof photoData === 'object' && photoData !== null && (photoData['path'] || photoData['url'])) {
       const path = photoData['path'] || photoData['url'];
-      channel._photo = path.startsWith('http')
-        ? path
-        : `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+      channel._photo = Channel.isUsablePhoto(path)
+        ? (path.startsWith('http') || path.startsWith('assets/')
+          ? path
+          : `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`)
+        : 'assets/images/default-channel.png';
     } else {
       channel._photo = 'assets/images/default-channel.png'; // Fallback image
     }

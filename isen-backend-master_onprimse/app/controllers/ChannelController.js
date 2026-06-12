@@ -586,6 +586,24 @@ const createStaticChannelsForCity = async (city, country, user) => {
                 channel.followers = [];
             }
             channelModified = true;
+        } else {
+            // Older static rows may have incomplete metadata. Keep them discoverable
+            // in Explore category tabs without changing user-created channels.
+            ['description', 'category', 'type', 'city', 'country'].forEach((field) => {
+                if (!channel[field] || String(channel[field]).trim() !== String(channelData[field]).trim()) {
+                    channel[field] = channelData[field];
+                    channelModified = true;
+                }
+            });
+            const existingPhotoPath = channel.photo && channel.photo.path;
+            const nextPhotoPath = channelData.photo && channelData.photo.path;
+            if (!existingPhotoPath || String(existingPhotoPath) === 'undefined' || String(existingPhotoPath) === 'null') {
+                channel.photo = channelData.photo;
+                channelModified = true;
+            } else if (nextPhotoPath && /channel-default\.png$/.test(String(existingPhotoPath))) {
+                channel.photo = channelData.photo;
+                channelModified = true;
+            }
         }
 
         const manuallyUnfollowed = unfollowedStaticIds.has(String(channel._id));

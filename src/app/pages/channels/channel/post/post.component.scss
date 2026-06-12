@@ -1021,3 +1021,39 @@
     color: #111827 !important;
   }
 }
+
+:host-context(body.light-theme) .jodel-card {
+  --post-bg: linear-gradient(145deg, #ffffff, #f5f8ff) !important;
+  --post-fg: #111827 !important;
+  --post-muted: #64748b !important;
+  --post-chip-bg: rgba(37, 99, 235, 0.08) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.90)),
+    var(--post-bg) !important;
+  border-color: rgba(37, 99, 235, 0.14) !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10) !important;
+  color: #111827 !important;
+}
+
+:host-context(body.light-theme) .jdl-text,
+:host-context(body.light-theme) .jdl-user .user-info .name,
+:host-context(body.light-theme) .jdl-reaction-rail .rail-score {
+  color: #111827 !important;
+}
+
+:host-context(body.light-theme) .jdl-user .user-info .meta-row,
+:host-context(body.light-theme) .jdl-meta div strong,
+:host-context(body.light-theme) .jdl-meta.compact-meta .meta-chip {
+  color: #64748b !important;
+}
+
+:host-context(body.light-theme) .jdl-top-rail,
+:host-context(body.light-theme) .jdl-reaction-rail,
+:host-context(body.light-theme) .jdl-meta.compact-meta .meta-chip,
+:host-context(body.light-theme) .jdl-actions .vote-controls,
+:host-context(body.light-theme) .jdl-actions .comment-btn,
+:host-context(body.light-theme) .icon-btn {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+  color: #111827 !important;
+}

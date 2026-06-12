@@ -438,8 +438,14 @@ getCurrentUserId(): string | null {
               if ((!merged.followedChannels || merged.followedChannels.length === 0) && existing.followedChannels && existing.followedChannels.length) merged.followedChannels = existing.followedChannels;
               if ((!merged.avatar || merged.avatar.length === 0) && existing.avatar) merged.avatar = existing.avatar || [];
               
-              // Only fall back to existing mainAvatar if the fresh one is truly empty
-              if (!merged.mainAvatar && existing.mainAvatar) merged.mainAvatar = existing.mainAvatar;
+              const hasFreshMainAvatar = typeof userData.mainAvatar === 'string'
+                && !!userData.mainAvatar.trim()
+                && userData.mainAvatar !== 'undefined'
+                && userData.mainAvatar !== 'null'
+                && userData.mainAvatar !== '[object Object]';
+              if (!hasFreshMainAvatar && existing.mainAvatarPath) {
+                merged.mainAvatar = existing.mainAvatarPath;
+              }
               
               // preserve missedCallBudget and peerId if not returned
               if ((merged as any).missedCallBudget === undefined && (existing as any).missedCallBudget !== undefined) (merged as any).missedCallBudget = (existing as any).missedCallBudget;

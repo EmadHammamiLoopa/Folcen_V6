@@ -325,6 +325,15 @@ export class User {
       return `${url}${separator}v=${timestamp}`;
     }
 
+    const firstUploadedAvatar = Array.isArray(this._avatar)
+      ? this._avatar.find(path => path && !this.isDefaultAvatar(path))
+      : '';
+    if (firstUploadedAvatar) {
+      const url = this.constructAvatarUrl(firstUploadedAvatar);
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}v=${timestamp}`;
+    }
+
     // 2. Fallback to customized avataaars if style is set
     if (this._avatarStyle === 'avataaars') {
       return AvatarUrlUtil.buildAvataaarsUrl({
@@ -506,6 +515,7 @@ set peerId(peerId: string | null) {
   set visitProfile(visitProfile: boolean) { this._visitProfile = visitProfile; }
 
   private constructAvatarUrl(avatarPath: string): string {
+    avatarPath = this.normalizeStoredAvatarPath(avatarPath);
     if (!avatarPath) {
       return `${constants.DOMAIN_URL}/uploads/default-avatar.png`; // Default avatar URL
     }
@@ -521,9 +531,12 @@ set peerId(peerId: string | null) {
   }
 
   private normalizeStoredAvatarPath(avatarPath: any): string {
-    if (!avatarPath || avatarPath === 'undefined' || avatarPath === '[object Object]') return '';
+    if (avatarPath && typeof avatarPath === 'object') {
+      avatarPath = avatarPath.path || avatarPath.url || avatarPath.mainAvatar || avatarPath.src || '';
+    }
+    if (!avatarPath || avatarPath === 'undefined' || avatarPath === 'null' || avatarPath === '[object Object]') return '';
     let path = String(avatarPath).trim();
-    if (!path) return '';
+    if (!path || path === 'undefined' || path === 'null' || path === '[object Object]') return '';
 
     if (path.startsWith('data:image')) return path;
 
@@ -545,6 +558,12 @@ set peerId(peerId: string | null) {
   public getMainAvatar(): string {
     if (this._mainAvatar && !this.isDefaultAvatar(this._mainAvatar)) {
       return this.constructAvatarUrl(this._mainAvatar);
+    }
+    const firstUploadedAvatar = Array.isArray(this._avatar)
+      ? this._avatar.find(path => path && !this.isDefaultAvatar(path))
+      : '';
+    if (firstUploadedAvatar) {
+      return this.constructAvatarUrl(firstUploadedAvatar);
     }
     if (this._avatarStyle === 'avataaars') {
       return AvatarUrlUtil.buildAvataaarsUrl({
@@ -801,7 +820,7 @@ set peerId(peerId: string | null) {
     this._aboutMe = user.aboutMe || '';
     this.avatar = Array.isArray(user.avatar) ? this.filterCustomAvatars(user.avatar, user.gender) : [];
 
-    let mainAv = user.mainAvatar;
+    let mainAv = this.normalizeStoredAvatarPath(user.mainAvatar);
     if (!mainAv || this.isOldDefaultAvatar(mainAv)) {
       this._mainAvatar = this.getDefaultAvatar(this._gender);
     } else {
@@ -944,8 +963,10 @@ set peerId(peerId: string | null) {
     return this;
   }
 
-  private filterCustomAvatars(avatars: string[], gender: string): string[] {
-    return avatars.filter(avatar => !this.isDefaultAvatar(avatar));
+  private filterCustomAvatars(avatars: any[], gender: string): string[] {
+    return avatars
+      .map(avatar => this.normalizeStoredAvatarPath(avatar))
+      .filter(avatar => avatar && !this.isDefaultAvatar(avatar));
   }
 
 

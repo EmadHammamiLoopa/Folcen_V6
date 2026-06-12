@@ -84,6 +84,7 @@ export class ListComponent implements OnInit {
   type: string = '';
   followLoading: string[] = [];
   searchTimeout: any;
+  private readonly followStateStorageKey = 'channelFollowStateChanged';
 
   constructor(
     public channelService: ChannelService,
@@ -134,6 +135,87 @@ export class ListComponent implements OnInit {
   isFollowing(channel: Channel): boolean {
     if (!channel || !this.authUserId) return false;
     return channel.followedBy(this.authUserId);
+  }
+
+  private readPendingFollowState(): { id: string; followed: boolean; at: number } | null {
+    try {
+      const raw = localStorage.getItem(this.followStateStorageKey);
+      if (!raw) return null;
+      const state = JSON.parse(raw);
+      if (!state || !state.id || typeof state.followed !== 'boolean') return null;
+      if (state.at && Date.now() - Number(state.at) > 120000) {
+        localStorage.removeItem(this.followStateStorageKey);
+        return null;
+      }
+      return state;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private rememberFollowState(channelId: string, followed: boolean) {
+    try {
+      localStorage.setItem(this.followStateStorageKey, JSON.stringify({
+        id: channelId,
+        followed,
+        at: Date.now()
+      }));
+    } catch (e) {}
+  }
+
+  private applyPendingFollowState() {
+    const state = this.readPendingFollowState();
+    if (!state) return;
+
+    const uid = String(this.authUserId || this.user?.id || this.user?._id || '');
+    const syncList = (list: Channel[] = []) => {
+      const updated = list.map(channel => {
+        if (!channel || String(channel.id) !== String(state.id)) return channel;
+        if (uid) {
+          let followers = [...(channel.followers || [])];
+          if (state.followed) {
+            if (!channel.followedBy(uid)) followers.push(uid);
+          } else {
+            followers = followers.filter((f: any) => {
+              const fid = typeof f === 'object' ? (f && (f._id || f.id)) : f;
+              return String(fid) !== uid;
+            });
+          }
+          channel.followers = followers;
+        }
+        return channel;
+      });
+      if (this.type === 'followed' && !state.followed) {
+        return updated.filter(channel => String(channel.id) !== String(state.id));
+      }
+      return updated;
+    };
+
+    this.channels = syncList(this.channels);
+    this.backupChannels = syncList(this.backupChannels);
+    this.nonSearchChannels = syncList(this.nonSearchChannels);
+  }
+
+  private normalizeCategory(value: any): string {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, ' ');
+  }
+
+  private categoryForChannel(channel: Channel): string {
+    const fromCategory = this.normalizeCategory(channel?.category);
+    if (fromCategory) return fromCategory;
+    const type = String(channel?.type || '').toLowerCase();
+    const name = String(channel?.name || '').toLowerCase();
+    if (type === 'static_dating' || name.includes('dating')) return 'dating';
+    if (type === 'static_events' || name.includes('events')) return 'events';
+    if (name.includes('local news')) return 'news';
+    if (name.includes('arts')) return 'arts';
+    if (name.includes('found')) return 'found';
+    if (name.includes('watch')) return 'watch';
+    return '';
   }
 
   getType() {
@@ -264,6 +346,7 @@ export class ListComponent implements OnInit {
         if (!this.searchWord) {
           this.nonSearchChannels = [...this.channels];
         }
+        this.applyPendingFollowState();
 
         if (resp.data.more === false || resp.data.channels.length < 10) {
           if (this.infinitScroll) {
@@ -407,7 +490,7 @@ export class ListComponent implements OnInit {
           if (this.type === 'followed' && !isFollowing) return;
           if (this.type === 'explore') {
             if (isFollowing) return;
-            if (currentCat && sCat !== currentCat && !this.searchWord) return;
+            if (currentCat && this.categoryForChannel(s) !== currentCat && !this.searchWord) return;
           }
           if (!(this.channels || []).find(c => c.id === s.id)) {
             this.channels.push(s);
@@ -417,6 +500,7 @@ export class ListComponent implements OnInit {
         this.channels = _.uniqBy(this.channels.reverse(), 'id').reverse();
         this.backupChannels = [...this.channels];
         if (!this.searchWord) this.nonSearchChannels = [...this.channels];
+        this.applyPendingFollowState();
       }
     } catch (e) { }
   }
@@ -432,14 +516,16 @@ export class ListComponent implements OnInit {
 
   follow(channel: Channel) {
     if (!this.user) return;
+    const uid = String(this.user?.id || this.user?._id || '');
+    const wasFollowing = channel.followedBy(uid);
     this.followLoading.push(channel.id);
     this.channelService.follow(channel.id)
       .then(
         (resp: any) => {
           this.followLoading.splice(this.followLoading.indexOf(channel.id), 1);
           this.toastService.presentSuccessToastr(resp.message);
-          const uid = this.user?.id || this.user?._id || '';
-          const isNowFollowing = resp.data && resp.data.followed;
+          const isNowFollowing = !wasFollowing;
+          this.rememberFollowState(channel.id, isNowFollowing);
           if (isNowFollowing) {
             try {
               if (!channel.followers) channel.followers = [];
@@ -483,4 +569,3 @@ export class ListComponent implements OnInit {
     });
   }
 }
-

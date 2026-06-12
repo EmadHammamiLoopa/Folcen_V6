@@ -926,3 +926,31 @@
     }
   }
 }
+
+:host-context(body.light-theme) .comment-card {
+  background: linear-gradient(145deg, #ffffff, #f6f9ff) !important;
+  border-color: rgba(37, 99, 235, 0.14) !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.09) !important;
+  color: #111827 !important;
+
+  .card-header .user-info .meta .username,
+  .card-body .comment-text {
+    color: #111827 !important;
+  }
+
+  .card-header .user-info .meta .timestamp {
+    color: #64748b !important;
+  }
+
+  .card-header .btn-more,
+  .card-footer .vote-widget {
+    background: rgba(241, 245, 249, 0.94) !important;
+    border-color: rgba(148, 163, 184, 0.24) !important;
+    color: #334155 !important;
+  }
+
+  .card-footer .vote-widget .vote-btn,
+  .card-footer .vote-widget .vote-val {
+    color: #334155 !important;
+  }
+}
