@@ -13,6 +13,19 @@
 const { admin } = require('./firebaseAdmin');
 const PushToken  = require('../models/PushToken');
 
+function cleanPushText(value, fallback = '') {
+  let raw = value;
+  if (raw && typeof raw === 'object') {
+    raw = raw.en || raw.title || raw.body || raw.name || raw.displayName || raw.fullName || '';
+  }
+  const clean = String(raw ?? '')
+    .replace(/\[object Object\]/gi, '')
+    .replace(/\bundefined\b|\bnull\b|\bNaN\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean || fallback;
+}
+
 /**
  * Send an FCM push notification to all devices registered for a user.
  *
@@ -41,10 +54,13 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
   const tokens = tokenDocs.map(d => d.token);
   console.log(`[fcmPushService] preparing push userId=${userId} tokens=${tokens.length} type=${data.type || data.event || data.category || 'notification'}`);
 
+  const safeTitle = cleanPushText(title, 'Notification');
+  const safeBody = cleanPushText(body, '');
+
   // Convert all data values to strings (FCM requirement)
   const stringData = {};
   for (const [k, v] of Object.entries(data)) {
-    stringData[k] = v === null || v === undefined ? '' : String(v);
+    stringData[k] = v === null || v === undefined ? '' : cleanPushText(v, '');
   }
 
   const isIncomingCall =
@@ -56,8 +72,8 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     data: {
       ...stringData,
       serverSentAt: stringData.serverSentAt || String(Date.now()),
-      title: title || 'Notification',
-      body: body || ''
+      title: safeTitle,
+      body: safeBody
     },
     tokens,
   };
@@ -66,8 +82,8 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
   // build the full-screen incoming-call UI even when the WebView is killed.
   if (!isIncomingCall) {
     message.notification = {
-      title: title || 'Notification',
-      body:  body  || '',
+      title: safeTitle,
+      body:  safeBody,
     };
   }
   if (android) {

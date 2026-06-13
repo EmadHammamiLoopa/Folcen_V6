@@ -354,8 +354,13 @@ function emitFriendRequestDeclined(userAId, userBId) {
  * Create a persistent notification and optionally send push
  */
 function cleanNotificationText(value, fallback) {
-  const clean = String(value || '')
-    .replace(/\bundefined\b|\bnull\b/gi, '')
+  let raw = value;
+  if (raw && typeof raw === 'object') {
+    raw = raw.en || raw.title || raw.body || raw.name || raw.displayName || raw.fullName || '';
+  }
+  const clean = String(raw ?? '')
+    .replace(/\[object Object\]/gi, '')
+    .replace(/\bundefined\b|\bnull\b|\bNaN\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
   return clean || fallback;
@@ -363,10 +368,38 @@ function cleanNotificationText(value, fallback) {
 
 function getSafeDisplayName(user, fallback = 'Someone') {
   if (!user) return fallback;
-  const direct = user.displayName || user.fullName || user.name;
-  const composed = `${user.firstName || ''} ${user.lastName || ''}`;
-  const emailName = user.email ? String(user.email).split('@')[0] : '';
+  const direct = cleanNotificationText(user.displayName || user.fullName || user.name, '');
+  const first = cleanNotificationText(user.firstName, '');
+  const last = cleanNotificationText(user.lastName, '');
+  const composed = cleanNotificationText(`${first} ${last}`, '');
+  const emailName = user.email ? cleanNotificationText(String(user.email).split('@')[0], '') : '';
   return cleanNotificationText(direct || composed || emailName, fallback);
+}
+
+function cleanNotificationData(data = {}) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  return Object.entries(data).reduce((acc, [key, value]) => {
+    if (value === undefined || value === null) {
+      acc[key] = '';
+    } else if (typeof value === 'string') {
+      acc[key] = cleanNotificationText(value, '');
+    } else {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
+function cleanNotificationDoc(notification) {
+  if (!notification || typeof notification !== 'object') return notification;
+  const senderName = getSafeDisplayName(notification.sender, 'Folcen');
+  const titleFallback = senderName === 'Folcen' ? 'Folcen' : senderName;
+  return {
+    ...notification,
+    title: cleanNotificationText(notification.title, titleFallback),
+    body: cleanNotificationText(notification.body, 'You have a new notification'),
+    data: cleanNotificationData(notification.data || {})
+  };
 }
 
 function isBroadActivityPush(type, data = {}) {
@@ -400,29 +433,30 @@ async function createNotification({ recipientId, senderId, type, title, body, da
       } catch (_) {}
     }
 
+    const safeData = cleanNotificationData(data);
     const notification = await Notification.create({
       recipient: recipientId,
       sender: senderId,
       type,
       title: safeTitle,
       body: safeBody,
-      data
+      data: safeData
     });
 
     // Notify user via socket immediately if online (NotificationService listens)
-    emitToUser(recipientId, 'notification-received', notification);
+    emitToUser(recipientId, 'notification-received', cleanNotificationDoc(notification.toObject ? notification.toObject() : notification));
 
     // Trigger push â€” use 5-arg path when data.link is set so the FCM deep-link
     // points to the actual content (post/comment) not a chat thread.
-    if (isBroadActivityPush(type, data)) {
+    if (isBroadActivityPush(type, safeData)) {
       return notification;
     }
 
-    if (data && data.link) {
+    if (safeData && safeData.link) {
       sendNotification(
         { en: safeTitle },
         { en: safeBody },
-        { type: type || 'message', link: data.link },
+        { type: type || 'message', link: safeData.link },
         [],
         [String(recipientId)]
       ).catch(() => {});
@@ -943,7 +977,7 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
     // 5-argument signature
     title = cleanNotificationText(userIds.en, 'Folcen');
     body  = cleanNotificationText(message.en, 'You have a new notification');
-    data  = senderName || {}; // 3rd arg is data
+    data  = cleanNotificationData(senderName || {}); // 3rd arg is data
     recipientIds = recipientsOverride || [];
   } else {
     // Original 4-argument signature
@@ -955,11 +989,11 @@ async function sendNotification(userIds, message, senderName, fromUserId, recipi
     title = cleanNotificationText(title, 'Folcen');
     body  = cleanNotificationText(message, 'You have a new message');
 
-    data = {
+    data = cleanNotificationData({
       type: 'message',
       link: `/messages/chat/${fromUserId}`,
       fromUserId: fromUserId ? String(fromUserId) : ''
-    };
+    });
   }
 
   recipientIds = recipientIds
@@ -1013,6 +1047,9 @@ module.exports = {
   emitFriendRequestAccepted,
   emitFriendRequestDeclined,
   createNotification,
+  cleanNotificationText,
+  getSafeDisplayName,
+  cleanNotificationDoc,
   realtime,
 
   /* misc utilities */

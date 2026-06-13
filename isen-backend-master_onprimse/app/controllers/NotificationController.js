@@ -1,6 +1,6 @@
 const Notification = require('../models/Notification');
 const Response = require('./Response');
-const { emitToUser } = require('../helpers');
+const { emitToUser, cleanNotificationDoc } = require('../helpers');
 
 /** GET /api/v1/notifications — list recent notifications for the auth user */
 exports.list = async (req, res) => {
@@ -19,7 +19,8 @@ exports.list = async (req, res) => {
       Notification.countDocuments({ recipient: userId, read: false })
     ]);
 
-    return Response.sendResponse(res, { docs, unread, page, limit }, 'Notifications fetched');
+    const safeDocs = docs.map(doc => cleanNotificationDoc(doc));
+    return Response.sendResponse(res, { docs: safeDocs, unread, page, limit }, 'Notifications fetched');
   } catch (err) {
     console.error('NotificationController.list error:', err);
     return Response.sendError(res, 500, 'Server error');
