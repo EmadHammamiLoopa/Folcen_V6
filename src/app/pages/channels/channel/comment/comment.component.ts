@@ -7,7 +7,7 @@ import { PhotoViewerComponent } from 'src/app/components/photo-viewer/photo-view
 import { ReportModalComponent } from 'src/app/components/report-modal/report-modal.component';
 import { User } from './../../../../models/User';
 import { Comment } from '../../../../models/Comment';
-import { Component, Input, OnInit, Output, EventEmitter, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Input, OnInit, Output, EventEmitter, OnChanges, SimpleChanges, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { DropDownComponent } from 'src/app/pages/drop-down/drop-down.component';
 import { getCommentUserName } from '../comments/comment-utils';
 import constants from '../../../../helpers/constants';
@@ -17,7 +17,7 @@ import constants from '../../../../helpers/constants';
   templateUrl: './comment.component.html',
   styleUrls: ['./comment.component.scss'],
 })
-export class CommentComponent implements OnInit, OnChanges {
+export class CommentComponent implements OnInit, OnChanges, AfterViewInit {
 
   @Output() removeComment = new EventEmitter();
   @Input() comment: Comment;
@@ -30,6 +30,7 @@ export class CommentComponent implements OnInit, OnChanges {
   @Input() cardThemeIndex = 0;
   @Input() user: User;
   @Input() userName: string;
+  @ViewChild('cardEl') cardEl?: ElementRef<HTMLElement>;
   deleteLoading = false;
   isImageEnlarged: boolean = false;
   mediaUrl: string = '';
@@ -48,6 +49,11 @@ export class CommentComponent implements OnInit, OnChanges {
     if (!this.comment.user) this.comment.user = {} as any;
     this.normalizeCommentUser();
     this.updateMediaUrl();
+    this.applyCardTheme();
+  }
+
+  ngAfterViewInit() {
+    this.applyCardTheme();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -57,6 +63,29 @@ export class CommentComponent implements OnInit, OnChanges {
       this.normalizeCommentUser();
       this.updateMediaUrl();
     }
+    if (changes['cardBackground'] || changes['cardTextColor'] || changes['cardMutedColor'] || changes['cardControlBackground']) {
+      this.applyCardTheme();
+    }
+  }
+
+  private applyCardTheme() {
+    requestAnimationFrame(() => {
+      const el = this.cardEl?.nativeElement;
+      if (!el) return;
+      if (this.cardBackground) {
+        el.style.setProperty('background', this.cardBackground, 'important');
+      }
+      if (this.cardTextColor) {
+        el.style.setProperty('--comment-card-text', this.cardTextColor);
+        el.style.setProperty('color', this.cardTextColor, 'important');
+      }
+      if (this.cardMutedColor) {
+        el.style.setProperty('--comment-card-muted', this.cardMutedColor);
+      }
+      if (this.cardControlBackground) {
+        el.style.setProperty('--comment-card-control', this.cardControlBackground);
+      }
+    });
   }
 
   private normalizeCommentUser() {

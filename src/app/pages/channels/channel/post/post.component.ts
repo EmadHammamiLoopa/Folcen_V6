@@ -100,8 +100,11 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
   }
 
   getCommentCount(): number {
-    const count = Number((this.post as any)?.commentCount);
-    if (Number.isFinite(count) && count > 0) return count;
+    const rawCount = (this.post as any)?.commentCount;
+    if (rawCount !== undefined && rawCount !== null) {
+      const count = Number(rawCount);
+      if (Number.isFinite(count)) return count;
+    }
     return Array.isArray(this.post?.comments) ? this.post.comments.length : 0;
   }
 

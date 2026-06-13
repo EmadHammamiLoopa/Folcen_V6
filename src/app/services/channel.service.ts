@@ -204,7 +204,7 @@ export class ChannelService extends DataService {
   voteOnComment(id: string, vote: number){
     return this.sendRequest({
       method: 'post',
-      url: '/' + id + '/vote',
+      url: '/comment/' + id + '/vote',
       data: {vote}
     })
   }

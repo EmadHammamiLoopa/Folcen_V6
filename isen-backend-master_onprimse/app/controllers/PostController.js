@@ -28,6 +28,19 @@ const makeExcerpt = (text, max = 150) => {
     return truncated + '...';
 }
 
+const visibleCommentContentQuery = {
+    $or: [
+        { text: { $regex: /\S/ } },
+        {
+            'media.url': {
+                $exists: true,
+                $regex: /\S/,
+                $nin: ['', null, 'undefined', 'null', '[object Object]']
+            }
+        }
+    ]
+};
+
 
 const multer = require('multer');
 
@@ -328,10 +341,7 @@ exports.getFeed = async (req, res) => {
                     $match: {
                         post: { $in: activePosts.map(post => post._id) },
                         deletedAt: null,
-                        $or: [
-                            { text: { $exists: true, $nin: ['', null] } },
-                            { 'media.url': { $exists: true, $nin: ['', null, 'undefined', 'null', '[object Object]'] } }
-                        ]
+                        ...visibleCommentContentQuery
                     }
                 },
                 { $group: { _id: '$post', count: { $sum: 1 } } }
@@ -920,15 +930,22 @@ exports.getPosts = async (req, res) => {
 
         logger.info(`Posts filtered: ${posts.length} -> ${validPosts.length} (removed ${posts.length - validPosts.length} posts with missing users)`);
 
+        const validPostIds = validPosts
+            .map(post => {
+                try {
+                    return new mongoose.Types.ObjectId(String(post._id));
+                } catch (e) {
+                    return null;
+                }
+            })
+            .filter(Boolean);
+
         const visibleCommentCounts = await Comment.aggregate([
             {
                 $match: {
-                    post: { $in: validPosts.map(post => post._id) },
+                    post: { $in: validPostIds },
                     deletedAt: null,
-                    $or: [
-                        { text: { $exists: true, $nin: ['', null] } },
-                        { 'media.url': { $exists: true, $nin: ['', null, 'undefined', 'null', '[object Object]'] } }
-                    ]
+                    ...visibleCommentContentQuery
                 }
             },
             { $group: { _id: '$post', count: { $sum: 1 } } }

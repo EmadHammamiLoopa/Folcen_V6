@@ -144,6 +144,15 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    cursor: pointer;
+    transition: color 0.18s ease;
+
+    &.expanded {
+      display: block;
+      -webkit-line-clamp: unset;
+      overflow: visible;
+      color: rgba(255, 255, 255, 0.86);
+    }
   }
 
   .ch-stats {
@@ -334,4 +343,283 @@
 
 ion-content {
   --background: var(--folcen-deep-slate);
+}
+
+/* Premium community header and feed spacing refresh */
+.channel-hero {
+  background:
+    radial-gradient(circle at 16% 4%, rgba(124, 92, 255, 0.24), transparent 32%),
+    radial-gradient(circle at 88% 10%, rgba(34, 211, 238, 0.16), transparent 26%),
+    linear-gradient(180deg, #0b1020, #111827);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  .hero-overlay {
+    background:
+      linear-gradient(180deg, rgba(11, 16, 32, 0.28), rgba(11, 16, 32, 0.86)),
+      linear-gradient(135deg, rgba(124, 92, 255, 0.22), rgba(34, 211, 238, 0.08));
+  }
+
+  .top-bar {
+    padding-left: 8px;
+    padding-right: 8px;
+
+    ion-back-button,
+    .action-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 999px;
+      min-width: 38px;
+      height: 38px;
+    }
+  }
+
+  .hero-row {
+    gap: clamp(12px, 4vw, 18px);
+    padding: 12px clamp(14px, 4vw, 20px) 20px;
+  }
+
+  .ch-avatar {
+    width: clamp(64px, 18vw, 82px);
+    height: clamp(64px, 18vw, 82px);
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -12px;
+      border-radius: 28px;
+      background: radial-gradient(circle, rgba(124, 92, 255, 0.34), transparent 68%);
+      filter: blur(6px);
+      z-index: -1;
+    }
+
+    .ch-avatar-img,
+    .ch-avatar-initials {
+      border-radius: 24px;
+      border-color: rgba(255, 255, 255, 0.28);
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.36);
+    }
+  }
+
+  .ch-top-line .ch-name {
+    font-size: clamp(1.14rem, 5vw, 1.45rem);
+    color: #f8fafc;
+  }
+
+  .ch-desc {
+    color: #cbd5e1;
+    font-size: clamp(0.78rem, 3vw, 0.9rem);
+  }
+
+  .ch-stats {
+    gap: 6px;
+
+    .ch-stat {
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: clamp(0.68rem, 2.6vw, 0.76rem);
+    }
+
+    .ch-dot {
+      display: none;
+    }
+  }
+
+  .ch-actions {
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+
+    .ch-btn {
+      appearance: none;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      color: #f8fafc;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 36px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1;
+      min-width: 0;
+      overflow: hidden;
+      padding: 0 16px;
+
+      ion-icon {
+        font-size: 18px;
+        flex: 0 0 auto;
+      }
+    }
+
+    .follow-btn {
+      background: linear-gradient(135deg, #7c5cff, #22d3ee);
+      border-color: rgba(255, 255, 255, 0.18);
+
+      &.followed {
+        background: rgba(255, 255, 255, 0.12);
+      }
+    }
+  }
+}
+
+.posts-container {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(124, 92, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, #0b1020 0%, #111827 100%);
+  padding: 10px 0 calc(112px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Device-final: light theme feed must not inherit the dark premium feed background. */
+ion-content,
+:host-context(body.light-theme) ion-content {
+  --background: #eef3ff !important;
+}
+
+.posts-container,
+:host-context(body.light-theme) .posts-container {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(99, 102, 241, 0.10), transparent 28%),
+    radial-gradient(circle at 92% 8%, rgba(20, 184, 166, 0.10), transparent 24%),
+    linear-gradient(180deg, #eef3ff 0%, #f8fbff 46%, #eef2f7 100%) !important;
+}
+
+:host-context(body.dark-theme) ion-content {
+  --background: var(--folcen-deep-slate) !important;
+}
+
+:host-context(body.dark-theme) .posts-container {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(124, 92, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, #0b1020 0%, #111827 100%) !important;
+}
+
+@media (max-width: 380px) {
+  .channel-hero {
+    .hero-row {
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .ch-actions .ch-btn {
+      padding: 0 12px;
+    }
+  }
+}
+
+.channel-hero {
+  .ch-desc.expanded {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  .ch-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: clamp(8px, 2.4vw, 12px) !important;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 10px !important;
+  }
+
+  .ch-stats .ch-stat,
+  .ch-actions .ch-btn {
+    background-clip: padding-box !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .ch-stats .ch-stat {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    color: rgba(248, 250, 252, 0.88) !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 !important;
+
+    strong,
+    i {
+      background: transparent !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+  }
+
+  .ch-actions .ch-btn {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.20) !important;
+    color: #f8fafc !important;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 7px !important;
+    height: 38px !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 0 clamp(13px, 3.6vw, 18px) !important;
+    white-space: nowrap !important;
+    outline: 0;
+    flex: 0 1 auto;
+
+    *,
+    i,
+    span {
+      background: transparent !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      border: 0 !important;
+      display: inline-flex;
+      align-items: center;
+      line-height: 1;
+    }
+
+    &.follow-btn:not(.followed) {
+      background: linear-gradient(135deg, #7c5cff, #22d3ee) !important;
+      border-color: rgba(255, 255, 255, 0.20) !important;
+    }
+
+    &.follow-btn {
+      min-width: clamp(118px, 31vw, 150px) !important;
+    }
+
+    &.post-btn {
+      min-width: clamp(94px, 25vw, 122px) !important;
+    }
+  }
+}
+
+@media (max-width: 380px) {
+  .channel-hero {
+    .ch-actions {
+      gap: 7px !important;
+    }
+
+    .ch-actions .ch-btn {
+      height: 36px !important;
+      padding: 0 12px !important;
+      font-size: 0.78rem !important;
+
+      &.follow-btn {
+        min-width: 106px !important;
+      }
+
+      &.post-btn {
+        min-width: 86px !important;
+      }
+    }
+  }
 }

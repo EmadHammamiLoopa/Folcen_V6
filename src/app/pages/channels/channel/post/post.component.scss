@@ -1022,21 +1022,23 @@
 }
 
 :host-context(body.light-theme) .jodel-card {
-  --post-fg: #111827 !important;
   --post-muted: #64748b !important;
   --post-chip-bg: rgba(37, 99, 235, 0.08) !important;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.90)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(248, 250, 252, 0.12)),
     var(--post-bg) !important;
   border-color: rgba(37, 99, 235, 0.14) !important;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10) !important;
-  color: #111827 !important;
+  color: var(--post-fg) !important;
 }
 
 :host-context(body.light-theme) .jdl-text,
-:host-context(body.light-theme) .jdl-user .user-info .name,
+:host-context(body.light-theme) .jdl-user .user-info .name {
+  color: var(--post-fg) !important;
+}
+
 :host-context(body.light-theme) .jdl-reaction-rail .rail-score {
-  color: #111827 !important;
+  color: var(--post-fg) !important;
 }
 
 :host-context(body.light-theme) .jdl-user .user-info .meta-row,
@@ -1054,4 +1056,142 @@
   background: rgba(255, 255, 255, 0.86) !important;
   border-color: rgba(148, 163, 184, 0.24) !important;
   color: #111827 !important;
+}
+
+/* Device pass: right-side feed controls must never overlap or disappear. */
+.jodel-card.feed-card {
+  padding-right: clamp(64px, 16vw, 76px) !important;
+  min-height: clamp(214px, 45vw, 248px) !important;
+
+  .jdl-top-rail {
+    top: 12px !important;
+    right: 10px !important;
+    padding: 4px !important;
+    gap: 5px !important;
+    background: rgba(15, 23, 42, 0.50) !important;
+    border-color: rgba(255, 255, 255, 0.20) !important;
+
+    .icon-btn {
+      width: 32px !important;
+      min-width: 32px !important;
+      height: 32px !important;
+      background: rgba(255, 255, 255, 0.92) !important;
+      color: #111827 !important;
+    }
+  }
+
+  .jdl-reaction-rail {
+    top: auto !important;
+    bottom: 12px !important;
+    right: 10px !important;
+    padding: 4px !important;
+    gap: 4px !important;
+    background: rgba(15, 23, 42, 0.56) !important;
+    border-color: rgba(255, 255, 255, 0.20) !important;
+
+    .rail-btn {
+      width: 31px !important;
+      height: 31px !important;
+      min-width: 31px !important;
+      background: rgba(255, 255, 255, 0.92) !important;
+      color: #111827 !important;
+    }
+
+    .rail-btn.comment {
+      width: auto !important;
+      min-width: 38px !important;
+      padding: 0 6px !important;
+    }
+
+    .rail-score {
+      color: #ffffff !important;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55) !important;
+    }
+  }
+}
+
+/* Opened post detail: vote pill should stay readable on any selected post color. */
+.jodel-card:not(.feed-card) {
+  padding-right: clamp(12px, 3.4vw, 18px) !important;
+
+  .jdl-actions .vote-controls,
+  .jdl-actions .comment-btn {
+    background: rgba(255, 255, 255, 0.78) !important;
+    border-color: rgba(15, 23, 42, 0.10) !important;
+    color: #0f172a !important;
+  }
+
+  .jdl-actions .vote-controls .icon-btn,
+  .jdl-actions .vote-controls .score,
+  .jdl-actions .comment-btn,
+  .jdl-actions .comment-btn .c-count {
+    color: #0f172a !important;
+  }
+}
+
+/* Final control contrast pass: feed cards and opened posts keep readable counts on light colors. */
+.jodel-card.feed-card {
+  padding-right: clamp(68px, 17vw, 82px) !important;
+
+  .jdl-top-rail,
+  .jdl-reaction-rail {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+  }
+
+  .jdl-top-rail {
+    top: 12px !important;
+    right: 10px !important;
+  }
+
+  .jdl-reaction-rail {
+    right: 10px !important;
+    bottom: 12px !important;
+    top: auto !important;
+  }
+
+  .jdl-top-rail .icon-btn,
+  .jdl-reaction-rail .rail-btn {
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    color: #0f172a !important;
+  }
+
+  .jdl-reaction-rail .rail-score,
+  :host-context(body.light-theme) & .jdl-reaction-rail .rail-score {
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.58) !important;
+  }
+
+  .jdl-reaction-rail .rail-btn.comment {
+    min-width: 34px !important;
+    max-width: 36px !important;
+    padding: 0 4px !important;
+    overflow: visible !important;
+  }
+
+  .jdl-reaction-rail .rail-btn.comment span {
+    color: #0f172a !important;
+    font-weight: 900 !important;
+  }
+}
+
+.jodel-card:not(.feed-card) .jdl-actions .vote-controls,
+.jodel-card:not(.feed-card) .jdl-actions .comment-btn,
+:host-context(body.light-theme) .jodel-card:not(.feed-card) .jdl-actions .vote-controls,
+:host-context(body.light-theme) .jodel-card:not(.feed-card) .jdl-actions .comment-btn {
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.14) !important;
+}
+
+.jodel-card:not(.feed-card) .jdl-actions .vote-controls .score,
+.jodel-card:not(.feed-card) .jdl-actions .comment-btn .c-count,
+:host-context(body.light-theme) .jodel-card:not(.feed-card) .jdl-actions .vote-controls .score,
+:host-context(body.light-theme) .jodel-card:not(.feed-card) .jdl-actions .comment-btn .c-count {
+  color: #0f172a !important;
+  font-weight: 900 !important;
 }

@@ -47,6 +47,19 @@ const publicUploadUrl = (file) => {
     return raw;
 };
 
+const visibleCommentContentQuery = {
+    $or: [
+        { text: { $regex: /\S/ } },
+        {
+            'media.url': {
+                $exists: true,
+                $regex: /\S/,
+                $nin: ['', null, 'undefined', 'null', '[object Object]']
+            }
+        }
+    ]
+};
+
 
 exports.showComment = async (req, res) => {
     try {
@@ -494,7 +507,9 @@ exports.getComments = async (req, res) => {
         // Find comments for the post with pagination and population
         const comments = await Comment.find({ 
             post: post._id,
-            user: { $nin: disabledUserIds }
+            user: { $nin: disabledUserIds },
+            deletedAt: null,
+            ...visibleCommentContentQuery
         })
             .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides', 'User')
             .sort({ createdAt: -1 })
@@ -509,7 +524,9 @@ exports.getComments = async (req, res) => {
         // Count the total number of comments (excluding disabled users)
         const count = await Comment.countDocuments({ 
             post: post._id,
-            user: { $nin: disabledUserIds }
+            user: { $nin: disabledUserIds },
+            deletedAt: null,
+            ...visibleCommentContentQuery
         }).exec();
 
         // Ensure the correct anonymous name is used for comments
@@ -528,6 +545,7 @@ exports.getComments = async (req, res) => {
 
         return Response.sendResponse(res, {
             comments: commentsWithVotes,
+            count,
             more: (count - (limit * (page + 1))) > 0
         });
 

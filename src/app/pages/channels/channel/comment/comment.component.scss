@@ -559,6 +559,293 @@
   }
 }
 
+/* Absolute last device override: no grid, no negative right rail. */
+.comment-card,
+:host-context(body.light-theme) .comment-card,
+:host-context(body.dark-theme) .comment-card {
+  position: relative !important;
+  display: block !important;
+  padding: 12px 106px 14px 12px !important;
+  min-height: 96px !important;
+  overflow: hidden !important;
+}
+
+.comment-card .card-header,
+:host-context(body.light-theme) .comment-card .card-header,
+:host-context(body.dark-theme) .comment-card .card-header {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  min-height: 42px !important;
+}
+
+.comment-card .card-header .btn-more,
+:host-context(body.light-theme) .comment-card .card-header .btn-more,
+:host-context(body.dark-theme) .comment-card .card-header .btn-more {
+  position: absolute !important;
+  top: 12px !important;
+  right: 10px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 8 !important;
+}
+
+.comment-card .card-body,
+:host-context(body.light-theme) .comment-card .card-body,
+:host-context(body.dark-theme) .comment-card .card-body {
+  padding: 0 0 0 52px !important;
+}
+
+.comment-card .card-footer,
+:host-context(body.light-theme) .comment-card .card-footer,
+:host-context(body.dark-theme) .comment-card .card-footer {
+  position: absolute !important;
+  top: 58px !important;
+  right: 10px !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  z-index: 7 !important;
+}
+
+.comment-card .card-footer .vote-widget,
+:host-context(body.light-theme) .comment-card .card-footer .vote-widget,
+:host-context(body.dark-theme) .comment-card .card-footer .vote-widget {
+  width: 34px !important;
+  min-width: 82px !important;
+  max-width: 86px !important;
+  padding: 2px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.light-theme) .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.dark-theme) .comment-card .card-footer .vote-widget .vote-btn {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  font-size: 11px !important;
+}
+
+.comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.light-theme) .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.dark-theme) .comment-card .card-footer .vote-widget .vote-val {
+  display: block !important;
+  min-width: 22px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  line-height: 28px !important;
+  font-size: 0.72rem !important;
+}
+
+@media (max-width: 360px) {
+  .comment-card,
+  :host-context(body.light-theme) .comment-card,
+  :host-context(body.dark-theme) .comment-card {
+    padding: 10px 52px 12px 10px !important;
+    padding-right: 100px !important;
+  }
+
+  .comment-card .card-header .btn-more,
+  :host-context(body.light-theme) .comment-card .card-header .btn-more,
+  :host-context(body.dark-theme) .comment-card .card-header .btn-more {
+    right: 8px !important;
+  }
+
+  .comment-card .card-footer,
+  :host-context(body.light-theme) .comment-card .card-footer,
+  :host-context(body.dark-theme) .comment-card .card-footer {
+    right: 8px !important;
+    top: 54px !important;
+  }
+}
+
+/* Device-final geometry: reserve a clean right rail for menu and vote. */
+.comment-card,
+:host-context(body.light-theme) .comment-card,
+:host-context(body.dark-theme) .comment-card {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 94px !important;
+  padding: 12px 58px 14px 12px !important;
+  overflow: hidden !important;
+  border-radius: 18px !important;
+  color: #111827 !important;
+
+  .card-header {
+    position: static !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 0 8px !important;
+    padding: 0 0 0 0 !important;
+    min-height: 42px !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+
+    .user-info {
+      width: 100% !important;
+      min-width: 0 !important;
+      padding-right: 0 !important;
+      gap: 10px !important;
+
+      .avatar-ring {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+      }
+
+      .meta {
+        min-width: 0 !important;
+        overflow: hidden !important;
+
+        .username {
+          font-size: clamp(0.9rem, 3.1vw, 1rem) !important;
+          line-height: 1.12 !important;
+          color: #111827 !important;
+        }
+
+        .timestamp {
+          display: block !important;
+          margin-top: 2px !important;
+          color: #475569 !important;
+        }
+      }
+    }
+
+    .btn-more {
+      position: absolute !important;
+      top: 12px !important;
+      right: 10px !important;
+      width: 38px !important;
+      height: 38px !important;
+      min-width: 38px !important;
+      border-radius: 999px !important;
+      background: rgba(255, 255, 255, 0.74) !important;
+      border: 1px solid rgba(15, 23, 42, 0.10) !important;
+      color: #334155 !important;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+      z-index: 4 !important;
+    }
+  }
+
+  .card-body {
+    min-width: 0 !important;
+    padding: 0 0 0 52px !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+
+    .comment-text {
+      margin: 0 !important;
+      color: #111827 !important;
+      font-size: clamp(0.94rem, 3.25vw, 1.02rem) !important;
+      line-height: 1.42 !important;
+      font-weight: 700 !important;
+    }
+  }
+
+  .card-footer {
+    position: absolute !important;
+    right: 10px !important;
+    bottom: 12px !important;
+    top: auto !important;
+    transform: none !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    margin: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    z-index: 4 !important;
+
+    .interaction-group,
+    .vote-widget {
+      width: 38px !important;
+      min-width: 38px !important;
+      max-width: 38px !important;
+      margin: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .vote-widget {
+      padding: 3px !important;
+      border-radius: 999px !important;
+      background: rgba(255, 255, 255, 0.74) !important;
+      border: 1px solid rgba(15, 23, 42, 0.10) !important;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+
+      .vote-btn {
+        width: 30px !important;
+        min-width: 30px !important;
+        height: 27px !important;
+        color: #334155 !important;
+      }
+
+      .vote-val {
+        color: #334155 !important;
+        font-weight: 900 !important;
+      }
+    }
+  }
+}
+
+@media (max-width: 360px) {
+  .comment-card,
+  :host-context(body.light-theme) .comment-card,
+  :host-context(body.dark-theme) .comment-card {
+    min-height: 90px !important;
+    padding: 10px 52px 12px 10px !important;
+
+    .card-header .user-info {
+      gap: 8px !important;
+
+      .avatar-ring {
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+      }
+    }
+
+    .card-header .btn-more {
+      width: 34px !important;
+      height: 34px !important;
+      min-width: 34px !important;
+      right: 8px !important;
+      top: 10px !important;
+    }
+
+    .card-body {
+      padding-left: 46px !important;
+    }
+
+    .card-footer {
+      right: 8px !important;
+      bottom: 10px !important;
+    }
+  }
+}
+
 /* Final mobile layout guard: compact, readable, no horizontal squeeze */
 .comment-card {
   display: grid !important;
@@ -1331,27 +1618,50 @@
 }
 
 .comment-card.theme-0 {
-  background: linear-gradient(145deg, #bff4ea 0%, #ecfffb 100%) !important;
+  background: linear-gradient(145deg, #8be9d8 0%, #d9fff7 100%) !important;
 }
 
 .comment-card.theme-1 {
-  background: linear-gradient(145deg, #d9ccff 0%, #f5f0ff 100%) !important;
+  background: linear-gradient(145deg, #c9b5ff 0%, #f0e9ff 100%) !important;
 }
 
 .comment-card.theme-2 {
-  background: linear-gradient(145deg, #ffc6d5 0%, #fff1f5 100%) !important;
+  background: linear-gradient(145deg, #ffaec6 0%, #ffeaf1 100%) !important;
 }
 
 .comment-card.theme-3 {
-  background: linear-gradient(145deg, #baddff 0%, #f0f8ff 100%) !important;
+  background: linear-gradient(145deg, #9bd0ff 0%, #e8f6ff 100%) !important;
 }
 
 .comment-card.theme-4 {
-  background: linear-gradient(145deg, #ffd899 0%, #fff6e7 100%) !important;
+  background: linear-gradient(145deg, #ffc96b 0%, #fff0cf 100%) !important;
 }
 
 .comment-card.theme-5 {
-  background: linear-gradient(145deg, #c9ef96 0%, #f4ffe5 100%) !important;
+  background: linear-gradient(145deg, #b7e66d 0%, #efffda 100%) !important;
+}
+
+.comment-card,
+:host-context(body.dark-theme) .comment-card,
+:host-context(body.light-theme) .comment-card {
+  color: #111827 !important;
+}
+
+.comment-card .card-header .user-info .meta .username,
+.comment-card .card-body .comment-text,
+:host-context(body.dark-theme) .comment-card .card-header .user-info .meta .username,
+:host-context(body.dark-theme) .comment-card .card-body .comment-text,
+:host-context(body.light-theme) .comment-card .card-header .user-info .meta .username,
+:host-context(body.light-theme) .comment-card .card-body .comment-text {
+  color: #111827 !important;
+  opacity: 1 !important;
+}
+
+.comment-card .card-header .user-info .meta .timestamp,
+:host-context(body.dark-theme) .comment-card .card-header .user-info .meta .timestamp,
+:host-context(body.light-theme) .comment-card .card-header .user-info .meta .timestamp {
+  color: #475569 !important;
+  opacity: 1 !important;
 }
 
 @media (max-width: 360px) {
@@ -1372,4 +1682,125 @@
       padding-left: 48px !important;
     }
   }
+}
+
+/* Absolute last device override: no grid, no negative right rail. */
+.comment-card,
+:host-context(body.light-theme) .comment-card,
+:host-context(body.dark-theme) .comment-card {
+  position: relative !important;
+  display: block !important;
+  padding: 12px 112px 14px 12px !important;
+  min-height: 96px !important;
+  overflow: hidden !important;
+}
+
+.comment-card .card-header,
+:host-context(body.light-theme) .comment-card .card-header,
+:host-context(body.dark-theme) .comment-card .card-header {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  min-height: 42px !important;
+}
+
+.comment-card .card-header .btn-more,
+:host-context(body.light-theme) .comment-card .card-header .btn-more,
+:host-context(body.dark-theme) .comment-card .card-header .btn-more {
+  position: absolute !important;
+  top: 12px !important;
+  right: 10px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 8 !important;
+}
+
+.comment-card .card-body,
+:host-context(body.light-theme) .comment-card .card-body,
+:host-context(body.dark-theme) .comment-card .card-body {
+  padding: 0 0 0 52px !important;
+}
+
+.comment-card .card-footer,
+:host-context(body.light-theme) .comment-card .card-footer,
+:host-context(body.dark-theme) .comment-card .card-footer {
+  position: absolute !important;
+  top: 56px !important;
+  right: 10px !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
+  z-index: 7 !important;
+}
+
+.comment-card .card-footer .interaction-group,
+:host-context(body.light-theme) .comment-card .card-footer .interaction-group,
+:host-context(body.dark-theme) .comment-card .card-footer .interaction-group,
+.comment-card .card-footer .vote-widget,
+:host-context(body.light-theme) .comment-card .card-footer .vote-widget,
+:host-context(body.dark-theme) .comment-card .card-footer .vote-widget {
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
+}
+
+.comment-card .card-footer .vote-widget,
+:host-context(body.light-theme) .comment-card .card-footer .vote-widget,
+:host-context(body.dark-theme) .comment-card .card-footer .vote-widget {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  padding: 3px !important;
+}
+
+.comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.light-theme) .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.dark-theme) .comment-card .card-footer .vote-widget .vote-btn {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+}
+
+.comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.light-theme) .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.dark-theme) .comment-card .card-footer .vote-widget .vote-val {
+  min-width: 26px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  text-align: center !important;
+}
+
+@media (max-width: 360px) {
+  .comment-card,
+  :host-context(body.light-theme) .comment-card,
+  :host-context(body.dark-theme) .comment-card {
+    padding: 10px 100px 12px 10px !important;
+  }
+
+  .comment-card .card-header .btn-more,
+  :host-context(body.light-theme) .comment-card .card-header .btn-more,
+  :host-context(body.dark-theme) .comment-card .card-header .btn-more {
+    right: 8px !important;
+  }
+
+.comment-card .card-footer,
+:host-context(body.light-theme) .comment-card .card-footer,
+:host-context(body.dark-theme) .comment-card .card-footer {
+  right: 8px !important;
+  top: 54px !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+}
 }

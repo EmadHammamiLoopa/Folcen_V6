@@ -856,6 +856,190 @@ ion-toggle{
     linear-gradient(180deg, #0b1020 0%, #111827 54%, #0b1020 100%) !important;
 }
 
+.comments-list ::ng-deep app-comment .comment-card .card-footer,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer {
+  top: 58px !important;
+  bottom: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget {
+  width: auto !important;
+  min-width: 82px !important;
+  max-width: 86px !important;
+  padding: 2px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  font-size: 11px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val {
+  display: block !important;
+  min-width: 22px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  line-height: 28px !important;
+  font-size: 0.72rem !important;
+}
+
+/* Absolute last parent rail rule: menu and vote do not collide. */
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget {
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  padding: 2px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  font-size: 11px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val {
+  display: block !important;
+  min-width: 28px !important;
+  height: 15px !important;
+  padding: 0 !important;
+  line-height: 15px !important;
+  font-size: 0.72rem !important;
+}
+
+/* Device pass: opened post and thread share one centered readable width. */
+.comments-page-container {
+  width: 100% !important;
+  max-width: 760px !important;
+  margin: 0 auto !important;
+  padding-left: clamp(10px, 3vw, 18px) !important;
+  padding-right: clamp(10px, 3vw, 18px) !important;
+}
+
+.post-detail-shell,
+.post-focus,
+.thread-section {
+  width: 100% !important;
+  max-width: 720px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.post-focus ::ng-deep app-post,
+.post-focus ::ng-deep app-post .jodel-card {
+  display: block !important;
+  width: 100% !important;
+  max-width: 720px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.thread-section {
+  padding: clamp(9px, 2.4vw, 14px) !important;
+}
+
+.comments-list {
+  gap: 10px !important;
+  padding-bottom: 28px !important;
+}
+
+/* Parent-level device override: keep comment menu visible and vote separate. */
+.comments-list ::ng-deep app-comment .comment-card,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
+  position: relative !important;
+  display: block !important;
+  padding: 12px 58px 14px 12px !important;
+  min-height: 96px !important;
+  overflow: hidden !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  min-height: 42px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header .btn-more,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .btn-more,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .btn-more {
+  position: absolute !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  top: 12px !important;
+  right: 10px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(15, 23, 42, 0.10) !important;
+  color: #334155 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 6 !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-body {
+  padding: 0 0 0 52px !important;
+  margin: 0 !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer {
+  position: absolute !important;
+  display: flex !important;
+  justify-content: center !important;
+  top: auto !important;
+  right: 10px !important;
+  bottom: 12px !important;
+  transform: none !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  z-index: 5 !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .interaction-group,
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget {
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+}
+
 :host-context(body.dark-theme) .thread-section {
   background: rgba(17, 24, 39, 0.82) !important;
   border-color: rgba(255, 255, 255, 0.10) !important;
@@ -1009,4 +1193,236 @@ ion-toggle{
 
 .comment-footer .text-input-container .comment-textarea {
   width: 100% !important;
+}
+
+/* Final mode-independent comment cards: readable colored cards in light and dark modes. */
+.comments-list ::ng-deep app-comment .comment-card.theme-0 {
+  background: linear-gradient(145deg, #8be9d8 0%, #d9fff7 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card.theme-1 {
+  background: linear-gradient(145deg, #c9b5ff 0%, #f0e9ff 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card.theme-2 {
+  background: linear-gradient(145deg, #ffaec6 0%, #ffeaf1 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card.theme-3 {
+  background: linear-gradient(145deg, #9bd0ff 0%, #e8f6ff 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card.theme-4 {
+  background: linear-gradient(145deg, #ffc96b 0%, #fff0cf 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card.theme-5 {
+  background: linear-gradient(145deg, #b7e66d 0%, #efffda 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card {
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .username,
+.comments-list ::ng-deep app-comment .comment-card .card-body .comment-text,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .username,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-body .comment-text,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .username,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-body .comment-text {
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .timestamp,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .timestamp,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .user-info .meta .timestamp {
+  color: #475569 !important;
+  opacity: 1 !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-header .btn-more,
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .btn-more,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-header .btn-more,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget {
+  background: rgba(255, 255, 255, 0.74) !important;
+  color: #334155 !important;
+  border-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+/* Device-final: align comment thread to the post width and keep light mode light. */
+.comments-page,
+:host-context(body.light-theme) .comments-page {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(99, 102, 241, 0.10), transparent 26%),
+    radial-gradient(circle at 92% 10%, rgba(20, 184, 166, 0.10), transparent 24%),
+    linear-gradient(180deg, #eef3ff 0%, #f8fbff 46%, #eef2f7 100%) !important;
+}
+
+.comments-page ion-content,
+:host-context(body.light-theme) .comments-page ion-content {
+  --background: transparent !important;
+}
+
+.post-detail-shell,
+.post-focus,
+.thread-section {
+  width: min(100%, 680px) !important;
+  max-width: 680px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.thread-section,
+:host-context(body.light-theme) .thread-section {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08) !important;
+}
+
+.comments-count-pill,
+:host-context(body.light-theme) .comments-count-pill {
+  margin: 0 0 10px !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+}
+
+.comments-list {
+  width: 100% !important;
+}
+
+.comments-list ::ng-deep app-comment {
+  display: block !important;
+  width: 100% !important;
+}
+
+.comments-list ::ng-deep app-comment.comment-theme-host {
+  border-radius: 22px !important;
+  overflow: hidden !important;
+}
+
+.comments-list ::ng-deep app-comment.comment-theme-host .comment-card {
+  background: inherit !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 1) .comment-card,
+.comments-list ::ng-deep app-comment .comment-card.theme-0 {
+  --comment-card-bg: linear-gradient(145deg, #8be9d8 0%, #d9fff7 100%) !important;
+  background: linear-gradient(145deg, #8be9d8 0%, #d9fff7 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 2) .comment-card,
+.comments-list ::ng-deep app-comment .comment-card.theme-1 {
+  --comment-card-bg: linear-gradient(145deg, #c9b5ff 0%, #f0e9ff 100%) !important;
+  background: linear-gradient(145deg, #c9b5ff 0%, #f0e9ff 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 3) .comment-card,
+.comments-list ::ng-deep app-comment .comment-card.theme-2 {
+  --comment-card-bg: linear-gradient(145deg, #ffaec6 0%, #ffeaf1 100%) !important;
+  background: linear-gradient(145deg, #ffaec6 0%, #ffeaf1 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 4) .comment-card,
+.comments-list ::ng-deep app-comment .comment-card.theme-3 {
+  --comment-card-bg: linear-gradient(145deg, #9bd0ff 0%, #e8f6ff 100%) !important;
+  background: linear-gradient(145deg, #9bd0ff 0%, #e8f6ff 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n + 5) .comment-card,
+.comments-list ::ng-deep app-comment .comment-card.theme-4 {
+  --comment-card-bg: linear-gradient(145deg, #ffc96b 0%, #fff0cf 100%) !important;
+  background: linear-gradient(145deg, #ffc96b 0%, #fff0cf 100%) !important;
+}
+
+.comments-list ::ng-deep app-comment:nth-child(6n) .comment-card,
+.comments-list ::ng-deep app-comment .comment-card.theme-5 {
+  --comment-card-bg: linear-gradient(145deg, #b7e66d 0%, #efffda 100%) !important;
+  background: linear-gradient(145deg, #b7e66d 0%, #efffda 100%) !important;
+}
+
+:host-context(body.dark-theme) .comments-page {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(124, 92, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 94% 16%, rgba(34, 211, 238, 0.12), transparent 24%),
+    linear-gradient(180deg, #0b1020 0%, #111827 54%, #0b1020 100%) !important;
+}
+
+/* Absolute last parent rail rule: menu and vote do not collide. */
+.comments-list ::ng-deep app-comment .comment-card,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
+  padding-right: 112px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer {
+  top: 56px !important;
+  right: 10px !important;
+  bottom: auto !important;
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget {
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
+  padding: 3px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-btn {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  font-size: 11px !important;
+}
+
+.comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val,
+:host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget .vote-val {
+  display: block !important;
+  min-width: 26px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  line-height: 28px !important;
+  font-size: 0.72rem !important;
+  text-align: center !important;
+}
+
+@media (max-width: 360px) {
+  .comments-list ::ng-deep app-comment .comment-card,
+  :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card,
+  :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
+    padding-right: 100px !important;
+  }
+
+  .comments-list ::ng-deep app-comment .comment-card .card-footer,
+  :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer,
+  :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer,
+  .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+  :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget,
+  :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer .vote-widget {
+    width: 88px !important;
+    min-width: 88px !important;
+    max-width: 88px !important;
+  }
 }

@@ -45,7 +45,7 @@
       <section class="thread-section">
         <div class="comments-count-pill">
           <i class="far fa-comment-dots"></i>
-          <span>{{ comments?.length || 0 }} {{ (comments?.length || 0) === 1 ? 'comment' : 'comments' }}</span>
+          <span>{{ visibleCommentTotal || 0 }} {{ (visibleCommentTotal || 0) === 1 ? 'comment' : 'comments' }}</span>
         </div>
 
         <div class="empty-comments-state" *ngIf="comments && !comments.length && !pageLoading">
@@ -60,7 +60,9 @@
 
         <div class="comments-list" *ngIf="comments && comments.length">
           <app-comment
+            class="comment-theme-host"
             [id]="'comment-' + comment.id"
+            [style.background]="getCommentTheme(ind).bg"
             (removeComment)="onRemoveComment(ind)"
             [backgroundColor]="post.backgroundColor"
             [color]="'#111827'"

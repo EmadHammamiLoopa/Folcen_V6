@@ -43,39 +43,40 @@ export class CommentsComponent implements OnInit, OnDestroy {
   mediaFile: File | null = null; // Store the selected media file
   mediaPreview: any = "";
   comments: Comment[] = [];
+  visibleCommentTotal = 0;
   private readonly commentThemes = [
     {
-      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.80), transparent 34%), linear-gradient(145deg, #dffcf6, #c8f7ee)',
+      bg: 'linear-gradient(145deg, #8be9d8 0%, #d9fff7 100%)',
       text: '#111827',
       muted: '#64748b',
       control: 'rgba(255, 255, 255, 0.62)'
     },
     {
-      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #eee7ff, #ddd4ff)',
+      bg: 'linear-gradient(145deg, #c9b5ff 0%, #f0e9ff 100%)',
       text: '#111827',
       muted: '#64748b',
       control: 'rgba(255, 255, 255, 0.62)'
     },
     {
-      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #ffe7ed, #ffd3df)',
+      bg: 'linear-gradient(145deg, #ffaec6 0%, #ffeaf1 100%)',
       text: '#111827',
       muted: '#64748b',
       control: 'rgba(255, 255, 255, 0.62)'
     },
     {
-      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #e1f3ff, #cde7ff)',
+      bg: 'linear-gradient(145deg, #9bd0ff 0%, #e8f6ff 100%)',
       text: '#111827',
       muted: '#64748b',
       control: 'rgba(255, 255, 255, 0.62)'
     },
     {
-      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #fff1d8, #ffe2b8)',
+      bg: 'linear-gradient(145deg, #ffc96b 0%, #fff0cf 100%)',
       text: '#111827',
       muted: '#64748b',
       control: 'rgba(255, 255, 255, 0.62)'
     },
     {
-      bg: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(145deg, #ecfbd7, #daf5b3)',
+      bg: 'linear-gradient(145deg, #b7e66d 0%, #efffda 100%)',
       text: '#111827',
       muted: '#64748b',
       control: 'rgba(255, 255, 255, 0.62)'
@@ -319,6 +320,11 @@ taggedUserIds: Set<string> = new Set();
             this.comments.push(new Comment().initialize(cmt));
           }
         });
+        const responseCount = Number(resp?.data?.count);
+        this.visibleCommentTotal = Number.isFinite(responseCount) ? responseCount : this.comments.length;
+        if (this.post) {
+          this.post.commentCount = this.visibleCommentTotal;
+        }
   
         this.pageLoading = false;
 
@@ -370,17 +376,17 @@ taggedUserIds: Set<string> = new Set();
       return;
     }
 
+    await this.captureCommentFromCamera();
+  }
+
+  async chooseCommentMediaSource() {
     const alert = await this.alertController.create({
       header: 'Add media',
       buttons: [
         {
           text: 'Gallery',
           handler: () => {
-            const input = this.mediaInput && this.mediaInput.nativeElement;
-            if (input) {
-              input.value = '';
-              input.click();
-            }
+            this.openGalleryInput();
           }
         },
         {
@@ -394,6 +400,15 @@ taggedUserIds: Set<string> = new Set();
       ]
     });
     await alert.present();
+  }
+
+  private openGalleryInput() {
+    const input = this.mediaInput && this.mediaInput.nativeElement;
+    if (input) {
+      input.removeAttribute('capture');
+      input.value = '';
+      input.click();
+    }
   }
 
   private async captureCommentFromCamera() {
@@ -463,7 +478,8 @@ isValidMedia(file: File): boolean {
       if (this.post) {
         const current = Array.isArray(this.post.comments) ? this.post.comments : [];
         this.post.comments = this.hasCommentContent(newComment) ? [newComment, ...current] : current;
-        this.post.commentCount = Number(this.post.commentCount || current.length) + 1;
+        this.visibleCommentTotal = Number(this.visibleCommentTotal || this.post.commentCount || current.length) + 1;
+        this.post.commentCount = this.visibleCommentTotal;
       }
       this.commentText = ""; // Reset the comment text
       this.mediaFile = null; // Reset the media file
@@ -500,7 +516,8 @@ onRemoveComment(index: number) {
     this.post.comments = this.post.comments.filter((_comment, ind) => ind !== index);
   }
   if (this.post) {
-    this.post.commentCount = Math.max(Number(this.post.commentCount || 0) - 1, this.comments.length);
+    this.visibleCommentTotal = Math.max(Number(this.visibleCommentTotal || this.post.commentCount || 0) - 1, this.comments.length);
+    this.post.commentCount = this.visibleCommentTotal;
   }
   // Additional logic if required
 }
