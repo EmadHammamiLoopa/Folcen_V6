@@ -39,6 +39,22 @@ export class Post{
     return isNaN(d.getTime()) ? null : d;
   }
 
+  private cleanMediaUrl(rawMedia: any): string {
+    const candidates = typeof rawMedia === 'string'
+      ? [rawMedia]
+      : [rawMedia?.url, rawMedia?.path, rawMedia?.src, rawMedia?.image, rawMedia?.photo];
+
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string') continue;
+      const clean = candidate.trim();
+      if (clean && clean !== 'undefined' && clean !== 'null' && clean !== '[object Object]') {
+        return clean;
+      }
+    }
+
+    return '';
+  }
+
   constructor(){
     this._media = { url: '', expiryDate: null };
     this._eventDate = null;
@@ -77,9 +93,10 @@ export class Post{
     this.anonymName = post.anonymName; // Initialize anonymName
     this.isOwner = post.isOwner;       // Initialize ownership
     this.visibility = post.visibility || 'public';
-    this.media = post.media ? {
-      url: post.media.url || '',
-      expiryDate: this.safeDate(post.media.expiryDate)
+    const cleanMediaUrl = this.cleanMediaUrl(post.media);
+    this.media = cleanMediaUrl ? {
+      url: cleanMediaUrl,
+      expiryDate: this.safeDate(post.media?.expiryDate)
     } : { url: '', expiryDate: null };
 
     this.deletedAt = this.safeDate(post.deletedAt);

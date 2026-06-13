@@ -96,8 +96,13 @@ export class CommentComponent implements OnInit, OnChanges, AfterViewInit {
     if (!Array.isArray(raw.avatar)) {
       raw.avatar = raw.avatar ? [raw.avatar] : [];
     }
-    if (!raw.mainAvatar && raw.avatar.length) {
-      raw.mainAvatar = raw.avatar[0];
+    const isUsableAvatar = (value: any) => {
+      const clean = typeof value === 'string' ? value.trim() : '';
+      return !!clean && clean !== 'undefined' && clean !== 'null' && clean !== '[object Object]';
+    };
+    if (!isUsableAvatar(raw.mainAvatar)) {
+      const firstAvatar = raw.avatar.find((avatar: any) => isUsableAvatar(avatar));
+      raw.mainAvatar = firstAvatar || '';
     }
     this.comment.user = raw;
   }

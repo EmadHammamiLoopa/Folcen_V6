@@ -105,6 +105,13 @@ export class User {
       payload.avatarVariant || '',
       payload.avatarOverrides ? JSON.stringify(payload.avatarOverrides) : '',
       payload.mainAvatar || '',
+      payload._mainAvatar || '',
+      payload.profilePhoto || '',
+      payload.profilePicture || '',
+      payload.photo || '',
+      payload.picture || '',
+      payload.image || '',
+      payload.avatarUrl ? JSON.stringify(payload.avatarUrl) : '',
       Array.isArray(payload.avatar) ? payload.avatar.join(',') : (payload.avatar || '')
     ].join('|');
     const videoRequests = payload.allowVideoRequestsFromNonFriends === false ? 'videoRequests:false' : 'videoRequests:true';
@@ -532,7 +539,17 @@ set peerId(peerId: string | null) {
 
   private normalizeStoredAvatarPath(avatarPath: any): string {
     if (avatarPath && typeof avatarPath === 'object') {
-      avatarPath = avatarPath.path || avatarPath.url || avatarPath.mainAvatar || avatarPath.src || '';
+      avatarPath = this.firstUsableAvatarValue([
+        avatarPath.path,
+        avatarPath.url,
+        avatarPath.mainAvatar,
+        avatarPath.profilePhoto,
+        avatarPath.profilePicture,
+        avatarPath.photo,
+        avatarPath.picture,
+        avatarPath.image,
+        avatarPath.src
+      ]);
     }
     if (!avatarPath || avatarPath === 'undefined' || avatarPath === 'null' || avatarPath === '[object Object]') return '';
     let path = String(avatarPath).trim();
@@ -553,6 +570,36 @@ set peerId(peerId: string | null) {
     }
 
     return path.split('?')[0].split('#')[0];
+  }
+
+  private firstUsableAvatarValue(values: any[]): any {
+    for (const value of values || []) {
+      if (Array.isArray(value)) {
+        const fromArray = this.firstUsableAvatarValue(value);
+        if (fromArray) return fromArray;
+        continue;
+      }
+      if (value && typeof value === 'object') {
+        const fromObject = this.firstUsableAvatarValue([
+          value.path,
+          value.url,
+          value.mainAvatar,
+          value.profilePhoto,
+          value.profilePicture,
+          value.photo,
+          value.picture,
+          value.image,
+          value.src
+        ]);
+        if (fromObject) return fromObject;
+        continue;
+      }
+      const clean = typeof value === 'string' ? value.trim() : '';
+      if (clean && clean !== 'undefined' && clean !== 'null' && clean !== '[object Object]') {
+        return clean;
+      }
+    }
+    return '';
   }
 
   public getMainAvatar(): string {
@@ -818,9 +865,22 @@ set peerId(peerId: string | null) {
     this._gender = user.gender || 'Not specified';
     this._address = user.address || '';
     this._aboutMe = user.aboutMe || '';
-    this.avatar = Array.isArray(user.avatar) ? this.filterCustomAvatars(user.avatar, user.gender) : [];
+    const avatarInput = Array.isArray(user.avatar)
+      ? user.avatar
+      : this.firstUsableAvatarValue([user.avatar]) ? [user.avatar] : [];
+    this.avatar = this.filterCustomAvatars(avatarInput, user.gender);
 
-    let mainAv = this.normalizeStoredAvatarPath(user.mainAvatar);
+    let mainAv = this.normalizeStoredAvatarPath(this.firstUsableAvatarValue([
+      user.mainAvatar,
+      user._mainAvatar,
+      user.profilePhoto,
+      user.profilePicture,
+      user.photo,
+      user.picture,
+      user.image,
+      user.avatarUrl,
+      avatarInput
+    ]));
     if (!mainAv || this.isOldDefaultAvatar(mainAv)) {
       this._mainAvatar = this.getDefaultAvatar(this._gender);
     } else {

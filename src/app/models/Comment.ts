@@ -23,6 +23,22 @@ export class Comment{
     return isNaN(d.getTime()) ? null : d;
   }
 
+  private cleanMediaUrl(rawMedia: any): string {
+    const candidates = typeof rawMedia === 'string'
+      ? [rawMedia]
+      : [rawMedia?.url, rawMedia?.path, rawMedia?.src, rawMedia?.image, rawMedia?.photo];
+
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string') continue;
+      const clean = candidate.trim();
+      if (clean && clean !== 'undefined' && clean !== 'null' && clean !== '[object Object]') {
+        return clean;
+      }
+    }
+
+    return '';
+  }
+
   constructor(){
 
     this._media = { url: '', expiryDate: null };
@@ -47,16 +63,7 @@ export class Comment{
 
     this.createdAt = this.safeDate(comment.createdAt) || new Date();
     const rawMedia = comment.media || {};
-    const rawMediaUrl = typeof rawMedia === 'string'
-      ? rawMedia
-      : (rawMedia.url || rawMedia.path || rawMedia.src || '');
-    const cleanMediaUrl = typeof rawMediaUrl === 'string'
-      && rawMediaUrl.trim()
-      && rawMediaUrl !== 'undefined'
-      && rawMediaUrl !== 'null'
-      && rawMediaUrl !== '[object Object]'
-      ? rawMediaUrl.trim()
-      : '';
+    const cleanMediaUrl = this.cleanMediaUrl(rawMedia);
     this.media = cleanMediaUrl ? {
       url: cleanMediaUrl,
       expiryDate: this.safeDate(rawMedia.expiryDate)

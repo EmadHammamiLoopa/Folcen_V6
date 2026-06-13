@@ -120,9 +120,21 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
 
   getMediaUrl(post: Post): string {
     if (!post || !post.media) return '';
-    if (post.media && post.media.url) {
-      const baseUrl = environment.socketUrl + '/';
-      const mediaUrl = baseUrl + post.media.url.replace(/\\/g, '/');
+    const rawUrl = post.media && post.media.url;
+    if (typeof rawUrl === 'string') {
+      const cleanUrl = rawUrl.trim();
+      if (!cleanUrl || cleanUrl === 'undefined' || cleanUrl === 'null' || cleanUrl === '[object Object]') {
+        return '';
+      }
+      if (cleanUrl.startsWith('http') || cleanUrl.startsWith('data:') || cleanUrl.startsWith('blob:')) {
+        return cleanUrl;
+      }
+      const normalizedPath = cleanUrl
+        .replace(/\\/g, '/')
+        .replace(/^.*\/uploads\//, 'uploads/')
+        .replace(/^public\/uploads\//, 'uploads/');
+      const baseUrl = environment.socketUrl.replace(/\/+$/, '') + '/';
+      const mediaUrl = baseUrl + normalizedPath.replace(/^\/+/, '');
       console.log("Generated Media URL:", mediaUrl);
       return mediaUrl;
     }

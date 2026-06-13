@@ -32,28 +32,44 @@ export class Channel {
     return !!normalized && normalized !== 'undefined' && normalized !== 'null' && normalized !== '[object Object]';
   }
 
+  private static pickPhotoCandidate(channel: any): string {
+    const candidates = [
+      channel?.photo,
+      channel?.image,
+      channel?.avatar,
+      channel?.cover,
+      channel?.picture,
+      channel?._photo
+    ];
+
+    for (const candidate of candidates) {
+      if (Channel.isUsablePhoto(candidate)) return candidate.trim();
+      if (candidate && typeof candidate === 'object') {
+        const nested = candidate.path || candidate.url || candidate.src || candidate.photo || candidate.image;
+        if (Channel.isUsablePhoto(nested)) return nested.trim();
+      }
+    }
+
+    return '';
+  }
+
+  private static normalizePhotoUrl(photo: string): string {
+    if (!Channel.isUsablePhoto(photo)) return 'assets/images/default-channel.png';
+    const baseUrl = constants.DOMAIN_URL;
+    return (photo.startsWith('http') || photo.startsWith('data:') || photo.startsWith('assets/'))
+      ? photo
+      : `${baseUrl}${photo.startsWith('/') ? '' : '/'}${photo}`;
+  }
+
   initialize(channel: Partial<Channel>) {
     const c = channel as any;
-    const baseUrl = constants.DOMAIN_URL;
     this._id = c.id ?? c['_id'] ?? '';
     this._name = c.name ?? '';
     this._description = c.description ?? '';
     this._approved = true;
 
     // Handle photo normalization in initialize as well
-    const photoData = c['photo'] || c['image'] || c['avatar'] || c['cover'] || c['picture'] || c['_photo'];
-    if (Channel.isUsablePhoto(photoData)) {
-      this._photo = (photoData.startsWith('http') || photoData.startsWith('assets/'))
-        ? photoData
-        : `${baseUrl}${photoData.startsWith('/') ? '' : '/'}${photoData}`;
-    } else if (typeof photoData === 'object' && photoData !== null && (photoData['path'] || photoData['url'])) {
-      const p = photoData['path'] || photoData['url'];
-      this._photo = Channel.isUsablePhoto(p)
-        ? (p.startsWith('http') || p.startsWith('assets/') ? p : `${baseUrl}${p.startsWith('/') ? '' : '/'}${p}`)
-        : 'assets/images/default-channel.png';
-    } else {
-      this._photo = 'assets/images/default-channel.png';
-    }
+    this._photo = Channel.normalizePhotoUrl(Channel.pickPhotoCandidate(c));
 
     // Normalize user: accept string id, populated object, or empty -> try fallbacks
     const uInit = c.user;
@@ -89,28 +105,13 @@ export class Channel {
   static createFromData(data: Partial<Channel>): Channel {
     const channel = new Channel();
     const d = data as any;
-    const baseUrl = constants.DOMAIN_URL;
 
     channel._id = d.id ?? d['_id'] ?? '';
     channel._name = d.name || '';
     channel._description = d.description || '';
     channel._approved = d.approved ?? true;
 
-    const photoData = d['photo'] || d['image'] || d['avatar'] || d['cover'] || d['picture'] || d['_photo'];
-    if (Channel.isUsablePhoto(photoData)) {
-      channel._photo = (photoData.startsWith('http') || photoData.startsWith('assets/'))
-        ? photoData
-        : `${baseUrl}${photoData.startsWith('/') ? '' : '/'}${photoData}`;
-    } else if (typeof photoData === 'object' && photoData !== null && (photoData['path'] || photoData['url'])) {
-      const path = photoData['path'] || photoData['url'];
-      channel._photo = Channel.isUsablePhoto(path)
-        ? (path.startsWith('http') || path.startsWith('assets/')
-          ? path
-          : `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`)
-        : 'assets/images/default-channel.png';
-    } else {
-      channel._photo = 'assets/images/default-channel.png'; // Fallback image
-    }
+    channel._photo = Channel.normalizePhotoUrl(Channel.pickPhotoCandidate(d));
 
     channel._createdAt = d.createdAt ? new Date(d.createdAt) : new Date();
     // Normalize user: can be string (id), populated object, or empty
@@ -223,7 +224,7 @@ export class Channel {
       return;
     }
     const baseUrl = constants.DOMAIN_URL;
-    this._photo = (photo.startsWith('http') || photo.startsWith('assets/'))
+    this._photo = (photo.startsWith('http') || photo.startsWith('data:') || photo.startsWith('assets/'))
       ? photo
       : `${baseUrl}${photo.startsWith('/') ? '' : '/'}${photo}`;
   }
