@@ -108,14 +108,14 @@ export class GuidedTourService {
       {
         id: 'welcome',
         title: 'Welcome to Folcen',
-        body: 'A quick tour, then the app is yours.',
+        body: 'A fast first lap through people, posts, privacy, calls, and your own style.',
         icon: 'sparkles-outline',
         route: '/tabs/new-friends'
       },
       {
         id: 'discover',
         title: 'Discover People',
-        body: 'Find new friends nearby and open profiles that feel worth knowing.',
+        body: 'Find nearby people, open real profiles, and build your circle at your pace.',
         icon: 'search-outline',
         route: '/tabs/new-friends',
         target: '[data-tour="tab-new-friends"]'
@@ -123,15 +123,15 @@ export class GuidedTourService {
       {
         id: 'profile',
         title: 'Your Profile',
-        body: 'Your photos, bio, privacy, and the way others meet you.',
+        body: 'This is how people meet you: photos, bio, friend status, and privacy.',
         icon: 'person-circle-outline',
         route: '/tabs/profile',
         target: '[data-tour="tab-profile"]'
       },
       {
         id: 'avatar-customize',
-        title: 'Make It Yours',
-        body: 'Upload photos or design a custom avatar with your own Folcen style.',
+        title: 'Make Your Look',
+        body: 'Use a real photo, create a custom avatar, or keep both ready for different moments.',
         icon: 'color-palette-outline',
         route: '/tabs/profile',
         target: '[data-tour="profile-avatar-tools"]'
@@ -139,7 +139,7 @@ export class GuidedTourService {
       {
         id: 'friends',
         title: 'Friends & Requests',
-        body: 'Accept requests, keep your circle close, and stay in control.',
+        body: 'Accept requests, manage friendships, and keep your social space intentional.',
         icon: 'people-outline',
         route: '/tabs/friends',
         target: '[data-tour="tab-friends"]'
@@ -147,23 +147,23 @@ export class GuidedTourService {
       {
         id: 'chat',
         title: 'Chat Instantly',
-        body: 'Messages live here, with real-time status when your friends reply.',
+        body: 'Message friends with clear delivery status and keep conversations easy to follow.',
         icon: 'chatbubbles-outline',
         route: '/tabs/messages/list',
         target: '[data-tour="tab-messages"]'
       },
       {
         id: 'calls',
-        title: 'Calls When It Matters',
-        body: 'Start video or audio calls from chat when both users can connect.',
+        title: 'Call With Context',
+        body: 'Friends can call directly. Non-friends use a request so calls stay wanted.',
         icon: 'videocam-outline',
         route: '/tabs/messages/list',
         target: '[data-tour="tab-messages"]'
       },
       {
         id: 'posts',
-        title: 'Posts & Channels',
-        body: 'Share updates and follow conversations from your community.',
+        title: 'Post Into Spaces',
+        body: 'Share text, temporary media, reactions, and comments inside the right channel.',
         icon: 'newspaper-outline',
         route: '/tabs/channels/list/followed',
         target: '[data-tour="tab-channels"]'
@@ -171,7 +171,7 @@ export class GuidedTourService {
       {
         id: 'explore-channels',
         title: 'Explore Channels',
-        body: 'Browse city, country, and global channels to find communities worth following.',
+        body: 'Browse local, country, global, dating, event, and community spaces.',
         icon: 'globe-outline',
         route: '/tabs/channels/list/followed',
         target: '[data-tour="channels-explore"]'
@@ -179,7 +179,7 @@ export class GuidedTourService {
       {
         id: 'follow-channel',
         title: 'Follow What You Like',
-        body: 'Open Explore to find channels first. Follow the ones you want in your feed.',
+        body: 'Follow channels to bring them into your feed. Unfollowed spaces stay in Explore.',
         icon: 'heart-outline',
         route: '/tabs/channels/list/explore',
         target: '[data-tour="channels-explore"]'
@@ -187,7 +187,7 @@ export class GuidedTourService {
       {
         id: 'create-channel',
         title: 'Create a Space',
-        body: 'Start your own channel for a topic, place, event, or local group.',
+        body: 'Start a channel for a place, event, topic, or small community.',
         icon: 'add-circle-outline',
         route: '/tabs/channels/list/mines',
         target: '[data-tour="channels-create"]'
@@ -195,29 +195,29 @@ export class GuidedTourService {
       {
         id: 'post-privacy',
         title: 'Post With Control',
-        body: 'Choose Public, Friends, or Private before you publish.',
+        body: 'Choose Public, Friends only, or Only me before your post goes live.',
         icon: 'eye-outline',
         route: '/tabs/channels/list/followed'
       },
       {
         id: 'anonymous-posts',
-        title: 'Anonymity When Needed',
-        body: 'Posts and comments can protect your identity when the moment calls for it.',
+        title: 'Anonymity When Useful',
+        body: 'Post or comment anonymously when the topic needs privacy, not pressure.',
         icon: 'person-circle-outline',
         route: '/tabs/channels/list/followed'
       },
       {
         id: 'feed',
-        title: 'The Feed',
-        body: 'A familiar stream for what friends and communities are sharing.',
+        title: 'Your Social Feed',
+        body: 'See friends, followed channels, mentions, and the activity most worth opening.',
         icon: 'albums-outline',
         route: '/tabs/feed',
         target: '[data-tour="tab-feed"]'
       },
       {
         id: 'notifications',
-        title: 'Never Miss a Beat',
-        body: 'Badges and alerts help you catch requests, messages, and calls.',
+        title: 'Important Alerts',
+        body: 'Notifications highlight messages, requests, mentions, missed calls, and replies.',
         icon: 'notifications-outline',
         route: '/tabs/profile',
         target: '[data-tour="tab-profile"]'
@@ -225,7 +225,7 @@ export class GuidedTourService {
       {
         id: 'privacy',
         title: 'Privacy Controls',
-        body: 'Tune profile privacy, video requests, blocked users, and who can see you.',
+        body: 'Tune age visibility, video request access, blocked users, and profile privacy.',
         icon: 'shield-checkmark-outline',
         route: '/tabs/profile/settings',
         target: '[data-tour="settings-privacy"]'

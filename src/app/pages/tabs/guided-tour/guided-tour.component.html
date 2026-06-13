@@ -1,32 +1,36 @@
 <div class="tour-root" *ngIf="active">
   <div class="tour-scrim"></div>
-  <div class="tour-aurora aurora-one"></div>
-  <div class="tour-aurora aurora-two"></div>
+  <div class="tour-grain"></div>
   <div class="tour-spotlight" *ngIf="spotlight" [ngStyle]="spotlightStyle"></div>
 
   <section [class]="cardClass" *ngIf="step">
-    <button type="button" class="skip-btn" (click)="skip()">Skip tour</button>
-
     <div class="tour-topline">
       <div class="tour-brand">
         <span class="brand-dot"></span>
         <span>Folcen Guide</span>
       </div>
-      <span class="step-count">{{ state.index + 1 }} / {{ state.steps.length }}</span>
+      <div class="tour-meta">
+        <span class="step-count">{{ state.index + 1 }} / {{ state.steps.length }}</span>
+        <button type="button" class="skip-btn" (click)="skip()">Skip</button>
+      </div>
     </div>
 
     <div class="tour-stage">
-      <div class="mini-phone" [class]="visualClass">
-        <div class="phone-top"></div>
-        <div class="phone-avatar">
+      <div class="feature-preview" [ngClass]="visualClass">
+        <div class="preview-head">
+          <span>{{ demoTitle }}</span>
           <ion-icon [name]="step.icon"></ion-icon>
         </div>
-        <div class="phone-lines">
-          <span></span>
-          <span></span>
-          <span></span>
+        <div class="preview-cardlet main">
+          <span class="avatar-chip"></span>
+          <div>
+            <strong>{{ chips[0] }}</strong>
+            <small>{{ chips[1] || stepLabel }}</small>
+          </div>
         </div>
-        <div class="phone-action"></div>
+        <div class="preview-rows">
+          <span *ngFor="let row of demoRows">{{ row }}</span>
+        </div>
       </div>
 
       <div class="tour-copy">
@@ -36,8 +40,11 @@
       </div>
     </div>
 
-    <div class="feature-chips">
-      <span *ngFor="let chip of chips">{{ chip }}</span>
+    <div class="detail-grid">
+      <span *ngFor="let item of details">
+        <ion-icon name="checkmark-circle"></ion-icon>
+        {{ item }}
+      </span>
     </div>
 
     <div class="progress-track">
@@ -49,7 +56,7 @@
         Back
       </ion-button>
       <ion-button class="next-btn" (click)="next()">
-        {{ state.index + 1 === state.steps.length ? 'Finish' : 'Next' }}
+        {{ primaryText }}
       </ion-button>
     </div>
   </section>
