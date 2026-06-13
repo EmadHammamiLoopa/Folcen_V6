@@ -145,8 +145,8 @@
   <!-- Media Preview -->
   <div *ngIf="mediaPreview" class="media-preview-container">
     <div class="preview-card">
-      <img *ngIf="mediaFile?.type.startsWith('image')" [src]="mediaPreview" alt="media preview" class="preview-img">
-      <video *ngIf="mediaFile?.type.startsWith('video')" class="preview-video">
+      <img *ngIf="isImageMedia()" [src]="mediaPreview" alt="media preview" class="preview-img">
+      <video *ngIf="isVideoMedia()" class="preview-video">
         <source [src]="mediaPreview" type="video/mp4">
       </video>
       <button class="remove-media-btn" (click)="removeMedia()">

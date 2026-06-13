@@ -39,8 +39,10 @@ export class CommentsComponent implements OnInit, OnDestroy {
   anonyme = false;
 
   commentText = "";
-  mediaFile: File | null = null; // Store the selected media file
+  mediaFile: File | Blob | null = null; // Store the selected media file
   mediaPreview: any = "";
+  private mediaFileName = '';
+  private mediaMimeType = '';
   comments: Comment[] = [];
   visibleCommentTotal = 0;
   showMediaSourceMenu = false;
@@ -365,6 +367,8 @@ taggedUserIds: Set<string> = new Set();
     console.log("Selected file type:", file.type); // Log the file type for debugging
     if (file && this.isValidMedia(file)) {
       this.mediaFile = file;
+      this.mediaFileName = file.name || `comment-media-${Date.now()}`;
+      this.mediaMimeType = this.getMediaType(file);
       // Sanitize the blob URL
       this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
     } else {
@@ -469,8 +473,10 @@ taggedUserIds: Set<string> = new Set();
       if (!context) throw new Error('Could not capture photo');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
-      const file = this.dataUrlToFile(dataUrl, `comment-${Date.now()}.jpg`, 'image/jpeg');
-      this.mediaFile = file;
+      const fileName = `comment-${Date.now()}.jpg`;
+      this.mediaFile = this.dataUrlToBlob(dataUrl, 'image/jpeg');
+      this.mediaFileName = fileName;
+      this.mediaMimeType = 'image/jpeg';
       this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(dataUrl);
       this.closeInlineCamera();
       this.changeDetectorRef.detectChanges();
@@ -522,9 +528,11 @@ taggedUserIds: Set<string> = new Set();
       }
       const dataUrl = pending.dataUrl || '';
       if (!dataUrl.startsWith('data:image/')) return;
-      const file = this.dataUrlToFile(dataUrl, pending.name || `comment-${Date.now()}.jpg`, pending.mimeType || 'image/jpeg');
-      this.mediaFile = file;
-      this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
+      const mimeType = pending.mimeType || 'image/jpeg';
+      this.mediaFile = this.dataUrlToBlob(dataUrl, mimeType);
+      this.mediaFileName = pending.name || `comment-${Date.now()}.jpg`;
+      this.mediaMimeType = mimeType;
+      this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(dataUrl);
       localStorage.removeItem('pendingCommentCameraMedia');
       localStorage.removeItem('pendingCommentCameraReturn');
       this.changeDetectorRef.detectChanges();
@@ -541,11 +549,34 @@ taggedUserIds: Set<string> = new Set();
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return new File([bytes], name, { type: mime });
   }
+
+  private dataUrlToBlob(dataUrl: string, fallbackMime: string): Blob {
+    const [meta, base64] = dataUrl.split(',');
+    const mime = /data:([^;]+)/.exec(meta || '')?.[1] || fallbackMime;
+    const binary = atob(base64 || '');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+
+  private getMediaType(file: any): string {
+    const type = file && typeof file.type === 'string' ? file.type : '';
+    return type || this.mediaMimeType || '';
+  }
+
+  isImageMedia(): boolean {
+    return this.getMediaType(this.mediaFile).toLowerCase().startsWith('image/');
+  }
+
+  isVideoMedia(): boolean {
+    return this.getMediaType(this.mediaFile).toLowerCase().startsWith('video/');
+  }
   
 
 // Validate file type (image/video)
 // Validate file type (image/video)
 isValidMedia(file: File): boolean {
+  const fileType = this.getMediaType(file);
   const allowedTypes = [
     'image/png',    // PNG images
     'image/jpeg',   // JPEG images
@@ -557,7 +588,7 @@ isValidMedia(file: File): boolean {
     'video/ogg',    // Ogg videos (optional)
     // Add more types if needed
   ];
-  return allowedTypes.includes(file.type);
+  return allowedTypes.includes(fileType);
 }
 
   storeComment() {
@@ -574,7 +605,7 @@ isValidMedia(file: File): boolean {
     Array.from(this.taggedUserIds).forEach(id => formData.append('mentionedUserIds[]', id));
   }
   if (this.mediaFile) {
-      formData.append('media', this.mediaFile);
+      formData.append('media', this.mediaFile, this.mediaFileName || `comment-${Date.now()}.jpg`);
   }
   formData.forEach((value, key) => {
       console.log(`FormData key: ${key}, value:`, value);
@@ -599,6 +630,8 @@ isValidMedia(file: File): boolean {
       this.commentText = ""; // Reset the comment text
       this.mediaFile = null; // Reset the media file
       this.mediaPreview = ""; // Clear media preview
+      this.mediaFileName = "";
+      this.mediaMimeType = "";
       this.taggedUserIds.clear();
       try {
         localStorage.removeItem('pendingCommentCameraMedia');
@@ -658,6 +691,8 @@ onHiddenComment(commentId: string) {
 removeMedia() {
   this.mediaFile = null;
   this.mediaPreview = ""; // Clear the preview UI (if any)
+  this.mediaFileName = "";
+  this.mediaMimeType = "";
   try {
     localStorage.removeItem('pendingCommentCameraMedia');
     localStorage.removeItem('pendingCommentCameraReturn');

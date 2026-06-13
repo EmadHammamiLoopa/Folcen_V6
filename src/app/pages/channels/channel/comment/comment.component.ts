@@ -159,9 +159,21 @@ export class CommentComponent implements OnInit, OnChanges, AfterViewInit {
   onMediaError() {
     this.mediaFailed = true;
     this.mediaUrl = '';
-    if (!this.comment?.text?.trim()) {
-      this.hiddenComment.emit(this.comment?.id || '');
-    }
+  }
+
+  hasCommentMedia(): boolean {
+    const rawUrl = this.comment?.media?.url;
+    return typeof rawUrl === 'string'
+      && !!rawUrl.trim()
+      && rawUrl.trim() !== 'undefined'
+      && rawUrl.trim() !== 'null'
+      && rawUrl.trim() !== '[object Object]';
+  }
+
+  hasRenderableContent(): boolean {
+    return !!(this.comment?.text && this.comment.text.trim())
+      || !!(this.mediaUrl && !this.mediaFailed)
+      || (this.hasCommentMedia() && this.mediaFailed);
   }
 
   // Function to calculate expiration progress
