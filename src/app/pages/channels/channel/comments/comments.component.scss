@@ -1359,12 +1359,13 @@ ion-toggle{
 :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card,
 :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
   padding-right: 112px !important;
+  min-height: 112px !important;
 }
 
 .comments-list ::ng-deep app-comment .comment-card .card-footer,
 :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer,
 :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card .card-footer {
-  top: 56px !important;
+  top: 68px !important;
   right: 10px !important;
   bottom: auto !important;
   width: 94px !important;
@@ -1413,6 +1414,7 @@ ion-toggle{
   :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card,
   :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
     padding-right: 100px !important;
+    min-height: 106px !important;
   }
 
   .comments-list ::ng-deep app-comment .comment-card .card-footer,
@@ -1424,5 +1426,6 @@ ion-toggle{
     width: 88px !important;
     min-width: 88px !important;
     max-width: 88px !important;
+    top: 62px !important;
   }
 }

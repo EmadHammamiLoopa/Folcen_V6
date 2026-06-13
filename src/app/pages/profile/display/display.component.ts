@@ -378,31 +378,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
         }
       } catch (e) { /* ignore decode errors */ }
   
-  const storedRaw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-  let storedUser: any = null;
-  try {
-    storedUser = storedRaw ? JSON.parse(storedRaw) : null;
-  } catch (e) {
-    // Sometimes nativeStorage returns a Buffer-like object serialized; attempt to recover
-    try {
-      const parsed = typeof storedRaw === 'string' ? JSON.parse(storedRaw) : null;
-      storedUser = parsed;
-    } catch (err) {
-      storedUser = null;
-    }
-  }
-  // If storedUser looks like a Buffer wrapper (e.g., { buffer: { data: [...] } }), decode it
-  if (storedUser && storedUser.buffer && Array.isArray(storedUser.buffer.data)) {
-    try {
-      const bytes = new Uint8Array(storedUser.buffer.data);
-      const decoded = new TextDecoder().decode(bytes);
-      const recovered = JSON.parse(decoded);
-      storedUser = recovered;
-      console.warn('Decoded Buffer-like stored user into object');
-    } catch (e) {
-      console.warn('Failed to decode Buffer-like stored user', e);
-    }
-  }
+      const storedUser = this.readCachedUserSync();
       if (!this.userId || this.userId === 'null') {
         if (storedUser && storedUser._id) {
           this.userId = storedUser._id;
@@ -410,8 +386,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
           console.log('Using stored userId:', this.userId);
           this.loadUserData();
         } else {
-          console.error('No user ID found in route or local storage');
-          this.getAuthUser();
+          this.loadCachedUserForOwnProfile();
         }
       } else {
         if (storedUser && storedUser._id === this.userId) {
@@ -424,6 +399,63 @@ export class DisplayComponent implements OnInit, OnDestroy {
         this.loadUserData();
       }
     });
+  }
+
+  private normalizeCachedUser(raw: any): any {
+    let storedUser = raw;
+    if (!storedUser) return null;
+    if (typeof storedUser === 'string') {
+      try { storedUser = JSON.parse(storedUser); } catch (e) { return null; }
+    }
+    if (storedUser && storedUser.buffer && Array.isArray(storedUser.buffer.data)) {
+      try {
+        const bytes = new Uint8Array(storedUser.buffer.data);
+        storedUser = JSON.parse(new TextDecoder().decode(bytes));
+      } catch (e) {
+        return null;
+      }
+    }
+    return storedUser && (storedUser._id || storedUser.id) ? storedUser : null;
+  }
+
+  private readCachedUserSync(): any {
+    const current = this.userService.currentUserValue;
+    if (current && (current._id || current.id)) return current;
+    const storedRaw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+    return this.normalizeCachedUser(storedRaw);
+  }
+
+  private async readCachedUserAsync(): Promise<any> {
+    const syncUser = this.readCachedUserSync();
+    if (syncUser) return syncUser;
+    if (!this.platform.is('cordova')) return null;
+    try {
+      let nativeUser: any = null;
+      try { nativeUser = await this.nativeStorage.getItem('currentUser'); } catch (e) {}
+      if (!nativeUser) {
+        try { nativeUser = await this.nativeStorage.getItem('user'); } catch (e) {}
+      }
+      return this.normalizeCachedUser(nativeUser);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private async loadCachedUserForOwnProfile() {
+    console.warn('No profile id in route/localStorage; trying NativeStorage/current user fallback');
+    const cachedUser = await this.readCachedUserAsync();
+    const id = cachedUser && (cachedUser._id || cachedUser.id);
+    if (id) {
+      this.userId = String(id);
+      this.myProfile = true;
+      this.user = new User().initialize(cachedUser);
+      this.mainAvatar = this.user.mainAvatarPath;
+      this.pageLoading = false;
+      this.changeDetectorRef.detectChanges();
+      this.loadUserData();
+      return;
+    }
+    this.getAuthUser();
   }
   
 
@@ -503,14 +535,14 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
   
   private processSelectedMedia(resp: any) {
-    let imageUrl = resp.imageData;
-  
-    if (this.platform.is('cordova')) {
-      imageUrl = this.webView.convertFileSrc(resp.imageData);
+    if (!resp?.file) {
+      console.error('Camera/gallery selection did not produce a file blob:', resp);
+      this.toastService.presentErrorToastr('Could not read the selected photo. Please try again.');
+      return;
     }
-  
-    const imageFile = new Blob([resp.file], { type: resp.file.type });
-    const imageName = resp.name || resp.file.name;
+
+    const imageFile = new Blob([resp.file], { type: resp.mimeType || resp.file.type || 'image/jpeg' });
+    const imageName = resp.name || resp.file.name || `avatar-${Date.now()}.jpg`;
   
     const formData = new FormData();
     formData.append('avatar', imageFile, imageName);
@@ -584,7 +616,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   openImagePicker() {
-    if (this.platform.is('cordova')) {
+    if (this.platform.is('cordova') || this.platform.is('capacitor') || this.platform.is('hybrid')) {
       // Native mobile: use existing uploadFile logic
       this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'image')
         .then(resp => this.processSelectedMedia(resp))
@@ -595,11 +627,46 @@ export class DisplayComponent implements OnInit, OnDestroy {
       input?.click();
     }
   }
+
+  async openAvatarMediaOptions() {
+    const alert = await this.alertCtrl.create({
+      header: 'Update avatar',
+      buttons: [
+        {
+          text: 'Camera',
+          handler: () => this.openCameraPicker()
+        },
+        {
+          text: 'Gallery',
+          handler: () => this.openImagePicker()
+        },
+        {
+          text: 'Customize avatar',
+          handler: () => this.openAvatarCustomize()
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        }
+      ]
+    });
+    await alert.present();
+  }
   
   
   openCameraPicker() {
+    try {
+      localStorage.setItem('pendingProfileCameraReturn', JSON.stringify({
+        userId: this.user?._id,
+        url: this.router.url,
+        at: Date.now()
+      }));
+    } catch (e) {}
     this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image')
-      .then(resp => this.processSelectedMedia(resp))
+      .then(resp => {
+        try { localStorage.removeItem('pendingProfileCameraReturn'); } catch (e) {}
+        this.processSelectedMedia(resp);
+      })
       .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
   }
   
@@ -1378,6 +1445,10 @@ export class DisplayComponent implements OnInit, OnDestroy {
 
   goBack() {
     this.location.back();
+  }
+
+  goToSafeProfileHome() {
+    this.router.navigateByUrl('/tabs/profile', { replaceUrl: true });
   }
 
   doRefresh(event: any) {

@@ -5,7 +5,7 @@ import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
 import { Post } from './../../../../models/Post';
 import { Channel } from 'src/app/models/Channel';
-import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { getCommentUserName } from './comment-utils';
@@ -95,7 +95,8 @@ export class CommentsComponent implements OnInit, OnDestroy {
     private events: AppEventsService,
     private uploadFile: UploadFileService,
     private camera: Camera,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private changeDetectorRef: ChangeDetectorRef
   ) { }
 
   ngOnInit() {
@@ -292,7 +293,7 @@ taggedUserIds: Set<string> = new Set();
     if (!event) this.pageLoading = true;
     if (refresh) this.page = 0;
   
-    this.channelService.getComments(this.post.id).then(
+    this.channelService.getComments(this.post.id, this.page).then(
       (resp: any) => {
         console.log(resp);
   
@@ -321,12 +322,15 @@ taggedUserIds: Set<string> = new Set();
           }
         });
         const responseCount = Number(resp?.data?.count);
-        this.visibleCommentTotal = Number.isFinite(responseCount) ? responseCount : this.comments.length;
+        this.visibleCommentTotal = this.comments.length;
         if (this.post) {
           this.post.commentCount = this.visibleCommentTotal;
         }
   
         this.pageLoading = false;
+        if (resp?.data?.more) {
+          this.page += 1;
+        }
 
         // Check for commentId in query params to scroll to it
         this.route.queryParamMap.subscribe(queryParams => {
@@ -376,7 +380,7 @@ taggedUserIds: Set<string> = new Set();
       return;
     }
 
-    await this.captureCommentFromCamera();
+    await this.chooseCommentMediaSource();
   }
 
   async chooseCommentMediaSource() {
@@ -413,6 +417,13 @@ taggedUserIds: Set<string> = new Set();
 
   private async captureCommentFromCamera() {
     try {
+      try {
+        localStorage.setItem('pendingCommentCameraReturn', JSON.stringify({
+          postId: this.post?.id,
+          channelId: this.channel?.id,
+          at: Date.now()
+        }));
+      } catch (e) {}
       const resp = await this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image');
       if (!resp?.file) {
         this.toastService.presentErrorToastr('Camera did not return a usable photo.');
@@ -423,6 +434,7 @@ taggedUserIds: Set<string> = new Set();
       });
       this.mediaFile = file;
       this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
+      try { localStorage.removeItem('pendingCommentCameraReturn'); } catch (e) {}
     } catch (err: any) {
       this.toastService.presentErrorToastr('Camera failed: ' + (err?.message || err));
     }
@@ -520,6 +532,18 @@ onRemoveComment(index: number) {
     this.post.commentCount = this.visibleCommentTotal;
   }
   // Additional logic if required
+}
+
+onHiddenComment(commentId: string) {
+  if (!commentId) return;
+  const before = this.comments.length;
+  this.comments = this.comments.filter(comment => String(comment.id) !== String(commentId));
+  if (before === this.comments.length) return;
+  this.visibleCommentTotal = this.comments.length;
+  if (this.post) {
+    this.post.commentCount = this.visibleCommentTotal;
+  }
+  this.changeDetectorRef.detectChanges();
 }
 
 

@@ -47,18 +47,29 @@ const publicUploadUrl = (file) => {
     return raw;
 };
 
-const visibleCommentContentQuery = {
+const visibleCommentContentQuery = () => ({
     $or: [
         { text: { $regex: /\S/ } },
         {
-            'media.url': {
-                $exists: true,
-                $regex: /\S/,
-                $nin: ['', null, 'undefined', 'null', '[object Object]']
-            }
+            $and: [
+                {
+                    'media.url': {
+                        $exists: true,
+                        $regex: /\S/,
+                        $nin: ['', null, 'undefined', 'null', '[object Object]']
+                    }
+                },
+                {
+                    $or: [
+                        { 'media.expiryDate': { $exists: false } },
+                        { 'media.expiryDate': null },
+                        { 'media.expiryDate': { $gt: new Date() } }
+                    ]
+                }
+            ]
         }
     ]
-};
+});
 
 
 exports.showComment = async (req, res) => {
@@ -509,7 +520,7 @@ exports.getComments = async (req, res) => {
             post: post._id,
             user: { $nin: disabledUserIds },
             deletedAt: null,
-            ...visibleCommentContentQuery
+            ...visibleCommentContentQuery()
         })
             .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides', 'User')
             .sort({ createdAt: -1 })
@@ -526,7 +537,7 @@ exports.getComments = async (req, res) => {
             post: post._id,
             user: { $nin: disabledUserIds },
             deletedAt: null,
-            ...visibleCommentContentQuery
+            ...visibleCommentContentQuery()
         }).exec();
 
         // Ensure the correct anonymous name is used for comments

@@ -28,18 +28,29 @@ const makeExcerpt = (text, max = 150) => {
     return truncated + '...';
 }
 
-const visibleCommentContentQuery = {
+const visibleCommentContentQuery = () => ({
     $or: [
         { text: { $regex: /\S/ } },
         {
-            'media.url': {
-                $exists: true,
-                $regex: /\S/,
-                $nin: ['', null, 'undefined', 'null', '[object Object]']
-            }
+            $and: [
+                {
+                    'media.url': {
+                        $exists: true,
+                        $regex: /\S/,
+                        $nin: ['', null, 'undefined', 'null', '[object Object]']
+                    }
+                },
+                {
+                    $or: [
+                        { 'media.expiryDate': { $exists: false } },
+                        { 'media.expiryDate': null },
+                        { 'media.expiryDate': { $gt: new Date() } }
+                    ]
+                }
+            ]
         }
     ]
-};
+});
 
 
 const multer = require('multer');
@@ -341,7 +352,7 @@ exports.getFeed = async (req, res) => {
                     $match: {
                         post: { $in: activePosts.map(post => post._id) },
                         deletedAt: null,
-                        ...visibleCommentContentQuery
+                        ...visibleCommentContentQuery()
                     }
                 },
                 { $group: { _id: '$post', count: { $sum: 1 } } }
@@ -945,7 +956,7 @@ exports.getPosts = async (req, res) => {
                 $match: {
                     post: { $in: validPostIds },
                     deletedAt: null,
-                    ...visibleCommentContentQuery
+                    ...visibleCommentContentQuery()
                 }
             },
             { $group: { _id: '$post', count: { $sum: 1 } } }

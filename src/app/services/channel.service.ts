@@ -187,10 +187,10 @@ export class ChannelService extends DataService {
 
   
 
-  getComments(id: string){
+  getComments(id: string, page: number = 0){
     return this.sendRequest({
       method: 'get',
-      url: '/post/' + id + '/comment'
+      url: '/post/' + id + '/comment?page=' + page
     })
   }
 

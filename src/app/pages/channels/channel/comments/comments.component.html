@@ -73,6 +73,7 @@
             [cardThemeIndex]="ind"
             [comment]="comment"
             [user]="user"
+            (hiddenComment)="onHiddenComment($event)"
             *ngFor="let comment of comments; let ind = index"
           ></app-comment>
         </div>

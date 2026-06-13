@@ -20,6 +20,7 @@ import constants from '../../../../helpers/constants';
 export class CommentComponent implements OnInit, OnChanges, AfterViewInit {
 
   @Output() removeComment = new EventEmitter();
+  @Output() hiddenComment = new EventEmitter<string>();
   @Input() comment: Comment;
   @Input() backgroundColor: string;
   @Input() color: string;
@@ -158,6 +159,9 @@ export class CommentComponent implements OnInit, OnChanges, AfterViewInit {
   onMediaError() {
     this.mediaFailed = true;
     this.mediaUrl = '';
+    if (!this.comment?.text?.trim()) {
+      this.hiddenComment.emit(this.comment?.id || '');
+    }
   }
 
   // Function to calculate expiration progress
