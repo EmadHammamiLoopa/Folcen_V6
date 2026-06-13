@@ -8,9 +8,9 @@ import { Channel } from 'src/app/models/Channel';
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
-import { getCommentUserName } from './comment-utils';
 import { DomSanitizer } from '@angular/platform-browser';
 import { AppEventsService } from 'src/app/services/app-events.service';
+import { UserService } from 'src/app/services/user.service';
 
 @Component({
   selector: 'app-comments',
@@ -49,6 +49,7 @@ export class CommentsComponent implements OnInit, OnDestroy {
   showInlineCamera = false;
   private inlineCameraStream: MediaStream | null = null;
   private capturingInlinePhoto = false;
+  private friendTagUsers: Array<{ name: string; id: string }> = [];
   private readonly commentThemes = [
     {
       bg: 'linear-gradient(145deg, #8be9d8 0%, #d9fff7 100%)',
@@ -98,6 +99,7 @@ export class CommentsComponent implements OnInit, OnDestroy {
     private nativeStorage: NativeStorage,
     private sanitizer: DomSanitizer,
     private events: AppEventsService,
+    private userService: UserService,
     private changeDetectorRef: ChangeDetectorRef
   ) { }
 
@@ -130,7 +132,10 @@ export class CommentsComponent implements OnInit, OnDestroy {
           try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) { /* ignore */ }
         }
         if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
-        if (u) this.user = new User().initialize(u);
+        if (u) {
+          this.user = new User().initialize(u);
+          this.loadFriendTagUsers();
+        }
         else this.fetchUserFromLocalStorage();
       } catch (error) {
         console.warn('Error fetching user data from NativeStorage:', error);
@@ -141,37 +146,101 @@ export class CommentsComponent implements OnInit, OnDestroy {
 
 
 
-  commentUserName(comment: Comment) {
-    return comment.anonymName || `${comment.user.firstName} ${comment.user.lastName}`;
-}
+  private idOf(value: any): string {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    return String(value._id || value.id || value.user || '');
+  }
 
-  
+  private currentUserId(): string {
+    return this.idOf(this.user);
+  }
+
+  private displayNameOfUser(value: any, fallback = ''): string {
+    if (!value) return fallback;
+    const first = value.firstName || value._firstName || '';
+    const last = value.lastName || value._lastName || '';
+    return String(value.fullName || value.name || `${first} ${last}`.trim() || fallback || '').trim();
+  }
+
+  private loadFriendTagUsers() {
+    if (!this.userService || !this.user) return;
+    this.userService.getFriends(0).subscribe(
+      (resp: any) => {
+        const rawFriends = Array.isArray(resp?.friends)
+          ? resp.friends
+          : (Array.isArray(resp?.data?.friends) ? resp.data.friends : (Array.isArray(resp?.data) ? resp.data : []));
+        this.friendTagUsers = this.normalizeFriendTagUsers(rawFriends);
+      },
+      () => {
+        this.friendTagUsers = this.extractFriendTagUsersFromCurrentUser();
+      }
+    );
+  }
+
+  private extractFriendTagUsersFromCurrentUser(): Array<{ name: string; id: string }> {
+    return this.normalizeFriendTagUsers((this.user as any)?.friends || []);
+  }
+
+  private normalizeFriendTagUsers(rawFriends: any[]): Array<{ name: string; id: string }> {
+    const currentId = this.currentUserId();
+    const seen = new Set<string>();
+    return (rawFriends || [])
+      .map(friend => ({
+        id: this.idOf(friend),
+        name: this.displayNameOfUser(friend)
+      }))
+      .filter(friend => {
+        if (!friend.id || !friend.name || friend.id === currentId || seen.has(friend.id)) return false;
+        seen.add(friend.id);
+        return true;
+      });
+  }
+
+  private addTaggableUser(map: Map<string, { name: string; id: string }>, id: any, name: any) {
+    const userId = this.idOf(id);
+    const currentId = this.currentUserId();
+    const cleanName = String(name || '').trim();
+    if (!userId || !cleanName || userId === currentId) return;
+    if (!map.has(userId)) {
+      map.set(userId, { id: userId, name: cleanName });
+    }
+  }
+
+  private participantName(comment: Comment): string {
+    if ((comment as any).anonyme) {
+      return (comment as any).anonymName || 'Anonymous';
+    }
+    return this.displayNameOfUser((comment as any).user);
+  }
+
+  commentUserName(comment: Comment) {
+    return this.participantName(comment);
+  }
+
   getTaggableUsers(): Array<{ name: string, id: string }> {
     const taggableUsersMap = new Map<string, { name: string, id: string }>();
-  
-    // Add the post author if not the current user
-    if (this.post && this.post.user._id !== this.user._id) {
-      const authorName = this.post.anonyme ? this.post.anonymName : `${this.post.user.firstName} ${this.post.user.lastName}`;
-      taggableUsersMap.set(`${this.post.user._id}-${this.post.anonyme}`, {
-        name: authorName,
-        id: this.post.user._id
-      });
+
+    if (this.post) {
+      const postUser = (this.post as any).user;
+      const authorName = (this.post as any).anonyme
+        ? ((this.post as any).anonymName || 'Anonymous')
+        : this.displayNameOfUser(postUser);
+      this.addTaggableUser(taggableUsersMap, postUser, authorName);
     }
-  
-    // Add the users from comments, considering both anonymous and real identities
+
     if (this.comments && this.comments.length > 0) {
       this.comments.forEach(comment => {
-        const identityKey = `${comment.user._id}-${comment.anonyme}`;
-        if (comment.user._id !== this.user._id && !taggableUsersMap.has(identityKey)) {
-          taggableUsersMap.set(identityKey, {
-            name: this.commentUserName(comment),
-            id: comment.user._id
-          });
-        }
+        this.addTaggableUser(taggableUsersMap, (comment as any).user, this.participantName(comment));
       });
     }
-  
-    // Convert the map values to an array and return
+
+    if (!this.anonyme) {
+      this.friendTagUsers.forEach(friend => this.addTaggableUser(taggableUsersMap, friend.id, friend.name));
+      this.extractFriendTagUsersFromCurrentUser()
+        .forEach(friend => this.addTaggableUser(taggableUsersMap, friend.id, friend.name));
+    }
+
     return Array.from(taggableUsersMap.values());
   }
   
@@ -205,6 +274,9 @@ onCommentInput(value: string) {
 }
 
 selectUser(user: { name: string; id: string }) {
+  const selectedId = this.idOf(user?.id);
+  const allowed = this.getTaggableUsers().some(taggableUser => taggableUser.id === selectedId);
+  if (!selectedId || selectedId === this.currentUserId() || !allowed) return;
   // Replace the trailing @query with @Name + space
   this.commentText = this.commentText.replace(/(?:^|\s)@([^\s@]*)$/, (full, _q, offset) => {
     const lead = offset === 0 ? '' : full[0];
@@ -212,10 +284,17 @@ selectUser(user: { name: string; id: string }) {
   });
   this.tagging = false;
   this.filteredTaggableUsers = [];
-  this.taggedUserIds.add(user.id);
+  this.taggedUserIds.add(selectedId);
 }
 
 taggedUserIds: Set<string> = new Set();
+
+onAnonymeChanged() {
+  this.tagging = false;
+  this.filteredTaggableUsers = [];
+  const allowedIds = new Set(this.getTaggableUsers().map(user => user.id));
+  this.taggedUserIds = new Set(Array.from(this.taggedUserIds).filter(id => allowedIds.has(id)));
+}
 
 
   private fetchUserFromLocalStorage() {
@@ -223,6 +302,7 @@ taggedUserIds: Set<string> = new Set();
   const user = raw ? JSON.parse(raw) : null;
     if (user) {
       this.user = new User().initialize(user);
+      this.loadFriendTagUsers();
     } else {
       console.log('User data not found in localStorage');
       // Handle the scenario where user data is not found
@@ -602,7 +682,10 @@ isValidMedia(file: File): boolean {
   formData.append('anonyme', this.anonyme.toString());
   // Send structured mention IDs so the backend doesn't have to guess from text.
   if (this.taggedUserIds && this.taggedUserIds.size) {
-    Array.from(this.taggedUserIds).forEach(id => formData.append('mentionedUserIds[]', id));
+    const allowedIds = new Set(this.getTaggableUsers().map(user => user.id));
+    Array.from(this.taggedUserIds)
+      .filter(id => allowedIds.has(id) && id !== this.currentUserId())
+      .forEach(id => formData.append('mentionedUserIds[]', id));
   }
   if (this.mediaFile) {
       formData.append('media', this.mediaFile, this.mediaFileName || `comment-${Date.now()}.jpg`);

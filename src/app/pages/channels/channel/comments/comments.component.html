@@ -194,7 +194,7 @@
     <div class="option-item">
       <ion-icon name="person-circle-outline"></ion-icon>
       <span>Comment anonymously</span>
-      <ion-toggle color="success" [(ngModel)]="anonyme"></ion-toggle>
+      <ion-toggle color="success" [(ngModel)]="anonyme" (ionChange)="onAnonymeChanged()"></ion-toggle>
     </div>
   </div>
 
