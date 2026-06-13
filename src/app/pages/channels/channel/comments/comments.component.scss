@@ -476,6 +476,258 @@
   }
 }
 
+.media-source-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  background: rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(6px);
+}
+
+.media-source-panel {
+  position: fixed;
+  left: 50%;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  z-index: 90;
+  width: min(calc(100% - 24px), 520px);
+  transform: translateX(-50%);
+  padding: 10px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(124, 92, 255, 0.16), transparent 34%),
+    radial-gradient(circle at 92% 10%, rgba(34, 211, 238, 0.14), transparent 34%),
+    rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 26px 80px rgba(15, 23, 42, 0.30);
+  animation: mediaSheetUp 180ms ease-out;
+
+  .sheet-handle {
+    width: 42px;
+    height: 5px;
+    margin: 2px auto 12px;
+    border-radius: 999px;
+    background: rgba(100, 116, 139, 0.28);
+  }
+
+  .sheet-copy {
+    padding: 0 10px 8px;
+
+    h3 {
+      margin: 0 0 4px;
+      color: #0f172a;
+      font-size: 1.18rem;
+      font-weight: 900;
+    }
+
+    p {
+      margin: 0;
+      color: #64748b;
+      font-size: 0.86rem;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+  }
+
+  .media-choice,
+  .media-cancel {
+    width: 100%;
+    border: 0;
+    font: inherit;
+  }
+
+  .media-choice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 66px;
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 20px;
+    background: rgba(248, 250, 252, 0.86);
+    color: #0f172a;
+    text-align: left;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+
+    &:active {
+      transform: scale(0.985);
+      background: #eef6ff;
+    }
+
+    .choice-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      border-radius: 16px;
+      color: #fff;
+      font-size: 22px;
+
+      &.gallery {
+        background: linear-gradient(135deg, #7c5cff, #22d3ee);
+      }
+
+      &.camera {
+        background: linear-gradient(135deg, #0f766e, #34d399);
+      }
+    }
+
+    strong,
+    small {
+      display: block;
+      letter-spacing: 0;
+    }
+
+    strong {
+      font-size: 0.98rem;
+      font-weight: 900;
+    }
+
+    small {
+      margin-top: 2px;
+      color: #64748b;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+  }
+
+  .media-cancel {
+    min-height: 48px;
+    margin-top: 8px;
+    border-radius: 18px;
+    background: rgba(100, 116, 139, 0.10);
+    color: #475569;
+    font-weight: 900;
+  }
+}
+
+.inline-camera-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 94;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.inline-camera-panel {
+  position: fixed;
+  left: 50%;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  z-index: 95;
+  width: min(calc(100% - 22px), 560px);
+  transform: translateX(-50%);
+  padding: 10px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(124, 92, 255, 0.20), transparent 34%),
+    radial-gradient(circle at 88% 8%, rgba(34, 211, 238, 0.18), transparent 36%),
+    rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.46);
+  animation: mediaSheetUp 180ms ease-out;
+}
+
+.inline-camera-top {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  min-height: 42px;
+  color: #f8fafc;
+
+  strong {
+    text-align: center;
+    font-size: 0.98rem;
+    font-weight: 900;
+  }
+}
+
+.inline-camera-close,
+.inline-camera-secondary,
+.inline-camera-capture {
+  border: 0;
+  font: inherit;
+}
+
+.inline-camera-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  color: #f8fafc;
+  font-size: 22px;
+}
+
+.inline-camera-frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  max-height: 62vh;
+  border-radius: 22px;
+  background: #020617;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.inline-camera-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #020617;
+}
+
+.inline-camera-actions {
+  display: grid;
+  grid-template-columns: 1fr 72px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px 2px;
+}
+
+.inline-camera-secondary {
+  justify-self: start;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  color: #e2e8f0;
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.inline-camera-capture {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c5cff, #22d3ee);
+  color: #ffffff;
+  font-size: 28px;
+  box-shadow: 0 14px 34px rgba(34, 211, 238, 0.28);
+
+  &:active {
+    transform: scale(0.94);
+  }
+}
+
+@keyframes mediaSheetUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 @media (max-height: 700px) {
   .comments-page-container {
     padding-bottom: 94px;
@@ -973,8 +1225,8 @@ ion-toggle{
 :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
   position: relative !important;
   display: block !important;
-  padding: 12px 58px 14px 12px !important;
-  min-height: 96px !important;
+  padding: 14px 58px 16px 12px !important;
+  min-height: 108px !important;
   overflow: hidden !important;
 }
 
@@ -1359,7 +1611,7 @@ ion-toggle{
 :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card,
 :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
   padding-right: 112px !important;
-  min-height: 112px !important;
+  min-height: 124px !important;
 }
 
 .comments-list ::ng-deep app-comment .comment-card .card-footer,
@@ -1414,7 +1666,7 @@ ion-toggle{
   :host-context(body.light-theme) .comments-list ::ng-deep app-comment .comment-card,
   :host-context(body.dark-theme) .comments-list ::ng-deep app-comment .comment-card {
     padding-right: 100px !important;
-    min-height: 106px !important;
+    min-height: 114px !important;
   }
 
   .comments-list ::ng-deep app-comment .comment-card .card-footer,

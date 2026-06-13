@@ -1,5 +1,5 @@
 import { User } from 'src/app/models/User';
-import { AlertController, IonInfiniteScroll } from '@ionic/angular';
+import { IonInfiniteScroll } from '@ionic/angular';
 import { Comment } from '../../../../models/Comment';
 import { ToastService } from './../../../../services/toast.service';
 import { ChannelService } from './../../../../services/channel.service';
@@ -11,8 +11,6 @@ import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { getCommentUserName } from './comment-utils';
 import { DomSanitizer } from '@angular/platform-browser';
 import { AppEventsService } from 'src/app/services/app-events.service';
-import { UploadFileService } from 'src/app/services/upload-file.service';
-import { Camera } from '@ionic-native/camera/ngx';
 
 @Component({
   selector: 'app-comments',
@@ -23,6 +21,7 @@ export class CommentsComponent implements OnInit, OnDestroy {
 
   @ViewChild('infinitScroll') infinitScroll!: IonInfiniteScroll;
   @ViewChild('mediaInput') mediaInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('cameraPreview') cameraPreview!: ElementRef<HTMLVideoElement>;
   @HostListener('document:click', ['$event'])
   onClickOutside(event: any) {
     if (!event.target.closest('.tag-dropdown')) {
@@ -44,6 +43,10 @@ export class CommentsComponent implements OnInit, OnDestroy {
   mediaPreview: any = "";
   comments: Comment[] = [];
   visibleCommentTotal = 0;
+  showMediaSourceMenu = false;
+  showInlineCamera = false;
+  private inlineCameraStream: MediaStream | null = null;
+  private capturingInlinePhoto = false;
   private readonly commentThemes = [
     {
       bg: 'linear-gradient(145deg, #8be9d8 0%, #d9fff7 100%)',
@@ -93,9 +96,6 @@ export class CommentsComponent implements OnInit, OnDestroy {
     private nativeStorage: NativeStorage,
     private sanitizer: DomSanitizer,
     private events: AppEventsService,
-    private uploadFile: UploadFileService,
-    private camera: Camera,
-    private alertController: AlertController,
     private changeDetectorRef: ChangeDetectorRef
   ) { }
 
@@ -114,6 +114,7 @@ export class CommentsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.stopInlineCamera();
     this.events.setShowTabs(true);
   }
 
@@ -232,6 +233,7 @@ taggedUserIds: Set<string> = new Set();
       params => {
         this.postId = params.get('id') || '';
         this.hydrateChannelFromRoute();
+        this.restorePendingCommentCameraMedia();
         this.getPost();
       }
     )
@@ -277,11 +279,15 @@ taggedUserIds: Set<string> = new Set();
       ? media.trim()
       : (typeof media?.url === 'string' ? media.url.trim() : '');
     const cleanMediaUrl = mediaUrl.toLowerCase();
+    const expiryRaw = typeof media === 'object' && media ? media.expiryDate : null;
+    const expiryTime = expiryRaw ? new Date(expiryRaw).getTime() : null;
+    const mediaExpired = Number.isFinite(expiryTime) && expiryTime <= Date.now();
     return !!text || (
       !!mediaUrl &&
       !cleanMediaUrl.includes('undefined') &&
       !cleanMediaUrl.includes('null') &&
-      mediaUrl !== '[object Object]'
+      mediaUrl !== '[object Object]' &&
+      !mediaExpired
     );
   }
 
@@ -384,60 +390,156 @@ taggedUserIds: Set<string> = new Set();
   }
 
   async chooseCommentMediaSource() {
-    const alert = await this.alertController.create({
-      header: 'Add media',
-      buttons: [
-        {
-          text: 'Gallery',
-          handler: () => {
-            this.openGalleryInput();
-          }
-        },
-        {
-          text: 'Camera',
-          handler: () => this.captureCommentFromCamera()
-        },
-        {
-          text: 'Cancel',
-          role: 'cancel'
-        }
-      ]
-    });
-    await alert.present();
+    this.showMediaSourceMenu = true;
+  }
+
+  closeMediaSourceMenu() {
+    this.showMediaSourceMenu = false;
+  }
+
+  selectCommentMediaSource(source: 'gallery' | 'camera') {
+    this.closeMediaSourceMenu();
+    if (source === 'gallery') {
+      this.openGalleryInput();
+      return;
+    }
+    this.openInlineCamera();
   }
 
   private openGalleryInput() {
     const input = this.mediaInput && this.mediaInput.nativeElement;
     if (input) {
+      input.setAttribute('accept', 'image/*,video/*');
       input.removeAttribute('capture');
       input.value = '';
       input.click();
     }
   }
 
-  private async captureCommentFromCamera() {
+  private openCameraInput() {
+    const input = this.mediaInput && this.mediaInput.nativeElement;
+    if (input) {
+      input.setAttribute('accept', 'image/*');
+      input.setAttribute('capture', 'environment');
+      input.value = '';
+      input.click();
+    }
+  }
+
+  async openInlineCamera() {
+    this.showInlineCamera = true;
+    this.changeDetectorRef.detectChanges();
     try {
-      try {
-        localStorage.setItem('pendingCommentCameraReturn', JSON.stringify({
-          postId: this.post?.id,
-          channelId: this.channel?.id,
-          at: Date.now()
-        }));
-      } catch (e) {}
-      const resp = await this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image');
-      if (!resp?.file) {
-        this.toastService.presentErrorToastr('Camera did not return a usable photo.');
-        return;
-      }
-      const file = new File([resp.file], resp.name || `comment-${Date.now()}.jpg`, {
-        type: resp.mimeType || resp.file.type || 'image/jpeg'
+      this.inlineCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
       });
-      this.mediaFile = file;
-      this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
-      try { localStorage.removeItem('pendingCommentCameraReturn'); } catch (e) {}
+      await new Promise(resolve => setTimeout(resolve, 80));
+      if (this.cameraPreview?.nativeElement) {
+        this.cameraPreview.nativeElement.srcObject = this.inlineCameraStream;
+        await this.cameraPreview.nativeElement.play().catch(() => {});
+      }
     } catch (err: any) {
+      this.showInlineCamera = false;
+      this.stopInlineCamera();
       this.toastService.presentErrorToastr('Camera failed: ' + (err?.message || err));
     }
+  }
+
+  async captureInlineCameraPhoto() {
+    if (this.capturingInlinePhoto) return;
+    this.capturingInlinePhoto = true;
+    try {
+      const video = this.cameraPreview?.nativeElement;
+      if (!video) {
+        this.toastService.presentErrorToastr('Camera is not ready yet.');
+        return;
+      }
+      await this.waitForInlineVideoReady(video);
+      const width = video.videoWidth || Math.round(video.clientWidth * (window.devicePixelRatio || 1));
+      const height = video.videoHeight || Math.round(video.clientHeight * (window.devicePixelRatio || 1));
+      if (!width || !height) {
+        this.toastService.presentErrorToastr('Camera is not ready yet.');
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Could not capture photo');
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
+      const file = this.dataUrlToFile(dataUrl, `comment-${Date.now()}.jpg`, 'image/jpeg');
+      this.mediaFile = file;
+      this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(dataUrl);
+      this.closeInlineCamera();
+      this.changeDetectorRef.detectChanges();
+    } catch (e) {
+      this.toastService.presentErrorToastr('Camera failed: ' + (e?.message || e));
+    } finally {
+      this.capturingInlinePhoto = false;
+    }
+  }
+
+  private async waitForInlineVideoReady(video: HTMLVideoElement) {
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      if (video.videoWidth && video.videoHeight) return;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  closeInlineCamera() {
+    this.showInlineCamera = false;
+    this.stopInlineCamera();
+  }
+
+  private stopInlineCamera() {
+    if (this.inlineCameraStream) {
+      this.inlineCameraStream.getTracks().forEach(track => track.stop());
+      this.inlineCameraStream = null;
+    }
+  }
+
+  private safeSerializeChannel() {
+    try {
+      return this.channel && typeof (this.channel as any).toObject === 'function'
+        ? (this.channel as any).toObject()
+        : this.channel;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private restorePendingCommentCameraMedia() {
+    try {
+      const raw = localStorage.getItem('pendingCommentCameraMedia');
+      if (!raw) return;
+      const pending = JSON.parse(raw);
+      if (!pending?.postId || String(pending.postId) !== String(this.postId)) return;
+      if (pending.at && Date.now() - Number(pending.at) > 10 * 60 * 1000) {
+        localStorage.removeItem('pendingCommentCameraMedia');
+        return;
+      }
+      const dataUrl = pending.dataUrl || '';
+      if (!dataUrl.startsWith('data:image/')) return;
+      const file = this.dataUrlToFile(dataUrl, pending.name || `comment-${Date.now()}.jpg`, pending.mimeType || 'image/jpeg');
+      this.mediaFile = file;
+      this.mediaPreview = this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(file));
+      localStorage.removeItem('pendingCommentCameraMedia');
+      localStorage.removeItem('pendingCommentCameraReturn');
+      this.changeDetectorRef.detectChanges();
+    } catch (e) {
+      console.warn('[comments] failed to restore pending camera media', e);
+    }
+  }
+
+  private dataUrlToFile(dataUrl: string, name: string, fallbackMime: string): File {
+    const [meta, base64] = dataUrl.split(',');
+    const mime = /data:([^;]+)/.exec(meta || '')?.[1] || fallbackMime;
+    const binary = atob(base64 || '');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new File([bytes], name, { type: mime });
   }
   
 
@@ -484,19 +586,24 @@ isValidMedia(file: File): boolean {
 
       // Successfully added the comment
       const newComment = new Comment().initialize(resp.data);
-      if (this.hasCommentContent(newComment)) {
+      const shouldShowComment = this.hasCommentContent(newComment);
+      if (shouldShowComment) {
         this.comments.unshift(newComment);
       }
       if (this.post) {
         const current = Array.isArray(this.post.comments) ? this.post.comments : [];
-        this.post.comments = this.hasCommentContent(newComment) ? [newComment, ...current] : current;
-        this.visibleCommentTotal = Number(this.visibleCommentTotal || this.post.commentCount || current.length) + 1;
+        this.post.comments = shouldShowComment ? [newComment, ...current] : current;
+        this.visibleCommentTotal = this.comments.length;
         this.post.commentCount = this.visibleCommentTotal;
       }
       this.commentText = ""; // Reset the comment text
       this.mediaFile = null; // Reset the media file
       this.mediaPreview = ""; // Clear media preview
       this.taggedUserIds.clear();
+      try {
+        localStorage.removeItem('pendingCommentCameraMedia');
+        localStorage.removeItem('pendingCommentCameraReturn');
+      } catch (e) {}
 
       this.toastService.presentSuccessToastr('Comment added successfully.');
     },
@@ -551,6 +658,10 @@ onHiddenComment(commentId: string) {
 removeMedia() {
   this.mediaFile = null;
   this.mediaPreview = ""; // Clear the preview UI (if any)
+  try {
+    localStorage.removeItem('pendingCommentCameraMedia');
+    localStorage.removeItem('pendingCommentCameraReturn');
+  } catch (e) {}
   this.toastService.presentSuccessToastr('Media file removed.');
 }
 

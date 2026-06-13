@@ -1690,8 +1690,8 @@
 :host-context(body.dark-theme) .comment-card {
   position: relative !important;
   display: block !important;
-  padding: 16px 112px 18px 14px !important;
-  min-height: 112px !important;
+  padding: 18px 112px 20px 14px !important;
+  min-height: 124px !important;
   overflow: hidden !important;
 }
 
@@ -1786,7 +1786,7 @@
   :host-context(body.light-theme) .comment-card,
   :host-context(body.dark-theme) .comment-card {
     padding: 14px 100px 16px 12px !important;
-    min-height: 106px !important;
+    min-height: 114px !important;
   }
 
   .comment-card .card-header .btn-more,

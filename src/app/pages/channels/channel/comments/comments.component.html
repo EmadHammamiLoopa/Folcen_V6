@@ -91,6 +91,56 @@
 
 </ion-content>
 
+<div class="media-source-backdrop" *ngIf="showMediaSourceMenu" (click)="closeMediaSourceMenu()"></div>
+<section class="media-source-panel" *ngIf="showMediaSourceMenu" role="dialog" aria-label="Add media">
+  <div class="sheet-handle"></div>
+  <div class="sheet-copy">
+    <h3>Add media</h3>
+    <p>Attach something to your comment. Photos stay temporary for 24 hours.</p>
+  </div>
+  <button type="button" class="media-choice" (click)="selectCommentMediaSource('gallery')">
+    <span class="choice-icon gallery"><ion-icon name="images-outline"></ion-icon></span>
+    <span>
+      <strong>Gallery</strong>
+      <small>Pick an existing photo or video</small>
+    </span>
+  </button>
+  <button type="button" class="media-choice" (click)="selectCommentMediaSource('camera')">
+    <span class="choice-icon camera"><ion-icon name="camera-outline"></ion-icon></span>
+    <span>
+      <strong>Camera</strong>
+      <small>Take a new photo now</small>
+    </span>
+  </button>
+  <button type="button" class="media-cancel" (click)="closeMediaSourceMenu()">Cancel</button>
+</section>
+
+<div class="inline-camera-backdrop" *ngIf="showInlineCamera"></div>
+<section class="inline-camera-panel" *ngIf="showInlineCamera" role="dialog" aria-label="Take photo">
+  <div class="inline-camera-top">
+    <button type="button" class="inline-camera-close" (click)="closeInlineCamera()" aria-label="Close camera">
+      <ion-icon name="close-outline"></ion-icon>
+    </button>
+    <strong>Take photo</strong>
+    <span></span>
+  </div>
+  <div class="inline-camera-frame" (click)="captureInlineCameraPhoto()">
+    <video #cameraPreview class="inline-camera-video" autoplay playsinline muted></video>
+  </div>
+  <div class="inline-camera-actions">
+    <button type="button" class="inline-camera-secondary" (click)="closeInlineCamera()">Cancel</button>
+    <button
+      type="button"
+      class="inline-camera-capture"
+      (click)="$event.preventDefault(); $event.stopPropagation(); captureInlineCameraPhoto()"
+      (pointerup)="$event.preventDefault(); $event.stopPropagation(); captureInlineCameraPhoto()"
+      aria-label="Capture photo"
+    >
+      <ion-icon name="camera"></ion-icon>
+    </button>
+  </div>
+</section>
+
 <ion-footer class="comment-footer" *ngIf="!postError">
   <!-- Media Preview -->
   <div *ngIf="mediaPreview" class="media-preview-container">
