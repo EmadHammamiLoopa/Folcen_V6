@@ -15,6 +15,7 @@ const { destroyComment } = require("./CommentController");
 const Response = require("./Response");
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
 const logger = require('../utils/logger');
+const mediaStore = require('../utils/mediaStore');
 
 // Create a short excerpt like Facebook: cut at word boundary and append ellipsis
 const makeExcerpt = (text, max = 150) => {
@@ -67,6 +68,16 @@ const storage = multer.diskStorage({
 
 // Create an upload instance with the storage settings
 const upload = multer({ storage: storage });
+
+const publicUploadUrl = (file) => {
+    if (!file) return '';
+    if (file.filename) return `/uploads/${file.filename}`;
+    const raw = String(file.path || '').replace(/\\/g, '/');
+    const idx = raw.lastIndexOf('/uploads/');
+    if (idx >= 0) return raw.slice(idx);
+    if (raw.startsWith('uploads/')) return `/${raw}`;
+    return raw;
+};
 
 
 
@@ -718,8 +729,19 @@ exports.storePost = async (req, res) => {
             
             // If media is uploaded, attach it to the post
             if (req.file) {
+                const mediaUrl = publicUploadUrl(req.file);
+                try {
+                    await mediaStore.saveFile({
+                        filePath: req.file.path,
+                        publicPath: mediaUrl,
+                        contentType: req.file.mimetype,
+                        metadata: { type: 'post', userId: String(req.auth._id), channelId: String(req.channel._id) }
+                    });
+                } catch (error) {
+                    logger.warn('Post media durable save failed:', error);
+                }
                 post.media = {
-                    url: req.file.path, // Store the file path
+                    url: mediaUrl, // Stable public URL; DB fallback preserves new uploads across restarts.
                     expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Set a 24-hour expiry for the media
                 };
                 console.log('Media attached to post:', post.media);

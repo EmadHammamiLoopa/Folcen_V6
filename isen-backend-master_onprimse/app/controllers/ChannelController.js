@@ -11,6 +11,7 @@ const Post = require("../models/Post");
 const { destroyPost } = require("./PostController")
 const User = require("../models/User")
 const Comment = require("../models/Comment")
+const mediaStore = require("../utils/mediaStore")
 
 
 
@@ -38,6 +39,16 @@ const storeChannelPhoto = async (req, channel) => {
             }
             channel.photo.path = `/channels/${photoName}`;
             channel.photo.format = 'png';
+            try {
+                await mediaStore.saveFile({
+                    filePath: photoPath,
+                    publicPath: channel.photo.path,
+                    contentType: photo.type || photo.mimetype || 'image/png',
+                    metadata: { type: 'channel', channelId: String(channel._id) }
+                });
+            } catch (error) {
+                console.warn('Channel photo durable save failed:', error);
+            }
         } else if (req.fields.photo && typeof req.fields.photo === 'string' && req.fields.photo.startsWith('data:image')) {
             const base64Data = req.fields.photo.replace(/^data:image\/\w+;base64,/, "");
             const buffer = Buffer.from(base64Data, 'base64');
@@ -52,6 +63,16 @@ const storeChannelPhoto = async (req, channel) => {
             }
             channel.photo.path = `/channels/${photoName}`;
             channel.photo.format = 'png';
+            try {
+                await mediaStore.saveBuffer({
+                    buffer,
+                    publicPath: channel.photo.path,
+                    contentType: 'image/png',
+                    metadata: { type: 'channel', channelId: String(channel._id) }
+                });
+            } catch (error) {
+                console.warn('Channel photo durable save failed:', error);
+            }
         } else {
             if (!channel.photo || typeof channel.photo !== 'object') {
                 channel.photo = {};

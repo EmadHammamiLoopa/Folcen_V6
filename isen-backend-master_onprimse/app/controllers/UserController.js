@@ -27,6 +27,7 @@ const { isUserOnline, connectedUsers } = require("../utils/socketManager");
 const tokenBlacklist = require('../utils/tokenBlacklist');
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
+const mediaStore = require('../utils/mediaStore');
 
 exports.resetBudget = async (req, res) => {
     try {
@@ -640,6 +641,17 @@ exports.uploadChatMedia = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
 
+        try {
+            await mediaStore.saveFile({
+                filePath: req.file.path,
+                publicPath: req.savedChatPath,
+                contentType: req.file.mimetype,
+                metadata: { type: 'chat', userId: String(req.params.userId || '') }
+            });
+        } catch (error) {
+            logger.warn('Chat media durable save failed:', error);
+        }
+
         // File uploaded successfully
         const chatFileUrl = `${req.protocol}://${req.get('host')}${req.savedChatPath}`;
 
@@ -1154,8 +1166,20 @@ exports.storeAvatar = async (avatar, user) => {
             }
         }
 
-        // Update the user object with the new avatar path
-        const newAvatarPath = `/public/uploads/${avatarName}`;
+        // Update the user object with a stable public path. The file is also
+        // mirrored into MongoDB so Railway restarts do not lose new uploads.
+        const newAvatarPath = `/uploads/${avatarName}`;
+        try {
+            await mediaStore.saveFile({
+                filePath: avatarPath,
+                publicPath: newAvatarPath,
+                contentType: avatar.mimetype || avatar.type,
+                metadata: { type: 'avatar', userId: String(user._id) }
+            });
+        } catch (error) {
+            logger.warn('Avatar durable save failed:', error);
+        }
+
         user.mainAvatar = newAvatarPath;
         if (!user.avatar.includes(newAvatarPath)) {
             user.avatar.push(newAvatarPath);

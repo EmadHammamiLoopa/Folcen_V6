@@ -9,6 +9,7 @@ const Response = require("./Response")
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
+const mediaStore = require('../utils/mediaStore');
 
 // excerpt helper
 const makeExcerpt = (text, max = 150) => {
@@ -292,7 +293,20 @@ exports.storeComment = async (req, res) => {
                     moderationStatus: req.body.moderationStatus || 'approved'
                 });
 
-                if (req.file) comment.media = { url: publicUploadUrl(req.file), expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000) };
+                if (req.file) {
+                    const mediaUrl = publicUploadUrl(req.file);
+                    try {
+                        await mediaStore.saveFile({
+                            filePath: req.file.path,
+                            publicPath: mediaUrl,
+                            contentType: req.file.mimetype,
+                            metadata: { type: 'comment', userId: String(req.auth._id), postId: String(post._id) }
+                        });
+                    } catch (error) {
+                        logger.warn('Comment media durable save failed:', error);
+                    }
+                    comment.media = { url: mediaUrl, expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000) };
+                }
 
                 const savedComment = await comment.save();
 

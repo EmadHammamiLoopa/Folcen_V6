@@ -441,12 +441,17 @@ try {
 }
 // Serve uploads from both modern and legacy locations.
 // New avatar uploads are written under public/uploads, while older post media can still be in uploads/.
+const mediaStore = require('./app/utils/mediaStore');
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', mediaStore.serveFallback());
+app.use('/public/uploads', mediaStore.serveFallback());
 app.use('/public/images/avatars', express.static(path.join(__dirname, 'public/images/avatars')));
 app.use('/channels', express.static(path.join(__dirname, 'public/channels')));
+app.use('/channels', mediaStore.serveFallback());
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/upload_chat', express.static(path.join(__dirname, 'public/upload_chat')));
+app.use('/upload_chat', mediaStore.serveFallback());
 
 
 
