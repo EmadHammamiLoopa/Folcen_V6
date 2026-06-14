@@ -121,6 +121,14 @@ export class GuidedTourService {
         target: '[data-tour="tab-new-friends"]'
       },
       {
+        id: 'search',
+        title: 'Search Everything',
+        body: 'Find people, channels, posts, and profiles without digging through the app.',
+        icon: 'search-circle-outline',
+        route: '/tabs/new-friends',
+        target: '[data-tour="tab-new-friends"]'
+      },
+      {
         id: 'profile',
         title: 'Your Profile',
         body: 'This is how people meet you: photos, bio, friend status, and privacy.',
@@ -130,8 +138,8 @@ export class GuidedTourService {
       },
       {
         id: 'avatar-customize',
-        title: 'Make Your Look',
-        body: 'Use a real photo, create a custom avatar, or keep both ready for different moments.',
+        title: 'Customize Your Look',
+        body: 'Add a photo, open the avatar studio, and shape a profile that still works when photos are missing.',
         icon: 'color-palette-outline',
         route: '/tabs/profile',
         target: '[data-tour="profile-avatar-tools"]'
@@ -153,6 +161,14 @@ export class GuidedTourService {
         target: '[data-tour="tab-messages"]'
       },
       {
+        id: 'chat-media',
+        title: 'Send Media Carefully',
+        body: 'Use gallery or camera moments in conversations and comments when the story needs a photo.',
+        icon: 'camera-outline',
+        route: '/tabs/messages/list',
+        target: '[data-tour="tab-messages"]'
+      },
+      {
         id: 'calls',
         title: 'Call With Context',
         body: 'Friends can call directly. Non-friends use a request so calls stay wanted.',
@@ -165,6 +181,22 @@ export class GuidedTourService {
         title: 'Post Into Spaces',
         body: 'Share text, temporary media, reactions, and comments inside the right channel.',
         icon: 'newspaper-outline',
+        route: '/tabs/channels/list/followed',
+        target: '[data-tour="tab-channels"]'
+      },
+      {
+        id: 'comments-reactions',
+        title: 'React, Vote, Discuss',
+        body: 'Open posts for the full discussion, add clean reactions, and vote without losing the thread.',
+        icon: 'chatbubble-ellipses-outline',
+        route: '/tabs/channels/list/followed',
+        target: '[data-tour="tab-channels"]'
+      },
+      {
+        id: 'tagging',
+        title: 'Mention Friends',
+        body: 'Tag friends in normal posts and comments. Anonymous moments keep identity protected.',
+        icon: 'at-circle-outline',
         route: '/tabs/channels/list/followed',
         target: '[data-tour="tab-channels"]'
       },

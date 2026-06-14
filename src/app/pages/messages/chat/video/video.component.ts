@@ -430,12 +430,11 @@ async ionViewWillEnter() {
       this.cdr.detectChanges();
       if (this.autoAnswer) {
         this.ringer.stop();
+        this.scheduleAutoAnswer('view-enter');
       } else {
         this.ringer.start('calling.mp3');
+        await this.ensureIncomingPeerReady();
       }
-      // Incoming side: DO NOT open camera yet
-      await this.ensureIncomingPeerReady();
-      this.scheduleAutoAnswer('view-enter');
       // keep your startUnansweredTimeout() from ngOnInit or call here
     } else {
       await this.ensurePartnerLoaded();
@@ -476,7 +475,7 @@ private scheduleAutoAnswer(source: string): void {
   this.answeringCall = true;
   this.cdr.detectChanges();
   console.log('[video] auto-answer scheduled from native incoming call', { source, callId: this.callId, caller: this.userId });
-  setTimeout(() => this.answerCall(), source === 'view-enter' ? 250 : 600);
+  setTimeout(() => this.answerCall(), source === 'view-enter' ? 50 : 300);
 }
 
 private canStartOutgoingCall(): boolean {

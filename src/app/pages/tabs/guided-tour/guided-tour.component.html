@@ -1,63 +1,62 @@
 <div class="tour-root" *ngIf="active">
   <div class="tour-scrim"></div>
-  <div class="tour-grain"></div>
-  <div class="tour-spotlight" *ngIf="spotlight" [ngStyle]="spotlightStyle"></div>
+  <div class="tour-pattern"></div>
 
-  <section [class]="cardClass" *ngIf="step">
-    <div class="tour-topline">
-      <div class="tour-brand">
-        <span class="brand-dot"></span>
-        <span>Folcen Guide</span>
+  <section class="tour-shell" *ngIf="step" [ngClass]="visualClass">
+    <header class="tour-header">
+      <div class="guide-mark">
+        <span class="mark-dot"></span>
+        <span>Folcen guide</span>
       </div>
-      <div class="tour-meta">
-        <span class="step-count">{{ state.index + 1 }} / {{ state.steps.length }}</span>
-        <button type="button" class="skip-btn" (click)="skip()">Skip</button>
+      <button type="button" class="skip-btn" (click)="skip()">Skip</button>
+    </header>
+
+    <div class="tour-orbit" aria-hidden="true">
+      <div class="orbit-card primary">
+        <ion-icon [name]="step.icon"></ion-icon>
       </div>
+      <div class="orbit-card small one">{{ state.index + 1 }}</div>
+      <div class="orbit-card small two">{{ state.steps.length }}</div>
     </div>
 
-    <div class="tour-stage">
-      <div class="feature-preview" [ngClass]="visualClass">
-        <div class="preview-head">
-          <span>{{ demoTitle }}</span>
+    <main class="tour-main">
+      <p class="eyebrow">{{ stepLabel }}</p>
+      <h2>{{ step.title }}</h2>
+      <p class="body">{{ step.body }}</p>
+
+      <div class="story-card">
+        <div class="story-top">
+          <div>
+            <span class="story-label">{{ demoTitle }}</span>
+            <strong>{{ chips[0] }}</strong>
+          </div>
           <ion-icon [name]="step.icon"></ion-icon>
         </div>
-        <div class="preview-cardlet main">
-          <span class="avatar-chip"></span>
-          <div>
-            <strong>{{ chips[0] }}</strong>
-            <small>{{ chips[1] || stepLabel }}</small>
-          </div>
-        </div>
-        <div class="preview-rows">
+        <div class="story-lines">
           <span *ngFor="let row of demoRows">{{ row }}</span>
         </div>
       </div>
 
-      <div class="tour-copy">
-        <p class="eyebrow">{{ stepLabel }}</p>
-        <h2>{{ step.title }}</h2>
-        <p class="body">{{ step.body }}</p>
+      <div class="detail-strip">
+        <span *ngFor="let item of details">
+          <ion-icon name="checkmark-circle"></ion-icon>
+          {{ item }}
+        </span>
       </div>
-    </div>
+    </main>
 
-    <div class="detail-grid">
-      <span *ngFor="let item of details">
-        <ion-icon name="checkmark-circle"></ion-icon>
-        {{ item }}
-      </span>
-    </div>
+    <footer class="tour-footer">
+      <div class="progress-row">
+        <span class="step-count">{{ state.index + 1 }} / {{ state.steps.length }}</span>
+        <div class="progress-track">
+          <span [style.width.%]="progress"></span>
+        </div>
+      </div>
 
-    <div class="progress-track">
-      <span [style.width.%]="progress"></span>
-    </div>
-
-    <div class="tour-actions">
-      <ion-button fill="clear" class="back-btn" [disabled]="state.index === 0" (click)="back()">
-        Back
-      </ion-button>
-      <ion-button class="next-btn" (click)="next()">
-        {{ primaryText }}
-      </ion-button>
-    </div>
+      <div class="tour-actions">
+        <button type="button" class="back-btn" [disabled]="state.index === 0" (click)="back()">Back</button>
+        <button type="button" class="next-btn" (click)="next()">{{ primaryText }}</button>
+      </div>
+    </footer>
   </section>
 </div>

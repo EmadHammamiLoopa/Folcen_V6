@@ -1,4 +1,4 @@
-import { Component, ElementRef, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { GuidedTourService, GuidedTourState, GuidedTourStep } from 'src/app/services/guided-tour.service';
 
@@ -9,33 +9,20 @@ import { GuidedTourService, GuidedTourState, GuidedTourStep } from 'src/app/serv
 })
 export class GuidedTourComponent implements OnInit, OnDestroy {
   state: GuidedTourState;
-  spotlight: DOMRect | null = null;
   private sub: Subscription;
-  private resizeHandler = () => this.syncSpotlight();
 
   constructor(
-    public tour: GuidedTourService,
-    private zone: NgZone,
-    private host: ElementRef<HTMLElement>
+    public tour: GuidedTourService
   ) {}
 
   ngOnInit() {
     this.sub = this.tour.state$.subscribe(state => {
       this.state = state;
-      if (state.active) {
-        setTimeout(() => this.syncSpotlight(), 220);
-      } else {
-        this.spotlight = null;
-      }
     });
-    window.addEventListener('resize', this.resizeHandler);
-    window.addEventListener('orientationchange', this.resizeHandler);
   }
 
   ngOnDestroy() {
     if (this.sub) this.sub.unsubscribe();
-    window.removeEventListener('resize', this.resizeHandler);
-    window.removeEventListener('orientationchange', this.resizeHandler);
   }
 
   get active(): boolean {
@@ -54,6 +41,7 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   get stepLabel(): string {
     if (!this.step) return 'Guide';
     if (this.step.id === 'welcome') return 'Your first lap';
+    if (this.step.id.includes('tag') || this.step.id.includes('comment') || this.step.id.includes('reaction')) return 'Join the moment';
     if (this.step.id.includes('privacy') || this.step.id.includes('anonymous')) return 'Your control';
     if (this.step.id.includes('chat') || this.step.id.includes('call')) return 'Stay close';
     if (this.step.id.includes('channel') || this.step.id.includes('post')) return 'Create and explore';
@@ -66,7 +54,7 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
     const id = this.step?.id || 'default';
     if (id.includes('privacy') || id.includes('anonymous')) return 'privacy';
     if (id.includes('chat') || id.includes('call')) return 'connect';
-    if (id.includes('channel') || id.includes('post') || id.includes('feed')) return 'create';
+    if (id.includes('channel') || id.includes('post') || id.includes('feed') || id.includes('comment') || id.includes('reaction') || id.includes('tag')) return 'create';
     if (id.includes('profile') || id.includes('avatar')) return 'identity';
     if (id.includes('notification')) return 'notify';
     return 'discover';
@@ -75,6 +63,10 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   get chips(): string[] {
     const id = this.step?.id || '';
     if (id.includes('avatar')) return ['Avatar', 'Photos', 'Style'];
+    if (id.includes('tag')) return ['Mention', 'Friends', 'Respect'];
+    if (id.includes('comment') || id.includes('reaction')) return ['Vote', 'React', 'Reply'];
+    if (id.includes('media')) return ['Photo', 'Camera', '24 hours'];
+    if (id.includes('search')) return ['People', 'Posts', 'Channels'];
     if (id.includes('privacy')) return ['Public', 'Friends', 'Only me'];
     if (id.includes('anonymous')) return ['Anonymous posts', 'Safer comments'];
     if (id.includes('channel')) return ['Explore', 'Follow', 'Create'];
@@ -88,17 +80,21 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   get details(): string[] {
     const id = this.step?.id || '';
     if (id === 'welcome') return ['Your profile', 'Your circle', 'Your first post'];
+    if (id.includes('search')) return ['Find people', 'Find channels', 'Open posts'];
     if (id.includes('discover')) return ['Search nearby people', 'Open profiles safely', 'Send requests when it feels right'];
     if (id === 'profile') return ['Photos and bio', 'Friend status', 'Profile privacy'];
     if (id.includes('avatar')) return ['Upload a real photo', 'Design a custom avatar', 'Keep a fallback style'];
     if (id.includes('friends')) return ['Review requests', 'See your friends', 'Unfriend when needed'];
     if (id.includes('chat')) return ['Real-time messages', 'Delivery status', 'Media and replies'];
     if (id.includes('call')) return ['Friends can call directly', 'Requests protect non-friends', 'Missed calls stay visible'];
+    if (id.includes('media')) return ['Gallery', 'Camera', 'Temporary media'];
     if (id.includes('explore')) return ['City channels', 'Global spaces', 'Follow what fits'];
     if (id.includes('follow-channel')) return ['Follow to add it to your feed', 'Unfollow anytime', 'Explore keeps it discoverable'];
     if (id.includes('create-channel')) return ['Choose a topic', 'Add a clear image', 'Invite a community'];
     if (id.includes('post-privacy')) return ['Public', 'Friends only', 'Only me'];
     if (id.includes('anonymous')) return ['Anonymous posts', 'Anonymous comments', 'Mentions stay controlled'];
+    if (id.includes('tag')) return ['Tag friends only', 'No self-tags', 'Anonymous stays private'];
+    if (id.includes('comment') || id.includes('reaction')) return ['Vote without clutter', 'React quickly', 'Open full discussion'];
     if (id.includes('posts')) return ['Create updates', 'React and vote', 'Open full discussions'];
     if (id.includes('feed')) return ['Friends first', 'Followed channels', 'Important activity'];
     if (id.includes('notification')) return ['Messages', 'Requests', 'Mentions and calls'];
@@ -113,6 +109,11 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   get demoTitle(): string {
     const id = this.step?.id || '';
     if (id.includes('avatar')) return 'Style studio';
+    if (id.includes('search')) return 'Find anything';
+    if (id.includes('tag')) return 'Mention flow';
+    if (id.includes('comment')) return 'Discussion layer';
+    if (id.includes('reaction')) return 'Quick reactions';
+    if (id.includes('media')) return 'Media moment';
     if (id.includes('privacy')) return 'Control panel';
     if (id.includes('anonymous')) return 'Anonymous mode';
     if (id.includes('chat')) return 'Live thread';
@@ -129,6 +130,11 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   get demoRows(): string[] {
     const id = this.step?.id || '';
     if (id.includes('avatar')) return ['Photo', 'Avatar', 'Color'];
+    if (id.includes('search')) return ['People', 'Channels', 'Posts'];
+    if (id.includes('tag')) return ['Friend tag', 'No self-tag', 'Private safe'];
+    if (id.includes('comment')) return ['Read', 'Reply', 'Vote'];
+    if (id.includes('reaction')) return ['Emoji', 'Vote', 'Open'];
+    if (id.includes('media')) return ['Camera', 'Gallery', 'Expires'];
     if (id.includes('privacy')) return ['Public', 'Friends', 'Only me'];
     if (id.includes('anonymous')) return ['Name hidden', 'Tags guarded', 'Still social'];
     if (id.includes('chat')) return ['Sent', 'Delivered', 'Read'];
@@ -145,22 +151,6 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
     return index + 1 === total ? 'Finish guide' : 'Next';
   }
 
-  get spotlightStyle() {
-    if (!this.spotlight) return {};
-    return {
-      width: `${this.spotlight.width + 18}px`,
-      height: `${this.spotlight.height + 18}px`,
-      transform: `translate3d(${this.spotlight.left - 9}px, ${this.spotlight.top - 9}px, 0)`
-    };
-  }
-
-  get cardClass() {
-    if (!this.spotlight) return 'tour-card centered';
-    const cardShouldBeLower = this.spotlight.top < window.innerHeight * 0.5;
-    const compact = window.innerHeight < 700 || window.innerWidth < 390 ? ' compact' : '';
-    return (cardShouldBeLower ? 'tour-card lower has-spotlight' : 'tour-card upper has-spotlight') + compact;
-  }
-
   next() {
     this.tour.next();
   }
@@ -171,38 +161,5 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
 
   skip() {
     this.tour.skip();
-  }
-
-  private syncSpotlight() {
-    const step = this.step;
-    if (!step?.target) {
-      this.zone.run(() => this.spotlight = null);
-      return;
-    }
-
-    const root = document;
-    const target = root.querySelector(step.target) as HTMLElement;
-    if (!target || !this.isVisible(target)) {
-      this.zone.run(() => this.spotlight = null);
-      return;
-    }
-
-    target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
-    setTimeout(() => this.updateSpotlightRect(target), 220);
-  }
-
-  private updateSpotlightRect(target: HTMLElement) {
-    if (!target || !this.isVisible(target)) {
-      this.zone.run(() => this.spotlight = null);
-      return;
-    }
-    const rect = target.getBoundingClientRect();
-    this.zone.run(() => this.spotlight = rect);
-  }
-
-  private isVisible(el: HTMLElement): boolean {
-    const rect = el.getBoundingClientRect();
-    const style = window.getComputedStyle(el);
-    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
   }
 }
