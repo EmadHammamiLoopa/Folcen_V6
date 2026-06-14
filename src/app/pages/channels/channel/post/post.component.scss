@@ -24,10 +24,6 @@
   }
 }
 
-.jodel-card.owner-card .jdl-h {
-  padding-top: clamp(36px, 10vw, 44px);
-}
-
 .jdl-reaction-rail {
   position: absolute;
   right: clamp(10px, 3vw, 14px);
@@ -102,15 +98,15 @@
   }
 }
 
-.jdl-top-rail,
-.jdl-privacy-rail {
+.jdl-top-rail {
   position: absolute;
+  right: clamp(10px, 3vw, 14px);
   top: clamp(10px, 3vw, 14px);
   z-index: 7;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 5px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.22);
@@ -140,20 +136,6 @@
     right: 0;
     left: auto;
     top: 40px;
-  }
-}
-
-.jdl-top-rail {
-  right: clamp(10px, 3vw, 14px);
-}
-
-.jdl-privacy-rail {
-  left: clamp(10px, 3vw, 14px);
-  right: auto;
-
-  .custom-popover {
-    left: 0;
-    right: auto;
   }
 }
 

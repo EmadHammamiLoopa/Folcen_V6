@@ -1,4 +1,4 @@
-<ion-card class="jodel-card" [class.feed-card]="showCommentsBtn" [class.owner-card]="post.isOwner" [style]="{'--post-bg': post.backgroundColor, '--post-fg': post.color}">
+<ion-card class="jodel-card" [class.feed-card]="showCommentsBtn" [style]="{'--post-bg': post.backgroundColor, '--post-fg': post.color}">
   <div class="jdl-reaction-rail" aria-label="Post reactions">
     <button type="button" class="rail-btn love" [class.active]="post.voted === 1" (click)="$event.stopPropagation(); voteOnPost(1)">
       <i class="fas fa-heart"></i>
@@ -12,7 +12,7 @@
       <span>{{ getCommentCount() }}</span>
     </button>
   </div>
-  <div class="jdl-privacy-rail" aria-label="Post privacy" *ngIf="post.isOwner">
+  <div class="jdl-top-rail" aria-label="Post options">
     <ng-container *ngIf="post.isOwner">
       <div class="rel">
         <ion-button class="icon-btn" fill="clear" size="small" (click)="toggleVisibilityOptions($event)">
@@ -33,9 +33,7 @@
         </div>
       </div>
     </ng-container>
-  </div>
 
-  <div class="jdl-top-rail" aria-label="Post options">
     <ion-button class="icon-btn" fill="clear" size="small" (click)="presentPopover($event)">
       <i class="fas fa-ellipsis-v"></i>
     </ion-button>
