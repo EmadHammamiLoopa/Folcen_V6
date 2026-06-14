@@ -783,6 +783,10 @@ listenForVideoCallEvents() {
       const stage = ev?.stage || 'ready';
       this.ringer.stop();
       this.clearCallTimeout();
+      this.calling = false;
+      this.answered = true;
+      this.startCallTimer();
+      this.cdr.detectChanges();
       if (stage === 'answered') {
         return;
       }

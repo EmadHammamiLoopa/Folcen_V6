@@ -131,6 +131,16 @@ export class TabsPage implements OnInit, OnDestroy {
       });
     });
 
+    SocketService.notificationReceived$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
+      this.zone.run(() => {
+        const type = String(payload?.type || payload?.data?.type || payload?.notification?.type || '').toLowerCase();
+        const isFeedActivity = /post|comment|mention|vote|channel/.test(type);
+        if (isFeedActivity && this.activeTab !== 'feed') {
+          this.badges.inc('feed', 1);
+        }
+      });
+    });
+
     // New incoming friend request → increment immediately then recount from API after a short delay
     SocketService.newFriendRequest$.pipe(takeUntil(this.destroy$)).subscribe(() => {
       this.zone.run(() => {

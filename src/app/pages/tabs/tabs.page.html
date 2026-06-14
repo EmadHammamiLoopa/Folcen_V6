@@ -8,7 +8,7 @@
       <ion-badge *ngIf="tab.url === 'profile' && notificationCount > 0" color="danger">{{ notificationCount > 99 ? '99+' : notificationCount }}</ion-badge>
 
       <!-- Budget Badge (Missed Calls) -->
-      <div class="budget-indicator" *ngIf="tab.url === 'feed' && budget > 0 && missedCallsCount > 0">
+      <div class="budget-indicator" *ngIf="tab.url === 'feed' && budget > 0">
         {{ budget }}
       </div>
     </ion-tab-button>

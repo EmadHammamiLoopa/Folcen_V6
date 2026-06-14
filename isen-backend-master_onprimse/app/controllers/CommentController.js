@@ -408,6 +408,29 @@ exports.storeComment = async (req, res) => {
                             await createNotification({ recipientId: postOwnerId, senderId: req.auth._id, type: 'post_commented', title: 'New comment', body: `${senderName} commented on your post`, data: { postId: post._id, commentId: commentWithVotes._id, link: `/tabs/channels/post/${post._id}`, anonymName: isAnon ? anonymName : null } });
                         }
                     }
+
+                    // Thread participant notifications: users who already commented on
+                    // the post should know the discussion continued, even without a mention.
+                    const excluded = new Set([
+                        req.auth._id.toString(),
+                        postOwnerId,
+                        ...Array.from(mentionedUsers)
+                    ]);
+                    if (comment.parentComment) {
+                        const parent = await Comment.findById(comment.parentComment).select('user').lean();
+                        if (parent?.user) excluded.add(parent.user.toString());
+                    }
+                    const participantRecipients = Array.from(participants).filter(id => !excluded.has(id));
+                    for (const userId of participantRecipients) {
+                        await createNotification({
+                            recipientId: userId,
+                            senderId: req.auth._id,
+                            type: 'comment_thread_activity',
+                            title: 'New comment',
+                            body: `${senderName} also commented on a post you joined`,
+                            data: { postId: post._id, commentId: commentWithVotes._id, link: `/tabs/channels/post/${post._id}`, anonymName: isAnon ? anonymName : null }
+                        });
+                    }
                 } catch (notifyErr) { logger.warn('Notification logic failed:', notifyErr); }
 
                 return Response.sendResponse(res, commentWithVotes, 'Comment created');

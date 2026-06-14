@@ -10,7 +10,7 @@
     <div class="label">{{ answeringCall || (answer && autoAnswer) ? 'Joining call...' : (answer ? 'Incoming video call' : 'Ringing...') }}</div>
   </div>
 
-  <div class="video-stage" [class.hidden-stage]="!answered && !autoAnswer">
+  <div class="video-stage" [class.hidden-stage]="!answered">
     <video #partnerVideo id="partner-video" autoplay playsinline
            (click)="swapVideo('my-video')"
            [ngClass]="topVideoFrame === 'partner-video' ? 'main-video' : 'pip-video'">

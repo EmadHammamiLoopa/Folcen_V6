@@ -550,6 +550,20 @@ exports.firebaseLogin = async (req, res) => {
             googleId: googleId || profileInput.googleId,
             emailVerified: email_verified || profileInput.emailVerified || false
         };
+        const loginContext = String(socialProfile.acceptanceContext || profileInput.context || '').toLowerCase();
+        const isExplicitSignup = loginContext.includes('signup') && socialProfile.acceptedTerms === true;
+        const hasCompletedSignupProfile = (candidate = {}, requireTerms = true) => {
+            const value = (field) => String(candidate[field] || '').trim();
+            return !!(
+                value('firstName') &&
+                value('email') &&
+                value('country') &&
+                value('city') &&
+                value('birthDate') &&
+                value('gender') &&
+                (!requireTerms || candidate.acceptedTerms === true)
+            );
+        };
 
         // Find or create user
         let user = await User.findOne({ 
@@ -560,8 +574,9 @@ exports.firebaseLogin = async (req, res) => {
         });
 
         if (!user) {
-            // If user doesn't exist and profile is provided, create new user (Sign-up flow)
-            if (profile || email) {
+            // Firebase/Google sign-in must never create an incomplete MongoDB user.
+            // Creation is allowed only from an explicit completed signup flow.
+            if (isExplicitSignup && hasCompletedSignupProfile(socialProfile)) {
                 user = new User({
                     ...socialProfile,
                     email: String(email || socialProfile.email).toLowerCase(),
@@ -651,10 +666,16 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
                 } catch (welcomeErr) {
                     console.error('[firebaseLogin] Failed to send welcome message:', welcomeErr);
                 }
-            } else {
-                return Response.sendError(res, 404, 'User not found. Please sign up first.');
+            }
+            else {
+                return Response.sendError(res, isExplicitSignup ? 422 : 404, isExplicitSignup
+                    ? 'Please finish all signup questions before entering Folcen.'
+                    : 'No account found with this Google email. Please sign up first.');
             }
         } else {
+            if (loginContext.includes('signin') && !hasCompletedSignupProfile(user, false)) {
+                return Response.sendError(res, 409, 'This Google account has not finished signup. Please complete signup first.');
+            }
             // Update firebaseUid if it was found via email
             if (!user.firebaseUid) {
                 user.firebaseUid = uid;
