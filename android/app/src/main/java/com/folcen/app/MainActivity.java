@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -20,6 +21,9 @@ import com.getcapacitor.BridgeActivity;
 
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "FolcenMainActivity";
     private static final long INCOMING_URL_DEDUPE_MS = 45000L;
@@ -35,7 +39,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         installFolcenWebChromeClient();
-        ensureNotificationCapabilities();
+        ensureCallRuntimeCapabilities();
         dispatchIncomingCallIntent(getIntent());
     }
 
@@ -140,11 +144,18 @@ public class MainActivity extends BridgeActivity {
         return res;
     }
 
-    private void ensureNotificationCapabilities() {
-        if (Build.VERSION.SDK_INT >= 33
-                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.POST_NOTIFICATIONS }, 4101);
+    private void ensureCallRuntimeCapabilities() {
+        List<String> missing = new ArrayList<>();
+        addMissingPermission(missing, Manifest.permission.CAMERA);
+        addMissingPermission(missing, Manifest.permission.RECORD_AUDIO);
+        if (Build.VERSION.SDK_INT >= 31) {
+            addMissingPermission(missing, Manifest.permission.BLUETOOTH_CONNECT);
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            addMissingPermission(missing, Manifest.permission.POST_NOTIFICATIONS);
+        }
+        if (!missing.isEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toArray(new String[0]), 4101);
         }
 
         if (Build.VERSION.SDK_INT >= 34) {
@@ -157,6 +168,13 @@ public class MainActivity extends BridgeActivity {
                     Log.w(TAG, "Unable to inspect full-screen intent capability", e);
                 }
             }
+        }
+    }
+
+    private void addMissingPermission(List<String> missing, String permission) {
+        if (permission == null) return;
+        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(permission);
         }
     }
 

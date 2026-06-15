@@ -64,6 +64,7 @@ private hasAnswered = false;
   private acceptedSignalSent = false;
   private acceptedSignalStagesSent = new Set<string>();
   private outgoingRetryAfterAccepted = false;
+  private connectingAfterRemoteReady = false;
   private autoAnswerScheduled = false;
   private answerCallPromise: Promise<void> | null = null;
   private acceptedRetryTimer: any = null;
@@ -782,14 +783,20 @@ listenForVideoCallEvents() {
       if (callee && this.userId && String(callee) !== String(this.userId)) return;
       const stage = ev?.stage || 'ready';
       this.ringer.stop();
-      this.clearCallTimeout();
       this.calling = false;
-      this.answered = true;
-      this.startCallTimer();
-      this.cdr.detectChanges();
+
       if (stage === 'answered') {
+        this.clearCallTimeout();
+        this.connectingAfterRemoteReady = false;
+        this.answered = true;
+        this.startCallTimer();
+        this.cdr.detectChanges();
         return;
       }
+
+      this.connectingAfterRemoteReady = true;
+      this.cdr.detectChanges();
+      this.retryOutgoingMediaCallAfterAccepted();
       this.clearAcceptedRetryTimer();
       this.acceptedRetryTimer = setTimeout(() => {
         if (!this.answered && !this.answer) {
@@ -1350,6 +1357,13 @@ private attachRemoteStream(remote: MediaStream): void {
   const playNow = () => el.play().catch(() => {});
   if (el.readyState >= 1) { playNow(); }
   else                    { el.onloadedmetadata = playNow; }
+  this.connectingAfterRemoteReady = false;
+  this.clearCallTimeout();
+  this.clearUnansweredTimeout();
+  this.ringer.stop();
+  this.answered = true;
+  this.startCallTimer();
+  this.cdr.detectChanges();
 }
 
 
