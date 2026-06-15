@@ -128,6 +128,17 @@ exports.allPosts = async (req, res) => {
                 $unwind: '$userDetails'  // Unwind the userDetails array
             },
             {
+                $lookup: {
+                    from: 'comments',
+                    let: { postId: '$_id' },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ['$post', '$$postId'] } } },
+                        { $count: 'count' }
+                    ],
+                    as: 'commentStats'
+                }
+            },
+            {
                 $project: {
                     _id: 1,
                     text: 1,
@@ -163,7 +174,7 @@ exports.allPosts = async (req, res) => {
                             else: '$anonymName'
                         }
                     },  // Show real name if not anonymous, otherwise show anonymous name
-                    comments: { $size: { $ifNull: ['$comments', []] } },
+                    comments: { $ifNull: [{ $arrayElemAt: ['$commentStats.count', 0] }, 0] },
                     reports: { $size: { $ifNull: ['$reports', []] } },
                     channel: 1,
                 }
@@ -199,6 +210,15 @@ exports.channelPosts = async (req, res) => {
             channel: channel._id,
             ...dashParams.filter
         })
+        .lookup({
+            from: 'comments',
+            let: { postId: '$_id' },
+            pipeline: [
+                { $match: { $expr: { $eq: ['$post', '$$postId'] } } },
+                { $count: 'count' }
+            ],
+            as: 'commentStats'
+        })
         .project({
             _id: 1,
             text: 1,
@@ -219,9 +239,7 @@ exports.channelPosts = async (req, res) => {
             hintAboutMe: 1,
             createdAt: 1,
             votes: 1,
-            comments: {
-                $size: "$comments"
-            }
+            comments: { $ifNull: [{ $arrayElemAt: ['$commentStats.count', 0] }, 0] }
         })
         .sort(dashParams.sort)
         .skip(dashParams.skip)

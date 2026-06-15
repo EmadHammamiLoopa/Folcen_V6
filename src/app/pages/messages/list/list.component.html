@@ -4,8 +4,8 @@
   <button class="fancy-bell" style="width: 40px; min-width: 40px; height: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; visibility: visible;" (click)="showMissedCalls()" aria-label="Missed calls">
     <ion-icon name="notifications-outline"></ion-icon>
     <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
-      <span *ngIf="(missedCalls?.length || 0) > 0" class="fancy-badge">
-        {{ missedCalls.length > 99 ? '99+' : missedCalls.length }}
+      <span *ngIf="getMissedBellCount(missedCalls) > 0" class="fancy-badge">
+        {{ getMissedBellCount(missedCalls) > 99 ? '99+' : getMissedBellCount(missedCalls) }}
       </span>
     </ng-container>
   </button>

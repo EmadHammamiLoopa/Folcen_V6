@@ -39,7 +39,8 @@ export class ListComponent implements OnInit, OnDestroy {
   public missedMapLatest: { [userId: string]: number } = {};
   private socket: any;
   private destroy$ = new Subject<void>();
-  private authId: string | null = null;  
+  private authId: string | null = null;
+  missedCallBudgetCount = 0;
   private static READ_KEY = 'chatLastReadAt';
   private lastReadAt: Record<string, number> = {};
   private prevMissedCount = 0;
@@ -139,10 +140,11 @@ export class ListComponent implements OnInit, OnDestroy {
     } catch {}
     this.loadLastReadMap();
 
-    // Reset budget when viewing messages/missed calls
-    this.userService.resetBudget().subscribe({
-      next: () => console.log('Budget reset on messages view'),
-      error: (err) => console.warn('Failed to reset budget', err)
+    this.badges.budget$.pipe(takeUntil(this.destroy$)).subscribe((count: number) => {
+      this.zone.run(() => {
+        this.missedCallBudgetCount = Math.max(0, Number(count || 0));
+        this.cdr.markForCheck();
+      });
     });
 
     // Prefer centralized stream from AppEventsService to avoid duplicate subscriptions
@@ -465,6 +467,11 @@ export class ListComponent implements OnInit, OnDestroy {
     return Number(this.missedMapLatest?.[key] || 0);
   }
 
+  public getMissedBellCount(missedCalls?: any[]): number {
+    const localCount = Array.isArray(missedCalls) ? missedCalls.length : 0;
+    return Math.max(localCount, Number(this.missedCallBudgetCount || 0));
+  }
+
   
   async initSocket() {
     await SocketService.initializeSocket();
@@ -582,7 +589,15 @@ async showMissedCalls() {
   if (data?.action === 'callback' && data.userId) {
     this.callBack(data.userId);
   } else if (data?.action === 'clearAll') {
-    try { this.webrtcService.clearMissedCalls(); this.badges.reset('messages'); } catch(e) { this.webrtcService.clearMissedCalls(); }
+    try {
+      this.webrtcService.clearMissedCalls();
+      this.userService.resetBudget().subscribe({ error: () => {} });
+      this.missedCallBudgetCount = 0;
+      this.badges.setBudget(0);
+      this.badges.reset('messages');
+    } catch(e) {
+      this.webrtcService.clearMissedCalls();
+    }
   }
 
   }
