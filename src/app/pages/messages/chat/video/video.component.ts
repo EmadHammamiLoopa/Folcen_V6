@@ -488,12 +488,16 @@ private canStartOutgoingCall(): boolean {
 private async ensureIncomingPeerReady(): Promise<void> {
   try {
     const myId = this.authUser?._id || this.authUser?.id;
-    if (!myId) return;
+    if (!myId) throw new Error('Missing authenticated user for incoming peer');
     await this.webRTC.createPeer(myId, !!this.callId);
     await this.webRTC.waitForPeerOpen();
+    const peerId = this.webRTC.getPeerId();
+    if (!peerId) throw new Error('Peer ID was not created');
+    await this.userService.sendPeerIdToBackend(myId, peerId);
     await this.webRTC.wait();
   } catch (e) {
     console.warn('[video] incoming peer warmup failed', e);
+    throw e;
   }
 }
 
@@ -712,24 +716,26 @@ getUser() {
             } else {
                 console.warn("ðŸ”„ WebSocket was disconnected. Attempting to reconnect...");
                 this.socket.disconnect(); // Ensure cleanup before reconnecting
+                this.socket = null;
             }
         }
 
         console.log("ðŸ”µ Initializing WebSocket for userId:", userId);
         await SocketService.initializeSocket();
+        await SocketService.ensureConnected();
 
         // âœ… Retry WebSocket retrieval to ensure it's available
         let attempts = 0;
-        while (!this.socket && attempts < 3) {
+        while ((!this.socket || !this.socket.connected) && attempts < 3) {
             this.socket = await SocketService.getSocket();
-            if (!this.socket) {
+            if (!this.socket || !this.socket.connected) {
                 console.warn(`âš ï¸ WebSocket still not available. Retrying (${attempts + 1}/3)...`);
                 await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 sec before retrying
             }
             attempts++;
         }
 
-        if (!this.socket) {
+        if (!this.socket || !this.socket.connected) {
             console.error("âŒ WebSocket initialization failed after multiple attempts.");
             return;
         }
@@ -987,19 +993,29 @@ private leaveCallRoom() {
 }
 
 async emitWebSocketEvent(eventName: string, data: any) {
-  if (!this.socket) {
+  if (!this.socket?.connected) {
       console.warn("âš ï¸ WebSocket is not ready. Trying to retrieve...");
+      await SocketService.initializeSocket();
+      await SocketService.ensureConnected();
       this.socket = await SocketService.getSocket();
 
-      if (!this.socket) {
+      if (!this.socket?.connected) {
           console.error("âŒ WebSocket is still not available. Aborting event emit.");
+          SocketService.emit(eventName, data);
           return;
       }
   }
 
   if (!this.socket.connected) {
       console.warn("âš ï¸ WebSocket is disconnected. Attempting to reconnect...");
-      await this.initializeSocket(this.userId);
+      await SocketService.initializeSocket();
+      await SocketService.ensureConnected();
+      this.socket = await SocketService.getSocket();
+  }
+
+  if (!this.socket?.connected) {
+      SocketService.emit(eventName, data);
+      return;
   }
 
   console.log(`ðŸ“¤ Emitting event: ${eventName}`, data);
@@ -1011,8 +1027,11 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
   if (this.isCallLocallyFinished()) return { answerable: false, status: 'ended' };
   if (!this.callId) return { answerable: true };
   try {
-    if (!this.socket) this.socket = await SocketService.getSocket();
-    if (!this.socket?.connected) await this.initializeSocket(this.userId);
+    if (!this.socket?.connected) {
+      await SocketService.initializeSocket();
+      await SocketService.ensureConnected();
+      this.socket = await SocketService.getSocket();
+    }
     if (!this.socket?.connected) return { answerable: true };
 
     return await new Promise(resolve => {
