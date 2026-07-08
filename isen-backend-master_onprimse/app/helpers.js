@@ -841,6 +841,15 @@ function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
         }
       }
     }
+  }).then(result => {
+    console.log(
+      `[callPush] callId=${payload.callId} calleeId=${calleeId} callerId=${callerId || ''} sockets=${sockets.length} success=${result?.successCount || 0} failure=${result?.failureCount || 0} removed=${result?.removedInvalid || 0}`
+    );
+  }).catch(err => {
+    console.error(
+      `[callPush] failed callId=${payload.callId} calleeId=${calleeId} callerId=${callerId || ''}:`,
+      err && err.stack ? err.stack : err
+    );
   });
 }
 

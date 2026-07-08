@@ -48,6 +48,9 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
   // Fetch all FCM tokens for this user
   const tokenDocs = await PushToken.find({ userId: String(userId) }).lean();
   if (!tokenDocs.length) {
+    console.warn(
+      `[fcmPushService] no tokens for userId=${userId} type=${data.type || data.event || data.category || 'notification'}`
+    );
     return { successCount: 0, failureCount: 0, removedInvalid: 0 };
   }
 
