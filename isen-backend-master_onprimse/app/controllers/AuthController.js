@@ -18,6 +18,20 @@ function recordAuthEvent(event) {
     AuthEvent.create(event).catch(() => {});
 }
 
+function logSigninDiagnostic(reasonCode, email, extra = {}) {
+    try {
+        const emailHash = crypto.createHash('sha256')
+            .update(String(email || '').trim().toLowerCase())
+            .digest('hex')
+            .slice(0, 12);
+        logger.warn('[signin] authentication failed', {
+            reasonCode,
+            emailHash,
+            ...extra
+        });
+    } catch (_) {}
+}
+
 
 
 
@@ -345,6 +359,7 @@ exports.signin = async (req, res) => {
         // Generic failure to avoid user enumeration unless detailed errors are enabled
         if (!user) {
             recordAuthEvent({ type: 'signin_failed', ipHash, reasonCode: 'user_not_found' });
+            logSigninDiagnostic('user_not_found', email);
             if (String(process.env.ENABLE_DETAILED_AUTH_ERRORS || '').toLowerCase() === 'true') {
                 return Response.sendError(res, 401, 'Account not found');
             }
@@ -354,19 +369,31 @@ exports.signin = async (req, res) => {
         // banned users should fail generically
         if (user.banned) {
             recordAuthEvent({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'banned' });
+            logSigninDiagnostic('banned', email, { userId: String(user._id) });
             return Response.sendError(res, 401, 'Authentication failed');
         }
 
         // Ensure enabled
         if (!user.enabled) {
             recordAuthEvent({ type: 'blocked_request', user: user._id, ipHash, reasonCode: 'disabled' });
+            logSigninDiagnostic('disabled', email, { userId: String(user._id) });
             return Response.sendError(res, 401, 'Your account has been disabled. Please contact support.');
         }
 
         // Authenticate using model method (handles formats)
         const isAuthenticated = await user.authenticate(password);
         if (!isAuthenticated) {
+            const hash = String(user.hashed_password || '');
+            const hashShape = !hash
+                ? 'missing'
+                : (/^\$2[aby]\$\d{2}\$/.test(hash) ? 'bcrypt' : (user.salt ? 'legacy_salted' : 'unknown'));
             recordAuthEvent({ type: 'signin_failed', user: user._id, ipHash, reasonCode: 'invalid_password' });
+            logSigninDiagnostic('invalid_password', email, {
+                userId: String(user._id),
+                hashShape,
+                hasFirebaseUid: !!user.firebaseUid,
+                emailVerified: user.emailVerified === true
+            });
             if (String(process.env.ENABLE_DETAILED_AUTH_ERRORS || '').toLowerCase() === 'true') {
                 return Response.sendError(res, 401, 'Incorrect password');
             }
