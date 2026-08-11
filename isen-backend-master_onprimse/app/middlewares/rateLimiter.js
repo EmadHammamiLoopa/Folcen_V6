@@ -17,7 +17,15 @@ try {
   const IORedis = require('ioredis');
   const redisUrl = process.env.REDIS_URL || (process.env.REDIS_HOST && `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`) || null;
   if (redisUrl) {
-    redisClient = new IORedis(redisUrl);
+    redisClient = new IORedis(redisUrl, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      retryStrategy: () => null
+    });
+    redisClient.on('error', (e) => {
+      console.error('rateLimiter: Redis error', e && e.message ? e.message : e);
+    });
     console.log('rateLimiter: using Redis at', redisUrl);
   }
 } catch (e) {
