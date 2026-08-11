@@ -27,6 +27,16 @@ export class ToastService {
 
   async presentErrorToastr(err: any, position: any = 'top') {
     const msg = this.toErrorString(err);
+    try {
+      const trace = {
+        message: msg,
+        raw: err,
+        stack: err?.stack,
+        at: new Date().toISOString()
+      };
+      (window as any).__lastErrorToast = trace;
+      console.error('[toast:error]', trace);
+    } catch (_) {}
     if (this.platform.is('cordova')) {
       this.toast.show(msg, '3000', position).subscribe(
         toast => { console.log(toast); },

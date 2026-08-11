@@ -11,7 +11,8 @@
         "SplashShowOnlyFirstTime": "false",
         "SplashScreen": "screen",
         "loadUrlTimeoutValue": "700000",
-        "SplashScreenDelay": "3000"
+        "SplashScreenDelay": "3000",
+        "applicationId": "com.folcen.app"
       }
     }
   }

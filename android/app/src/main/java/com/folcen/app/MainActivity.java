@@ -2,6 +2,7 @@ package com.folcen.app;
 
 import android.Manifest;
 import android.app.NotificationManager;
+import android.app.PictureInPictureParams;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -11,6 +12,7 @@ import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Rational;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -26,10 +28,12 @@ import java.util.List;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "FolcenMainActivity";
+    private static final String TRACE_TAG = "FolcenCallTrace";
     private static final long INCOMING_URL_DEDUPE_MS = 45000L;
     private static boolean foreground = false;
     private static String lastIncomingCallUrl = "";
     private static long lastIncomingCallUrlAt = 0L;
+    private static boolean lastIncomingCallDeliveredToWebView = false;
 
     public static boolean isInForeground() {
         return foreground;
@@ -38,6 +42,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        trace("main_on_create", getIntent() != null ? getIntent().getData() : null, "bridgeReady=" + (bridge != null));
         installFolcenWebChromeClient();
         ensureCallRuntimeCapabilities();
         dispatchIncomingCallIntent(getIntent());
@@ -47,25 +52,60 @@ public class MainActivity extends BridgeActivity {
     protected void onNewIntent(Intent intent) {
         setIntent(intent);
         super.onNewIntent(intent);
+        trace("main_on_new_intent", intent != null ? intent.getData() : null, "bridgeReady=" + (bridge != null));
         dispatchIncomingCallIntent(intent);
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        foreground = true;
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        foreground = true;
+        Log.d(TAG, "app active/resumed; foreground=true");
+        trace("main_on_resume", getIntent() != null ? getIntent().getData() : null, "bridgeReady=" + (bridge != null));
         dispatchIncomingCallIntent(getIntent());
+    }
+
+    @Override
+    public void onPause() {
+        foreground = false;
+        Log.d(TAG, "app paused; foreground=false");
+        super.onPause();
     }
 
     @Override
     public void onStop() {
         foreground = false;
+        Log.d(TAG, "app stopped; foreground=false");
         super.onStop();
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        enterCallPictureInPictureIfNeeded();
+    }
+
+    private void enterCallPictureInPictureIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        if (isInPictureInPictureMode()) return;
+        try {
+            String currentUrl = bridge != null && bridge.getWebView() != null
+                    ? bridge.getWebView().getUrl()
+                    : "";
+            if (currentUrl == null || !currentUrl.contains("/messages/video")) return;
+            PictureInPictureParams params = new PictureInPictureParams.Builder()
+                    .setAspectRatio(new Rational(9, 16))
+                    .build();
+            enterPictureInPictureMode(params);
+            Log.d(TAG, "entered PiP for active call url=" + currentUrl);
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to enter call PiP", e);
+        }
     }
 
     private void dispatchIncomingCallIntent(Intent intent) {
@@ -75,8 +115,11 @@ public class MainActivity extends BridgeActivity {
         String url = data.toString();
         if (!url.startsWith("folcen://incoming-call")) return;
         String callId = data.getQueryParameter("callId");
+        long dispatchAt = System.currentTimeMillis();
+        trace("deeplink_dispatch_start", data, "foreground=" + foreground + " bridgeReady=" + (bridge != null));
         if (isExpiredIncomingCall(data)) {
             Log.d(TAG, "expired incoming deeplink ignored callId=" + callId + " url=" + url);
+            trace("deeplink_expired_ignored", data, "");
             MyFirebaseMessagingService.cancelIncomingCallNotifications(this, callId, 0);
             try {
                 getSharedPreferences("folcen_call", MODE_PRIVATE)
@@ -89,30 +132,69 @@ public class MainActivity extends BridgeActivity {
         }
         long now = System.currentTimeMillis();
         if (url.equals(lastIncomingCallUrl) && now - lastIncomingCallUrlAt < INCOMING_URL_DEDUPE_MS) {
-            Log.d(TAG, "duplicate incoming deeplink ignored url=" + url);
+            if (lastIncomingCallDeliveredToWebView) {
+                Log.d(TAG, "duplicate incoming deeplink ignored url=" + url);
+                trace("deeplink_duplicate_ignored", data, "ageMs=" + (now - lastIncomingCallUrlAt));
+                intent.setData(null);
+                return;
+            }
+            Log.d(TAG, "duplicate incoming deeplink stored before WebView delivery url=" + url);
+            trace("deeplink_duplicate_store_until_webview", data, "ageMs=" + (now - lastIncomingCallUrlAt));
+            persistAndDispatchIncomingCallUrl(data, url, dispatchAt);
+            intent.setData(null);
             return;
         }
         lastIncomingCallUrl = url;
         lastIncomingCallUrlAt = now;
+        lastIncomingCallDeliveredToWebView = false;
         Log.d(TAG, "incoming deeplink received url=" + url);
         try {
             MyFirebaseMessagingService.cancelIncomingCallNotifications(this, callId, 0);
         } catch (Exception ignored) {}
+        persistAndDispatchIncomingCallUrl(data, url, dispatchAt);
+        intent.setData(null);
+    }
+
+    private void persistAndDispatchIncomingCallUrl(Uri data, String url, long dispatchAt) {
         try {
             getSharedPreferences("folcen_call", MODE_PRIVATE)
                     .edit()
                     .putString("pendingIncomingCallUrl", url)
                     .apply();
+            trace("deeplink_stored_shared_preferences", data, "elapsedMs=" + (System.currentTimeMillis() - dispatchAt));
         } catch (Exception ignored) {}
         if (bridge != null) {
             try {
-                bridge.triggerWindowJSEvent("folcen-incoming-call", "{\"url\":" + JSONObject.quote(url) + "}");
+                String quotedUrl = JSONObject.quote(url);
+                if (bridge.getWebView() != null) {
+                    bridge.getWebView().post(() -> {
+                        try {
+                            trace("deeplink_eval_start", data, "elapsedMs=" + (System.currentTimeMillis() - dispatchAt));
+                            bridge.getWebView().evaluateJavascript(
+                                    "try{localStorage.setItem('pendingIncomingCallUrl'," + quotedUrl + ");" +
+                                            "window.dispatchEvent(new CustomEvent('folcen-incoming-call',{detail:{url:" + quotedUrl + "}}));}catch(e){}",
+                                    null
+                            );
+                            trace("deeplink_eval_called", data, "elapsedMs=" + (System.currentTimeMillis() - dispatchAt));
+                            lastIncomingCallDeliveredToWebView = true;
+                        } catch (Exception e) {
+                            Log.w(TAG, "Unable to persist incoming call URL in WebView", e);
+                            trace("deeplink_eval_failed", data, "error=" + e.getClass().getSimpleName() + ":" + e.getMessage());
+                        }
+                    });
+                } else {
+                    bridge.triggerWindowJSEvent("folcen-incoming-call", "{\"url\":" + quotedUrl + "}");
+                    lastIncomingCallDeliveredToWebView = true;
+                }
                 Log.d(TAG, "incoming deeplink dispatched to WebView");
+                trace("deeplink_trigger_window_event", data, "elapsedMs=" + (System.currentTimeMillis() - dispatchAt));
             } catch (Exception e) {
                 Log.w(TAG, "Unable to dispatch incoming call URL to WebView", e);
+                trace("deeplink_dispatch_failed", data, "error=" + e.getClass().getSimpleName() + ":" + e.getMessage());
             }
         } else {
             Log.d(TAG, "incoming deeplink stored; bridge not ready yet");
+            trace("deeplink_bridge_not_ready", data, "elapsedMs=" + (System.currentTimeMillis() - dispatchAt));
         }
     }
 
@@ -188,6 +270,24 @@ public class MainActivity extends BridgeActivity {
             Log.w(TAG, "Unable to install Folcen WebChromeClient", e);
         }
     }
+
+    private void trace(String event, Uri data, String details) {
+        String callId = data != null ? data.getQueryParameter("callId") : "";
+        String callerId = data != null ? firstNonEmpty(data.getQueryParameter("callerId"), data.getQueryParameter("fromUserId")) : "";
+        String receiverId = data != null ? firstNonEmpty(data.getQueryParameter("receiverId"), data.getQueryParameter("toUserId")) : "";
+        Log.d(TRACE_TAG, "native main event=" + event
+                + " t=" + System.currentTimeMillis()
+                + " callId=" + firstNonEmpty(callId, "")
+                + " callerId=" + firstNonEmpty(callerId, "")
+                + " receiverId=" + firstNonEmpty(receiverId, "")
+                + " " + firstNonEmpty(details, ""));
+    }
+
+    private String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && value.trim().length() > 0) return value;
+        }
+        return "";
+    }
 }
-
-

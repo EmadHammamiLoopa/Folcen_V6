@@ -61,6 +61,34 @@ export class WebrtcService {
   private callTimeoutTimer: any = null; // timeout for unanswered outbound/inbound calls
   private lastMissedEmitKey: string | null = null; // guard for single explicit missed emission per attempt
 
+  private callTrace(event: string, data: any = {}): void {
+    const now = Date.now();
+    const callId = data?.callId || this.extractCallId(this.router.url || '') || 'no-call-id';
+    const key = `folcenCallTraceStart:${callId}`;
+    let start = 0;
+    try {
+      start = Number(sessionStorage.getItem(key) || 0);
+      if (!start) {
+        start = now;
+        sessionStorage.setItem(key, String(start));
+      }
+    } catch (_) {
+      start = now;
+    }
+    console.log('[FolcenCallTrace]', {
+      layer: 'webrtc.service',
+      t: now,
+      dt: now - start,
+      userId: this.userId,
+      peerId: WebrtcService.peer?.id,
+      peerOpen: WebrtcService.peer?.open,
+      hasCall: !!WebrtcService.call,
+      hasLocalStream: !!this.myStream,
+      ...data,
+      event
+    });
+  }
+
   constructor(
     private androidPermission: AndroidPermissions,
     private permissionService: PermissionService,
@@ -258,11 +286,15 @@ export class WebrtcService {
     localStream : MediaStream, // <-- already opened camera/mic
     options: { callId?: string; videoRequestId?: string; wakeOnFirstLookup?: boolean } = {}
   ): Promise<MediaConnection> {
+    const startAt = Date.now();
+    const traceCallId = options.callId || this.createCallId(partnerUserId);
+    this.callTrace('start_call_start', { callId: traceCallId, partnerUserId, wakeOnFirstLookup: options.wakeOnFirstLookup !== false });
     // reset explicit-missed emission guard for a fresh attempt
     this.lastMissedEmitKey = null;
     this.isClosed = false; // Ã¢Å“â€¦ allow reinitialization
     if (!WebrtcService.peer) {
       await this.createPeer(this.userId); // fallback
+      this.callTrace('start_call_peer_created_fallback', { callId: traceCallId, elapsedMs: Date.now() - startAt });
     }
 
     /* 0Ã¢â‚¬Å Ã¢â‚¬â€Ã¢â‚¬Å sanity checks -------------------------------------------------- */
@@ -276,13 +308,16 @@ export class WebrtcService {
     /* 1Ã¢â‚¬Å Ã¢â‚¬â€Ã¢â‚¬Å make sure *our* peer is ready --------------------------------- */
     await this.createPeer(this.userId); // no-op if it already exists
     await this.waitForPeerOpen(); // throws after 10 s timeout
+    this.callTrace('start_call_peer_open', { callId: traceCallId, elapsedMs: Date.now() - startAt });
 
     /* 2Ã¢â‚¬Å Ã¢â‚¬â€Ã¢â‚¬Å look-up partnerÃ¢â‚¬â„¢s current peer-id ------------------------------ */
-    const callId = options.callId || this.createCallId(partnerUserId);
+    const callId = traceCallId;
     const partnerPeerId = await this.resolvePartnerPeerId(partnerUserId, callId, options.videoRequestId, options.wakeOnFirstLookup !== false);
     if (!partnerPeerId) {
+      this.callTrace('start_call_partner_peer_missing', { callId, elapsedMs: Date.now() - startAt });
       throw new Error('Partner is offline or has no peer-id');
     }
+    this.callTrace('start_call_partner_peer_resolved', { callId, elapsedMs: Date.now() - startAt, partnerPeerId });
 
 
 
@@ -290,9 +325,19 @@ export class WebrtcService {
     const mc = this.peer.call(
       partnerPeerId,
       localStream,
-      { sdpTransform: preferVp8 } // keep the VP8 tweak
+      {
+        sdpTransform: preferVp8, // keep the VP8 tweak
+        metadata: {
+          callId,
+          fromUserId: this.userId,
+          toUserId: partnerUserId,
+          videoRequestId: options.videoRequestId || null,
+          startedAt: Date.now(),
+        },
+      } as any
     );
     WebrtcService.call = mc; // store globally
+    this.callTrace('start_call_peer_call_created', { callId, elapsedMs: Date.now() - startAt, partnerPeerId, mediaPeer: mc?.peer });
 
     // start outbound timeout: if nobody answers, teardown and emit timeout
     try { clearTimeout(this.callTimeoutTimer); } catch(_) {}
@@ -330,6 +375,7 @@ export class WebrtcService {
       if (remoteAttached) return;
       remoteAttached = true;
       try { clearTimeout(this.callTimeoutTimer); } catch(_) {}
+      this.callTrace('start_call_stream_event', { callId, elapsedMs: Date.now() - startAt, remoteTracks: remote?.getTracks?.().map(t => `${t.kind}:${t.readyState}`) });
       this.attachRemoteStream(this.partnerEl!, remote, connected);
     });
     
@@ -338,6 +384,7 @@ export class WebrtcService {
       if (remote && !remoteAttached) {
         try { clearTimeout(this.callTimeoutTimer); } catch(_) {}
         remoteAttached = true;
+        this.callTrace('start_call_track_event', { callId, elapsedMs: Date.now() - startAt, remoteTracks: remote?.getTracks?.().map(t => `${t.kind}:${t.readyState}`) });
         this.attachRemoteStream(this.partnerEl!, remote, connected);
       }
     });
@@ -346,6 +393,7 @@ export class WebrtcService {
     /* 5Ã¢â‚¬Å Ã¢â‚¬â€Ã¢â‚¬Å emit Ã¢â‚¬Å“video-call-startedÃ¢â‚¬Â via socket --------------------------- */
     try {
       const sock = await SocketService.getSocket(); // static helper in your svc
+      this.callTrace('start_call_socket_emit_start', { callId, elapsedMs: Date.now() - startAt, socketConnected: sock?.connected });
       sock?.emit('video-call-started', {
         from : this.userId,
         to : partnerUserId,
@@ -357,28 +405,40 @@ export class WebrtcService {
       /* socket not critical Ã¢â‚¬â€œ ignore */
     }
 
+    this.callTrace('start_call_done', { callId, elapsedMs: Date.now() - startAt });
     return mc;
   }
 
   private async resolvePartnerPeerId(partnerUserId: string, callId?: string, videoRequestId?: string, wakeOnFirstLookup = true): Promise<string | null> {
     const delays = [0, 500, 1000, 1500, 2500, 3500, 5000, 7000, 9000, 12000, 15000];
     let lastPeerId: string | null = null;
+    const lookupAt = Date.now();
+    this.callTrace('partner_peer_lookup_start', { callId, partnerUserId, wakeOnFirstLookup });
 
     for (let i = 0; i < delays.length; i++) {
       const delayMs = delays[i];
       if (delayMs) await this.delay(delayMs);
       try {
+        this.callTrace('partner_peer_lookup_attempt', { callId, partnerUserId, attempt: i + 1, delayMs, elapsedMs: Date.now() - lookupAt });
         lastPeerId = await this.userService.getPartnerPeerId(
           partnerUserId,
           i === 0 && wakeOnFirstLookup,
           callId ? { callId, callType: 'video', videoRequestId } : undefined
         ).toPromise();
-        if (lastPeerId) return lastPeerId;
+        if (i === 0 && wakeOnFirstLookup) {
+          console.log('[webrtc] incoming-call wake requested', { partnerUserId, callId, hasPeerId: !!lastPeerId });
+        }
+        if (lastPeerId) {
+          this.callTrace('partner_peer_lookup_found', { callId, partnerUserId, attempt: i + 1, elapsedMs: Date.now() - lookupAt, partnerPeerId: lastPeerId });
+          return lastPeerId;
+        }
       } catch (err) {
+        this.callTrace('partner_peer_lookup_attempt_failed', { callId, partnerUserId, attempt: i + 1, elapsedMs: Date.now() - lookupAt, error: (err as any)?.message || String(err) });
         console.warn('[webrtc] partner peer lookup failed; retrying', err);
       }
     }
 
+    this.callTrace('partner_peer_lookup_done_missing', { callId, partnerUserId, elapsedMs: Date.now() - lookupAt });
     return lastPeerId;
   }
 
@@ -972,6 +1032,8 @@ public async bindMissedCallSocketHandlers() {
 
   // webrtc.service.ts Ã¢â€â‚¬Ã¢â€â‚¬ improved: auto-create peer if missing and wait for open
   public async waitForPeerOpen(): Promise<void> {
+    const waitAt = Date.now();
+    this.callTrace('wait_peer_open_start');
     // If Peer instance missing, try to create it using a known userId.
     // If userId is not yet available, attempt to recover it from localStorage
     // or wait briefly for other initialization code to set it.
@@ -1020,7 +1082,10 @@ public async bindMissedCallSocketHandlers() {
       }
     }
 
-    if (WebrtcService.peer.open) return Promise.resolve();
+    if (WebrtcService.peer.open) {
+      this.callTrace('wait_peer_open_already_open', { elapsedMs: Date.now() - waitAt });
+      return Promise.resolve();
+    }
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -1032,6 +1097,7 @@ public async bindMissedCallSocketHandlers() {
       const onOpen = () => {
         clearTimeout(timeout);
         cleanup();
+        this.callTrace('wait_peer_open_done', { elapsedMs: Date.now() - waitAt });
         resolve();
       };
       const onError = (err: any) => {
@@ -1061,6 +1127,8 @@ public async bindMissedCallSocketHandlers() {
   private creatingPeer = false;
 
   private spawnPeer(candidateId: string, authUserId: string): Promise<void> {
+    const spawnAt = Date.now();
+    this.callTrace('spawn_peer_start', { candidateId, authUserId });
     return new Promise((resolve, reject) => {
       try { WebrtcService.peer?.destroy(); } catch {}
       WebrtcService.peer = new Peer(candidateId, {
@@ -1085,6 +1153,7 @@ WebrtcService.peer.once('open', async () => {
   localStorage.setItem('peerId', candidateId);
   try { await this.userService.sendPeerIdToBackend(authUserId, candidateId); } catch {}
   this.startPeerIdHeartbeat(authUserId, candidateId);
+  this.callTrace('spawn_peer_open', { candidateId, authUserId, elapsedMs: Date.now() - spawnAt });
 
     // Ã¢Å“â€¦ ensure missed-call handlers are attached
   await this.bindMissedCallSocketHandlers();
@@ -1095,6 +1164,13 @@ WebrtcService.peer.once('open', async () => {
 
   
       WebrtcService.peer.once('error', (err: any) => {
+        this.callTrace('spawn_peer_error', {
+          candidateId,
+          authUserId,
+          elapsedMs: Date.now() - spawnAt,
+          type: err?.type,
+          error: err?.message || String(err)
+        });
         reject(err);
       });
     });
@@ -1111,14 +1187,22 @@ WebrtcService.peer.once('open', async () => {
   }
   
   async createPeer(authUserId: string, forceRefresh = false): Promise<void> {
+    const createAt = Date.now();
+    this.callTrace('create_peer_start', { authUserId, forceRefresh });
     if (this.creatingPeer) {
       const started = Date.now();
       while (this.creatingPeer && Date.now() - started < 5000) {
         await this.delay(100);
       }
-      if (this.creatingPeer && !forceRefresh) return;
+      if (this.creatingPeer && !forceRefresh) {
+        this.callTrace('create_peer_wait_existing_timeout_return', { authUserId, elapsedMs: Date.now() - createAt });
+        return;
+      }
     }
-    if (WebrtcService.peer && WebrtcService.peer.open && !forceRefresh) return;
+    if (WebrtcService.peer && WebrtcService.peer.open && !forceRefresh) {
+      this.callTrace('create_peer_reuse_open_peer', { authUserId, elapsedMs: Date.now() - createAt });
+      return;
+    }
     if (forceRefresh) {
       console.log('[webrtc] refreshing PeerJS session for incoming call');
       try { WebrtcService.peer?.destroy(); } catch {}
@@ -1152,6 +1236,7 @@ WebrtcService.peer.once('open', async () => {
       let candidate = this.makeCandidateId(authUserId);
       try {
         await this.spawnPeer(candidate, authUserId);
+        this.callTrace('create_peer_done', { authUserId, candidate, elapsedMs: Date.now() - createAt });
         return;
       } catch (e: any) {
         if (e?.type !== 'unavailable-id') throw e;
@@ -1161,6 +1246,7 @@ WebrtcService.peer.once('open', async () => {
       candidate = this.makeCandidateId(authUserId);
       try {
         await this.spawnPeer(candidate, authUserId);
+        this.callTrace('create_peer_done', { authUserId, candidate, elapsedMs: Date.now() - createAt });
         return;
       } catch (e: any) {
         if (e?.type !== 'unavailable-id') throw e;
@@ -1168,6 +1254,7 @@ WebrtcService.peer.once('open', async () => {
   
       // Fallback: plain base id as last resort
       await this.spawnPeer(authUserId, authUserId);
+      this.callTrace('create_peer_done', { authUserId, candidate: authUserId, elapsedMs: Date.now() - createAt });
     } finally {
       this.creatingPeer = false;
     }
@@ -1192,28 +1279,47 @@ WebrtcService.peer.once('open', async () => {
   async getUserMedia(): Promise<MediaStream | null> {
     // Reuse a live stream if we already have one
     if (this.myStream && this.myStream.getTracks().some(t => t.readyState === 'live')) {
+      this.callTrace('get_user_media_reuse', {
+        tracks: this.myStream.getTracks().map(t => `${t.kind}:${t.readyState}`)
+      });
       return this.myStream;
     }
     if (this.mediaRequestInFlight) {
+      this.callTrace('get_user_media_wait_inflight');
       return this.mediaRequestInFlight;
     }
 
+    const mediaAt = Date.now();
+    this.callTrace('get_user_media_start');
     this.mediaRequestInFlight = this.acquireUserMedia();
     try {
-      return await this.mediaRequestInFlight;
+      const stream = await this.mediaRequestInFlight;
+      this.callTrace('get_user_media_done', {
+        elapsedMs: Date.now() - mediaAt,
+        hasStream: !!stream,
+        tracks: stream?.getTracks?.().map(t => `${t.kind}:${t.readyState}`)
+      });
+      return stream;
     } finally {
       this.mediaRequestInFlight = null;
     }
   }
 
   private async acquireUserMedia(): Promise<MediaStream | null> {
+    const acquireAt = Date.now();
+    this.callTrace('acquire_user_media_start');
     this.releaseCurrentStream();
   
     try {
       const hasPermissions = await this.requestPermissions();
+      this.callTrace('acquire_user_media_permissions_done', { elapsedMs: Date.now() - acquireAt, hasPermissions });
       if (!hasPermissions) return null;
 
       const preferredStream = await navigator.mediaDevices.getUserMedia(this.buildPreferredMediaConstraints());
+      this.callTrace('acquire_user_media_preferred_done', {
+        elapsedMs: Date.now() - acquireAt,
+        tracks: preferredStream.getTracks().map(t => `${t.kind}:${t.readyState}`)
+      });
       return this.rememberLocalStream(preferredStream);
 
       // Acquire specific devices (with your locking)
@@ -1257,6 +1363,11 @@ WebrtcService.peer.once('open', async () => {
   
     } catch (error) {
       console.error('Error acquiring media:', error);
+      this.callTrace('acquire_user_media_preferred_failed', {
+        elapsedMs: Date.now() - acquireAt,
+        error: (error as any)?.message || String(error),
+        name: (error as any)?.name
+      });
   
       // Fallback: relaxed constraints
       try {
@@ -1281,11 +1392,20 @@ WebrtcService.peer.once('open', async () => {
           if (track.kind === 'video' && id) this.activeDevices.video = id;
           if (track.kind === 'audio' && id) this.activeDevices.audio = id;
         });
+        this.callTrace('acquire_user_media_fallback_done', {
+          elapsedMs: Date.now() - acquireAt,
+          tracks: fallbackStream.getTracks().map(t => `${t.kind}:${t.readyState}`)
+        });
   
         return fallbackStream;
   
       } catch (fallbackError) {
         console.error('Fallback media acquisition failed:', fallbackError);
+        this.callTrace('acquire_user_media_fallback_failed', {
+          elapsedMs: Date.now() - acquireAt,
+          error: (fallbackError as any)?.message || String(fallbackError),
+          name: (fallbackError as any)?.name
+        });
         this.toastService.presentErrorToastr(
           'All cameras/microphones are in use. Please close other applications using these devices and try again.'
         );
@@ -1424,36 +1544,72 @@ WebrtcService.peer.once('open', async () => {
       this.zone.runOutsideAngular(async () => {
         console.log('[peer:rx] incoming from', call.peer);
         try {
+          const metadata = ((call as any).metadata || {}) as any;
+          const callId = metadata.callId ? String(metadata.callId) : '';
+          const expectedCallId = this.getExpectedIncomingCallId();
+          this.callTrace('peer_rx_call_event', {
+            callId: callId || expectedCallId,
+            expectedCallId,
+            fromPeer: call.peer,
+            metadata
+          });
+          if (!callId && !expectedCallId) {
+            console.warn('[peer:rx] rejecting raw incoming media call without active callId', { fromPeer: call.peer });
+            this.callTrace('peer_rx_reject_no_call_id', { fromPeer: call.peer });
+            try { call.close(); } catch {}
+            return;
+          }
+          if (this.isFinishedCallId(callId || expectedCallId)) {
+            console.warn('[peer:rx] rejecting finished incoming media call', { callId, expectedCallId, fromPeer: call.peer });
+            this.callTrace('peer_rx_reject_finished_call', { callId: callId || expectedCallId, fromPeer: call.peer });
+            try { call.close(); } catch {}
+            return;
+          }
+          if (callId && expectedCallId && callId !== expectedCallId) {
+            console.warn('[peer:rx] rejecting stale incoming media callId mismatch', { callId, expectedCallId, fromPeer: call.peer });
+            this.callTrace('peer_rx_reject_mismatch', { callId, expectedCallId, fromPeer: call.peer });
+            try { call.close(); } catch {}
+            return;
+          }
+
           WebrtcService.call = call;
           const partnerId = call.peer.split('-')[0];
           this.partnerId = partnerId;
           localStorage.setItem('partnerId', partnerId);
+          this.callTrace('peer_rx_call_stored', { callId: callId || expectedCallId, partnerId, fromPeer: call.peer });
 
           // re-enter Angular only for navigation/UI actions
           try {
             await this.zone.run(async () => {
               if (!this.router.url.includes('/messages/video')) {
+                this.callTrace('peer_rx_navigate_incoming_video', { callId: callId || expectedCallId, partnerId });
                 await this.router.navigate(
                   ['/messages/video', partnerId],
-                  { queryParams: { answer: true }, state: { incomingCall: true } }
+                  { queryParams: { answer: true, callId: callId || expectedCallId || undefined }, state: { incomingCall: true } }
                 );
+              } else {
+                this.callTrace('peer_rx_already_on_video_route', { callId: callId || expectedCallId, partnerId });
               }
             });
           } catch (e) {
             console.warn('[webrtc] navigation skipped due to zone issues', e);
+            this.callTrace('peer_rx_navigation_failed', { callId: callId || expectedCallId, error: (e as any)?.message || String(e) });
           }
 
           // Basic safety handlers (these are light and kept out of zone)
           call.on("close", () => {
             console.log("Ã°Å¸â€œÂ´ Call closed by remote peer");
+            this.callTrace('peer_rx_call_closed', { callId: callId || expectedCallId, fromPeer: call.peer });
             try { if (this.partnerEl) this.partnerEl.srcObject = null; } catch(_) {}
           });
           call.on("error", (err) => {
             console.error("Ã¢ÂÅ’ Call error:", err);
+            this.callTrace('peer_rx_call_error', { callId: callId || expectedCallId, error: (err as any)?.message || String(err) });
             try { if (this.partnerEl) this.partnerEl.srcObject = null; } catch(_) {}
           });
         } catch (error) {
           console.error("Ã¢ÂÅ’ Error handling incoming call:", error);
+          this.callTrace('peer_rx_handler_failed', { error: (error as any)?.message || String(error) });
           try { call.close(); } catch {}
         }
       });
@@ -1462,6 +1618,40 @@ WebrtcService.peer.once('open', async () => {
   
 
   // Ã¢Å“â€¦ Function to check if the peer is online
+  private getExpectedIncomingCallId(): string {
+    const fromRoute = this.extractCallId(this.router.url || '');
+    if (fromRoute) return fromRoute;
+    try {
+      return this.extractCallId(localStorage.getItem('pendingIncomingCallUrl') || '') ||
+        this.extractCallId(sessionStorage.getItem('pendingIncomingCallUrl') || '') ||
+        String(localStorage.getItem('activeIncomingCallId') || '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  private extractCallId(value: string): string {
+    if (!value) return '';
+    try {
+      const parsed = value.startsWith('folcen://') ? new URL(value) : new URL(value, 'https://folcen.local');
+      return parsed.searchParams.get('callId') || '';
+    } catch (_) {
+      const match = value.match(/[?&]callId=([^&]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+  }
+
+  private isFinishedCallId(callId: string): boolean {
+    if (!callId) return false;
+    try {
+      const raw = localStorage.getItem('finishedVideoCallIds');
+      const ids = raw ? JSON.parse(raw) : [];
+      return Array.isArray(ids) && ids.some((item: any) => item?.callId === callId && Date.now() - Number(item.at || 0) < 2 * 60 * 60 * 1000);
+    } catch (_) {
+      return false;
+    }
+  }
+
   async checkPeerOnline(peerId: string): Promise<boolean> {
     return new Promise((resolve) => {
       let settled = false;
@@ -1532,14 +1722,14 @@ WebrtcService.peer.once('open', async () => {
     if (!this.myStream || !this.myStream.getTracks().some(t => t.readyState === 'live')) {
       console.warn('[answer] no live local stream; grabbing camera');
       this.myStream = await this.getUserMedia();
-      if (!this.myStream) return console.error('[answer] still no local media');
+      if (!this.myStream) throw new Error('No local media available');
     }
 
     const activeCall = call || WebrtcService.call;
-    if (!activeCall) return console.error('[answer] no call object');
+    if (!activeCall) throw new Error('No incoming media call available');
     if (typeof (activeCall as any).answer !== 'function') {
       WebrtcService.call = null;
-      return console.error('[answer] call object is not answerable');
+      throw new Error('Incoming media call is not answerable');
     }
 
     activeCall.answer(this.myStream);

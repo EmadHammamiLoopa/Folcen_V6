@@ -30,8 +30,9 @@
 }
 
 .settings-container {
-  padding: 16px;
+  padding: clamp(10px, 3.5vw, 16px);
   padding-bottom: 40px;
+  overflow-x: hidden;
 }
 
 .settings-section {
@@ -84,33 +85,42 @@
   
   ion-item {
     --background: transparent;
-    --padding-start: 12px;
-    --padding-end: 12px;
-    --inner-padding-end: 0;
+    --padding-start: clamp(8px, 2.5vw, 12px);
+    --padding-end: clamp(8px, 2.5vw, 12px);
+    --inner-padding-end: 4px;
     --min-height: 64px;
     --color: #ffffff;
+    max-width: 100%;
+    overflow: hidden;
     
     ion-label {
-      margin-left: 12px;
+      margin-left: clamp(8px, 2.5vw, 12px);
+      min-width: 0;
+      white-space: normal;
       
       h2 {
-        font-size: 16px;
+        font-size: clamp(14px, 3.8vw, 16px);
         font-weight: 600;
         color: #ffffff;
         margin-bottom: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       
       p {
-        font-size: 12px;
+        font-size: clamp(11px, 3.2vw, 12px);
         color: #94a3b8;
+        white-space: normal;
+        line-height: 1.25;
       }
     }
   }
 }
 
 .icon-box {
-  width: 36px;
-  height: 36px;
+  width: clamp(30px, 8.5vw, 36px);
+  min-width: clamp(30px, 8.5vw, 36px);
+  height: clamp(30px, 8.5vw, 36px);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   display: flex;
@@ -133,12 +143,14 @@
 .divider {
   height: 1px;
   background: rgba(255, 255, 255, 0.05);
-  margin-left: 60px;
+  margin-left: clamp(48px, 14vw, 60px);
 }
 
 .arrow {
   font-size: 16px;
   color: #475569;
+  flex: 0 0 auto;
+  margin-left: 4px;
 }
 
 .danger-card {

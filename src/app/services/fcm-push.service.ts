@@ -23,8 +23,10 @@ import { environment } from '../../environments/environment';
 export class FcmPushService {
 
   private currentToken: string | null = null;
+  private currentUserId: string | null = null;
   private listenersAttached = false;
   private readonly apiBase = environment.apiUrl;
+  private readonly storedTokenKey = 'folcen:fcmToken';
 
   constructor(
     private platform: Platform,
@@ -34,6 +36,7 @@ export class FcmPushService {
 
   /** Call after a successful login. */
   async open(userId: string): Promise<void> {
+    this.currentUserId = userId;
     const isNative =
       Capacitor.isNativePlatform() ||
       this.platform.is('capacitor') ||
@@ -47,11 +50,15 @@ export class FcmPushService {
 
     await this.platform.ready();
 
-    if (this.currentToken) {
-      console.log('[FcmPushService] Re-registering existing FCM token for user', userId);
-      await this.sendTokenToBackend(this.currentToken);
-      return;
+    const storedToken = this.getStoredToken();
+    if (storedToken) {
+      this.currentToken = storedToken;
+      console.log('[FcmPushService] Re-registering stored FCM token for user', userId);
+      await this.sendTokenToBackend(storedToken, userId);
     }
+
+    // Always call register on app start/login. Some Android builds do not
+    // re-fire the registration callback after process death unless requested.
     await this.registerFcm();
   }
 
@@ -67,6 +74,7 @@ export class FcmPushService {
       console.warn('[FcmPushService] Unregister failed (token already gone?)', e);
     }
     this.currentToken = null;
+    try { localStorage.removeItem(this.storedTokenKey); } catch (_) {}
   }
 
   // ──────────────────────── private ────────────────────────────────
@@ -77,8 +85,12 @@ export class FcmPushService {
         PushNotifications.addListener('registration', async (tokenData) => {
           const token = tokenData.value;
           this.currentToken = token;
-          console.log('[FcmPushService] FCM token received');
-          await this.sendTokenToBackend(token);
+          try { localStorage.setItem(this.storedTokenKey, token); } catch (_) {}
+          console.log('[FcmPushService] FCM token received', {
+            userId: this.currentUserId,
+            tokenTail: String(token).slice(-8)
+          });
+          await this.sendTokenToBackend(token, this.currentUserId || undefined);
         });
 
         PushNotifications.addListener('registrationError', (err) => {
@@ -162,7 +174,16 @@ export class FcmPushService {
     }
   }
 
-  private async sendTokenToBackend(token: string): Promise<void> {
+  private getStoredToken(): string | null {
+    try {
+      const token = localStorage.getItem(this.storedTokenKey);
+      return token && token.trim() ? token.trim() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  private async sendTokenToBackend(token: string, userId?: string): Promise<void> {
     if (!token) return;
 
     try {
@@ -173,9 +194,17 @@ export class FcmPushService {
           deviceId: null
         })
         .toPromise();
-      console.log('[FcmPushService] Token registered on backend', { platform: this.platform.is('ios') ? 'ios' : 'android' });
+      console.log('[FcmPushService] Token registered on backend', {
+        userId,
+        platform: this.platform.is('ios') ? 'ios' : 'android',
+        tokenTail: String(token).slice(-8)
+      });
     } catch (err) {
-      console.error('[FcmPushService] Failed to register token on backend:', err);
+      console.error('[FcmPushService] Failed to register token on backend:', {
+        userId,
+        tokenTail: String(token).slice(-8),
+        err
+      });
     }
   }
 

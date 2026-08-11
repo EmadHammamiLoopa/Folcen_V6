@@ -1195,3 +1195,24 @@
   color: #0f172a !important;
   font-weight: 900 !important;
 }
+
+/* Owner feed cards can show both privacy + menu. Keep them paired inside the card. */
+.jodel-card.feed-card .jdl-top-rail {
+  width: auto !important;
+  min-width: 44px !important;
+  max-width: calc(100% - 20px) !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  overflow: visible !important;
+}
+
+.jodel-card.feed-card .jdl-top-rail .rel {
+  flex: 0 0 auto !important;
+}
+
+.jodel-card.feed-card .jdl-top-rail .icon-btn {
+  flex: 0 0 32px !important;
+  margin: 0 !important;
+}

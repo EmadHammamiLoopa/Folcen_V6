@@ -26,8 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FolcenFcmService";
+    private static final String TRACE_TAG = "FolcenCallTrace";
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
-    public static final String CALL_CHANNEL_ID = "incoming_calls_v4";
+    public static final String CALL_CHANNEL_ID = "incoming_calls_v5";
     private static final long CALL_ALERT_DEDUPE_MS = 90000L;
     private static final Map<String, Long> ACTIVE_CALL_ALERTS = new ConcurrentHashMap<>();
 
@@ -35,15 +36,18 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     public void onMessageReceived(RemoteMessage remoteMessage) {
         Map<String, String> data = remoteMessage.getData();
         Log.d(TAG, "FCM received data=" + data);
+        trace("fcm_received", data, "messageId=" + remoteMessage.getMessageId());
         logDeliveryDelay(data);
 
         if (isIncomingCall(data)) {
             if (!isAnswerableCall(data)) {
                 Log.d(TAG, "Ignoring stale/non-ringing call push");
+                trace("fcm_ignored_not_answerable", data, "status=" + firstNonEmpty(data.get("status"), "ringing"));
                 return;
             }
             if (MainActivity.isInForeground()) {
                 Log.d(TAG, "App is foreground; socket UI will handle incoming call");
+                trace("fcm_foreground_socket_handles", data, "");
                 return;
             }
             showIncomingCall(data);
@@ -83,6 +87,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             if (sentAt == null || sentAt.length() == 0) return;
             long delayMs = System.currentTimeMillis() - Long.parseLong(sentAt);
             Log.d(TAG, "FCM delivery delayMs=" + delayMs + " type=" + firstNonEmpty(data.get("type"), data.get("event"), data.get("category")));
+            trace("fcm_delivery_delay", data, "delayMs=" + delayMs + " serverSentAt=" + sentAt);
         } catch (Exception ignored) {}
     }
 
@@ -117,6 +122,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Long lastShown = ACTIVE_CALL_ALERTS.get(callId);
         if (lastShown != null && now - lastShown < CALL_ALERT_DEDUPE_MS) {
             Log.d(TAG, "Duplicate incoming call alert ignored callId=" + callId + " ageMs=" + (now - lastShown));
+            trace("fcm_duplicate_ignored", data, "ageMs=" + (now - lastShown));
             return;
         }
         cancelIncomingCallNotifications(this, null, 0);
@@ -127,11 +133,24 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             }
         }
         Log.d(TAG, "Showing incoming call alert callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
+        trace("notification_build_start", data, "notificationId=" + notificationId + " timeoutMs=" + timeoutMs);
 
         PendingIntent fullScreenIntent = PendingIntent.getActivity(
                 this,
                 notificationId,
                 incomingCallIntent(callerId, callId, callerName, receiverId, callType, expiresAt, notificationId),
+                pendingIntentFlags()
+        );
+        PendingIntent answerIntent = PendingIntent.getActivity(
+                this,
+                notificationId + 1,
+                mainCallActionIntent(callerId, callId, receiverId, callType, expiresAt, true),
+                pendingIntentFlags()
+        );
+        PendingIntent rejectIntent = PendingIntent.getActivity(
+                this,
+                notificationId + 2,
+                mainCallActionIntent(callerId, callId, receiverId, callType, expiresAt, false),
                 pendingIntentFlags()
         );
 
@@ -149,9 +168,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setSound(Settings.System.DEFAULT_RINGTONE_URI)
                 .setVibrate(new long[] { 0, 700, 400, 700, 400, 700 })
                 .setFullScreenIntent(fullScreenIntent, true)
-                .setContentIntent(fullScreenIntent);
+                .setContentIntent(answerIntent)
+                .addAction(R.mipmap.ic_launcher, "Reject", rejectIntent)
+                .addAction(R.mipmap.ic_launcher, "Answer", answerIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+        trace("notification_posted", data, "notificationId=" + notificationId + " fullScreen=true");
     }
 
     private long callNotificationTimeoutMs(String expiresAtValue, long now) {
@@ -178,8 +200,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         try {
             startActivity(intent);
             Log.d(TAG, "Opened full-screen incoming call activity directly for callId=" + callId);
+            trace("activity_started_direct", data, "notificationId=" + notificationId);
         } catch (Exception e) {
             Log.w(TAG, "Direct incoming call activity launch failed; falling back to full-screen notification", e);
+            trace("activity_started_direct_failed", data, "error=" + e.getClass().getSimpleName() + ":" + e.getMessage());
             showIncomingCall(data);
         }
     }
@@ -195,6 +219,28 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         intent.putExtra("callType", callType != null ? callType : "video");
         intent.putExtra("expiresAt", expiresAt != null ? expiresAt : "");
         intent.putExtra("notificationId", notificationId);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return intent;
+    }
+
+    private Intent mainCallActionIntent(String callerId, String callId, String receiverId, String callType, String expiresAt, boolean answer) {
+        Uri uri = new Uri.Builder()
+                .scheme("folcen")
+                .authority("incoming-call")
+                .appendQueryParameter("callerId", callerId != null ? callerId : "")
+                .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
+                .appendQueryParameter("callId", callId != null ? callId : "")
+                .appendQueryParameter("receiverId", receiverId != null ? receiverId : "")
+                .appendQueryParameter("toUserId", receiverId != null ? receiverId : "")
+                .appendQueryParameter("callType", callType != null ? callType : "video")
+                .appendQueryParameter("expiresAt", expiresAt != null ? expiresAt : "")
+                .appendQueryParameter("answer", answer ? "true" : "false")
+                .appendQueryParameter("action", answer ? "answer" : "reject")
+                .appendQueryParameter("autoAnswer", answer ? "true" : "false")
+                .build();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setAction(Intent.ACTION_VIEW);
+        intent.setData(uri);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return intent;
     }
@@ -322,5 +368,17 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             if (value != null && value.trim().length() > 0) return value;
         }
         return "";
+    }
+
+    private void trace(String event, Map<String, String> data, String details) {
+        String callId = data != null ? firstNonEmpty(data.get("callId"), "") : "";
+        String callerId = data != null ? firstNonEmpty(data.get("callerId"), data.get("fromUserId"), data.get("from")) : "";
+        String receiverId = data != null ? firstNonEmpty(data.get("receiverId"), data.get("toUserId"), data.get("to")) : "";
+        Log.d(TRACE_TAG, "native fcm event=" + event
+                + " t=" + System.currentTimeMillis()
+                + " callId=" + callId
+                + " callerId=" + callerId
+                + " receiverId=" + receiverId
+                + " " + firstNonEmpty(details, ""));
     }
 }

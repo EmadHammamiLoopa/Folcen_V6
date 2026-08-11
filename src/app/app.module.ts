@@ -21,7 +21,6 @@ import { File } from '@ionic-native/file/ngx';
 import { FilePath } from '@ionic-native/file-path/ngx';
 import { WebView } from '@ionic-native/ionic-webview/ngx';
 import { AdMobFree } from '@ionic-native/admob-free/ngx';
-import { BackgroundMode } from '@ionic-native/background-mode/ngx';
 import { FormsModule, FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { NgxStripeModule } from 'ngx-stripe';
 
@@ -107,7 +106,6 @@ import { SharedComponentsModule } from './components/shared.module';
     FilePath,
     WebView,
     FormBuilder,
-    BackgroundMode,
     MockCordovaService,
     StorageService, 
     GooglePlus,

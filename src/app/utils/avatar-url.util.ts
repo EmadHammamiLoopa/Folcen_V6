@@ -83,6 +83,12 @@ export interface AvatarProfile {
   username?: string;
   userName?: string;
   mainAvatar?: string;
+  avatarUrl?: any;
+  photo?: string;
+  profilePhoto?: string;
+  profilePicture?: string;
+  picture?: string;
+  image?: string;
   [key: string]: any;
 }
 
@@ -97,8 +103,15 @@ export class AvatarUrlUtil {
       return url.includes('dicebear.com') && (url.includes('/bottts/') || url.includes('/avataaars/') === false);
     };
 
-    const normalizeUrl = (url: string) => {
+    const normalizeUrl = (rawUrl: any) => {
+      if (typeof rawUrl === 'function') return '';
+      let url = rawUrl;
+      if (url && typeof url === 'object') {
+        url = url.path || url.url || url.mainAvatar || url.src || '';
+      }
+      url = String(url || '').trim();
       if (!url) return '';
+      if (url === 'undefined' || url === 'null' || url === '[object Object]') return '';
       if (url.startsWith('http') || url.startsWith('data:')) return url;
       
       const fullUrl = backendRoot + (url.startsWith('/') ? '' : '/') + url;
@@ -107,9 +120,28 @@ export class AvatarUrlUtil {
       return `${fullUrl}${separator}v=${timestamp}`;
     };
 
-    // 1. Prioritize real uploaded photo (mainAvatar) if it's not a DiceBear URL
-    if (profile.mainAvatar && !profile.mainAvatar.includes('dicebear.com')) {
-      return normalizeUrl(profile.mainAvatar);
+    const avatarList = Array.isArray(profile.avatar)
+      ? profile.avatar
+      : (profile.avatar ? [profile.avatar] : []);
+    const candidates = [
+      profile.mainAvatar,
+      profile.profilePhoto,
+      profile.profilePicture,
+      profile.photo,
+      profile.picture,
+      profile.image,
+      profile.avatarUrl,
+      ...avatarList
+    ];
+    const normalizedCandidates = candidates
+      .map(normalizeUrl)
+      .filter(Boolean);
+    const uploadedAvatar = normalizedCandidates.find(url => !url.includes('dicebear.com'));
+    const mainAvatar = normalizedCandidates[0] || '';
+
+    // 1. Prioritize real uploaded photos before generated/custom avatars.
+    if (uploadedAvatar) {
+      return uploadedAvatar;
     }
 
     // 2. If it's a customized DiceBear avatar, build the URL with overrides
@@ -118,8 +150,8 @@ export class AvatarUrlUtil {
     }
 
     // 3. Fallback to mainAvatar if it exists and is NOT an old DiceBear style
-    if (profile.mainAvatar && !isOldDiceBear(profile.mainAvatar)) {
-      return normalizeUrl(profile.mainAvatar);
+    if (mainAvatar && !isOldDiceBear(mainAvatar)) {
+      return mainAvatar;
     }
 
     // 4. Last resort: Generate a default DiceBear avataaars URL

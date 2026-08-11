@@ -31,6 +31,8 @@ export class ChannelComponent implements OnInit {
   pageLoading = false;
   posts: Post[] = [];
   page = 0;
+  descriptionExpanded = false;
+  channelImageFailed = false;
   private destroy$ = new Subject<void>();
   private feedRefreshTimer: any;
 
@@ -88,8 +90,26 @@ export class ChannelComponent implements OnInit {
 
   isOwner(channel: Channel): boolean {
     if (!channel) return false;
-    const uid = this.user?.id || this.user?._id || '';
+    const uid = this.currentUserId();
     return channel.isOwner(uid);
+  }
+
+  currentUserId(): string {
+    return String(this.user?.id || this.user?._id || '');
+  }
+
+  isChannelFollowed(): boolean {
+    return !!(this.channel && this.channel.followedBy(this.currentUserId()));
+  }
+
+  private rememberFollowState(channelId: string, followed: boolean) {
+    try {
+      localStorage.setItem('channelFollowStateChanged', JSON.stringify({
+        id: channelId,
+        followed,
+        at: Date.now()
+      }));
+    } catch (e) {}
   }
 
   ionViewWillEnter() {
@@ -148,12 +168,15 @@ export class ChannelComponent implements OnInit {
       this.pageLoading = false;
       const channelData = JSON.parse(params.get('channel') || '{}');
       this.channel = Channel.createFromData(channelData);
+      this.channelImageFailed = false;
       // fetch fresh channel data from server to ensure populated user/followers
       if (this.channel && this.channel.id) {
         this.channelService.show(this.channel.id).then((resp: any) => {
           if (resp && resp.data && resp.data.channel) {
             this.channel = Channel.createFromData(resp.data.channel);
+            this.channelImageFailed = false;
           }
+          this.descriptionExpanded = false;
           this.getChannelPosts(null, true);
         }, err => {
           // fallback to local channel data
@@ -163,6 +186,10 @@ export class ChannelComponent implements OnInit {
         this.getChannelPosts(null, true);
       }
     });
+  }
+
+  onChannelImageError() {
+    this.channelImageFailed = true;
   }
 
   
@@ -252,14 +279,13 @@ async showPostForm() {
     const items = [];
     const chanUser: any = (this.channel && (this.channel as any).user) || null;
     const chanUserId = chanUser && (chanUser.id || chanUser._id || (typeof chanUser.getId === 'function' ? chanUser.getId() : null)) || '';
-    const myId = this.user && (this.user.id || this.user._id) ? (this.user.id || this.user._id) : '';
+    const myId = this.currentUserId();
 
     if (chanUserId && this.user && String(chanUserId) === String(myId)) {
       items.push({ text: 'Delete', icon: 'fas fa-trash-alt', event: 'delete' });
     } else {
-      const authId = myId;
       items.push(
-        { text: this.channel.followedBy(authId) ? 'Unfollow' : 'Follow', icon: this.channel.followedBy(authId) ? 'fas fa-minus-circle' : 'fas fa-plus', event: 'follow' },
+        { text: this.isChannelFollowed() ? 'Unfollow' : 'Follow', icon: this.isChannelFollowed() ? 'fas fa-minus-circle' : 'fas fa-plus', event: 'follow' },
         { text: 'Report', icon: 'fas fa-exclamation-triangle', event: 'report' }
       );
     }
@@ -268,7 +294,7 @@ async showPostForm() {
 
   async handlePopoverEvent(event) {
     if (event === 'follow') {
-      if (this.channel.followedBy(this.user._id)) this.togglefollowConf();
+      if (this.isChannelFollowed()) this.togglefollowConf();
       else this.togglefollow();
     } else if (event === 'delete') this.deleteConf();
     else if (event === 'report') this.reportChannel();
@@ -287,25 +313,27 @@ async showPostForm() {
   }
 
   togglefollow() {
-    const uid = this.user && (this.user.id || this.user._id) ? (this.user.id || this.user._id) : '';
+    const uid = this.currentUserId();
+    const wasFollowed = this.isChannelFollowed();
     this.channelService.follow(this.channel.id).then(
       (resp: any) => {
         this.toastService.presentSuccessToastr(resp.message);
         try {
           let currentFollowers = [...(this.channel.followers || [])];
-          if (resp.data) {
+          if (!wasFollowed) {
             // add uid if not present
-            const exists = currentFollowers.find((f: any) => (typeof f === 'string' ? f === uid : (f && (f._id === uid || f.id === uid))));
+            const exists = currentFollowers.find((f: any) => (typeof f === 'string' ? String(f) === uid : (f && (String(f._id || f.id) === uid))));
             if (!exists) currentFollowers.push(uid);
           } else {
             // remove all entries matching uid
             currentFollowers = currentFollowers.filter((f: any) => {
               if (!f) return false;
-              if (typeof f === 'string') return f !== uid;
+              if (typeof f === 'string') return String(f) !== uid;
               return String(f._id || f.id) !== String(uid);
             });
           }
           this.channel.followers = currentFollowers;
+          this.rememberFollowState(this.channel.id, !wasFollowed);
           this.changeDetectorRef.detectChanges();
         } catch (e) { console.warn('Error updating channel.followers', e); }
       },

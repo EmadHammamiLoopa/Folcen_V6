@@ -7,9 +7,12 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -21,6 +24,7 @@ import android.widget.TextView;
 
 public class IncomingCallActivity extends Activity {
     private static final String TAG = "FolcenIncomingCall";
+    private static final String TRACE_TAG = "FolcenCallTrace";
     private String callerId;
     private String callId;
     private int notificationId;
@@ -28,6 +32,7 @@ public class IncomingCallActivity extends Activity {
     private String callType;
     private String expiresAt;
     private boolean actionTaken = false;
+    private MediaPlayer ringtonePlayer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,12 +49,15 @@ public class IncomingCallActivity extends Activity {
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
         if (isExpired()) {
             Log.d(TAG, "expired incoming screen dismissed callId=" + callId + " expiresAt=" + expiresAt);
+            trace("incoming_activity_expired", "expiresAt=" + expiresAt);
             cancelNotification();
             finish();
             return;
         }
         Log.d(TAG, "display callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
+        trace("incoming_activity_display", "callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
         cancelNotification();
+        startRingtone();
 
         setContentView(buildView(callerName));
     }
@@ -67,14 +75,23 @@ public class IncomingCallActivity extends Activity {
         String callerName = firstNonEmpty(intent.getStringExtra("callerName"), "Incoming video call");
         if (isExpired()) {
             Log.d(TAG, "expired incoming refresh dismissed callId=" + callId + " expiresAt=" + expiresAt);
+            trace("incoming_activity_refresh_expired", "expiresAt=" + expiresAt);
             cancelNotification();
             finish();
             return;
         }
         actionTaken = false;
         Log.d(TAG, "refresh callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
+        trace("incoming_activity_refresh", "callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
         cancelNotification();
+        startRingtone();
         setContentView(buildView(callerName));
+    }
+
+    @Override
+    protected void onDestroy() {
+        stopRingtone();
+        super.onDestroy();
     }
 
     private View buildView(String callerName) {
@@ -221,12 +238,16 @@ public class IncomingCallActivity extends Activity {
         if (actionTaken) return;
         if (isExpired()) {
             Log.d(TAG, "expired answer ignored callId=" + callId + " expiresAt=" + expiresAt);
+            trace("incoming_answer_expired", "expiresAt=" + expiresAt);
             cancelNotification();
             finish();
             return;
         }
         actionTaken = true;
         Log.d(TAG, "answer tapped callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId);
+        long answerAt = System.currentTimeMillis();
+        trace("incoming_answer_tapped", "callerId=" + callerId + " receiverId=" + receiverId);
+        stopRingtone();
         cancelNotification();
         Uri uri = new Uri.Builder()
                 .scheme("folcen")
@@ -249,6 +270,7 @@ public class IncomingCallActivity extends Activity {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
         Log.d(TAG, "answer launched MainActivity callId=" + callId);
+        trace("incoming_answer_start_main", "elapsedFromTapMs=" + (System.currentTimeMillis() - answerAt) + " url=" + uri.toString());
         finish();
     }
 
@@ -256,12 +278,15 @@ public class IncomingCallActivity extends Activity {
         if (actionTaken) return;
         if (isExpired()) {
             Log.d(TAG, "expired reject ignored callId=" + callId + " expiresAt=" + expiresAt);
+            trace("incoming_reject_expired", "expiresAt=" + expiresAt);
             cancelNotification();
             finish();
             return;
         }
         actionTaken = true;
         Log.d(TAG, "reject tapped callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId);
+        trace("incoming_reject_tapped", "callerId=" + callerId + " receiverId=" + receiverId);
+        stopRingtone();
         cancelNotification();
         Uri uri = new Uri.Builder()
                 .scheme("folcen")
@@ -283,11 +308,47 @@ public class IncomingCallActivity extends Activity {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
         Log.d(TAG, "reject launched MainActivity callId=" + callId);
+        trace("incoming_reject_start_main", "url=" + uri.toString());
         finish();
     }
 
     private void cancelNotification() {
         MyFirebaseMessagingService.cancelIncomingCallNotifications(this, callId, notificationId);
+    }
+
+    private void startRingtone() {
+        try {
+            stopRingtone();
+            ringtonePlayer = new MediaPlayer();
+            ringtonePlayer.setDataSource(this, Settings.System.DEFAULT_RINGTONE_URI);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                ringtonePlayer.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build());
+            } else {
+                ringtonePlayer.setAudioStreamType(android.media.AudioManager.STREAM_RING);
+            }
+            ringtonePlayer.setLooping(true);
+            ringtonePlayer.prepare();
+            ringtonePlayer.start();
+            Log.d(TAG, "ringtone started callId=" + callId);
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to start incoming call ringtone callId=" + callId, e);
+            stopRingtone();
+        }
+    }
+
+    private void stopRingtone() {
+        try {
+            if (ringtonePlayer != null) {
+                if (ringtonePlayer.isPlaying()) ringtonePlayer.stop();
+                ringtonePlayer.release();
+            }
+        } catch (Exception ignored) {
+        } finally {
+            ringtonePlayer = null;
+        }
     }
 
     private void showOverLockScreen() {
@@ -320,5 +381,12 @@ public class IncomingCallActivity extends Activity {
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    private void trace(String event, String details) {
+        Log.d(TRACE_TAG, "native incoming event=" + event
+                + " t=" + System.currentTimeMillis()
+                + " callId=" + callId
+                + " " + firstNonEmpty(details, ""));
     }
 }

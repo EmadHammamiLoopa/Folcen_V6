@@ -57,10 +57,6 @@
         <i class="fas" [ngClass]="answeringCall ? 'fa-spinner fa-spin' : 'fa-phone'"></i>
       </button>
 
-      <button *ngIf="!answered && !answer && !calling" class="main-btn call" (click)="placeCall()" aria-label="Start video call">
-        <i class="fas fa-video"></i>
-      </button>
-
       <button class="main-btn hangup" (click)="answered ? closeCall() : cancel()" aria-label="End call">
         <i class="fas fa-phone-slash"></i>
       </button>

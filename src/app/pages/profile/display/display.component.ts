@@ -46,6 +46,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
   imageLoading = false;
   isUploading = false;
   usedCached = false;
+  showAvatarMediaMenu = false;
 
   private userSub: Subscription | null = null;
   private subs: Subscription[] = [];
@@ -629,28 +630,18 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   async openAvatarMediaOptions() {
-    const alert = await this.alertCtrl.create({
-      header: 'Update avatar',
-      buttons: [
-        {
-          text: 'Camera',
-          handler: () => this.openCameraPicker()
-        },
-        {
-          text: 'Gallery',
-          handler: () => this.openImagePicker()
-        },
-        {
-          text: 'Customize avatar',
-          handler: () => this.openAvatarCustomize()
-        },
-        {
-          text: 'Cancel',
-          role: 'cancel'
-        }
-      ]
-    });
-    await alert.present();
+    this.showAvatarMediaMenu = true;
+  }
+
+  closeAvatarMediaOptions() {
+    this.showAvatarMediaMenu = false;
+  }
+
+  selectAvatarMediaSource(source: 'camera' | 'gallery' | 'customize') {
+    this.closeAvatarMediaOptions();
+    if (source === 'camera') return this.openCameraPicker();
+    if (source === 'gallery') return this.openImagePicker();
+    return this.openAvatarCustomize();
   }
   
   

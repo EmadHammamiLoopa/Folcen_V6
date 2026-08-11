@@ -254,3 +254,34 @@
     </div>
   </div>
 </ion-content>
+
+<div class="avatar-source-backdrop" *ngIf="showAvatarMediaMenu" (click)="closeAvatarMediaOptions()"></div>
+<section class="avatar-source-panel" *ngIf="showAvatarMediaMenu" role="dialog" aria-label="Update avatar">
+  <div class="sheet-handle"></div>
+  <div class="sheet-copy">
+    <h3>Update avatar</h3>
+    <p>Use a fresh photo, pick from your gallery, or keep it playful with a custom avatar.</p>
+  </div>
+  <button type="button" class="avatar-choice" (click)="selectAvatarMediaSource('camera')">
+    <span class="choice-icon camera"><ion-icon name="camera-outline"></ion-icon></span>
+    <span>
+      <strong>Camera</strong>
+      <small>Take a new profile photo</small>
+    </span>
+  </button>
+  <button type="button" class="avatar-choice" (click)="selectAvatarMediaSource('gallery')">
+    <span class="choice-icon gallery"><ion-icon name="images-outline"></ion-icon></span>
+    <span>
+      <strong>Gallery</strong>
+      <small>Choose an existing image</small>
+    </span>
+  </button>
+  <button type="button" class="avatar-choice" (click)="selectAvatarMediaSource('customize')">
+    <span class="choice-icon customize"><ion-icon name="color-palette-outline"></ion-icon></span>
+    <span>
+      <strong>Customize avatar</strong>
+      <small>Create a look that feels like you</small>
+    </span>
+  </button>
+  <button type="button" class="avatar-cancel" (click)="closeAvatarMediaOptions()">Cancel</button>
+</section>

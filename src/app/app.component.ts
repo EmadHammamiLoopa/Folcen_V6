@@ -12,7 +12,6 @@ import { OneSignalService } from './services/one-signal.service';
 import { WebrtcService } from './services/webrtc.service';
 import { MessengerService } from './pages/messenger.service';
 import { AdMobFeeService } from './services/admobfree.service';
-import { BackgroundMode } from '@ionic-native/background-mode/ngx';
 import { User } from './models/User';
 import { SocketService } from './services/socket.service';
 import { ListSearchComponent } from '../app/pages/list-search/list-search.component';
@@ -88,7 +87,6 @@ export class AppComponent implements OnDestroy {
     private router: Router,
     private messengerService: MessengerService,
     private adMobFreeService: AdMobFeeService,
-    private backgroundMode: BackgroundMode,
     private modalCtrl: ModalController,
     private changeDetectorRef: ChangeDetectorRef,
     private zone: NgZone,
@@ -105,7 +103,7 @@ export class AppComponent implements OnDestroy {
   ) {
     // Expose performance monitor globally for debugging
     (window as any).__perfMonitor = this.perfMonitor;
-    console.log('📊 Performance monitor initialized. Use window.__perfMonitor.logSummary() to see stats');
+    console.log('Ã°Å¸â€œÅ  Performance monitor initialized. Use window.__perfMonitor.logSummary() to see stats');
     
     this.initializeApp();
     this.setupSocketListeners(); // Call this in constructor
@@ -245,7 +243,7 @@ export class AppComponent implements OnDestroy {
         const annCreated = announcement.createdAt ? new Date(announcement.createdAt).getTime() : Date.now();
         if (userCreated && annCreated < userCreated) return;
         if (!this.shownAnnouncements.has(announcement._id)) {
-          // Run inside Angular zone — ModalController requires it to render the overlay correctly
+          // Run inside Angular zone Ã¢â‚¬â€ ModalController requires it to render the overlay correctly
           this.zone.run(() => this.showAnnouncement(announcement));
         }
       } catch (e) {}
@@ -331,16 +329,16 @@ export class AppComponent implements OnDestroy {
       // Only attempt to get the live socket if a token exists.
       const token = localStorage.getItem('token');
       if (!token) {
-        console.log('ℹ️ No auth token — skipping socket listener setup until sign-in.');
+        console.log('Ã¢â€žÂ¹Ã¯Â¸Â No auth token Ã¢â‚¬â€ skipping socket listener setup until sign-in.');
         return; // do not schedule a retry here; listeners will be set after sign-in
       }
 
       const socket = await SocketService.getSocket();
-      this.socket = socket; // ✅ keep a reference
+      this.socket = socket; // Ã¢Å“â€¦ keep a reference
 
       socket.on('ping', () => {
         socket.emit('pong');
-        console.log('❤️ Responded to server ping');
+        console.log('Ã¢ÂÂ¤Ã¯Â¸Â Responded to server ping');
       });
 
       // Track user activity globally
@@ -361,7 +359,7 @@ export class AppComponent implements OnDestroy {
         setTimeout(() => this.setupSocketListeners(), 5000);
       } else {
         // If no token, avoid tight retry loop; listeners will be initialized after login.
-        console.log('ℹ️ Not retrying socket listener setup because no auth token is present.');
+        console.log('Ã¢â€žÂ¹Ã¯Â¸Â Not retrying socket listener setup because no auth token is present.');
       }
     }
   }
@@ -373,9 +371,9 @@ export class AppComponent implements OnDestroy {
   }
 
   initializeApp() {
-    console.log('🚀 AppComponent: initializeApp starting...');
+    console.log('Ã°Å¸Å¡â‚¬ AppComponent: initializeApp starting...');
     this.platform.ready().then(async () => {
-      console.log('📱 Platform ready');
+      console.log('Ã°Å¸â€œÂ± Platform ready');
       // Initialize Theme
       this.themeService.initializeTheme();
 
@@ -392,7 +390,7 @@ export class AppComponent implements OnDestroy {
             const tokStr = typeof tok === 'string' ? tok : String(tok);
             try { localStorage.setItem('token', tokStr); } catch {}
             SocketService.setTokenCache(tokStr);
-            console.log('🔑 Token backfilled from NativeStorage to localStorage+cache');
+            console.log('Ã°Å¸â€â€˜ Token backfilled from NativeStorage to localStorage+cache');
           }
         } else {
           SocketService.setTokenCache(typeof tok === 'string' ? tok : String(tok));
@@ -410,26 +408,26 @@ export class AppComponent implements OnDestroy {
       } catch (e) { /* ignore */ }
 
       // Initialize session/user once per app boot (deduped)
-      console.log('⏳ Initializing session store...');
+      console.log('Ã¢ÂÂ³ Initializing session store...');
       try {
         this.sessionStore.init().catch(e => console.warn('Session store init failed', e));
-        console.log('✅ Session store initialized');
+        console.log('Ã¢Å“â€¦ Session store initialized');
       } catch (e) {
-        console.warn('⚠️ Session store init failed', e);
+        console.warn('Ã¢Å¡Â Ã¯Â¸Â Session store init failed', e);
       }
 
-      // ✅ Ask notification permission
-      console.log('⏳ Requesting notification permissions...');
+      // Ã¢Å“â€¦ Ask notification permission
+      console.log('Ã¢ÂÂ³ Requesting notification permissions...');
       try {
         LocalNotifications.requestPermissions().catch(e => console.warn('Notification permissions failed', e));
-        console.log('✅ Notification permissions handled');
+        console.log('Ã¢Å“â€¦ Notification permissions handled');
       } catch (e) {
-        console.warn('⚠️ Notification permissions failed', e);
+        console.warn('Ã¢Å¡Â Ã¯Â¸Â Notification permissions failed', e);
       }
 
       SocketService.initializeSocket();
 
-      // ✅ Handle notification click when app is in background
+      // Ã¢Å“â€¦ Handle notification click when app is in background
       LocalNotifications.addListener(
         'localNotificationActionPerformed',
         (notification) => {
@@ -449,17 +447,22 @@ export class AppComponent implements OnDestroy {
         this.handleIncomingCallUrl(launch?.url);
       }).catch(() => {});
 
+      CapacitorApp.addListener('appRestoredResult', (event: any) => {
+        this.handleRestoredCameraResult(event);
+      });
+
       CapacitorApp.addListener('resume', () => {
-        console.log('📱 App resumed - checking connections...');
+        console.log('Ã°Å¸â€œÂ± App resumed - checking connections...');
+        setTimeout(() => this.consumeStoredIncomingCallUrl(), 50);
         if (this.user?.id) {
           this.handleReconnection();
           this.checkAnnouncements();
         } else {
-          console.warn('⚠️ Skipping reconnection: user not yet loaded.');
+          console.warn('Ã¢Å¡Â Ã¯Â¸Â Skipping reconnection: user not yet loaded.');
         }
       });
 
-      // ✅ Cordova-specific setup
+      // Ã¢Å“â€¦ Cordova-specific setup
       if (this.platform.is('cordova')) {
         this.statusBar.styleDefault();
         this.splashScreen.hide();
@@ -470,13 +473,13 @@ export class AppComponent implements OnDestroy {
         console.log('Running in browser, Cordova not available');
       }
 
-      // ✅ Initialize user & data
+      // Ã¢Å“â€¦ Initialize user & data
       // Auto-enable persistence of default static channel follows so
       // client will persist follows to the server when merging statics.
       try {
         if (!localStorage.getItem('persist_default_channel_follows')) {
           localStorage.setItem('persist_default_channel_follows', '1');
-          console.log('📌 Enabled persist_default_channel_follows by default');
+          console.log('Ã°Å¸â€œÅ’ Enabled persist_default_channel_follows by default');
         }
       } catch (err) {
         console.warn('Could not set persist_default_channel_follows in localStorage', err);
@@ -486,7 +489,7 @@ export class AppComponent implements OnDestroy {
       setTimeout(() => this.getJsonData(), 1500);
 
       setTimeout(() => {
-        console.log('✨ Hiding splash screen');
+        console.log('Ã¢Å“Â¨ Hiding splash screen');
         this.showSplash = false;
       }, 1200);
     });
@@ -496,8 +499,49 @@ export class AppComponent implements OnDestroy {
     setTimeout(() => {
       this.audio = new Audio('/assets/audio/ringing.mp3');
       this.audio.load();
-      console.log('🎵 Preloaded ringing audio');
+      console.log('Ã°Å¸Å½Âµ Preloaded ringing audio');
     }, 2000);
+  }
+
+  private handleRestoredCameraResult(event: any) {
+    try {
+      if (!event || event.pluginId !== 'Camera' || event.methodName !== 'getPhoto') return;
+      const pendingRaw = localStorage.getItem('pendingCommentCameraReturn');
+      if (!pendingRaw) return;
+      const pending = JSON.parse(pendingRaw);
+      if (!pending?.postId) return;
+
+      const data = event.data || {};
+      const base64 = data.base64String || (typeof data.dataUrl === 'string' ? data.dataUrl.split(',').pop() : '');
+      if (!base64) return;
+
+      const format = String(data.format || 'jpeg').replace('jpeg', 'jpg');
+      const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+      const dataUrl = data.dataUrl || `data:${mimeType};base64,${base64}`;
+
+      localStorage.setItem('pendingCommentCameraMedia', JSON.stringify({
+        postId: pending.postId,
+        channelId: pending.channelId,
+        channel: pending.channel || null,
+        dataUrl,
+        name: `comment-${Date.now()}.${format}`,
+        mimeType,
+        at: Date.now()
+      }));
+
+      const target = pending.routeUrl || `/tabs/channels/post/${pending.postId}`;
+      this.zone.run(() => {
+        this.router.navigateByUrl(target, { replaceUrl: true }).catch(() => {
+          const extras: any = {};
+          if (pending.channel) {
+            try { extras.queryParams = { channel: JSON.stringify(pending.channel) }; } catch (e) {}
+          }
+          this.router.navigate(['/tabs/channels/post', pending.postId], extras);
+        });
+      });
+    } catch (e) {
+      console.warn('[camera] failed to restore comment camera result', e);
+    }
   }
 
   startConnectionMonitoring() {
@@ -505,7 +549,7 @@ export class AppComponent implements OnDestroy {
       const isOnline = navigator.onLine;
       if (isOnline !== this.wasOnline) {
         console.log(
-          `🌐 Network status changed: ${isOnline ? 'Online' : 'Offline'}`,
+          `Ã°Å¸Å’Â Network status changed: ${isOnline ? 'Online' : 'Offline'}`,
         );
         this.wasOnline = isOnline;
 
@@ -519,9 +563,9 @@ export class AppComponent implements OnDestroy {
   }
 
   private async handleReconnection() {
-    console.log('🔄 Attempting to reconnect all services...');
+    console.log('Ã°Å¸â€â€ž Attempting to reconnect all services...');
     if (!this.user?.id) {
-      console.warn('⛔ User not initialized');
+      console.warn('Ã¢â€ºâ€ User not initialized');
       return;
     }
 
@@ -535,15 +579,15 @@ export class AppComponent implements OnDestroy {
 
       this.checkAnnouncements();
 
-      console.log('✅ All services reconnected successfully');
+      console.log('Ã¢Å“â€¦ All services reconnected successfully');
     } catch (error) {
-      console.error('❌ Reconnection failed:', error);
+      console.error('Ã¢ÂÅ’ Reconnection failed:', error);
       setTimeout(() => this.handleReconnection(), 10000);
     }
   }
 
   private handleOffline() {
-    console.log('⚠️ App is offline - queuing operations');
+    console.log('Ã¢Å¡Â Ã¯Â¸Â App is offline - queuing operations');
     // Implement offline queue if needed
   }
 
@@ -627,10 +671,10 @@ export class AppComponent implements OnDestroy {
     this.audio
       .play()
       .then(() => {
-        console.log('🎵 Audio started playing successfully');
+        console.log('Ã°Å¸Å½Âµ Audio started playing successfully');
       })
       .catch((error) => {
-        console.warn('⚠️ Audio autoplay prevented:', error);
+        console.warn('Ã¢Å¡Â Ã¯Â¸Â Audio autoplay prevented:', error);
       });
   }
 
@@ -678,6 +722,7 @@ export class AppComponent implements OnDestroy {
 
     console.log('Incoming call invite:', invite);
     localStorage.setItem('partnerId', invite.callerId);
+    localStorage.setItem('activeIncomingCallId', invite.callId);
 
     const queryParams = { answer: true, callId: invite.callId };
     const state = await CapacitorApp.getState().catch(() => ({ isActive: true }));
@@ -707,6 +752,19 @@ export class AppComponent implements OnDestroy {
     return !!url && url.startsWith('folcen://incoming-call');
   }
 
+  private callTrace(event: string, data: any = {}): void {
+    try {
+      console.log('[FolcenCallTrace]', {
+        layer: 'app.component',
+        event,
+        t: Date.now(),
+        userId: this.user?.id || (this.user as any)?._id,
+        route: this.router?.url,
+        ...data
+      });
+    } catch (_) {}
+  }
+
   private prepareIncomingCallLaunch(url?: string) {
     if (!this.isIncomingCallUrl(url)) return;
     this.pendingIncomingCallUrl = url;
@@ -729,9 +787,11 @@ export class AppComponent implements OnDestroy {
 
   private handleIncomingCallUrl(url?: string) {
     if (!this.isIncomingCallUrl(url)) return;
+    this.callTrace('CALL_INCOMING_URL_RECEIVED', { hasUser: !!this.user?.id, url });
     this.prepareIncomingCallLaunch(url);
     if (!this.user?.id) {
       this.pendingIncomingCallUrl = url;
+      this.callTrace('CALL_INCOMING_URL_WAITING_FOR_USER', { url });
       return;
     }
     this.pendingIncomingCallUrl = null;
@@ -742,10 +802,14 @@ export class AppComponent implements OnDestroy {
       const action = parsed.searchParams.get('action') || (parsed.searchParams.get('answer') === 'false' ? 'reject' : 'answer');
       const autoAnswer = parsed.searchParams.get('autoAnswer') === 'true' || action === 'answer';
       if (!callerId) return;
+      if (callId) localStorage.setItem('activeIncomingCallId', callId);
+      localStorage.setItem('partnerId', callerId);
       const actionKey = `${callId || callerId}:${action}`;
+      this.callTrace('CALL_INCOMING_ACTION_PARSED', { actionKey, callerId, callId, action, autoAnswer });
       console.log('[incoming-call] handling url action', { actionKey, callerId, callId, action, autoAnswer });
       if (this.handledIncomingCallActions.has(actionKey)) {
         console.log('Ignoring duplicate incoming call action:', actionKey);
+        this.callTrace('CALL_INCOMING_ACTION_DUPLICATE', { actionKey, callerId, callId, action });
         return;
       }
       this.handledIncomingCallActions.add(actionKey);
@@ -753,10 +817,17 @@ export class AppComponent implements OnDestroy {
       setTimeout(() => this.handledIncomingCallActions.delete(actionKey), 45000);
 
       if (action === 'reject') {
+        localStorage.removeItem('activeIncomingCallId');
+        try { localStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
+        try { sessionStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
+        this.callTrace('CALL_REJECT_FROM_URL', { callerId, callId });
         this.rejectIncomingCallFromUrl(callerId, callId);
         return;
       }
       this.zone.run(() => {
+        this.callTrace('CALL_NAVIGATE_TO_SCREEN', { callerId, callId, autoAnswer });
+        try { localStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
+        try { sessionStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
         this.router.navigate(['/messages/video', callerId], {
           queryParams: { answer: true, callId, autoAnswer, directCall: '1' },
           replaceUrl: true,
@@ -848,19 +919,19 @@ export class AppComponent implements OnDestroy {
       });
 
       socket.off('video-canceled').on('video-canceled', (data) => {
-        console.log('🚫 Call canceled.', data);
+        console.log('Ã°Å¸Å¡Â« Call canceled.', data);
         this.audio?.pause();
         localStorage.removeItem('partnerId');
       });
 
       socket.off('video-call-timeout').on('video-call-timeout', (data) => {
-        console.log('⏰ Call timed out.', data);
+        console.log('Ã¢ÂÂ° Call timed out.', data);
         this.audio?.pause();
         localStorage.removeItem('partnerId');
       });
 
       socket.off('missed-call').on('missed-call', (data) => {
-        console.log('📞 Missed call received.', data);
+        console.log('Ã°Å¸â€œÅ¾ Missed call received.', data);
         if (this.user?.id) {
           this.webrtcService.addMissedCallFromSignaling(data, this.user.id, 'missed-call');
         }
@@ -920,9 +991,21 @@ export class AppComponent implements OnDestroy {
     }
   }
 
+  private consumeStoredIncomingCallUrl(): void {
+    try {
+      const stored = localStorage.getItem('pendingIncomingCallUrl') || sessionStorage.getItem('pendingIncomingCallUrl');
+      if (!this.isIncomingCallUrl(stored || undefined)) return;
+      this.callTrace('CALL_CONSUME_STORED_URL', { hasUser: !!this.user?.id, stored });
+      console.log('[incoming-call] consuming stored pending url');
+      this.handleIncomingCallUrl(stored || undefined);
+    } catch (e) {
+      console.warn('Failed to consume stored incoming call url:', e);
+    }
+  }
   private async initializeUser(user: any) {
     this.user = new User().initialize(user);
     this.userService.setCurrentUser(this.user); // Ensure UserService is updated
+    this.callTrace('CALL_USER_INITIALIZED_FOR_PENDING_CHECK');
 
     try {
       const userId = this.user?.id || (this.user as any)?._id;
@@ -942,6 +1025,7 @@ export class AppComponent implements OnDestroy {
 
     setTimeout(() => this.initWebrtc(), 2500);
     this.connectUser();
+    this.consumeStoredIncomingCallUrl();
     if (this.pendingIncomingCallUrl) {
       const pendingUrl = this.pendingIncomingCallUrl;
       this.pendingIncomingCallUrl = null;
@@ -953,7 +1037,7 @@ export class AppComponent implements OnDestroy {
 
   private async initWebrtc() {
     if (!this.user?.id) {
-      console.error('❌ No authenticated user found');
+      console.error('Ã¢ÂÅ’ No authenticated user found');
       return;
     }
 
@@ -980,7 +1064,7 @@ export class AppComponent implements OnDestroy {
 
         const myPeerId = this.webRTC.getPeerId();
         if (!myPeerId?.startsWith(this.user.id)) {
-          console.warn('Peer ID mismatch; clearing and recreating…', { myPeerId, userId: this.user.id });
+          console.warn('Peer ID mismatch; clearing and recreatingÃ¢â‚¬Â¦', { myPeerId, userId: this.user.id });
           localStorage.removeItem('peerId');
           try { WebrtcService.peer?.destroy(); } catch {}
           WebrtcService.peer = null;
@@ -992,37 +1076,20 @@ export class AppComponent implements OnDestroy {
         const existing = localStorage.getItem('lastPeerIdSent');
         if (!existing || existing.trim() === '') {
           localStorage.setItem('lastPeerIdSent', myPeerId);
-          console.log('📌 Stored lastPeerIdSent in localStorage:', myPeerId);
+          console.log('Ã°Å¸â€œÅ’ Stored lastPeerIdSent in localStorage:', myPeerId);
         }
 
-        console.log(`✅ PeerJS initialized. My ID: ${myPeerId}`);
+        console.log(`Ã¢Å“â€¦ PeerJS initialized. My ID: ${myPeerId}`);
       }
 
       this.webRTC.wait();
 
-      const partnerId = localStorage.getItem('partnerId');
-      if (partnerId && partnerId !== this.user.id) {
-        this.userService.getPartnerPeerId(partnerId).subscribe({
-          next: (partnerPeerId) => {
-            if (!partnerPeerId?.startsWith(partnerId)) {
-              console.warn('⚠️ Invalid partner peer ID format');
-              return;
-            }
-            if (partnerPeerId === this.webRTC.getPeerId()) {
-              console.warn('⚠️ Cannot call self');
-              return;
-            }
-          },
-          error: (err) => {
-            console.error('❌ Partner peer lookup failed:', err);
-            this.toastService.presentErrorToastr(
-              'Could not connect to partner',
-            );
-          },
-        });
+      if (!this.router.url.includes('/messages/video')) {
+        localStorage.removeItem('partnerId');
+        localStorage.removeItem('activeIncomingCallId');
       }
     } catch (err) {
-      console.error('❌ WebRTC initialization failed:', err);
+      console.error('Ã¢ÂÅ’ WebRTC initialization failed:', err);
       setTimeout(() => this.initWebrtc(), 5000);
     }
   }
@@ -1038,10 +1105,10 @@ export class AppComponent implements OnDestroy {
         return resolve(true);
       }
       if (!WebrtcService.peer) {
-        return reject(new Error('⛔ Peer instance not initialized'));
+        return reject(new Error('Ã¢â€ºâ€ Peer instance not initialized'));
       }
       WebrtcService.peer.once('open', () => resolve(true));
-      setTimeout(() => reject(new Error('⏰ Peer open timeout')), 10000);
+      setTimeout(() => reject(new Error('Ã¢ÂÂ° Peer open timeout')), 10000);
     });
   }
 
