@@ -26,7 +26,17 @@ router.post('/forgot-password', authLimiter, forgotPassword);
  let oauthSessionMiddleware;
  try {
    const IORedis = require('ioredis');
-   const redisClient = new IORedis(process.env.REDIS_URL || process.env.REDIS_HOST && `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`);
+   const redisUrl = process.env.REDIS_URL || process.env.REDIS_HOST && `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`;
+   if (!redisUrl) throw new Error('OAuth Redis URL not configured');
+   const redisClient = new IORedis(redisUrl, {
+     lazyConnect: true,
+     maxRetriesPerRequest: 1,
+     enableOfflineQueue: false,
+     retryStrategy: () => null
+   });
+   redisClient.on('error', (e) => {
+     console.error('OAuth session: Redis error', e && e.message ? e.message : e);
+   });
    const connectRedis = require('connect-redis');
    const RedisStore = connectRedis(session);
    oauthSessionMiddleware = session({
