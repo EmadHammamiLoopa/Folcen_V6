@@ -583,9 +583,17 @@ private hydrateRouteStateFromSnapshot(): void {
 
   const query = this.route.snapshot.queryParamMap;
   this.answer = query.get('answer') === 'true';
-  this.callId = query.get('callId') || this.callId || undefined;
+  this.callId = query.get('callId') || (this.answer ? this.callId : undefined);
   this.videoRequestId = query.get('videoRequestId') || this.videoRequestId || undefined;
   this.autoAnswer = query.get('autoAnswer') === 'true';
+  if (!this.answer) {
+    try { localStorage.removeItem('activeIncomingCallId'); } catch (_) {}
+    try { localStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
+    try { sessionStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
+    this.autoAnswer = false;
+    this.hasAnswered = false;
+    this.answeringCall = false;
+  }
 }
 
 private scheduleAutoAnswer(source: string): void {

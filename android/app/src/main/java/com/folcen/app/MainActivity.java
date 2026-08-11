@@ -244,12 +244,39 @@ public class MainActivity extends BridgeActivity {
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
                 try {
-                    Log.d(TAG, "canUseFullScreenIntent=" + manager.canUseFullScreenIntent()
+                    boolean canUseFullScreenIntent = manager.canUseFullScreenIntent();
+                    Log.d(TAG, "canUseFullScreenIntent=" + canUseFullScreenIntent
                             + " settingsAction=" + Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
+                    if (!canUseFullScreenIntent && !isIncomingCallIntent(getIntent())) {
+                        maybeOpenFullScreenIntentSettings();
+                    }
                 } catch (Exception e) {
                     Log.w(TAG, "Unable to inspect full-screen intent capability", e);
                 }
             }
+        }
+    }
+
+    private boolean isIncomingCallIntent(Intent intent) {
+        Uri data = intent != null ? intent.getData() : null;
+        return data != null && data.toString().startsWith("folcen://incoming-call");
+    }
+
+    private void maybeOpenFullScreenIntentSettings() {
+        try {
+            boolean alreadyShown = getSharedPreferences("folcen_call", MODE_PRIVATE)
+                    .getBoolean("fullScreenIntentSettingsShown", false);
+            if (alreadyShown) return;
+            getSharedPreferences("folcen_call", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("fullScreenIntentSettingsShown", true)
+                    .apply();
+            Intent settingsIntent = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
+            settingsIntent.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(settingsIntent);
+            Log.d(TAG, "Opened full-screen intent settings for call reliability");
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to open full-screen intent settings", e);
         }
     }
 

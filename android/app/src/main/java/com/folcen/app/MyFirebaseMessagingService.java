@@ -50,7 +50,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 trace("fcm_foreground_socket_handles", data, "");
                 return;
             }
-            showIncomingCall(data);
+            openIncomingCallScreen(data);
             return;
         }
 
@@ -141,19 +141,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 incomingCallIntent(callerId, callId, callerName, receiverId, callType, expiresAt, notificationId),
                 pendingIntentFlags()
         );
-        PendingIntent answerIntent = PendingIntent.getActivity(
-                this,
-                notificationId + 1,
-                mainCallActionIntent(callerId, callId, receiverId, callType, expiresAt, true),
-                pendingIntentFlags()
-        );
-        PendingIntent rejectIntent = PendingIntent.getActivity(
-                this,
-                notificationId + 2,
-                mainCallActionIntent(callerId, callId, receiverId, callType, expiresAt, false),
-                pendingIntentFlags()
-        );
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CALL_CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title)
@@ -168,9 +155,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setSound(Settings.System.DEFAULT_RINGTONE_URI)
                 .setVibrate(new long[] { 0, 700, 400, 700, 400, 700 })
                 .setFullScreenIntent(fullScreenIntent, true)
-                .setContentIntent(answerIntent)
-                .addAction(R.mipmap.ic_launcher, "Reject", rejectIntent)
-                .addAction(R.mipmap.ic_launcher, "Answer", answerIntent);
+                .setContentIntent(fullScreenIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
         trace("notification_posted", data, "notificationId=" + notificationId + " fullScreen=true");
