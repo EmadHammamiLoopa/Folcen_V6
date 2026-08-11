@@ -107,12 +107,10 @@ export class SigninComponent implements OnInit {
       // only — MongoDB hash is not changed). Fall back to Firebase signin so
       // that users who reset their password can still log in.
       const status = firstErr?.status ?? firstErr?.error?.status;
-      // Only run Firebase password-sync fallback when backend explicitly reports
-      // MongoDB password drift. Generic 401 must remain a hard login failure.
-      const canFallback = status === 401 && (
-        firstErr?.error?.code === 'mongo_password_stale' ||
-        firstErr?.error?.reasonCode === 'mongo_password_stale'
-      );
+      // A generic 401 can also mean MongoDB's stored hash is stale while
+      // Firebase already has the user's latest valid password. Try Firebase
+      // once; wrong passwords still fail there and keep the original message.
+      const canFallback = status === 401;
 
       if (canFallback) {
         try {
