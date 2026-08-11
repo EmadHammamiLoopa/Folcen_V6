@@ -6,6 +6,7 @@
  */
 let redisClient = null;
 let useRedis = false;
+let redisErrorLogged = false;
 const rawRedisUrl = process.env.REDIS_URL || process.env.REDIS || null;
 let redisUrl = rawRedisUrl;
 if (!redisUrl && process.env.REDIS_HOST) {
@@ -17,15 +18,25 @@ if (redisUrl) {
   try {
     const IORedis = require('ioredis');
     // support password and TLS options via env
-    const redisOptions = {};
+    const redisOptions = {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      retryStrategy: () => null
+    };
     if (process.env.REDIS_PASSWORD) redisOptions.password = process.env.REDIS_PASSWORD;
     if (String(process.env.REDIS_TLS || '').toLowerCase() === 'true') {
       redisOptions.tls = { rejectUnauthorized: process.env.REDIS_TLS_REJECT_UNAUTHORIZED !== 'false' };
     }
     redisClient = new IORedis(redisUrl, redisOptions);
     useRedis = true;
-    redisClient.on('error', (e) => console.error('TokenBlacklist: Redis error', e));
-    console.log('TokenBlacklist: using Redis at', redisUrl);
+    redisClient.on('error', (e) => {
+      if (!redisErrorLogged) {
+        redisErrorLogged = true;
+        console.error('TokenBlacklist: Redis unavailable; token revocation checks will fail fast until Redis config is fixed', e && e.message ? e.message : e);
+      }
+    });
+    console.log('TokenBlacklist: using Redis');
   } catch (e) {
     console.error('TokenBlacklist: ioredis not available or failed to connect', e);
     // In production we must fail-fast (no silent fallback)
