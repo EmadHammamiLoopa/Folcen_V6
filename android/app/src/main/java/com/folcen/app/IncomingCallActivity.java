@@ -19,8 +19,14 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.lang.ref.WeakReference;
+
 public class IncomingCallActivity extends Activity {
     private static final String TAG = "FolcenIncomingCall";
+
+    private static WeakReference<IncomingCallActivity>
+            activeInstance =
+            new WeakReference<>(null);
     private String callerId;
     private String callId;
     private int notificationId;
@@ -32,6 +38,10 @@ public class IncomingCallActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        activeInstance =
+                new WeakReference<>(this);
+
         showOverLockScreen();
 
         Intent intent = getIntent();
@@ -75,6 +85,71 @@ public class IncomingCallActivity extends Activity {
         Log.d(TAG, "refresh callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
         cancelNotification();
         setContentView(buildView(callerName));
+    }
+
+    @Override
+    protected void onDestroy() {
+        IncomingCallActivity active =
+                activeInstance.get();
+
+        if (active == this) {
+            activeInstance.clear();
+        }
+
+        super.onDestroy();
+    }
+
+    public static void dismissActiveCall(
+            String terminalCallId
+    ) {
+        IncomingCallActivity activity =
+                activeInstance.get();
+
+        if (activity == null) {
+            return;
+        }
+
+        /*
+         * Never let a terminal event for an older/newer call
+         * close a different incoming call screen.
+         */
+        if (
+                terminalCallId != null &&
+                terminalCallId.length() > 0 &&
+                activity.callId != null &&
+                activity.callId.length() > 0 &&
+                !terminalCallId.equals(
+                        activity.callId
+                )
+        ) {
+            Log.d(
+                    TAG,
+                    "Ignoring terminal event for different callId="
+                            + terminalCallId
+                            + " active="
+                            + activity.callId
+            );
+            return;
+        }
+
+        activity.runOnUiThread(() -> {
+            if (
+                    activity.isFinishing() ||
+                    activity.isDestroyed()
+            ) {
+                return;
+            }
+
+            Log.d(
+                    TAG,
+                    "Closing incoming screen from terminal FCM callId="
+                            + terminalCallId
+            );
+
+            activity.actionTaken = true;
+            activity.cancelNotification();
+            activity.finish();
+        });
     }
 
     private View buildView(String callerName) {

@@ -29,7 +29,16 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
     public static final String CALL_CHANNEL_ID = "incoming_calls_v4";
     private static final long CALL_ALERT_DEDUPE_MS = 90000L;
-    private static final Map<String, Long> ACTIVE_CALL_ALERTS = new ConcurrentHashMap<>();
+
+    private static final String CALL_STATE_PREFS =
+            "folcen_native_call_state";
+    private static final String TERMINAL_PREFIX =
+            "terminal_";
+    private static final long TERMINAL_TTL_MS =
+            5 * 60 * 1000L;
+
+    private static final Map<String, Long> ACTIVE_CALL_ALERTS =
+            new ConcurrentHashMap<>();
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -37,15 +46,66 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Log.d(TAG, "FCM received data=" + data);
         logDeliveryDelay(data);
 
+        /*
+         * Terminal call lifecycle must be processed BEFORE the
+         * generic call-category check.
+         *
+         * Backend sends these as data-only FCM:
+         *   video_call_cancelled
+         *   video_call_timeout
+         *
+         * "answered" also arrives through video_call_cancelled so
+         * every other device stops ringing immediately.
+         */
+        if (isTerminalCallEvent(data)) {
+            handleTerminalCallEvent(data);
+            return;
+        }
+
         if (isIncomingCall(data)) {
+            String callId =
+                    firstNonEmpty(data.get("callId"));
+
+            /*
+             * FCM ordering is not guaranteed. If cancel/timeout/
+             * answer was already processed, a delayed incoming
+             * push must never resurrect the call.
+             */
+            if (
+                    callId.length() > 0 &&
+                    isCallTerminal(callId)
+            ) {
+                Log.d(
+                        TAG,
+                        "Ignoring incoming push for terminal callId="
+                                + callId
+                );
+
+                cancelIncomingCallNotifications(
+                        this,
+                        callId,
+                        stableNotificationId(callId)
+                );
+
+                return;
+            }
+
             if (!isAnswerableCall(data)) {
-                Log.d(TAG, "Ignoring stale/non-ringing call push");
+                Log.d(
+                        TAG,
+                        "Ignoring stale/non-ringing call push"
+                );
                 return;
             }
+
             if (MainActivity.isInForeground()) {
-                Log.d(TAG, "App is foreground; socket UI will handle incoming call");
+                Log.d(
+                        TAG,
+                        "App is foreground; socket UI will handle incoming call"
+                );
                 return;
             }
+
             showIncomingCall(data);
             return;
         }
@@ -71,9 +131,176 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private boolean isIncomingCall(Map<String, String> data) {
         if (data == null) return false;
-        return "incoming_call".equals(data.get("type"))
+
+        return "incoming_video_call".equals(data.get("type"))
+                || "incoming_call".equals(data.get("type"))
                 || "call:invite".equals(data.get("event"))
                 || "call".equals(data.get("category"));
+    }
+
+    private boolean isTerminalCallEvent(
+            Map<String, String> data
+    ) {
+        if (data == null) return false;
+
+        String type =
+                firstNonEmpty(data.get("type"));
+
+        if (
+                "video_call_cancelled".equals(type) ||
+                "video_call_timeout".equals(type)
+        ) {
+            return true;
+        }
+
+        String status =
+                firstNonEmpty(
+                        data.get("status"),
+                        data.get("reason")
+                );
+
+        return "answered".equals(status)
+                || "cancelled".equals(status)
+                || "canceled".equals(status)
+                || "declined".equals(status)
+                || "timeout".equals(status)
+                || "ended".equals(status);
+    }
+
+    private void handleTerminalCallEvent(
+            Map<String, String> data
+    ) {
+        String callId =
+                firstNonEmpty(data.get("callId"));
+
+        if (callId.length() == 0) {
+            Log.w(
+                    TAG,
+                    "Terminal call push missing callId"
+            );
+            return;
+        }
+
+        String type =
+                firstNonEmpty(data.get("type"));
+
+        String status =
+                firstNonEmpty(
+                        data.get("status"),
+                        data.get("reason"),
+                        type
+                );
+
+        markCallTerminal(callId);
+
+        ACTIVE_CALL_ALERTS.remove(callId);
+
+        cancelIncomingCallNotifications(
+                this,
+                callId,
+                stableNotificationId(callId)
+        );
+
+        /*
+         * If Android full-screen incoming UI is currently
+         * visible, cancelling the notification alone is not
+         * enough. Close that Activity too.
+         */
+        IncomingCallActivity.dismissActiveCall(
+                callId
+        );
+
+        Log.d(
+                TAG,
+                "Terminal call lifecycle processed callId="
+                        + callId
+                        + " status="
+                        + status
+                        + " type="
+                        + type
+        );
+    }
+
+    private void markCallTerminal(
+            String callId
+    ) {
+        if (
+                callId == null ||
+                callId.length() == 0
+        ) {
+            return;
+        }
+
+        try {
+            getSharedPreferences(
+                    CALL_STATE_PREFS,
+                    MODE_PRIVATE
+            )
+                    .edit()
+                    .putLong(
+                            TERMINAL_PREFIX + callId,
+                            System.currentTimeMillis()
+                    )
+                    .apply();
+
+        } catch (Exception e) {
+            Log.w(
+                    TAG,
+                    "Unable to store terminal call state",
+                    e
+            );
+        }
+    }
+
+    private boolean isCallTerminal(
+            String callId
+    ) {
+        if (
+                callId == null ||
+                callId.length() == 0
+        ) {
+            return false;
+        }
+
+        try {
+            String key =
+                    TERMINAL_PREFIX + callId;
+
+            long terminalAt =
+                    getSharedPreferences(
+                            CALL_STATE_PREFS,
+                            MODE_PRIVATE
+                    )
+                            .getLong(
+                                    key,
+                                    0L
+                            );
+
+            if (terminalAt <= 0L) {
+                return false;
+            }
+
+            long age =
+                    System.currentTimeMillis()
+                            - terminalAt;
+
+            if (age > TERMINAL_TTL_MS) {
+                getSharedPreferences(
+                        CALL_STATE_PREFS,
+                        MODE_PRIVATE
+                )
+                        .edit()
+                        .remove(key)
+                        .apply();
+
+                return false;
+            }
+
+            return true;
+
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void logDeliveryDelay(Map<String, String> data) {
