@@ -158,8 +158,26 @@ describe('video call request flow', function () {
       let afterAccept;
       socket.handlers['call-state-check']({ callId: 'call-peer-wake-1' }, value => { afterAccept = value; });
       assert.strictEqual(afterAccept.answerable, false);
-      assert.strictEqual(afterAccept.status, 'connected');
+      assert.strictEqual(afterAccept.status, 'accepted');
       assert.ok(emitted.some(e => e.event === 'video-call-accepted' && e.payload.callId === 'call-peer-wake-1'));
+
+      // New signaling contract:
+      // acceptance means the callee is ready; media start transitions
+      // the authoritative call session to connected.
+      socket.handlers['video-call-started']({
+        from: callerId,
+        to: calleeId,
+        callId: 'call-peer-wake-1'
+      });
+
+      let afterStarted;
+      socket.handlers['call-state-check'](
+        { callId: 'call-peer-wake-1' },
+        value => { afterStarted = value; }
+      );
+
+      assert.strictEqual(afterStarted.answerable, false);
+      assert.strictEqual(afterStarted.status, 'connected');
     } finally {
       User.findById = originalFindById;
       peerStore.get = originalPeerGet;

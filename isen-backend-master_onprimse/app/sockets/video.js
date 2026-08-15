@@ -2,6 +2,10 @@ const User = require("../models/User");
 const Message = require("../models/Message");
 const { connectedUsers, isUserOnline } = require("../utils/socketManager"); // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ import only
 const { createCallRequest, appendCallLifecycle } = require('../utils/eventLogger');
+const {
+  sendIncomingVideoCallPush,
+  sendVideoCallLifecyclePush
+} = require('../services/videoCallPushService');
 
 const callSessions = require('../utils/callSessionStore');
 const activeVideoCalls = callSessions.activeVideoCalls;
@@ -15,7 +19,9 @@ const getActiveCallId = callSessions.getActiveCallId;
 module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ no extra param
   // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ helpers ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
   function getUserSockets(userId) {
-    const bucket = connectedUsers.get(userId); // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Map access
+    const bucket =
+      connectedUsers.get(userId) ||
+      connectedUsers.get(String(userId));
     return bucket ? Array.from(bucket) : [];
   }
 
@@ -120,11 +126,14 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       if (!callerId || !calleeId) return;
 
       const now = Date.now();
+      const callId = getActiveCallId(callerId, calleeId);
+      const state = getCallState(callId);
 
       // canonical real-time signaling event for immediate UI teardown
       const canonical = {
         from: callerId,
         to: calleeId,
+        callId,
         reason: 'cancel',
         at: now,
         callerName: payload?.callerName || null,
@@ -140,6 +149,32 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       // Backward-compatible DB/message update event (kept for compatibility)
       emitToUser(calleeId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, callerName: payload?.callerName, messageId: payload?.messageId });
       emitToUser(callerId, 'video-call-cancelled', { callerId, calleeId, reason: 'cancel', at: now, notify: false, messageId: payload?.messageId });
+
+      if (callId) {
+        sendVideoCallLifecyclePush(
+          calleeId,
+          'video_call_cancelled',
+          {
+            callId,
+            callerId,
+            calleeId,
+            callerName:
+              payload?.callerName ||
+              state?.callerName,
+            messageId:
+              payload?.messageId ||
+              state?.messageId,
+            reason: 'cancelled',
+            timestamp: now,
+            expiresAt: state?.expiresAt
+          }
+        ).catch(err =>
+          console.warn(
+            '[video] cancel FCM failed',
+            err.message
+          )
+        );
+      }
 
       // finalize cleanup
       forceEndCall(callerId, calleeId, 'cancel');
@@ -165,8 +200,20 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
     }
     clearRingTimer(caller, callee);
     setActivePair(caller, callee, callId);
+
+    const alreadyStarted = Boolean(state?.started);
+    const nextState =
+      acceptedStage === 'answered' || alreadyStarted
+        ? 'connected'
+        : 'accepted';
+
     if (callId) {
-      setCallState(callId, acceptedStage === 'answered' ? 'connected' : 'accepted', { from: caller, to: callee, stage: acceptedStage });
+      setCallState(callId, nextState, {
+        from: caller,
+        to: callee,
+        stage: acceptedStage,
+        started: alreadyStarted
+      });
     }
     // Append lifecycle
     try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'matched', at: new Date() }); } catch (e) {}
@@ -175,15 +222,63 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
     }
     emitToUser(caller, 'video-call-accepted', { from: caller, to: callee, callId, stage: acceptedStage, at: Date.now() });
     emitToUser(callee, 'video-call-accepted', { from: caller, to: callee, callId, stage: acceptedStage, at: Date.now() });
+
+    if (callId) {
+      sendVideoCallLifecyclePush(
+        callee,
+        'video_call_cancelled',
+        {
+          callId,
+          callerId: caller,
+          calleeId: callee,
+          callerName: state?.callerName,
+          messageId: state?.messageId,
+          reason: 'answered',
+          timestamp: Date.now(),
+          expiresAt: state?.expiresAt
+        }
+      ).catch(err =>
+        console.warn(
+          '[video] answer FCM failed',
+          err.message
+        )
+      );
+    }
   });
 
   socket.on('video-call-declined', ({ from, to, callId: payloadCallId }) => {
     if (!from || !to) return;
+    if (String(socket.userId) !== String(to)) return;
+
     const callId = payloadCallId || getActiveCallId(from, to);
+    const state = getCallState(callId);
     clearRingTimer(from, to);
     if (callId) setCallState(callId, 'declined', { from, to, reason: 'declined' });
     try { if (callId) appendCallLifecycle(callId, { event: 'declined', at: new Date() }); } catch (e) {}
     emitToBoth(from, to, 'video-call-declined', { from, to, callId, reason: 'declined', status: 'declined', at: Date.now() });
+
+    if (callId) {
+      sendVideoCallLifecyclePush(
+        to,
+        'video_call_cancelled',
+        {
+          callId,
+          callerId: from,
+          calleeId: to,
+          callerName: state?.callerName,
+          messageId: state?.messageId,
+          reason: 'declined',
+          timestamp: Date.now(),
+          expiresAt: state?.expiresAt
+        }
+      ).catch(err =>
+        console.warn(
+          '[video] decline FCM failed',
+          err.message
+        )
+      );
+    }
+
     // end for both
     forceEndCall(from, to, 'declined');
   });
@@ -216,12 +311,89 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       try { callEvent = await createCallRequest({ initiatedBy: from, participants: [from, to], initialEvent: 'requested' }); } catch (e) { console.warn('call event create failed', e); }
       // mark pair active during ringing (prevents duplicates while ringing)
       const callId = callEvent ? callEvent.callId : null;
-      const expiresAt = Date.now() + RING_TIMEOUT_MS;
-      setActivePair(from, to, callId);
-      if (callId) setCallState(callId, 'ringing', { from, to, expiresAt });
 
-      // deliver ring
-      const delivered = emitToUser(to, 'incoming-video-call', { from, to, text, messageId, callId, status: 'ringing', expiresAt, at: Date.now() });
+      if (!callId) {
+        return callback?.({
+          success: false,
+          error: 'Unable to initialize call'
+        });
+      }
+
+      const timestamp = Date.now();
+      const expiresAt = timestamp + RING_TIMEOUT_MS;
+
+      const callerName = [
+        sender.firstName,
+        sender.lastName
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 120) || 'Folcen user';
+
+      setActivePair(from, to, callId);
+      setCallState(callId, 'ringing', {
+        from,
+        to,
+        expiresAt,
+        started: false,
+        callerName,
+        messageId
+      });
+
+      const incomingPayload = {
+        from,
+        to,
+        callerId: String(from),
+        calleeId: String(to),
+        callerName,
+        text,
+        messageId,
+        callId: String(callId),
+        type: 'incoming_video_call',
+        category: 'call',
+        event: 'call:invite',
+        callType: 'video',
+        status: 'ringing',
+        timestamp,
+        expiresAt,
+        at: timestamp
+      };
+
+      // Socket.IO fast path
+      const delivered = emitToUser(
+        to,
+        'incoming-video-call',
+        incomingPayload
+      );
+
+      // New mobile compatibility event
+      emitToUser(
+        to,
+        'called',
+        incomingPayload
+      );
+
+      // FCM path is independent of socket presence.
+      sendIncomingVideoCallPush(
+        to,
+        {
+          callId,
+          callerId: from,
+          calleeId: to,
+          callerName,
+          messageId,
+          timestamp,
+          expiresAt
+        }
+      ).catch(err =>
+        console.warn(
+          '[video] incoming call FCM failed',
+          err.message
+        )
+      );
+
       if (!delivered) {
         console.warn(`ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Receiver ${to} offlineÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âcannot deliver call request.`);
       }
@@ -235,6 +407,13 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       const timerId = setTimeout(() => {
         const now = Date.now();
 
+        if (
+          String(getActiveCallId(from, to) || '') !==
+          String(callId || '')
+        ) {
+          return;
+        }
+
         // canonical timeout signaling so callee UI closes and registers missed call
         const canonical = { from, to, reason: 'timeout', at: now };
         emitToUser(to, 'video-canceled', { ...canonical, notify: true });
@@ -244,6 +423,28 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
         // caller cleanup only
         emitToUser(from, 'video-canceled', { ...canonical, notify: false });
         emitToUser(from, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now, notify: false });
+
+        if (callId) {
+          sendVideoCallLifecyclePush(
+            to,
+            'video_call_timeout',
+            {
+              callId,
+              callerId: from,
+              calleeId: to,
+              callerName,
+              messageId,
+              reason: 'timeout',
+              timestamp: now,
+              expiresAt
+            }
+          ).catch(err =>
+            console.warn(
+              '[video] timeout FCM failed',
+              err.message
+            )
+          );
+        }
 
         // end for both
         if (callId) setCallState(callId, 'timeout', { from, to, reason: 'timeout' });
@@ -267,7 +468,24 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
     clearRingTimer(caller, callee);
     const callId = payloadCallId || getActiveCallId(caller, callee);
     setActivePair(caller, callee, callId);
-    if (callId) setCallState(callId, 'ringing', { from: caller, to: callee });
+
+    const state = getCallState(callId);
+    if (state && FINAL_STATES.has(state.state)) return;
+
+    const nextState =
+      state?.state === 'accepted' ||
+      state?.state === 'connected'
+        ? 'connected'
+        : 'ringing';
+
+    if (callId) {
+      setCallState(callId, nextState, {
+        from: caller,
+        to: callee,
+        started: true
+      });
+    }
+
     emitToBoth(caller, callee, 'video-call-started', { from: caller, to: callee, callId, at: Date.now() });
     // append lifecycle
     try { const cid = activeCallIds[`${caller}:${callee}`]; if (cid) appendCallLifecycle(cid, { event: 'started', at: new Date() }); } catch (e) {}
@@ -287,7 +505,9 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       const callId = payload.callId;
       const state = getCallState(callId);
       if (!state) return ack?.({ success: true, answerable: !callId, status: 'unknown' });
-      const answerable = (state.state === 'ringing' || state.state === 'accepted') && (!state.expiresAt || Date.now() <= Number(state.expiresAt));
+      const answerable =
+        state.state === 'ringing' &&
+        (!state.expiresAt || Date.now() <= Number(state.expiresAt));
       ack?.({ success: true, answerable, status: state.state, state: state.state, expiresAt: state.expiresAt, reason: state.reason });
     } catch (err) {
       ack?.({ success: false, answerable: false, error: err.message });
@@ -356,11 +576,75 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
   socket.on('disconnect', () => {
     const me = socket.userId;
     if (!me) return;
+
+    const remainingSockets = getUserSockets(me)
+      .filter(sid => String(sid) !== String(socket.id));
+
+    if (remainingSockets.length) return;
+
     const other = activeVideoCalls[me];
-    if (other) {
-      // tell the other side this ended due to disconnect
-      forceEndCall(me, other, 'disconnect');
+    if (!other) return;
+
+    const callId = getActiveCallId(me, other);
+    const state = getCallState(callId);
+
+    // Callee disappearing while ringing is normal for
+    // background/process-dead FCM delivery.
+    if (
+      state?.state === 'ringing' &&
+      String(state.to) === String(me)
+    ) {
+      console.log(
+        '[video] preserving ringing call after callee socket disconnect',
+        { callId }
+      );
+      return;
     }
+
+    // Caller disappearing while ringing makes the call invalid.
+    if (
+      state?.state === 'ringing' &&
+      String(state.from) === String(me)
+    ) {
+      const now = Date.now();
+
+      emitToUser(other, 'video-canceled', {
+        from: me,
+        to: other,
+        callId,
+        reason: 'disconnect',
+        status: 'cancelled',
+        notify: true,
+        at: now
+      });
+
+      if (callId) {
+        sendVideoCallLifecyclePush(
+          other,
+          'video_call_cancelled',
+          {
+            callId,
+            callerId: me,
+            calleeId: other,
+            callerName: state?.callerName,
+            messageId: state?.messageId,
+            reason: 'cancelled',
+            timestamp: now,
+            expiresAt: state?.expiresAt
+          }
+        ).catch(err =>
+          console.warn(
+            '[video] disconnect FCM failed',
+            err.message
+          )
+        );
+      }
+
+      forceEndCall(me, other, 'cancel');
+      return;
+    }
+
+    forceEndCall(me, other, 'disconnect');
   });
 
   // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ missed calls sync ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
