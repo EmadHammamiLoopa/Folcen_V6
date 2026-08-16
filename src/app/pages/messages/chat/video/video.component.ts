@@ -416,7 +416,7 @@ startCallTimer() {
 startMissedCallTimeout() {
   this.clearCallTimeout();
 
-  // Backend owns the real 60-second missed-call timeout.
+  // Backend owns the real 90-second missed-call timeout.
   // This timer is only an emergency local cleanup fallback.
   this.callTimeout = setTimeout(() => {
     if (!this.answered) {
@@ -427,7 +427,7 @@ startMissedCallTimeout() {
 
       this.finishLocalTimeoutFallback();
     }
-  }, 75000);
+  }, 105000);
 }
 
 stopCallTimer() {
@@ -1465,7 +1465,7 @@ private async finishLocalTimeoutFallback(): Promise<void> {
      *   MISSED_TIMEOUT
      *   video-call-timeout
      *
-     * The backend already owns the 60s timeout.
+     * The backend already owns the 90s timeout.
      */
 
     if (this.router.url.includes('/video')) {
@@ -1486,7 +1486,7 @@ private async finishLocalTimeoutFallback(): Promise<void> {
 startUnansweredTimeout() {
   this.clearUnansweredTimeout();
 
-  // Backend owns the authoritative 60-second missed-call decision.
+  // Backend owns the authoritative 90-second missed-call decision.
   // Never race it from the callee.
   this.unansweredTimeout = setTimeout(() => {
     if (!this.answered) {
@@ -1497,7 +1497,7 @@ startUnansweredTimeout() {
 
       this.finishLocalTimeoutFallback();
     }
-  }, 75000);
+  }, 105000);
 }
 
 clearUnansweredTimeout() {
