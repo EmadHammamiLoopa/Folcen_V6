@@ -568,11 +568,110 @@ private isUnread(peerKey: string, lastMsg: Message, isIncoming: boolean): boolea
   return isIncoming && lastTs > readTs;
 }
   
+  /**
+   * Load missed calls from the authoritative backend history.
+   *
+   * Returns:
+   *   array -> backend answered successfully
+   *   null  -> backend/socket unavailable; caller may use local fallback
+   */
+  private async fetchServerMissedCalls(): Promise<any[] | null> {
+    try {
+      await SocketService.initializeSocket();
+
+      let socket = this.socket;
+
+      // The list page can survive an Android background/resume cycle while
+      // its previous Socket.IO instance is no longer connected.
+      if (!socket?.connected) {
+        socket = await SocketService.getSocket();
+        this.socket = socket;
+      }
+
+      if (!socket?.connected) {
+        console.warn(
+          '[missed-calls] socket unavailable; using local fallback'
+        );
+        return null;
+      }
+
+      return await new Promise<any[] | null>((resolve) => {
+        let settled = false;
+
+        const finish = (value: any[] | null) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        };
+
+        const timer = setTimeout(() => {
+          console.warn(
+            '[missed-calls] server request timed out'
+          );
+          finish(null);
+        }, 6000);
+
+        socket.emit(
+          'missed-calls:list',
+          {},
+          (resp: any) => {
+            if (!resp?.success) {
+              console.warn(
+                '[missed-calls] server rejected request',
+                resp
+              );
+              finish(null);
+              return;
+            }
+
+            const calls =
+              Array.isArray(resp.calls)
+                ? resp.calls
+                : [];
+
+            console.log(
+              '[missed-calls] loaded from server',
+              {
+                count: calls.length
+              }
+            );
+
+            finish(calls);
+          }
+        );
+      });
+
+    } catch (err) {
+      console.warn(
+        '[missed-calls] server load failed; using local fallback',
+        err
+      );
+
+      return null;
+    }
+  }
+
   /** ✅ Show Missed Calls */
 // Update the showMissedCalls method in list.component.ts
 async showMissedCalls() {
-  const rawMissed = this.badges.getMissedCalls ? this.badges.getMissedCalls() : this.webrtcService.getMissedCalls();
-  const missedCalls = await this.normalizeMissedCallsForModal(rawMissed || []);
+  // Prefer persistent server history. The old local buffer remains only
+  // as an offline/backward-compatible fallback.
+  const serverMissed =
+    await this.fetchServerMissedCalls();
+
+  const localMissed =
+    this.badges.getMissedCalls
+      ? this.badges.getMissedCalls()
+      : this.webrtcService.getMissedCalls();
+
+  const rawMissed =
+    serverMissed !== null
+      ? serverMissed
+      : (localMissed || []);
+
+  const missedCalls =
+    await this.normalizeMissedCallsForModal(rawMissed || []);
   if (!missedCalls || missedCalls.length === 0) {
     const alert = await this.alertController.create({ header: 'No Missed Calls', message: 'You have no missed video calls.', buttons: ['OK'] });
     await alert.present();
@@ -619,10 +718,22 @@ async showMissedCalls() {
         // If name missing, attempt to resolve synchronously via userService
         if (!userName || userName === 'Unknown') {
           try {
-            const prof: any = await this.userService.getUserProfile(userId).toPromise();
+            const profileResp: any =
+              await this.userService.getUserProfile(userId).toPromise();
+
+            const prof: any =
+              profileResp?.data ?? profileResp ?? null;
+
             if (prof) {
-              userName = prof.fullName || `${prof.firstName || ''} ${prof.lastName || ''}`.trim() || userName;
-              userAvatar = userAvatar || prof.mainAvatar || prof.avatar;
+              userName =
+                prof.fullName ||
+                `${prof.firstName || ''} ${prof.lastName || ''}`.trim() ||
+                userName;
+
+              userAvatar =
+                userAvatar ||
+                prof.mainAvatar ||
+                prof.avatar;
             }
           } catch (e) { /* ignore */ }
         }
