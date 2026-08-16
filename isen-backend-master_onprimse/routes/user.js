@@ -23,9 +23,262 @@ const Activity = require('../app/models/Activity');
 const AuditLog = require('../app/models/AuditLog');
 const MessageEvent = require('../app/models/MessageEvent');
 const peerStore = require('.././app/utils/peerStorage');
-const { notifyPeerNeeded } = require('../app/helpers');   // <-- import once
+const { notifyPeerNeeded, emitToUser } = require('../app/helpers');
 const callSessions = require('../app/utils/callSessionStore');
+const { sendVideoCallLifecyclePush } = require('../app/services/videoCallPushService');
+
 const Response = require('../app/controllers/Response');
+
+async function armPeerWakeTimeout(callerId, calleeId, meta = {}) {
+  const from = String(callerId || '');
+  const to = String(calleeId || '');
+  const callId = String(meta.callId || '');
+
+  if (!from || !to || !callId) return;
+
+  const now = Date.now();
+  const retentionDays = Number(process.env.CALL_EVENT_RETENTION_DAYS || 90);
+
+  await CallEvent.updateOne(
+    { callId },
+    {
+      $setOnInsert: {
+        callId,
+        initiatedBy: from,
+        participants: [from, to],
+        lifecycle: [
+          {
+            event: 'requested',
+            at: new Date(now)
+          }
+        ],
+        createdAt: new Date(now),
+        expiresAt: new Date(
+          now + retentionDays * 24 * 60 * 60 * 1000
+        )
+      }
+    },
+    { upsert: true }
+  );
+
+  callSessions.clearRingTimer(from, to);
+
+  const remaining =
+    Number(meta.expiresAt || 0) - Date.now();
+
+  const delayMs =
+    Number.isFinite(remaining) && remaining > 0
+      ? remaining
+      : callSessions.RING_TIMEOUT_MS;
+
+  const timer = setTimeout(async () => {
+    try {
+      const activeCallId =
+        callSessions.getActiveCallId(from, to);
+
+      const state =
+        callSessions.callStates.get(callId);
+
+      console.log('[peer-wake][timeout] fired', {
+        callId,
+        activeCallId,
+        state: state?.state || null
+      });
+
+      if (
+        String(activeCallId || '') !== callId ||
+        state?.state !== 'ringing'
+      ) {
+        return;
+      }
+
+      const at = Date.now();
+
+      const lifecycleResult =
+        await CallEvent.updateOne(
+          {
+            callId,
+            'lifecycle.event': {
+              $ne: 'timeout'
+            }
+          },
+          {
+            $push: {
+              lifecycle: {
+                event: 'timeout',
+                at: new Date(at)
+              }
+            }
+          }
+        );
+
+      const changed =
+        Number(
+          lifecycleResult?.modifiedCount ??
+          lifecycleResult?.nModified ??
+          0
+        );
+
+      if (changed !== 1) {
+        console.log(
+          '[peer-wake][timeout] already recorded',
+          { callId }
+        );
+        return;
+      }
+
+      const updatedUser =
+        await User.findByIdAndUpdate(
+          to,
+          {
+            $inc: {
+              missedCallBudget: 1
+            }
+          },
+          {
+            new: true
+          }
+        )
+          .select('missedCallBudget')
+          .lean();
+
+      const payload = {
+        from,
+        to,
+        callerId: from,
+        calleeId: to,
+        callId,
+        callerName: meta.callerName || '',
+        reason: 'timeout',
+        status: 'timeout',
+        at
+      };
+
+      console.log(
+        '[peer-wake][timeout] MISSED RECORDED',
+        {
+          callId,
+          to,
+          missedCallBudget:
+            updatedUser?.missedCallBudget
+        }
+      );
+
+      emitToUser(to, 'budget-update', {
+        missedCallBudget:
+          updatedUser?.missedCallBudget
+      });
+
+      emitToUser(
+        to,
+        'video-call-missed-timeout',
+        payload
+      );
+
+      emitToUser(
+        to,
+        'missed-call',
+        payload
+      );
+
+      emitToUser(
+        to,
+        'video-call-timeout',
+        {
+          ...payload,
+          notify: true
+        }
+      );
+
+      emitToUser(
+        from,
+        'video-call-timeout',
+        {
+          ...payload,
+          notify: false
+        }
+      );
+
+      emitToUser(
+        to,
+        'video-canceled',
+        {
+          ...payload,
+          notify: true
+        }
+      );
+
+      emitToUser(
+        from,
+        'video-canceled',
+        {
+          ...payload,
+          notify: false
+        }
+      );
+
+      sendVideoCallLifecyclePush(
+        to,
+        'video_call_timeout',
+        {
+          callId,
+          callerId: from,
+          calleeId: to,
+          callerName:
+            meta.callerName || '',
+          reason: 'timeout',
+          timestamp: at,
+          expiresAt:
+            meta.expiresAt || at
+        }
+      ).catch(err =>
+        console.warn(
+          '[peer-wake][timeout] FCM failed',
+          err?.message || err
+        )
+      );
+
+      callSessions.setCallState(
+        callId,
+        'timeout',
+        {
+          from,
+          to,
+          reason: 'timeout'
+        }
+      );
+
+      callSessions.clearRingTimer(
+        from,
+        to
+      );
+
+      callSessions.clearActivePair(
+        from,
+        to
+      );
+
+    } catch (err) {
+      console.error(
+        '[peer-wake][timeout] failed',
+        err
+      );
+    }
+  }, delayMs);
+
+  callSessions.ringTimers.set(
+    callSessions.keyOf(from, to),
+    timer
+  );
+
+  console.log(
+    '[peer-wake] authoritative timeout armed',
+    {
+      callId,
+      delayMs
+    }
+  );
+}
 
 const {
   allUsers,
@@ -208,14 +461,37 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
 
     if (req.query?.wake === '1' || req.query?.wake === 'true') {
       registerRingingSession('peer-wake');
-      notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite);
+
+      await armPeerWakeTimeout(
+        callerId,
+        userId,
+        callInvite
+      );
+
+      notifyPeerNeeded(
+        userId,
+        req.auth?._id || req.authUser?._id,
+        callInvite
+      );
+
       didWake = true;
     }
 
     if (!record) {
       if (!didWake) {
         registerRingingSession('peer-missing');
-        notifyPeerNeeded(userId, req.auth?._id || req.authUser?._id, callInvite);
+
+        await armPeerWakeTimeout(
+          callerId,
+          userId,
+          callInvite
+        );
+
+        notifyPeerNeeded(
+          userId,
+          req.auth?._id || req.authUser?._id,
+          callInvite
+        );
       }
       return res.json({ success: true, peerId: null });
     }
