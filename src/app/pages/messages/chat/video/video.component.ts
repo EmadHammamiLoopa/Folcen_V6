@@ -1056,7 +1056,9 @@ listenForVideoCallEvents() {
     if (this.myEl)      { this.myEl.srcObject = null; this.myEl.pause(); }
     if (this.partnerEl) { this.partnerEl.srcObject = null; this.partnerEl.pause(); }
     this.messengerService.sendMessage({ event: 'stop-audio' });
-    await this.toastService.presentSuccessToastr('Call was canceled.');
+    if (String(ev?.reason || '').toLowerCase() !== 'timeout') {
+      await this.toastService.presentSuccessToastr('Call was canceled.');
+    }
     this.leaveCallRoom();
     this.calling = false;
     this.answered = false;
@@ -1067,22 +1069,42 @@ listenForVideoCallEvents() {
 
   // unify timeout handling for legacy and canonical events
   const onTimeout = async (ev: any) => {
-    const to   = this.idOf(ev?.to);
-    const from = this.idOf(ev?.from);
-    // No implicit missed accounting here; teardown only
-
     if (this.tearingDown) return;
+
     this.tearingDown = true;
-    this.clearUnansweredTimeout();
-  try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(e) {}
-  this.stopCallTimer();
-    this.clearFinishedCallState();
-    this.ringer.stop();
-    await this.webRTC.close({ silent: true });
-    this.leaveCallRoom();
-    this.calling = false; // clear calling state on timeout for caller side too
-    if (this.router.url.includes('/video')) {
-      this.router.navigate(['/tabs/messages/list']);
+
+    try {
+      console.log('[video] authoritative timeout received', {
+        callId: ev?.callId,
+        from: ev?.from ?? ev?.callerId,
+        to: ev?.to ?? ev?.calleeId
+      });
+
+      this.clearUnansweredTimeout();
+      this.clearCallTimeout();
+      this.stopCallTimer();
+      this.ringer.stop();
+      this.releaseWakeLock();
+
+      this.calling = false;
+      this.answered = false;
+      this.hasAnswered = false;
+
+      try {
+        await this.webRTC.close({ silent: true });
+      } catch (_) {}
+
+      if (this.router.url.includes('/video')) {
+        this.ngZone.run(() =>
+          this.router.navigate(
+            ['/tabs/messages/list'],
+            { replaceUrl: true }
+          )
+        );
+      }
+    } finally {
+      // Ionic can reuse the component for a later call.
+      this.tearingDown = false;
     }
   };
 
