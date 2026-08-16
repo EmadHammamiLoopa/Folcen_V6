@@ -422,7 +422,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
 
       // start ring timeout (missed call)
       clearRingTimer(from, to);
-      const timerId = setTimeout(() => {
+      const timerId = setTimeout(async () => {
         const now = Date.now();
 
         if (
@@ -432,15 +432,56 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
           return;
         }
 
-        // canonical timeout signaling so callee UI closes and registers missed call
-        const canonical = { from, to, reason: 'timeout', at: now };
-        emitToUser(to, 'video-canceled', { ...canonical, notify: true });
-        // keep backward-compatible timeout event (existing handlers)
-        emitToUser(to, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now });
+        /*
+         * SERVER IS AUTHORITATIVE FOR MISSED-CALL TIMEOUT.
+         *
+         * Client timers are only safety fallbacks and must not decide
+         * whether a call becomes a missed call.
+         */
+        const canonical = {
+          from,
+          to,
+          callerId: from,
+          calleeId: to,
+          callId,
+          callerName,
+          messageId,
+          reason: 'timeout',
+          status: 'timeout',
+          at: now
+        };
 
-        // caller cleanup only
-        emitToUser(from, 'video-canceled', { ...canonical, notify: false });
-        emitToUser(from, 'video-call-timeout', { callerId: from, calleeId: to, reason: 'timeout', at: now, notify: false });
+        // Record budget + missed-call event exactly once.
+        try {
+          await handleMissed('timeout', canonical);
+        } catch (err) {
+          console.warn(
+            '[video] authoritative missed-call record failed',
+            err?.message || err
+          );
+        }
+
+        // Send the explicit timeout FIRST so both clients stop ringing.
+        emitToUser(to, 'video-call-timeout', {
+          ...canonical,
+          notify: true
+        });
+
+        emitToUser(from, 'video-call-timeout', {
+          ...canonical,
+          notify: false
+        });
+
+        // Compatibility teardown event for older clients.
+        emitToUser(to, 'video-canceled', {
+          ...canonical,
+          notify: true
+        });
+
+        emitToUser(from, 'video-canceled', {
+          ...canonical,
+          notify: false
+        });
 
         if (callId) {
           sendVideoCallLifecyclePush(
@@ -464,11 +505,36 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
           );
         }
 
-        // end for both
-        if (callId) setCallState(callId, 'timeout', { from, to, reason: 'timeout' });
+        if (callId) {
+          setCallState(
+            callId,
+            'timeout',
+            {
+              from,
+              to,
+              reason: 'timeout'
+            }
+          );
+        }
+
+        try {
+          if (callEvent?.callId) {
+            await appendCallLifecycle(
+              callEvent.callId,
+              {
+                event: 'timeout',
+                at: new Date(now)
+              }
+            );
+          }
+        } catch (err) {
+          console.warn(
+            '[video] timeout lifecycle append failed',
+            err?.message || err
+          );
+        }
+
         forceEndCall(from, to, 'timeout');
-        // append lifecycle timeout
-        try { if (callEvent && callEvent.callId) appendCallLifecycle(callEvent.callId, { event: 'timeout', at: new Date(now) }); } catch (e) {}
       }, RING_TIMEOUT_MS);
       ringTimers.set(keyOf(from, to), timerId);
 
@@ -483,7 +549,11 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
   socket.on('video-call-started', ({ from, to, callId: payloadCallId }) => {
     const caller = from; const callee = to;
     if (!caller || !callee) return;
-    clearRingTimer(caller, callee);
+
+    // IMPORTANT:
+    // "started" means signaling/media startup only.
+    // The callee may still be ringing, so the authoritative ring timeout
+    // MUST remain active until ACCEPTED / DECLINED / CANCELLED / FAILED.
     const callId = payloadCallId || getActiveCallId(caller, callee);
     setActivePair(caller, callee, callId);
 
@@ -553,7 +623,9 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       }
 
       // Dedup key per attempt to avoid double processing
-      const dedupKey = `${from}|${to}|${Math.floor(at/1000)}|${reason}`;
+      const dedupKey = payload.callId
+        ? `call:${String(payload.callId)}`
+        : `${from}|${to}|${Math.floor(at/1000)}|${reason}`;
       // Cheap in-memory dedupe bucket; auto-expire after 60s
       handleMissed._seen = handleMissed._seen || new Map();
       if (handleMissed._seen.has(dedupKey)) return;
@@ -569,7 +641,14 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       } catch (e) { console.warn('Failed to increment missedCallBudget', e); }
 
       // Include callerName if provided by the emitter
-      const payloadOut = { from, to, at, reason: 'timeout', callerName: payload.callerName || payload.fromName || null };
+      const payloadOut = {
+        from,
+        to,
+        callId: payload.callId || null,
+        at,
+        reason: 'timeout',
+        callerName: payload.callerName || payload.fromName || null
+      };
 
       // Emit explicit event matching frontend names for stronger compatibility
       try {
