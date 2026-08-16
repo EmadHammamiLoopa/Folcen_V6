@@ -49,6 +49,7 @@ export class VideoComponent implements OnInit, OnDestroy {
   audioEnabled = true;
   cameraEnabled = true;
   localStream: MediaStream | null = null;
+  remoteVideoReady = false;
   jwtHelper = new JwtHelperService();
   private callTimer: any; // For storing the timer reference
   partnerName: string;
@@ -231,6 +232,20 @@ private handleBackButton() {
 }
 
 private clearFinishedCallState(): void {
+  // REMOTE_UI_RESET_ON_CLEAR
+  this.remoteVideoReady = false;
+
+  try {
+    const remote =
+      this.partnerVideoRef?.nativeElement ||
+      document.querySelector('#partner-video') as HTMLVideoElement;
+
+    if (remote) {
+      try { remote.pause(); } catch (_) {}
+      try { remote.srcObject = null; } catch (_) {}
+    }
+  } catch (_) {}
+
   try { localStorage.removeItem('partnerId'); } catch (_) {}
   try { localStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
   try { sessionStorage.removeItem('pendingIncomingCallUrl'); } catch (_) {}
@@ -335,7 +350,14 @@ private showSelfPreview(stream: MediaStream): void {
   el.muted = true;                           // autoplay allow-list
   el.volume = 0;
 
-  const playNow = () => el.play().catch(() => {});
+  const playNow = () => {
+    el.play()
+      .then(() => {
+        this.remoteVideoReady = true;
+        this.cdr.detectChanges();
+      })
+      .catch(() => {});
+  };
   if (el.readyState >= 1)           { playNow(); }      // metadata present
   else                              { el.onloadedmetadata = playNow; }
 }
@@ -411,6 +433,29 @@ stopCallTimer() {
 
 // video.component.ts
 async ionViewWillEnter() {
+  // IMPORTANT:
+  // Ionic can reuse this video component between calls.
+  // Never inherit the previous call's remote-video UI state.
+  this.remoteVideoReady = false;
+
+  try {
+    const oldRemote =
+      this.partnerVideoRef?.nativeElement ||
+      document.querySelector('#partner-video') as HTMLVideoElement;
+
+    if (oldRemote) {
+      try { oldRemote.pause(); } catch (_) {}
+      try { oldRemote.srcObject = null; } catch (_) {}
+      oldRemote.removeAttribute('src');
+      oldRemote.load?.();
+    }
+  } catch (_) {}
+
+  console.error('[video-ui] fresh call UI state', {
+    remoteVideoReady: this.remoteVideoReady,
+    callId: this.callId
+  });
+
   try {
     this.hydrateRouteStateFromSnapshot();
     if (this.isCallLocallyFinished()) {
@@ -431,6 +476,14 @@ async ionViewWillEnter() {
       this.cdr.detectChanges();
       if (this.autoAnswer) {
         this.ringer.stop();
+
+        // Native incoming-call Answer means the user has already accepted.
+        // Background/resume must not trust a PeerJS instance left open from
+        // before suspension. Start preparing a fresh receiver transport now.
+        this.ensureIncomingPeerReady().catch(err => {
+          console.warn('[video] background peer prewarm failed; Answer will retry', err);
+        });
+
         this.scheduleAutoAnswer('view-enter');
       } else {
         this.ringer.start('calling.mp3');
@@ -444,13 +497,56 @@ async ionViewWillEnter() {
         this.router.navigate(['/tabs/messages/list'], { replaceUrl: true });
         return;
       }
-      // Outgoing side: we can open camera
-      const ok = await this.webRTC.init(this.myEl, this.partnerEl);
-      if (!ok) throw new Error('Media init failed');
-  await this.placeCall();
+      // Outgoing side: open camera.
+      // Fast path has no artificial delay. If Android's camera HAL is
+      // still releasing the previous call, recover once and retry.
+      let ok = await this.webRTC.init(this.myEl, this.partnerEl);
+
+      if (!ok) {
+        console.warn('[video] outgoing media init failed; camera recovery retry');
+
+        await this.webRTC.recoverMediaAfterCameraFailure(700);
+
+        ok = await this.webRTC.init(this.myEl, this.partnerEl);
+      }
+
+      if (!ok) {
+        throw new Error('Media init failed after camera recovery');
+      }
+
+      await this.placeCall();
     }
   } catch (e) {
     console.error(e);
+
+    // If an outgoing invite was already created/sent but local startup
+    // later fails, terminate the authoritative call so the other device
+    // does not continue ringing.
+    if (
+      !this.answer &&
+      this.callId &&
+      this.authUser?._id &&
+      this.userId
+    ) {
+      try {
+        this.socket?.emit('video-call-cancelled', {
+          from: this.authUser._id,
+          to: this.userId,
+          callId: this.callId,
+          reason: 'local-start-failed',
+          at: Date.now()
+        });
+
+        console.error('[video] local startup failure -> cancel sent', {
+          callId: this.callId
+        });
+      } catch (_) {}
+    }
+
+    this.ringer.stop();
+    this.calling = false;
+    this.placingCall = false;
+
     this.toastService.presentErrorToastr('Failed to start video call.');
     this.router.navigate(['/']);
   } finally {
@@ -465,9 +561,19 @@ private hydrateRouteStateFromSnapshot(): void {
 
   const query = this.route.snapshot.queryParamMap;
   this.answer = query.get('answer') === 'true';
-  this.callId = query.get('callId') || this.callId || undefined;
-  this.videoRequestId = query.get('videoRequestId') || this.videoRequestId || undefined;
-  this.autoAnswer = query.get('autoAnswer') === 'true';
+
+  // Ionic caches pages. Never inherit a callId from the previous call.
+  // Incoming routes provide their authoritative callId explicitly;
+  // outgoing routes must generate a fresh one in placeCall().
+  this.callId = query.get('callId') || undefined;
+
+  this.videoRequestId =
+    query.get('videoRequestId') ||
+    undefined;
+
+  this.autoAnswer =
+    this.answer &&
+    query.get('autoAnswer') === 'true';
 }
 
 private scheduleAutoAnswer(source: string): void {
@@ -485,16 +591,77 @@ private canStartOutgoingCall(): boolean {
   return !!(this.partner?.isFriend || (this.partner as any)?.friend || this.user?.isFriend || (this.user as any)?.friend);
 }
 
-private async ensureIncomingPeerReady(): Promise<void> {
+private incomingPeerReadyPromise: Promise<void> | null = null;
+private incomingPeerReadyCallId: string | undefined;
+
+private ensureIncomingPeerReady(): Promise<void> {
+  // If there is no authoritative callId, preserve the old behaviour.
+  if (!this.callId) {
+    return this.prepareIncomingPeerFresh();
+  }
+
+  const key = String(this.callId);
+
+  // ionViewWillEnter may already have prepared the incoming PeerJS
+  // listener. Do not destroy/recreate it again when Answer is pressed.
+  if (
+    this.incomingPeerReadyPromise &&
+    this.incomingPeerReadyCallId === key
+  ) {
+    console.log('[video] reusing incoming peer preparation', {
+      callId: this.callId
+    });
+    return this.incomingPeerReadyPromise;
+  }
+
+  this.incomingPeerReadyCallId = key;
+
+  const promise = this.prepareIncomingPeerFresh();
+  this.incomingPeerReadyPromise = promise;
+
+  // A failed preparation must be retryable.
+  promise.catch(() => {
+    if (
+      this.incomingPeerReadyPromise === promise &&
+      this.incomingPeerReadyCallId === key
+    ) {
+      this.incomingPeerReadyPromise = null;
+      this.incomingPeerReadyCallId = undefined;
+    }
+  });
+
+  return promise;
+}
+
+private async prepareIncomingPeerFresh(): Promise<void> {
   try {
     const myId = this.authUser?._id || this.authUser?.id;
     if (!myId) throw new Error('Missing authenticated user for incoming peer');
-    await this.webRTC.createPeer(myId, !!this.callId);
+    // Each answered call gets a fresh PeerJS transport.
+    // The caller now waits for READY, so it cannot dial the old peer ID
+    // while this refresh is happening.
+    try {
+      if (WebrtcService.call) {
+        try { WebrtcService.call.close(); } catch (_) {}
+        WebrtcService.call = null;
+      }
+    } catch (_) {}
+
+    // A native background Answer resumes the WebView. An existing Peer
+    // may still report open=true while its transport is stale. Force a fresh
+    // PeerJS session only for that background/native auto-answer path.
+    const nativeIncoming =
+      this.route.snapshot.queryParamMap.get('directCall') === '1';
+
+    await this.webRTC.createPeer(
+      myId,
+      this.autoAnswer === true || nativeIncoming
+    );
     await this.webRTC.waitForPeerOpen();
     const peerId = this.webRTC.getPeerId();
     if (!peerId) throw new Error('Peer ID was not created');
     await this.userService.sendPeerIdToBackend(myId, peerId);
-    await this.webRTC.wait();
+    await this.webRTC.wait(this.callId);
   } catch (e) {
     console.warn('[video] incoming peer warmup failed', e);
     throw e;
@@ -792,6 +959,7 @@ listenForVideoCallEvents() {
       this.calling = false;
 
       if (stage === 'answered') {
+        this.clearAcceptedRetryTimer();
         this.clearCallTimeout();
         this.connectingAfterRemoteReady = false;
         this.answered = true;
@@ -802,13 +970,24 @@ listenForVideoCallEvents() {
 
       this.connectingAfterRemoteReady = true;
       this.cdr.detectChanges();
-      this.retryOutgoingMediaCallAfterAccepted();
+
+      // The receiver has finished preparing its PeerJS listener.
+      // There is no earlier media call anymore, so create exactly one
+      // MediaConnection now.
       this.clearAcceptedRetryTimer();
-      this.acceptedRetryTimer = setTimeout(() => {
-        if (!this.answered && !this.answer) {
-          this.retryOutgoingMediaCallAfterAccepted();
-        }
-      }, 3500);
+
+      const readyPeerId =
+        typeof ev?.peerId === 'string' && ev.peerId.trim()
+          ? ev.peerId.trim()
+          : undefined;
+
+      console.error('[PERF][caller] READY_RX', {
+        callId: this.callId,
+        directPeerId: !!readyPeerId,
+        peerId: readyPeerId
+      });
+
+      await this.retryOutgoingMediaCallAfterAccepted(readyPeerId);
     } catch (err) {
       console.warn('[video] accepted retry failed', err);
     }
@@ -1268,13 +1447,20 @@ async placeCall() {
       open:   WebrtcService.peer?.open
     });
 
-    const mc = await this.webRTC.startCall(this.userId!, this.localStream, { callId: this.callId, videoRequestId: this.videoRequestId, wakeOnFirstLookup: !wakeAlreadySent });
+    // Signaling/FCM invite has already been sent above.
+    // Do NOT dial PeerJS yet. The receiver may still be opening the
+    // app, registering its peer ID, or preparing camera/mic.
+    //
+    // Receiver will send ACCEPTED(stage='ready') when its PeerJS
+    // listener is ready. Only then do we create ONE MediaConnection.
     started = true;
-    this.wireHangup(mc);
-    mc.on('stream', (remote) => this.attachRemoteStream(remote));
-    mc.on('error',  (e) => console.error('[call] error', e));
-
     this.calling = true;
+
+    console.log('[video] invite sent; waiting for receiver READY', {
+      callId: this.callId,
+      to: this.userId,
+      wakeAlreadySent
+    });
   } catch (err: any) {
     this.ringer.stop();
     this.toastService.presentErrorToastr(err.message ?? String(err));
@@ -1287,11 +1473,14 @@ async placeCall() {
   }
 }
 
-private async retryOutgoingMediaCallAfterAccepted(): Promise<void> {
+private async retryOutgoingMediaCallAfterAccepted(readyPeerId?: string): Promise<void> {
   if (this.outgoingRetryAfterAccepted || this.answered || this.answer) return;
   if (!this.userId || !this.callId) return;
   this.outgoingRetryAfterAccepted = true;
-  console.log('[video] receiver accepted; retrying media call with fresh peer', { callId: this.callId, to: this.userId });
+  console.log('[video] receiver READY; starting authoritative media call', {
+    callId: this.callId,
+    to: this.userId
+  });
 
   try {
     if (!this.myEl || !this.partnerEl) await this.waitForVideoElements();
@@ -1321,7 +1510,8 @@ private async retryOutgoingMediaCallAfterAccepted(): Promise<void> {
     const mc = await this.webRTC.startCall(this.userId, this.localStream, {
       callId: this.callId,
       videoRequestId: this.videoRequestId,
-      wakeOnFirstLookup: false
+      wakeOnFirstLookup: false,
+      preferredPeerId: readyPeerId
     });
     this.wireHangup(mc);
     mc.on('stream', (remote) => this.attachRemoteStream(remote));
@@ -1363,7 +1553,55 @@ private async consumeOneTimeVideoRequest() {
 
 
 
+onRemoteVideoPlaying(): void {
+  if (this.remoteVideoReady) return;
+
+  const el = this.partnerVideoRef?.nativeElement;
+  const stream = el?.srcObject as MediaStream | null;
+
+  if (!stream) return;
+
+  const liveVideo = stream
+    .getVideoTracks()
+    .some(track =>
+      track.readyState === 'live' &&
+      track.enabled
+    );
+
+  if (!liveVideo) return;
+
+  // A 'playing' event alone is not enough on some Android WebViews.
+  // Do not expose the native video surface until a decoded frame exists.
+  if (!el.videoWidth || !el.videoHeight) {
+    console.warn('[video-ui] playing without decoded remote frame yet', {
+      videoWidth: el.videoWidth,
+      videoHeight: el.videoHeight
+    });
+    return;
+  }
+
+  console.error('[PERF][ui] REMOTE_VIDEO_VISIBLE', {
+    callId: this.callId,
+    streamId: stream.id,
+    videoWidth: el.videoWidth,
+    videoHeight: el.videoHeight
+  });
+
+  this.remoteVideoReady = true;
+  this.answered = true;
+  this.cdr.detectChanges();
+}
+
+
 private attachRemoteStream(remote: MediaStream): void {
+  console.error('[PERF][media] REMOTE_MEDIA', {
+    callId: this.callId,
+    at: performance.now(),
+    tracks: remote?.getTracks?.().map(t => ({
+      kind: t.kind,
+      state: t.readyState
+    }))
+  });
   if (this.localStream && remote && remote.id === this.localStream.id) {
     console.warn('[video] ignoring local stream attached as remote stream');
     return;
@@ -1414,21 +1652,106 @@ this.hasAnswered = true;
   try {
     this.answeringCall = true;
     this.cdr.detectChanges();
-    const state = await this.validateAnswerableCall();
-    if (!state.answerable) {
-      throw new Error(state.status === 'timeout' ? 'This call has expired.' : 'This call is no longer available.');
-    }
-    if (this.answer) {
-      await this.ensureIncomingPeerReady();
-    }
+
+    const answerPerfStart = performance.now();
+    const perf = (stage: string) => {
+      console.error(
+        `[PERF][answer] ${stage} +${Math.round(performance.now() - answerPerfStart)}ms`,
+        { callId: this.callId }
+      );
+    };
+
+    perf('TAP');
+
+    // User already accepted: stop ringing immediately instead of waiting
+    // for validation / PeerJS / camera.
     this.ringer.stop();
     this.requestWakeLock();
-    /* â”€â”€ grab cam/mic only once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-    if (!this.localStream) {
-      this.localStream = await this.webRTC.getUserMedia();
-      this.showSelfPreview(this.localStream);        // local tile
+
+    const hasLiveLocal =
+      !!this.localStream &&
+      this.localStream.getTracks().some(t => t.readyState === 'live');
+
+    /*
+     * These operations do not depend on each other, so run them together:
+     *
+     * 1. backend verifies the call is still answerable
+     * 2. PeerJS listener is made ready
+     * 3. camera/mic are acquired
+     *
+     * Manual incoming calls normally already warmed PeerJS from
+     * ionViewWillEnter(), so do not repeat the backend peer registration.
+     */
+    const validationPromise = this.validateAnswerableCall()
+      .then(result => {
+        perf('VALIDATION_DONE');
+        return result;
+      })
+      .catch(err => {
+        console.error('[PERF][answer] VALIDATION_FAILED', err, err?.stack);
+        throw err;
+      });
+
+    const peerPromise: Promise<void> = (
+      this.answer
+        ? (
+            this.autoAnswer
+              ? this.ensureIncomingPeerReady()
+              : (
+                  WebrtcService.peer?.open && this.webRTC.getPeerId()
+                    ? this.webRTC.wait(this.callId)
+                    : this.ensureIncomingPeerReady()
+                )
+          )
+        : Promise.resolve()
+    ).then(result => {
+      perf('PEER_READY');
+      return result;
+    }).catch(err => {
+      console.error('[PERF][answer] PEER_FAILED', err, err?.stack);
+      throw err;
+    });
+
+    const mediaPromise: Promise<MediaStream | null> = (
+      hasLiveLocal
+        ? Promise.resolve(this.localStream)
+        : this.webRTC.getUserMedia()
+    ).then(result => {
+      perf('MEDIA_READY');
+      return result;
+    }).catch(err => {
+      console.error('[PERF][answer] MEDIA_FAILED', err, err?.stack);
+      throw err;
+    });
+
+    const [state, , preparedStream] = await Promise.all([
+      validationPromise,
+      peerPromise,
+      mediaPromise
+    ]);
+
+    perf('VALIDATION_PEER_MEDIA_READY');
+
+    if (!state.answerable) {
+      throw new Error(
+        state.status === 'timeout'
+          ? 'This call has expired.'
+          : 'This call is no longer available.'
+      );
     }
+
+    if (!preparedStream) {
+      throw new Error('Cannot access camera / mic');
+    }
+
+    this.localStream = preparedStream;
+    this.showSelfPreview(this.localStream);
+
+    perf('READY_SIGNAL_START');
+
     await this.signalAcceptedToCaller('ready');
+
+    perf('READY_SIGNAL_SENT');
 
     const incoming = await this.waitForIncomingCall(this.autoAnswer ? 85000 : 45000);
     if (!incoming || typeof (incoming as any).answer !== 'function') {
@@ -1436,12 +1759,63 @@ this.hasAnswered = true;
       throw new Error('This call is no longer answerable');
     }
 
-    incoming.answer(this.localStream);
+    // Install remote-media listeners BEFORE answer().
+    // PeerJS can emit the remote stream very quickly after answer and
+    // registering afterwards can miss the first stream event.
+    let remoteAttached = false;
+
+    const attachIncomingRemote = (remote: MediaStream | null | undefined) => {
+      if (!remote || remoteAttached) return;
+
+      if (
+        this.localStream &&
+        remote.id === this.localStream.id
+      ) {
+        console.warn('[answer] ignoring local stream as remote');
+        return;
+      }
+
+      remoteAttached = true;
+
+      console.error('[PERF][receiver] REMOTE_MEDIA', {
+        callId: this.callId,
+        streamId: remote.id,
+        tracks: remote.getTracks().map(t => `${t.kind}:${t.readyState}`)
+      });
+
+      this.attachRemoteStream(remote);
+    };
+
+    incoming.on('stream', (remote: MediaStream) => {
+      attachIncomingRemote(remote);
+    });
+
+    try {
+      incoming.peerConnection?.addEventListener('track', (ev: RTCTrackEvent) => {
+        const remote = ev.streams?.[0];
+        if (remote) {
+          attachIncomingRemote(remote);
+        }
+      });
+    } catch (_) {}
+
+    incoming.on('error', (e) => console.error('[answer] error', e));
+
+    // Usually answered synchronously by WebrtcService.wait().
+    if (!(incoming as any).__folcenAnswered) {
+      console.error('[answer] fallback answer()', {
+        callId: this.callId,
+        peer: incoming.peer
+      });
+
+      incoming.answer(this.localStream);
+      (incoming as any).__folcenAnswered = true;
+    }
+
     await this.signalAcceptedToCaller('answered');
+
     this.wireHangup(incoming);
     this.startCallTimer();
-    incoming.on('stream',  (remote) => this.attachRemoteStream(remote));
-    incoming.on('error',   (e)      => console.error('[answer] error', e));
     this.ringer.stop();
 
     this.answered = true;
@@ -1471,7 +1845,20 @@ private async signalAcceptedToCaller(stage: 'ready' | 'answered'): Promise<void>
   this.acceptedSignalSent = true;
   this.acceptedSignalStagesSent.add(stage);
   console.log('[video] signaling accepted to caller', { stage, callId: this.callId, caller: this.userId, callee: this.authUser._id });
-  await this.emitWebSocketEvent(VideoEvents.ACCEPTED, { from: this.userId, to: this.authUser._id, callId: this.callId, stage });
+  // Callee -> caller.
+  // On an incoming call:
+  //   authUser = callee (this device)
+  //   userId   = caller
+  await this.emitWebSocketEvent(VideoEvents.ACCEPTED, {
+    // Backend contract:
+    // from = original caller
+    // to   = original callee
+    from: this.userId,
+    to: this.authUser._id,
+    callId: this.callId,
+    stage,
+    peerId: stage === 'ready' ? this.webRTC.getPeerId() : undefined
+  });
 }
 
 private async waitForIncomingCall(timeoutMs = 12000): Promise<MediaConnection | null> {

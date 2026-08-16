@@ -362,6 +362,17 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 pendingIntentFlags()
         );
 
+        // When the phone is unlocked Android normally shows a heads-up
+        // notification instead of launching the full-screen activity.
+        // Tapping that notification should enter the Angular incoming-call
+        // screen directly so PeerJS can warm before the user presses Answer.
+        PendingIntent previewIntent = PendingIntent.getActivity(
+                this,
+                stableNotificationId(callId + ":preview"),
+                previewCallIntent(callerId, callId),
+                pendingIntentFlags()
+        );
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CALL_CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title)
@@ -376,7 +387,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setSound(Settings.System.DEFAULT_RINGTONE_URI)
                 .setVibrate(new long[] { 0, 700, 400, 700, 400, 700 })
                 .setFullScreenIntent(fullScreenIntent, true)
-                .setContentIntent(fullScreenIntent);
+                .setContentIntent(previewIntent);
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build());
     }
@@ -423,6 +434,29 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         intent.putExtra("expiresAt", expiresAt != null ? expiresAt : "");
         intent.putExtra("notificationId", notificationId);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return intent;
+    }
+
+    private Intent previewCallIntent(String callerId, String callId) {
+        Uri uri = new Uri.Builder()
+                .scheme("folcen")
+                .authority("incoming-call")
+                .appendQueryParameter("callerId", callerId != null ? callerId : "")
+                .appendQueryParameter("fromUserId", callerId != null ? callerId : "")
+                .appendQueryParameter("callId", callId != null ? callId : "")
+                .appendQueryParameter("answer", "true")
+                .appendQueryParameter("action", "view")
+                .appendQueryParameter("autoAnswer", "false")
+                .build();
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setAction(Intent.ACTION_VIEW);
+        intent.setData(uri);
+        intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK |
+                Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        );
         return intent;
     }
 
