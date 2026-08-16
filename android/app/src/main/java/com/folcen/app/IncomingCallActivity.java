@@ -59,8 +59,10 @@ public class IncomingCallActivity extends Activity {
             return;
         }
         Log.d(TAG, "display callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
-        cancelNotification();
 
+        // Keep the full-screen call notification alive while the call is ringing.
+        // On Xiaomi/HyperOS cancelling it here can immediately dismiss the
+        // IncomingCallActivity that was launched by the full-screen intent.
         setContentView(buildView(callerName));
     }
 
@@ -83,7 +85,8 @@ public class IncomingCallActivity extends Activity {
         }
         actionTaken = false;
         Log.d(TAG, "refresh callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId + " callType=" + callType);
-        cancelNotification();
+
+        // Do not cancel the backing full-screen notification while ringing.
         setContentView(buildView(callerName));
     }
 

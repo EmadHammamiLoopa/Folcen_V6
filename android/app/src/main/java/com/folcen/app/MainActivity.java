@@ -53,13 +53,19 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStart() {
         super.onStart();
-        foreground = true;
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        foreground = true;
         dispatchIncomingCallIntent(getIntent());
+    }
+
+    @Override
+    public void onPause() {
+        foreground = false;
+        super.onPause();
     }
 
     @Override
