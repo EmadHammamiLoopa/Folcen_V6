@@ -22,7 +22,7 @@ if (redisUrl) {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
-      retryStrategy: () => null
+      retryStrategy: (times) => Math.min(times * 200, 3000)
     };
     if (process.env.REDIS_PASSWORD) redisOptions.password = process.env.REDIS_PASSWORD;
     if (String(process.env.REDIS_TLS || '').toLowerCase() === 'true') {

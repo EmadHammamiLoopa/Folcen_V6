@@ -18,16 +18,14 @@ if (redisUrl) {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
-      retryStrategy: () => null
+      retryStrategy: (times) => Math.min(times * 200, 3000)
     });
     useRedis = true;
     redisClient.on('error', (e) => {
       if (!redisErrorLogged) {
         redisErrorLogged = true;
-        console.error('Presence: Redis unavailable; using in-memory presence fallback', e && e.message ? e.message : e);
+        console.error('Presence: Redis connection error; Redis will retry automatically', e && e.message ? e.message : e);
       }
-      useRedis = false;
-      try { redisClient.disconnect(); } catch (_) {}
     });
     console.log('Presence: using Redis at', redisUrl);
   } catch (err) {
@@ -46,10 +44,8 @@ const PRESENCE_KEY = 'online_users';
 function disableRedis(error) {
   if (!redisErrorLogged) {
     redisErrorLogged = true;
-    console.error('Presence: Redis command failed; using in-memory presence fallback', error && error.message ? error.message : error);
+    console.error('Presence: Redis command failed; Redis will retry automatically', error && error.message ? error.message : error);
   }
-  useRedis = false;
-  try { redisClient && redisClient.disconnect(); } catch (_) {}
 }
 
 async function setUserOnline(userId) {

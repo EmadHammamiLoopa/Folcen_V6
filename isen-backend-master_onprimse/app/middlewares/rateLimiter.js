@@ -21,7 +21,7 @@ try {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
-      retryStrategy: () => null
+      retryStrategy: (times) => Math.min(times * 200, 3000)
     });
     redisClient.on('error', (e) => {
       console.error('rateLimiter: Redis error', e && e.message ? e.message : e);
