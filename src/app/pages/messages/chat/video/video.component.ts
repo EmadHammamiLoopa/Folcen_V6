@@ -415,13 +415,19 @@ startCallTimer() {
 
 startMissedCallTimeout() {
   this.clearCallTimeout();
+
+  // Backend owns the real 60-second missed-call timeout.
+  // This timer is only an emergency local cleanup fallback.
   this.callTimeout = setTimeout(() => {
     if (!this.answered) {
-      console.log('â° No answer in 60 sec â€” cancelling call');
-      this.calling = false; // ensure UI reflects ended state immediately
-      this.cancel(false, 'timeout');   // â¬… reason
+      console.warn(
+        '[video] caller local fallback after server timeout deadline',
+        { callId: this.callId }
+      );
+
+      this.finishLocalTimeoutFallback();
     }
-  }, 60000);
+  }, 75000);
 }
 
 stopCallTimer() {
@@ -1402,14 +1408,96 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
 
 
 
+private async finishLocalTimeoutFallback(): Promise<void> {
+  if (this.tearingDown) return;
+
+  this.tearingDown = true;
+
+  try {
+    console.warn(
+      '[video] LOCAL_TIMEOUT_FALLBACK',
+      { callId: this.callId }
+    );
+
+    this.clearUnansweredTimeout();
+    this.clearCallTimeout();
+    this.stopCallTimer();
+
+    this.ringer.stop();
+    this.releaseWakeLock();
+
+    this.messengerService.sendMessage({
+      event: 'stop-audio'
+    });
+
+    this.calling = false;
+    this.answered = false;
+    this.hasAnswered = false;
+
+    this.stopLocalStream();
+
+    try {
+      await this.webRTC.close({
+        silent: true
+      });
+    } catch (_) {}
+
+    if (this.myEl) {
+      try {
+        this.myEl.srcObject = null;
+        this.myEl.pause();
+      } catch (_) {}
+    }
+
+    if (this.partnerEl) {
+      try {
+        this.partnerEl.srcObject = null;
+        this.partnerEl.pause();
+      } catch (_) {}
+    }
+
+    this.localStream = null;
+
+    /*
+     * DO NOT emit:
+     *   CANCELED
+     *   MISSED
+     *   MISSED_TIMEOUT
+     *   video-call-timeout
+     *
+     * The backend already owns the 60s timeout.
+     */
+
+    if (this.router.url.includes('/video')) {
+      this.ngZone.run(() =>
+        this.router.navigate(
+          ['/tabs/messages/list'],
+          { replaceUrl: true }
+        )
+      );
+    }
+
+  } finally {
+    this.tearingDown = false;
+  }
+}
+
+
 startUnansweredTimeout() {
-  this.clearUnansweredTimeout(); // cleanup if needed
+  this.clearUnansweredTimeout();
+
+  // Backend owns the authoritative 60-second missed-call decision.
+  // Never race it from the callee.
   this.unansweredTimeout = setTimeout(() => {
     if (!this.answered) {
-      console.warn('â±ï¸ Call unanswered after 60 seconds. Closing...');
-      this.cancel(false, 'timeout');
+      console.warn(
+        '[video] callee local fallback after server timeout deadline',
+        { callId: this.callId }
+      );
+
+      this.finishLocalTimeoutFallback();
     }
-  }, 60000); // 60 seconds
+  }, 75000);
 }
 
 clearUnansweredTimeout() {
