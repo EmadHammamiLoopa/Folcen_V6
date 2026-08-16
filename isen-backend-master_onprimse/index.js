@@ -118,6 +118,10 @@ const _corsOrigins = _corsOriginEnv.split(',').map(s => s.trim()).filter(Boolean
 
 // Explicit CORS config: allow local dashboard origins and support credentials
 const allowedOrigins = [
+  'https://localhost',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'http://localhost',
   'http://localhost:4200',
   'http://127.0.0.1:4200',
   'http://localhost:8100',
