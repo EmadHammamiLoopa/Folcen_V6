@@ -15,7 +15,7 @@ const CallEventSchema = new mongoose.Schema({
   // lifecycle: matched, connected, timeout, cancelled, declined, ended
   lifecycle: [{
     at: { type: Date, default: Date.now },
-    event: { type: String, enum: ['requested','matched','connected','timeout','cancelled','declined','ended'], required: true },
+    event: { type: String, enum: ['requested','matched','started','connected','timeout','cancelled','declined','ended'], required: true },
     durationSeconds: { type: Number, default: null } // only for connected->ended
   }],
   createdAt: { type: Date, default: Date.now, index: true },

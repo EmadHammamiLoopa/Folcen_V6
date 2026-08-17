@@ -27,7 +27,7 @@ if (redisUrl) {
         console.error('Presence: Redis connection error; Redis will retry automatically', e && e.message ? e.message : e);
       }
     });
-    console.log('Presence: using Redis at', redisUrl);
+    console.log('Presence: using Redis');
   } catch (err) {
     console.warn('Presence: ioredis not installed or failed to load, falling back to in-memory presence');
     useRedis = false;
