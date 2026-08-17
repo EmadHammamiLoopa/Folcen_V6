@@ -2,69 +2,419 @@
 
 <ion-content fullscreen color="dark" class="video-container">
 
-  <div class="call-bg-portrait" *ngIf="!answered && partner">
-    <div class="ring">
-      <app-avatar [profile]="partner" [size]="168"></app-avatar>
+  <!-- FOLCEN VIDEO CONNECTION PORTAL -->
+  <div
+    class="folcen-call-portal"
+    *ngIf="!answer && !remoteVideoReady">
+
+    <div class="portal-ambient ambient-a"></div>
+    <div class="portal-ambient ambient-b"></div>
+
+    <div class="portal-stage">
+
+      <div class="portal-orbit orbit-one">
+        <span class="orbit-node"></span>
+      </div>
+
+      <div class="portal-orbit orbit-two">
+        <span class="orbit-node"></span>
+      </div>
+
+      <div class="portal-orbit orbit-three">
+        <span class="orbit-node"></span>
+      </div>
+
+      <div class="portal-pulse pulse-one"></div>
+      <div class="portal-pulse pulse-two"></div>
+
+      <div class="portal-core">
+        <div class="portal-core-inner">
+          <div class="camera-handshake-mark" aria-hidden="true">
+            <span class="camera-body"></span>
+            <span class="camera-lens"></span>
+            <span class="camera-glint"></span>
+            <span class="camera-wing"></span>
+          </div>
+        </div>
+      </div>
+
+      <span class="portal-star star-one"></span>
+      <span class="portal-star star-two"></span>
+      <span class="portal-star star-three"></span>
+      <span class="portal-star star-four"></span>
+
     </div>
-    <div class="name">{{ partner?.fullName }}</div>
-    <div class="label">{{ answeringCall || (answer && autoAnswer) ? 'Joining call...' : (answer ? 'Incoming video call' : 'Ringing...') }}</div>
+
+    <div class="portal-copy">
+
+      <div class="portal-eyebrow">FOLCEN</div>
+
+      <div class="portal-title">
+        Connecting your call
+      </div>
+
+      <div class="portal-person">
+        {{ partner?.fullName || 'Connecting…' }}
+      </div>
+
+      <div class="portal-security">
+        <i class="fas fa-lock"></i>
+        <span>Establishing secure connection</span>
+      </div>
+
+      <div class="portal-progress">
+        <span></span>
+      </div>
+
+    </div>
+
   </div>
 
-  <div class="video-stage" [class.hidden-stage]="!answered">
-    <video #partnerVideo id="partner-video" autoplay playsinline
-           (click)="swapVideo('my-video')"
-           [ngClass]="topVideoFrame === 'partner-video' ? 'main-video' : 'pip-video'">
+
+  <!-- Ambient background shown before remote video -->
+  <div class="ambient-layer"></div>
+
+  <!-- =========================
+       PRE-CALL / JOINING SCREEN
+       ========================= -->
+  <section
+    class="precall-screen"
+    *ngIf="!answered">
+
+    <div class="precall-badge">
+      <i class="fas fa-video"></i>
+      <span>Folcen video call</span>
+    </div>
+
+    <div class="caller-avatar-wrap" *ngIf="partner">
+      <div class="avatar-glow"></div>
+      <app-avatar
+        [profile]="partner"
+        [size]="138">
+      </app-avatar>
+    </div>
+
+    <h1 class="caller-name">
+      {{ partner?.fullName || 'Video call' }}
+    </h1>
+
+    <div
+      class="joining-visual"
+      *ngIf="calling || placingCall || answeringCall || (answer && autoAnswer)">
+
+      <div class="connection-symbol">
+        <span class="signal-ring signal-ring-one"></span>
+        <span class="signal-ring signal-ring-two"></span>
+        <span class="signal-ring signal-ring-three"></span>
+
+        <div class="signal-core">
+          <div class="camera-handshake-mark compact" aria-hidden="true">
+            <span class="camera-body"></span>
+            <span class="camera-lens"></span>
+            <span class="camera-glint"></span>
+            <span class="camera-wing"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="joining-title">
+        {{
+          answeringCall || (answer && autoAnswer)
+            ? 'Joining call'
+            : 'Connecting'
+        }}
+      </div>
+
+      <div class="joining-subtitle">
+        Establishing a secure video connection
+      </div>
+
+      <div class="dot-loader" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <div
+      class="precall-status"
+      *ngIf="!calling && !placingCall && !answeringCall && !(answer && autoAnswer)">
+      {{ answer ? 'Incoming video call' : 'Ringing…' }}
+    </div>
+  </section>
+
+
+  <!-- =========================
+       VIDEO STAGE
+       ========================= -->
+  <div
+    class="video-stage"
+    [class.stage-active]="answered || answeringCall || calling || placingCall"
+    [class.remote-pending]="!remoteVideoReady">
+
+    <!-- REMOTE VIDEO -->
+
+    <!-- FOLCEN REMOTE CONNECTING EXPERIENCE -->
+    <div
+      class="folcen-connect-state"
+      *ngIf="answer &&
+             !remoteVideoReady &&
+             (answeringCall || answered || autoAnswer)">
+
+      <div class="folcen-space">
+
+        <div class="folcen-orbit orbit-a">
+          <span></span>
+        </div>
+
+        <div class="folcen-orbit orbit-b">
+          <span></span>
+        </div>
+
+        <div class="folcen-orbit orbit-c">
+          <span></span>
+        </div>
+
+        <div class="folcen-energy"></div>
+
+        <div class="folcen-connect-core">
+          <div class="folcen-camera-mark">
+            <div class="camera-handshake-mark" aria-hidden="true">
+              <span class="camera-body"></span>
+              <span class="camera-lens"></span>
+              <span class="camera-glint"></span>
+              <span class="camera-wing"></span>
+            </div>
+          </div>
+        </div>
+
+        <span class="folcen-particle particle-a"></span>
+        <span class="folcen-particle particle-b"></span>
+        <span class="folcen-particle particle-c"></span>
+        <span class="folcen-particle particle-d"></span>
+
+      </div>
+
+      <div class="folcen-connect-copy">
+        <div class="folcen-connect-title">
+          Connecting
+        </div>
+
+        <div class="folcen-connect-person">
+          {{ partner?.fullName || 'Video call' }}
+        </div>
+
+        <div class="folcen-secure">
+          <i class="fas fa-lock"></i>
+          Establishing secure video
+        </div>
+      </div>
+
+      <div class="folcen-progress">
+        <span></span>
+      </div>
+
+    </div>
+
+<video
+      #partnerVideo
+      id="partner-video"
+      autoplay
+      playsinline
+      (playing)="onRemoteVideoPlaying()"
+      (loadeddata)="onRemoteVideoPlaying()"
+      (canplay)="onRemoteVideoPlaying()"
+      (click)="swapVideo('my-video')"
+      [ngClass]="topVideoFrame === 'partner-video'
+        ? 'main-video'
+        : 'pip-video'"
+      [class.folcen-remote-hidden]="!remoteVideoReady">
     </video>
 
-    <video #myVideo id="my-video" autoplay playsinline muted 
-           (click)="swapVideo('partner-video')"
-           [ngClass]="topVideoFrame === 'my-video' ? 'main-video' : 'pip-video'">
+
+    <!-- LOCAL VIDEO -->
+    <video
+      #myVideo
+      id="my-video"
+      autoplay
+      playsinline
+      muted
+      (click)="swapVideo('partner-video')"
+      [ngClass]="topVideoFrame === 'my-video'
+        ? 'main-video'
+        : 'pip-video'">
     </video>
+
   </div>
 
-  <div class="top-overlay" *ngIf="partner && answered">
-    <div class="call-hud">
-      <app-avatar [profile]="partner" [size]="60" class="mini-avatar"></app-avatar>
-      <div class="info">
-        <h3>{{ partner?.fullName }}</h3>
-        <span class="status">Video call</span>
+
+  <!-- =========================
+       CONNECTED HEADER
+       ========================= -->
+  <header
+    class="call-header"
+    *ngIf="partner && answered">
+
+    <div class="identity-pill">
+
+      <app-avatar
+        [profile]="partner"
+        [size]="42"
+        class="header-avatar">
+      </app-avatar>
+
+      <div class="identity-copy">
+        <div class="identity-name">
+          {{ partner?.fullName }}
+        </div>
+
+        <div class="identity-status">
+          <span class="live-dot"></span>
+          Connected
+        </div>
       </div>
-      <div class="call-timer">
-        <span class="live-dot"></span>
-        <span>{{ callDuration || '00:00' }}</span>
-      </div>
+
     </div>
-  </div>
 
+    <div class="timer-pill">
+      <i class="fas fa-lock"></i>
+      <span>{{ callDuration || '00:00' }}</span>
+    </div>
+
+  </header>
+
+
+  <!-- =========================
+       CALL CONTROLS
+       ========================= -->
   <div class="controls-overlay">
-    
-    <div class="utility-bar" *ngIf="answered || !answer">
-      <button class="blur-btn" [class.active]="!audioEnabled" (click)="toggleAudio()" aria-label="Toggle microphone">
-        <i class="fas" [ngClass]="audioEnabled ? 'fa-microphone' : 'fa-microphone-slash'"></i>
-      </button>
-      
-      <button class="blur-btn" (click)="toggleCameraDirection()" aria-label="Switch camera">
-        <i class="fas fa-sync-alt" [class.rotating]="switchingCamera"></i>
+
+    <!-- Connected controls -->
+    <div
+      class="control-dock"
+      *ngIf="answered">
+
+      <button
+        class="control-btn"
+        [class.disabled-control]="!audioEnabled"
+        (click)="toggleAudio()"
+        aria-label="Toggle microphone">
+
+        <i
+          class="fas"
+          [ngClass]="audioEnabled
+            ? 'fa-microphone'
+            : 'fa-microphone-slash'">
+        </i>
+
+        <span>Mic</span>
       </button>
 
-      <button class="blur-btn" [class.active]="!cameraEnabled" (click)="toggleCamera()" aria-label="Toggle camera">
-        <i class="fas" [ngClass]="cameraEnabled ? 'fa-video' : 'fa-video-slash'"></i>
-      </button>
-    </div>
 
-    <div class="action-bar">
-      <button *ngIf="answer && !answered && !autoAnswer" class="main-btn accept" [disabled]="answeringCall" (click)="answerCall()" aria-label="Answer call">
-        <i class="fas" [ngClass]="answeringCall ? 'fa-spinner fa-spin' : 'fa-phone'"></i>
+      <button
+        class="control-btn"
+        (click)="toggleCameraDirection()"
+        aria-label="Switch camera">
+
+        <i
+          class="fas fa-sync-alt"
+          [class.rotating]="switchingCamera">
+        </i>
+
+        <span>Flip</span>
       </button>
 
-      <button *ngIf="!answered && !answer && !calling" class="main-btn call" (click)="placeCall()" aria-label="Start video call">
-        <i class="fas fa-video"></i>
+
+      <button
+        class="control-btn"
+        [class.disabled-control]="!cameraEnabled"
+        (click)="toggleCamera()"
+        aria-label="Toggle camera">
+
+        <i
+          class="fas"
+          [ngClass]="cameraEnabled
+            ? 'fa-video'
+            : 'fa-video-slash'">
+        </i>
+
+        <span>Camera</span>
       </button>
 
-      <button class="main-btn hangup" (click)="answered ? closeCall() : cancel()" aria-label="End call">
+
+      <button
+        class="control-btn end-call-btn"
+        (click)="closeCall()"
+        aria-label="End call">
+
         <i class="fas fa-phone-slash"></i>
+        <span>End</span>
       </button>
+
     </div>
+
+
+    <!-- Incoming manual answer -->
+    <div
+      class="incoming-actions"
+      *ngIf="answer && !answered && !autoAnswer">
+
+      <button
+        class="incoming-action reject-action"
+        (click)="cancel()"
+        aria-label="Reject call">
+
+        <i class="fas fa-phone-slash"></i>
+        <span>Decline</span>
+      </button>
+
+
+      <button
+        class="incoming-action answer-action"
+        [disabled]="answeringCall"
+        (click)="answerCall()"
+        aria-label="Answer call">
+
+        <i
+          class="fas"
+          [ngClass]="answeringCall
+            ? 'fa-spinner fa-spin'
+            : 'fa-phone'">
+        </i>
+
+        <span>
+          {{ answeringCall ? 'Joining' : 'Answer' }}
+        </span>
+      </button>
+
+    </div>
+
+
+    <!-- Outgoing/cancel -->
+    <div
+      class="outgoing-actions"
+      *ngIf="!answered && !answer">
+
+      <button
+        *ngIf="!calling && !placingCall"
+        class="incoming-action answer-action"
+        (click)="placeCall()">
+
+        <i class="fas fa-video"></i>
+        <span>Call</span>
+      </button>
+
+
+      <button
+        class="incoming-action reject-action"
+        (click)="cancel()">
+
+        <i class="fas fa-phone-slash"></i>
+        <span>Cancel</span>
+      </button>
+
+    </div>
+
   </div>
 
 </ion-content>

@@ -472,7 +472,7 @@ export class ListComponent implements OnInit, OnDestroy {
     return Math.max(localCount, Number(this.missedCallBudgetCount || 0));
   }
 
-  
+
   async initSocket() {
     await SocketService.initializeSocket();
     this.socket = await SocketService.getSocket();
@@ -480,8 +480,8 @@ export class ListComponent implements OnInit, OnDestroy {
   }
 
   private bindSocketListeners() { /* replaced by SocketService.newMessage$ Observable in ngOnInit */ }
-  
-  
+
+
   ionViewWillEnter() {
     // keep messages badge synchronized with current missed-calls count
     try {
@@ -567,12 +567,111 @@ private isUnread(peerKey: string, lastMsg: Message, isIncoming: boolean): boolea
   const readTs = this.lastReadAt[peerKey] || 0;
   return isIncoming && lastTs > readTs;
 }
-  
+
+  /**
+   * Load missed calls from the authoritative backend history.
+   *
+   * Returns:
+   *   array -> backend answered successfully
+   *   null  -> backend/socket unavailable; caller may use local fallback
+   */
+  private async fetchServerMissedCalls(): Promise<any[] | null> {
+    try {
+      await SocketService.initializeSocket();
+
+      let socket = this.socket;
+
+      // The list page can survive an Android background/resume cycle while
+      // its previous Socket.IO instance is no longer connected.
+      if (!socket?.connected) {
+        socket = await SocketService.getSocket();
+        this.socket = socket;
+      }
+
+      if (!socket?.connected) {
+        console.warn(
+          '[missed-calls] socket unavailable; using local fallback'
+        );
+        return null;
+      }
+
+      return await new Promise<any[] | null>((resolve) => {
+        let settled = false;
+
+        const finish = (value: any[] | null) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        };
+
+        const timer = setTimeout(() => {
+          console.warn(
+            '[missed-calls] server request timed out'
+          );
+          finish(null);
+        }, 6000);
+
+        socket.emit(
+          'missed-calls:list',
+          {},
+          (resp: any) => {
+            if (!resp?.success) {
+              console.warn(
+                '[missed-calls] server rejected request',
+                resp
+              );
+              finish(null);
+              return;
+            }
+
+            const calls =
+              Array.isArray(resp.calls)
+                ? resp.calls
+                : [];
+
+            console.log(
+              '[missed-calls] loaded from server',
+              {
+                count: calls.length
+              }
+            );
+
+            finish(calls);
+          }
+        );
+      });
+
+    } catch (err) {
+      console.warn(
+        '[missed-calls] server load failed; using local fallback',
+        err
+      );
+
+      return null;
+    }
+  }
+
   /** ✅ Show Missed Calls */
 // Update the showMissedCalls method in list.component.ts
 async showMissedCalls() {
-  const rawMissed = this.badges.getMissedCalls ? this.badges.getMissedCalls() : this.webrtcService.getMissedCalls();
-  const missedCalls = await this.normalizeMissedCallsForModal(rawMissed || []);
+  // Prefer persistent server history. The old local buffer remains only
+  // as an offline/backward-compatible fallback.
+  const serverMissed =
+    await this.fetchServerMissedCalls();
+
+  const localMissed =
+    this.badges.getMissedCalls
+      ? this.badges.getMissedCalls()
+      : this.webrtcService.getMissedCalls();
+
+  const rawMissed =
+    serverMissed !== null
+      ? serverMissed
+      : (localMissed || []);
+
+  const missedCalls =
+    await this.normalizeMissedCallsForModal(rawMissed || []);
   if (!missedCalls || missedCalls.length === 0) {
     const alert = await this.alertController.create({ header: 'No Missed Calls', message: 'You have no missed video calls.', buttons: ['OK'] });
     await alert.present();
@@ -619,10 +718,22 @@ async showMissedCalls() {
         // If name missing, attempt to resolve synchronously via userService
         if (!userName || userName === 'Unknown') {
           try {
-            const prof: any = await this.userService.getUserProfile(userId).toPromise();
+            const profileResp: any =
+              await this.userService.getUserProfile(userId).toPromise();
+
+            const prof: any =
+              profileResp?.data ?? profileResp ?? null;
+
             if (prof) {
-              userName = prof.fullName || `${prof.firstName || ''} ${prof.lastName || ''}`.trim() || userName;
-              userAvatar = userAvatar || prof.mainAvatar || prof.avatar;
+              userName =
+                prof.fullName ||
+                `${prof.firstName || ''} ${prof.lastName || ''}`.trim() ||
+                userName;
+
+              userAvatar =
+                userAvatar ||
+                prof.mainAvatar ||
+                prof.avatar;
             }
           } catch (e) { /* ignore */ }
         }
@@ -650,9 +761,9 @@ private formatTimeAgo(timestamp: string): string {
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
   return `${Math.floor(diffInSeconds / 86400)} days ago`;
 }
-  
-  
-  
+
+
+
   // ✅ Helper method to show remaining missed calls
   async showRemainingMissedCalls(remainingCalls: any[]) {
     const buttons: any[] = remainingCalls.map(call => ({
@@ -661,7 +772,7 @@ private formatTimeAgo(timestamp: string): string {
         this.callBack(call.userId);
       }
     }));
-  
+
     buttons.push({
       text: "Close",
       role: "cancel",
@@ -669,17 +780,17 @@ private formatTimeAgo(timestamp: string): string {
         this.webrtcService.clearMissedCalls();
       }
     });
-  
+
     const alertElement = await this.alertController.create({
       header: "📞 More Missed Calls",
       message: `You have ${remainingCalls.length} more missed calls.`,
       buttons: buttons
     });
-  
+
     await alertElement.present();
   }
-  
-  
+
+
 
   getUsersMessages(event?: any, refresh: boolean = false) {
     if (!event) this.pageLoading = true;
@@ -701,7 +812,7 @@ private formatTimeAgo(timestamp: string): string {
                   productId: message.type === 'product' ? message.productId : message.productId ?? null,
                 })
               );
-            
+
               const uid = this.keyOf(usr._id);
               const user = new User().initialize({
                 ...profile,
@@ -713,16 +824,16 @@ private formatTimeAgo(timestamp: string): string {
                 mainAvatar: profile.mainAvatar || usr.mainAvatar,
                 avatar: profile.avatar?.length ? profile.avatar : usr.avatar,
               }) as ListUser;
-            
+
               const last = messages?.[0];
               const isIncoming = !!last && !!this.authId && last.from !== this.authId;
               const hasServerUnread = Number.isFinite(usr.unreadCount);
-              
+
               // ✅ prefer server unreadCount if provided, else fallback to local last-read logic
               user.hasUnread = hasServerUnread
                 ? (usr.unreadCount > 0)
                 : this.isUnread(uid, last, isIncoming);
-                
+
               // ✅ replace-or-insert (dedupe)
               const idx = this.users.findIndex(u => this.keyOf(u) === uid);
               if (idx !== -1) {
@@ -732,7 +843,7 @@ private formatTimeAgo(timestamp: string): string {
               } else {
                 this.users.unshift(user);
               }
-            
+
               this.sortUsersByLatestMessage();
               this.cdr.markForCheck();
             }, () => {
@@ -775,7 +886,7 @@ private formatTimeAgo(timestamp: string): string {
               this.sortUsersByLatestMessage();
               this.cdr.markForCheck();
             });
-            
+
           }
         });
 
@@ -808,12 +919,12 @@ private formatTimeAgo(timestamp: string): string {
     localStorage.removeItem('partnerId');
     this.router.navigate(['/messages/video', userId], { queryParams: { answer: false } });
   }
-  
+
 
 openThread(user: User) {
   (user as any).hasUnread = false;
   const peerKey = String(user._id || user.id);
-  this.markLocallyRead(peerKey);  
+  this.markLocallyRead(peerKey);
 
   // Clear missed calls for this user
   try { this.webrtcService.removeMissedCallsFor(peerKey); } catch(e) {}
