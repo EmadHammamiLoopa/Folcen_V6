@@ -2360,3 +2360,309 @@ video::-webkit-media-controls-overlay-play-button {
   }
 }
 
+
+
+/* === CAMERA HANDSHAKE MOTION V1 === */
+
+.camera-handshake-mark {
+  position: relative;
+
+  width: 42px;
+  height: 34px;
+
+  display: block;
+
+  animation:
+    cameraHandshakeFloat
+    2.1s
+    ease-in-out
+    infinite;
+}
+
+.camera-handshake-mark.compact {
+  transform: scale(0.82);
+}
+
+
+.camera-body {
+  position: absolute;
+
+  left: 3px;
+  top: 6px;
+
+  width: 30px;
+  height: 23px;
+
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.98),
+      rgba(216,231,255,0.82)
+    );
+
+  box-shadow:
+    0 7px 18px rgba(0,0,0,0.16),
+    inset 0 1px 0 rgba(255,255,255,0.9);
+
+  animation:
+    cameraBodyBreathe
+    1.8s
+    ease-in-out
+    infinite;
+}
+
+
+.camera-wing {
+  position: absolute;
+
+  right: 1px;
+  top: 11px;
+
+  width: 11px;
+  height: 14px;
+
+  clip-path:
+    polygon(
+      0 22%,
+      100% 0,
+      100% 100%,
+      0 78%
+    );
+
+  border-radius: 3px;
+
+  background:
+    rgba(226,239,255,0.9);
+
+  transform-origin: left center;
+
+  animation:
+    cameraWingPulse
+    1.8s
+    ease-in-out
+    infinite;
+}
+
+
+.camera-lens {
+  position: absolute;
+
+  z-index: 4;
+
+  left: 12px;
+  top: 11px;
+
+  width: 13px;
+  height: 13px;
+
+  border-radius: 50%;
+
+  background:
+    radial-gradient(
+      circle at 38% 34%,
+      #d9f5ff 0 9%,
+      #79bcff 13%,
+      #6a74ff 42%,
+      #22294e 72%
+    );
+
+  border:
+    1px solid rgba(255,255,255,0.7);
+
+  box-shadow:
+    0 0 0 3px rgba(102,153,255,0.12),
+    0 0 14px rgba(103,154,255,0.65);
+
+  animation:
+    cameraLensPulse
+    1.35s
+    ease-in-out
+    infinite;
+}
+
+
+.camera-glint {
+  position: absolute;
+
+  z-index: 6;
+
+  left: 15px;
+  top: 13px;
+
+  width: 4px;
+  height: 4px;
+
+  border-radius: 50%;
+
+  background: #fff;
+
+  box-shadow:
+    0 0 7px rgba(255,255,255,0.95);
+
+  animation:
+    cameraGlint
+    1.6s
+    ease-in-out
+    infinite;
+}
+
+
+/*
+ * Expanding handshake ring.
+ * It visually communicates that we're establishing media,
+ * rather than showing a static "play" affordance.
+ */
+.camera-handshake-mark::before,
+.camera-handshake-mark::after {
+  content: "";
+
+  position: absolute;
+
+  left: 50%;
+  top: 50%;
+
+  width: 40px;
+  height: 40px;
+
+  margin-left: -20px;
+  margin-top: -20px;
+
+  border-radius: 50%;
+
+  border:
+    1px solid rgba(171,206,255,0.42);
+
+  pointer-events: none;
+
+  animation:
+    cameraHandshakeWave
+    2.25s
+    ease-out
+    infinite;
+}
+
+.camera-handshake-mark::after {
+  animation-delay: 1.08s;
+}
+
+
+.portal-core-inner .camera-handshake-mark,
+.loader-core .camera-handshake-mark,
+.folcen-camera-mark .camera-handshake-mark,
+.signal-core .camera-handshake-mark {
+  margin: auto;
+}
+
+
+@keyframes cameraHandshakeFloat {
+  0%,
+  100% {
+    transform:
+      translateY(1px)
+      rotate(-1deg);
+  }
+
+  50% {
+    transform:
+      translateY(-4px)
+      rotate(1deg);
+  }
+}
+
+
+@keyframes cameraBodyBreathe {
+  0%,
+  100% {
+    transform: scale(0.96);
+    opacity: 0.88;
+  }
+
+  50% {
+    transform: scale(1.035);
+    opacity: 1;
+  }
+}
+
+
+@keyframes cameraWingPulse {
+  0%,
+  100% {
+    transform:
+      scaleX(0.9)
+      translateX(-1px);
+
+    opacity: 0.76;
+  }
+
+  50% {
+    transform:
+      scaleX(1.08)
+      translateX(1px);
+
+    opacity: 1;
+  }
+}
+
+
+@keyframes cameraLensPulse {
+  0%,
+  100% {
+    transform: scale(0.86);
+
+    box-shadow:
+      0 0 0 2px rgba(102,153,255,0.1),
+      0 0 8px rgba(103,154,255,0.42);
+  }
+
+  50% {
+    transform: scale(1.12);
+
+    box-shadow:
+      0 0 0 5px rgba(102,153,255,0.11),
+      0 0 20px rgba(103,154,255,0.82);
+  }
+}
+
+
+@keyframes cameraGlint {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.65);
+  }
+
+  42% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+
+@keyframes cameraHandshakeWave {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.72;
+  }
+
+  70% {
+    opacity: 0.14;
+  }
+
+  100% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-handshake-mark,
+  .camera-handshake-mark *,
+  .camera-handshake-mark::before,
+  .camera-handshake-mark::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

@@ -1,6 +1,7 @@
 package com.folcen.app;
 
 import android.app.Activity;
+import android.app.KeyguardManager;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
@@ -34,6 +35,7 @@ public class IncomingCallActivity extends Activity {
     private String callType;
     private String expiresAt;
     private boolean actionTaken = false;
+    private boolean unlockInProgress = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -296,16 +298,115 @@ public class IncomingCallActivity extends Activity {
     }
 
     private void answerCall() {
-        if (actionTaken) return;
+        if (actionTaken || unlockInProgress) return;
+
         if (isExpired()) {
             Log.d(TAG, "expired answer ignored callId=" + callId + " expiresAt=" + expiresAt);
             cancelNotification();
             finish();
             return;
         }
+
+        KeyguardManager keyguardManager =
+                (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+
+        boolean locked =
+                keyguardManager != null &&
+                keyguardManager.isKeyguardLocked();
+
+        Log.d(
+                TAG,
+                "answer tapped callId=" + callId +
+                        " callerId=" + callerId +
+                        " receiverId=" + receiverId +
+                        " locked=" + locked
+        );
+
+        if (!locked) {
+            launchAnsweredCall();
+            return;
+        }
+
+        /*
+         * Never start camera/video behind a secure keyguard.
+         * Ask Android to authenticate the device owner first.
+         */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            unlockInProgress = true;
+
+            keyguardManager.requestDismissKeyguard(
+                    this,
+                    new KeyguardManager.KeyguardDismissCallback() {
+                        @Override
+                        public void onDismissSucceeded() {
+                            super.onDismissSucceeded();
+                            unlockInProgress = false;
+
+                            Log.d(
+                                    TAG,
+                                    "keyguard dismissed for answer callId=" + callId
+                            );
+
+                            launchAnsweredCall();
+                        }
+
+                        @Override
+                        public void onDismissCancelled() {
+                            super.onDismissCancelled();
+                            unlockInProgress = false;
+
+                            Log.d(
+                                    TAG,
+                                    "keyguard dismissal cancelled callId=" + callId
+                            );
+                        }
+
+                        @Override
+                        public void onDismissError() {
+                            super.onDismissError();
+                            unlockInProgress = false;
+
+                            Log.w(
+                                    TAG,
+                                    "keyguard dismissal error callId=" + callId
+                            );
+                        }
+                    }
+            );
+
+            return;
+        }
+
+        /*
+         * Legacy Android fallback. Modern Folcen devices use the
+         * requestDismissKeyguard path above.
+         */
+        launchAnsweredCall();
+    }
+
+    private void launchAnsweredCall() {
+        if (actionTaken) return;
+
+        if (isFinishing() ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed())) {
+            return;
+        }
+
+        if (isExpired()) {
+            Log.d(
+                    TAG,
+                    "answer expired before launch callId=" + callId
+            );
+            cancelNotification();
+            finish();
+            return;
+        }
+
         actionTaken = true;
-        Log.d(TAG, "answer tapped callId=" + callId + " callerId=" + callerId + " receiverId=" + receiverId);
+        unlockInProgress = false;
+
         cancelNotification();
+
         Uri uri = new Uri.Builder()
                 .scheme("folcen")
                 .authority("incoming-call")
@@ -324,12 +425,21 @@ public class IncomingCallActivity extends Activity {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setAction(Intent.ACTION_VIEW);
         intent.setData(uri);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK |
+                Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        );
+
         startActivity(intent);
-        Log.d(TAG, "answer launched MainActivity callId=" + callId);
+
+        Log.d(
+                TAG,
+                "answer launched MainActivity after unlock callId=" + callId
+        );
+
         finish();
     }
-
     private void rejectCall() {
         if (actionTaken) return;
         if (isExpired()) {
@@ -374,7 +484,6 @@ public class IncomingCallActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                         | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                         | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                        | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
         );
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);

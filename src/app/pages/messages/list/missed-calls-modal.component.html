@@ -1,32 +1,228 @@
-<ion-header>
-  <ion-toolbar>
-    <ion-title>Missed Calls</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="close()">Close</ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>
+<ion-content
+  class="missed-sheet"
+  [fullscreen]="true">
 
-<ion-content>
-  <ion-list *ngIf="calls?.length; else noCalls">
-    <ion-item *ngFor="let c of calls">
-      <app-avatar slot="start" [profile]="$any({ _id: c.userId, firstName: c.userName })" [size]="40"></app-avatar>
-      <ion-label (click)="callBack(c.userId)" class="clickable">
-        <div class="name">{{ c.userName || ('User ' + (c.userId | slice:0:6)) }}</div>
-        <div class="time">{{ c.timestamp | extractDiffTime }}</div>
-      </ion-label>
-      <ion-button fill="clear" (click)="callBack(c.userId)">Call back</ion-button>
-    </ion-item>
-  </ion-list>
+  <div class="sheet-shell">
 
-  <ng-template #noCalls>
-    <div class="empty-state" style="padding:20px;text-align:center;color:var(--ion-color-medium);">
-      No missed calls.
+    <div class="sheet-handle"></div>
+
+    <header class="sheet-header">
+
+      <div class="hero-mark">
+        <span class="hero-pulse pulse-a"></span>
+        <span class="hero-pulse pulse-b"></span>
+
+        <div class="hero-core">
+          <ion-icon name="videocam"></ion-icon>
+        </div>
+      </div>
+
+      <div class="hero-copy">
+        <div class="eyebrow">
+          CALL HISTORY
+        </div>
+
+        <h1>
+          Missed video calls
+        </h1>
+
+        <p>
+          {{
+            totalMissed === 1
+              ? '1 call waiting for you'
+              : totalMissed + ' calls waiting for you'
+          }}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="close-btn"
+        (click)="close()"
+        aria-label="Close missed calls">
+
+        <ion-icon name="close"></ion-icon>
+
+      </button>
+
+    </header>
+
+
+    <div
+      class="summary-card"
+      *ngIf="totalMissed > 0">
+
+      <div class="summary-icon">
+        <ion-icon name="time-outline"></ion-icon>
+      </div>
+
+      <div class="summary-copy">
+        <strong>
+          {{ groupedCalls.length }}
+          {{
+            groupedCalls.length === 1
+              ? 'person'
+              : 'people'
+          }}
+        </strong>
+
+        <span>
+          Tap the video button to call back
+        </span>
+      </div>
+
+      <div class="summary-count">
+        {{ totalMissed }}
+      </div>
+
     </div>
-  </ng-template>
 
-  <div class="modal-footer">
-    <ion-button color="danger" expand="full" (click)="clearAll()">Clear All</ion-button>
+
+    <section
+      class="call-list"
+      *ngIf="groupedCalls.length; else noCalls">
+
+      <article
+        class="call-card"
+        *ngFor="
+          let c of groupedCalls;
+          trackBy: trackByUserId
+        ">
+
+        <div class="avatar-wrap">
+
+          <img
+            [src]="avatarFor(c)"
+            (error)="onImgError($event)"
+            alt=""
+            class="caller-avatar">
+
+          <span class="missed-dot">
+            <ion-icon name="videocam"></ion-icon>
+          </span>
+
+        </div>
+
+
+        <div class="call-copy">
+
+          <div class="name-row">
+
+            <strong class="caller-name">
+              {{
+                c.userName ||
+                ('User ' + (c.userId | slice:0:6))
+              }}
+            </strong>
+
+            <span
+              class="repeat-pill"
+              *ngIf="c.count > 1">
+
+              {{ c.count }}×
+
+            </span>
+
+          </div>
+
+
+          <div class="call-kind">
+
+            <ion-icon
+              name="arrow-down-outline">
+            </ion-icon>
+
+            <span>
+              {{
+                c.count > 1
+                  ? c.count + ' missed video calls'
+                  : 'Missed video call'
+              }}
+            </span>
+
+          </div>
+
+
+          <div class="call-time">
+            {{
+              c.latestTimestamp |
+              extractDiffTime
+            }}
+          </div>
+
+        </div>
+
+
+        <button
+          type="button"
+          class="callback-btn"
+          (click)="callBack(c.userId)"
+          [attr.aria-label]="
+            'Video call ' +
+            (c.userName || 'contact')
+          ">
+
+          <span class="callback-glow"></span>
+
+          <ion-icon name="videocam"></ion-icon>
+
+        </button>
+
+      </article>
+
+    </section>
+
+
+    <ng-template #noCalls>
+
+      <div class="empty-state">
+
+        <div class="empty-orbit">
+
+          <span></span>
+
+          <div class="empty-core">
+            <ion-icon
+              name="checkmark-outline">
+            </ion-icon>
+          </div>
+
+        </div>
+
+        <h2>
+          You’re all caught up
+        </h2>
+
+        <p>
+          No missed video calls right now.
+        </p>
+
+      </div>
+
+    </ng-template>
+
+
+    <footer
+      class="sheet-footer"
+      *ngIf="totalMissed > 0">
+
+      <button
+        type="button"
+        class="clear-btn"
+        (click)="clearAll()">
+
+        <ion-icon
+          name="trash-outline">
+        </ion-icon>
+
+        <span>
+          Clear missed call history
+        </span>
+
+      </button>
+
+    </footer>
+
   </div>
-</ion-content>
 
+</ion-content>

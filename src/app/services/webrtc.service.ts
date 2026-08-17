@@ -1971,9 +1971,96 @@ WebrtcService.peer.once('open', async () => {
     return this.myStream.getAudioTracks()[0].enabled;
   }
 
-  toggleCameraDirection() {
-    this.facingMode = this.facingMode == 'user' ? 'environment' : 'user';
-    this.getMedia(this.facingMode);
+  async toggleCameraDirection(): Promise<boolean> {
+    if (!this.myStream) {
+      console.warn('[webrtc] camera flip skipped: no active stream');
+      return false;
+    }
+
+    const previousFacing = this.facingMode || 'user';
+    const nextFacing = previousFacing === 'user' ? 'environment' : 'user';
+    const oldTrack = this.myStream.getVideoTracks()[0];
+    const sender = this.getVideoSender();
+
+    if (!oldTrack) {
+      console.warn('[webrtc] camera flip skipped: no video track');
+      return false;
+    }
+
+    const wasEnabled = oldTrack.enabled;
+
+    try {
+      // Android/Samsung can reject opening the opposite camera while
+      // the current CameraDevice is still owned by this WebView.
+      this.myStream.removeTrack(oldTrack);
+      try { oldTrack.stop(); } catch {}
+
+      await new Promise(resolve => setTimeout(resolve, 700));
+
+      let cameraStream: MediaStream;
+
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: nextFacing } },
+          audio: false
+        });
+      } catch (exactError) {
+        console.warn(
+          '[webrtc] exact facingMode failed; retrying with ideal',
+          exactError
+        );
+
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: nextFacing } },
+          audio: false
+        });
+      }
+
+      const newTrack = cameraStream.getVideoTracks()[0];
+
+      if (!newTrack) {
+        throw new Error('Camera flip returned no video track');
+      }
+
+      newTrack.enabled = wasEnabled;
+
+      if (sender) {
+        await sender.replaceTrack(newTrack);
+      }
+
+      this.myStream.addTrack(newTrack);
+      this.myEl.srcObject = this.myStream;
+      this.facingMode = nextFacing;
+
+      console.log('[webrtc] camera flipped to', nextFacing);
+      return true;
+    } catch (error) {
+      console.error('[webrtc] camera flip failed', error);
+
+      // Best-effort recovery of the previous camera without touching audio.
+      try {
+        await new Promise(resolve => setTimeout(resolve, 700));
+
+        const recoveryStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: previousFacing } },
+          audio: false
+        });
+
+        const recoveryTrack = recoveryStream.getVideoTracks()[0];
+
+        if (recoveryTrack) {
+          recoveryTrack.enabled = wasEnabled;
+          if (sender) await sender.replaceTrack(recoveryTrack);
+          this.myStream.addTrack(recoveryTrack);
+          this.myEl.srcObject = this.myStream;
+        }
+      } catch (recoveryError) {
+        console.error('[webrtc] camera flip recovery failed', recoveryError);
+      }
+
+      this.facingMode = previousFacing;
+      return false;
+    }
   }
 }
 /** Move every VP8 payloadId to the front of the m=video line. */
