@@ -1958,6 +1958,61 @@ onRemoteVideoPlaying(): void {
 }
 
 
+private waitForRemoteDecodedFrame(
+  el: HTMLVideoElement,
+  stream: MediaStream,
+  attempt = 0
+): void {
+  // A newer call/stream replaced this one.
+  if (el.srcObject !== stream) return;
+
+  const liveVideo =
+    stream
+      .getVideoTracks()
+      .some(track =>
+        track.readyState === 'live' &&
+        track.enabled
+      );
+
+  if (!liveVideo) return;
+
+  if (
+    el.videoWidth > 0 &&
+    el.videoHeight > 0
+  ) {
+    this.onRemoteVideoPlaying();
+    return;
+  }
+
+  // Android WebView can emit playing/canplay before videoWidth and
+  // videoHeight become available. Keep the branded connecting state
+  // visible and retry briefly instead of permanently hiding valid media.
+  if (attempt >= 60) {
+    console.warn(
+      '[video-ui] remote frame still not decoded after retry window',
+      {
+        callId: this.callId,
+        streamId: stream.id,
+        readyState: el.readyState,
+        videoWidth: el.videoWidth,
+        videoHeight: el.videoHeight
+      }
+    );
+    return;
+  }
+
+  setTimeout(
+    () =>
+      this.waitForRemoteDecodedFrame(
+        el,
+        stream,
+        attempt + 1
+      ),
+    50
+  );
+}
+
+
 private attachRemoteStream(remote: MediaStream): void {
   console.error('[PERF][media] REMOTE_MEDIA', {
     callId: this.callId,
@@ -1976,9 +2031,29 @@ private attachRemoteStream(remote: MediaStream): void {
   el.muted = false;
   el.volume = 1;
 
-  const playNow = () => el.play().catch(() => {});
-  if (el.readyState >= 1) { playNow(); }
-  else                    { el.onloadedmetadata = playNow; }
+  const playNow = () => {
+    el.play()
+      .then(() => {
+        this.waitForRemoteDecodedFrame(el, remote);
+      })
+      .catch(() => {
+        // Playback can race WebView readiness. The retry helper will
+        // continue checking for the first decoded remote frame.
+        this.waitForRemoteDecodedFrame(el, remote);
+      });
+  };
+
+  if (el.readyState >= 1) {
+    playNow();
+  } else {
+    el.onloadedmetadata = playNow;
+  }
+
+  // Do not depend only on playing/canplay events. Some Android WebViews
+  // fire those before decoded dimensions are available and never fire a
+  // useful second event.
+  this.waitForRemoteDecodedFrame(el, remote);
+
   this.connectingAfterRemoteReady = false;
   this.clearCallTimeout();
   this.clearUnansweredTimeout();
