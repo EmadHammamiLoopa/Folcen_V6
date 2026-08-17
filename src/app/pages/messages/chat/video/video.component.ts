@@ -74,6 +74,10 @@ private hasAnswered = false;
   private appStateListener: any = null;
   private terminalCallClosed = false;
 
+  private nativeCallTerminalListener = (event: any) => {
+    void this.handleNativeCallTerminalEvent(event);
+  };
+
 callDuration: string = '00:00';
 private callStartTime: number | null = null;
 private callTimerInterval: any;
@@ -136,6 +140,10 @@ ngOnDestroy() {
   this.connectionSubscriptions.forEach(s => s?.unsubscribe());
   this.connectionSubscriptions = [];
   window.removeEventListener('partner-answered', this.partnerAnsweredListener);
+  window.removeEventListener(
+    'folcen-call-terminal',
+    this.nativeCallTerminalListener
+  );
 }
 
 
@@ -143,6 +151,11 @@ async ngOnInit() {
   /* â”€â”€ 1 â–¸ diagnostics & device list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   console.log('ðŸ“ž Initializing Video Call Componentâ€¦');
   this.webRTC.listAllMediaDevices();
+
+  window.addEventListener(
+    'folcen-call-terminal',
+    this.nativeCallTerminalListener
+  );
 
   /* â”€â”€ 2 â–¸ react to call-state changes (connected / ended) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   this.callStateSubscription = this.webRTC.callState$
@@ -212,6 +225,101 @@ async ngOnInit() {
   } catch (err) {
     console.error('âŒ ngOnInit() aborting:', err);
     this.router.navigate(['/auth/signin']);
+  }
+}
+
+
+private async handleNativeCallTerminalEvent(event: any): Promise<void> {
+  // Capacitor native bridge places eventData directly on the Event object.
+  // SocketService CustomEvent uses event.detail. Support both forms.
+  let detail: any = event?.detail || event || {};
+
+  if (typeof detail === 'string') {
+    try {
+      detail = JSON.parse(detail);
+    } catch (_) {
+      detail = {};
+    }
+  }
+
+  const eventCallId = detail?.callId;
+
+  // Never allow a terminal push from an old/other call to tear down
+  // the currently displayed video route.
+  if (
+    !eventCallId ||
+    !this.callId ||
+    String(eventCallId) !== String(this.callId)
+  ) {
+    return;
+  }
+
+  const status = String(
+    detail?.status || ''
+  ).toLowerCase();
+
+  const type = String(
+    detail?.type || ''
+  ).toLowerCase();
+
+  // The backend also sends an "answered" terminal push simply to
+  // dismiss native incoming-call UI. That must NEVER tear down the
+  // active WebRTC call.
+  if (
+    status === 'answered' ||
+    type === 'video_call_answered'
+  ) {
+    return;
+  }
+
+  const terminal =
+    status === 'cancel' ||
+    status === 'cancelled' ||
+    status === 'canceled' ||
+    status === 'declined' ||
+    status === 'timeout' ||
+    status === 'ended' ||
+    type === 'video_call_timeout' ||
+    type === 'video_call_cancelled';
+
+  if (!terminal) {
+    return;
+  }
+
+  console.log(
+    '[video] native terminal lifecycle received',
+    {
+      callId: eventCallId,
+      status,
+      type
+    }
+  );
+
+  this.clearUnansweredTimeout();
+  this.clearCallTimeout();
+  this.clearAcceptedRetryTimer();
+  this.stopCallTimer();
+  this.ringer.stop();
+  this.releaseWakeLock();
+
+  this.calling = false;
+  this.placingCall = false;
+  this.answeringCall = false;
+  this.answered = false;
+  this.hasAnswered = false;
+  this.remoteVideoReady = false;
+
+  try {
+    await this.webRTC.close({ silent: true });
+  } catch (_) {}
+
+  if (this.router.url.includes('/video')) {
+    this.ngZone.run(() =>
+      this.router.navigate(
+        ['/tabs/messages/list'],
+        { replaceUrl: true }
+      )
+    );
   }
 }
 
@@ -353,7 +461,8 @@ private showSelfPreview(stream: MediaStream): void {
   const playNow = () => {
     el.play()
       .then(() => {
-        this.remoteVideoReady = true;
+        // This is only the LOCAL preview.
+        // Never mark the partner video ready from the local camera.
         this.cdr.detectChanges();
       })
       .catch(() => {});
@@ -1365,6 +1474,24 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
     this.messengerService.sendMessage({ event: 'stop-audio' });
     this.clearFinishedCallState();
 
+    // An explicit caller Cancel must survive a temporary Socket.IO
+    // polling disconnect. SocketService queues it and flushes it
+    // after reconnect.
+    if (
+      !this.answer &&
+      !this.answered &&
+      reason === 'cancel' &&
+      this.userId
+    ) {
+      SocketService.emit('cancel-video', {
+        from: this.authUser._id,
+        to: this.userId,
+        callId: this.callId,
+        at: Date.now(),
+        reason: 'cancel'
+      });
+    }
+
     if (this.socket?.connected) {
       if (!this.answered) {
         // Distinguish caller vs callee side: if answer=true, we're the callee rejecting
@@ -1381,9 +1508,8 @@ private async validateAnswerableCall(): Promise<{ answerable: boolean; status?: 
           try { this.socket.emit(VideoEvents.CANCELED, payload); } catch(_) {}
           try { this.socket.emit('cancel-video', payload); } catch(_) {}
         } else {
-          const payload = { from: this.authUser._id, to: this.userId, callId: this.callId, at: Date.now(), reason: 'cancel' };
-          try { this.socket.emit(VideoEvents.CANCELED, payload); } catch(_) {}
-          try { this.socket.emit('cancel-video', payload); } catch(_) {}
+          // Explicit caller cancel was already sent/queued above
+          // through SocketService.emit().
         }
       } else {
         this.socket.emit(VideoEvents.ENDED, { from: this.authUser._id, to: this.userId, callId: this.callId });

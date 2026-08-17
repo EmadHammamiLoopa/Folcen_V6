@@ -23,6 +23,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.lang.ref.WeakReference;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "FolcenMainActivity";
@@ -30,9 +31,65 @@ public class MainActivity extends BridgeActivity {
     private static boolean foreground = false;
     private static String lastIncomingCallUrl = "";
     private static long lastIncomingCallUrlAt = 0L;
+    private static WeakReference<MainActivity> activeInstance =
+            new WeakReference<>(null);
 
     public static boolean isInForeground() {
         return foreground;
+    }
+
+    public static void dispatchCallTerminalToWebView(
+            String callId,
+            String status,
+            String type
+    ) {
+        MainActivity activity = activeInstance.get();
+
+        if (
+                activity == null ||
+                !foreground ||
+                activity.bridge == null
+        ) {
+            return;
+        }
+
+        activity.runOnUiThread(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put(
+                        "callId",
+                        callId == null ? "" : callId
+                );
+                payload.put(
+                        "status",
+                        status == null ? "" : status
+                );
+                payload.put(
+                        "type",
+                        type == null ? "" : type
+                );
+
+                activity.bridge.triggerWindowJSEvent(
+                        "folcen-call-terminal",
+                        payload.toString()
+                );
+
+                Log.d(
+                        TAG,
+                        "terminal call lifecycle dispatched to WebView callId="
+                                + callId
+                                + " status="
+                                + status
+                );
+
+            } catch (Exception e) {
+                Log.w(
+                        TAG,
+                        "Unable to dispatch terminal call lifecycle",
+                        e
+                );
+            }
+        });
     }
 
     @Override
@@ -58,6 +115,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        activeInstance = new WeakReference<>(this);
         foreground = true;
         dispatchIncomingCallIntent(getIntent());
     }

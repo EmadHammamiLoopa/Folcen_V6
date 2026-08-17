@@ -5,7 +5,7 @@
   <!-- FOLCEN VIDEO CONNECTION PORTAL -->
   <div
     class="folcen-call-portal"
-    *ngIf="!answer && !answered">
+    *ngIf="!answer && !remoteVideoReady">
 
     <div class="portal-ambient ambient-a"></div>
     <div class="portal-ambient ambient-b"></div>
@@ -152,49 +152,14 @@
     [class.stage-active]="answered || answeringCall || calling || placingCall"
     [class.remote-pending]="!remoteVideoReady">
 
-    <!-- Modern remote-video waiting screen -->
-    <div
-      class="remote-waiting"
-      *ngIf="!remoteVideoReady &&
-             (answered || answeringCall || calling || placingCall)">
-
-      <div class="remote-loader">
-        <div class="loader-halo halo-one"></div>
-        <div class="loader-halo halo-two"></div>
-
-        <div class="loader-core">
-          <div class="camera-handshake-mark" aria-hidden="true">
-            <span class="camera-body"></span>
-            <span class="camera-lens"></span>
-            <span class="camera-glint"></span>
-            <span class="camera-wing"></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="remote-loader-title">
-        Connecting your call
-      </div>
-
-      <div class="remote-loader-text">
-        Waiting for {{ partner?.fullName || 'your contact' }}
-      </div>
-
-      <div class="dot-loader small">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    </div>
-
-
     <!-- REMOTE VIDEO -->
     
     <!-- FOLCEN REMOTE CONNECTING EXPERIENCE -->
     <div
       class="folcen-connect-state"
-      *ngIf="!remoteVideoReady &&
-             (calling || placingCall || answeringCall || answered)">
+      *ngIf="answer &&
+             !remoteVideoReady &&
+             (answeringCall || answered || autoAnswer)">
 
       <div class="folcen-space">
 

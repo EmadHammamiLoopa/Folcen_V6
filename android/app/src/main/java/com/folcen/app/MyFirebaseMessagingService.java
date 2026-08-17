@@ -210,6 +210,15 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 callId
         );
 
+        // Socket.IO may temporarily be unavailable while the WebView
+        // is still ringing. Forward terminal FCM lifecycle events to
+        // the active foreground WebView as an independent fallback.
+        MainActivity.dispatchCallTerminalToWebView(
+                callId,
+                status,
+                type
+        );
+
         Log.d(
                 TAG,
                 "Terminal call lifecycle processed callId="

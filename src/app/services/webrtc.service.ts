@@ -1336,6 +1336,10 @@ WebrtcService.peer.once('open', async () => {
       console.warn('[webrtc] ignoring local stream attached as remote stream');
       return;
     }
+    // Preserve the remote stream so setVideoElements() can replay it
+    // if Ionic/WebView recreates or rebinds the video element.
+    this.latestRemoteStream = stream;
+
     el.srcObject = stream;
     el.muted = false;
     el.volume = 1;
