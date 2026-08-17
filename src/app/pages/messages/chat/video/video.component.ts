@@ -50,6 +50,7 @@ export class VideoComponent implements OnInit, OnDestroy {
   cameraEnabled = true;
   localStream: MediaStream | null = null;
   remoteVideoReady = false;
+  localVideoReady = false;
   jwtHelper = new JwtHelperService();
   private callTimer: any; // For storing the timer reference
   partnerName: string;
@@ -308,6 +309,7 @@ private async handleNativeCallTerminalEvent(event: any): Promise<void> {
   this.answered = false;
   this.hasAnswered = false;
   this.remoteVideoReady = false;
+  this.localVideoReady = false;
 
   try {
     await this.webRTC.close({ silent: true });
@@ -342,6 +344,7 @@ private handleBackButton() {
 private clearFinishedCallState(): void {
   // REMOTE_UI_RESET_ON_CLEAR
   this.remoteVideoReady = false;
+  this.localVideoReady = false;
 
   try {
     const remote =
@@ -454,7 +457,10 @@ private clearAcceptedRetryTimer(): void {
 private showSelfPreview(stream: MediaStream): void {
   const el = this.myVideoRef.nativeElement;
 
-  if (!el.srcObject)  { el.srcObject = stream; }
+  if (el.srcObject !== stream) {
+    try { el.pause(); } catch (_) {}
+    el.srcObject = stream;
+  }
   el.muted = true;                           // autoplay allow-list
   el.volume = 0;
 
@@ -552,6 +558,7 @@ async ionViewWillEnter() {
   // Ionic can reuse this video component between calls.
   // Never inherit the previous call's remote-video UI state.
   this.remoteVideoReady = false;
+  this.localVideoReady = false;
 
   try {
     const oldRemote =
@@ -563,6 +570,19 @@ async ionViewWillEnter() {
       try { oldRemote.srcObject = null; } catch (_) {}
       oldRemote.removeAttribute('src');
       oldRemote.load?.();
+    }
+  } catch (_) {}
+
+  try {
+    const oldLocal =
+      this.myVideoRef?.nativeElement ||
+      document.querySelector('#my-video') as HTMLVideoElement;
+
+    if (oldLocal) {
+      try { oldLocal.pause(); } catch (_) {}
+      try { oldLocal.srcObject = null; } catch (_) {}
+      oldLocal.removeAttribute('src');
+      oldLocal.load?.();
     }
   } catch (_) {}
 
@@ -1036,6 +1056,52 @@ getUser() {
 // video.component.ts
 private idOf = (x: any) => (x && typeof x === 'object') ? (x._id || x.id) : x;
 
+private isCurrentCallEvent(ev: any): boolean {
+  const eventCallId =
+    ev?.callId != null && String(ev.callId).trim()
+      ? String(ev.callId)
+      : '';
+
+  // Socket listeners can become active just before the query-param
+  // subscription has copied callId onto the component.
+  const currentCallId =
+    this.callId ||
+    this.route.snapshot.queryParamMap.get('callId') ||
+    '';
+
+  // Legacy backend events without callId retain their previous behavior.
+  if (!eventCallId) {
+    return true;
+  }
+
+  // A modern terminal event carrying callId must never destroy a route
+  // whose current call is different. If the route is not established yet,
+  // ignore the destructive event rather than risking a newer call.
+  if (!currentCallId) {
+    console.log(
+      '[video] ignoring terminal event before current callId is available',
+      { eventCallId }
+    );
+    return false;
+  }
+
+  if (
+    String(eventCallId) !==
+    String(currentCallId)
+  ) {
+    console.log(
+      '[video] ignoring stale terminal event',
+      {
+        eventCallId,
+        currentCallId
+      }
+    );
+    return false;
+  }
+
+  return true;
+}
+
 listenForVideoCallEvents() {
   if (!this.socket) return;
 
@@ -1109,6 +1175,10 @@ listenForVideoCallEvents() {
   });
 
   const onCanceled = async (ev?: any) => {
+    if (!this.isCurrentCallEvent(ev)) {
+      return;
+    }
+
     const from = ev?.from ?? ev?.callerId ?? this.userId;
     const to   = ev?.to   ?? ev?.calleeId;
 
@@ -1155,6 +1225,10 @@ listenForVideoCallEvents() {
   this.socket.on('cancel-video',         onCanceled);   // â¬… important
 
   this.socket.on(VideoEvents.CANCELED, async (ev) => {
+    if (!this.isCurrentCallEvent(ev)) {
+      return;
+    }
+
     const to   = this.idOf(ev?.to);
     const from = this.idOf(ev?.from);
 
@@ -1184,6 +1258,10 @@ listenForVideoCallEvents() {
 
   // unify timeout handling for legacy and canonical events
   const onTimeout = async (ev: any) => {
+    if (!this.isCurrentCallEvent(ev)) {
+      return;
+    }
+
     if (this.tearingDown) return;
 
     this.tearingDown = true;
@@ -1227,7 +1305,11 @@ listenForVideoCallEvents() {
   this.socket.on('video-call-timeout', onTimeout);
 
   // handle end events from server (some backends emit 'video-call-ended')
-  const onEnded = async (_ev: any) => {
+  const onEnded = async (ev: any) => {
+    if (!this.isCurrentCallEvent(ev)) {
+      return;
+    }
+
     try { this.clearUnansweredTimeout(); } catch(_) {}
     try { clearTimeout(this.callTimeout); this.callTimeout = null; } catch(_) {}
     try { this.stopCallTimer(); } catch(_) {}
@@ -1787,6 +1869,53 @@ private async consumeOneTimeVideoRequest() {
 }
 
 
+
+
+onLocalVideoPlaying(): void {
+  if (this.localVideoReady) return;
+
+  const el = this.myVideoRef?.nativeElement;
+  if (!el) return;
+
+  const stream =
+    el.srcObject as MediaStream | null;
+
+  if (!stream) return;
+
+  const liveVideoTrack =
+    stream
+      .getVideoTracks()
+      .some(track =>
+        track.readyState === 'live' &&
+        track.enabled
+      );
+
+  // A live MediaStream alone is not enough. videoWidth/videoHeight
+  // prove Chromium has decoded an actual camera frame.
+  if (
+    !liveVideoTrack ||
+    el.videoWidth <= 0 ||
+    el.videoHeight <= 0
+  ) {
+    return;
+  }
+
+  this.localVideoReady = true;
+
+  console.error(
+    '[PERF][ui] LOCAL_VIDEO_VISIBLE',
+    {
+      callId: this.callId,
+      streamId: stream.id,
+      videoWidth: el.videoWidth,
+      videoHeight: el.videoHeight
+    }
+  );
+
+  try {
+    this.cdr.detectChanges();
+  } catch (_) {}
+}
 
 
 onRemoteVideoPlaying(): void {

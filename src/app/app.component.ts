@@ -767,41 +767,73 @@ export class AppComponent implements OnDestroy {
     }
   }
 
-  private markNativeIncomingAction(callId: string | undefined, callerId: string, action: string): void {
+  private markNativeIncomingAction(
+    callId: string | undefined,
+    callerId: string,
+    action: string
+  ): void {
     const until = Date.now() + 60000;
-    const keys = [
-      callId ? `${callId}:answer` : '',
-      callId ? `${callId}:reject` : '',
-      callId || '',
-      `${callerId}:answer`,
-      `${callerId}:reject`,
-      callerId,
-      `${callId || callerId}:${action}`,
-    ].filter(Boolean);
 
-    keys.forEach(key => this.nativeIncomingCallActionUntil.set(key, until));
+    // A real callId uniquely identifies a call attempt. Never use callerId
+    // as an additional dedupe key when callId exists, otherwise a new call
+    // from the same person can be suppressed for up to 60 seconds.
+    const keys = callId
+      ? [
+          `${callId}:answer`,
+          `${callId}:reject`,
+          callId,
+          `${callId}:${action}`,
+        ]
+      : [
+          `${callerId}:answer`,
+          `${callerId}:reject`,
+          callerId,
+          `${callerId}:${action}`,
+        ];
+
+    keys.forEach(key =>
+      this.nativeIncomingCallActionUntil.set(key, until)
+    );
+
     setTimeout(() => {
       const now = Date.now();
+
       keys.forEach(key => {
-        if ((this.nativeIncomingCallActionUntil.get(key) || 0) <= now) {
+        if (
+          (this.nativeIncomingCallActionUntil.get(key) || 0) <= now
+        ) {
           this.nativeIncomingCallActionUntil.delete(key);
         }
       });
     }, 61000);
   }
 
-  private isNativeIncomingActionActive(callId?: string, callerId?: string): boolean {
+  private isNativeIncomingActionActive(
+    callId?: string,
+    callerId?: string
+  ): boolean {
     const now = Date.now();
-    const keys = [
-      callId ? `${callId}:answer` : '',
-      callId ? `${callId}:reject` : '',
-      callId || '',
-      callerId ? `${callerId}:answer` : '',
-      callerId ? `${callerId}:reject` : '',
-      callerId || '',
-    ].filter(Boolean);
 
-    return keys.some(key => (this.nativeIncomingCallActionUntil.get(key) || 0) > now);
+    // Modern incoming calls are deduplicated by callId only.
+    // callerId is a legacy fallback solely for payloads without callId.
+    const keys = callId
+      ? [
+          `${callId}:answer`,
+          `${callId}:reject`,
+          callId,
+        ]
+      : callerId
+        ? [
+            `${callerId}:answer`,
+            `${callerId}:reject`,
+            callerId,
+          ]
+        : [];
+
+    return keys.some(
+      key =>
+        (this.nativeIncomingCallActionUntil.get(key) || 0) > now
+    );
   }
 
   private async rejectIncomingCallFromUrl(callerId: string, callId?: string) {

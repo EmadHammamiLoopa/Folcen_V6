@@ -168,15 +168,24 @@ public class MainActivity extends BridgeActivity {
                     .putString("pendingIncomingCallUrl", url)
                     .apply();
         } catch (Exception ignored) {}
+        /*
+         * Do not dispatch the incoming-call event directly during
+         * locked-screen/cold startup. Keep the Intent data intact so
+         * @capacitor/app can deliver it through getLaunchUrl/appUrlOpen
+         * after the WebView and Angular listeners are ready.
+         */
         if (bridge != null) {
-            try {
-                bridge.triggerWindowJSEvent("folcen-incoming-call", "{\"url\":" + JSONObject.quote(url) + "}");
-                Log.d(TAG, "incoming deeplink dispatched to WebView");
-            } catch (Exception e) {
-                Log.w(TAG, "Unable to dispatch incoming call URL to WebView", e);
-            }
+            Log.d(
+                    TAG,
+                    "incoming deeplink retained for Capacitor App plugin callId="
+                            + callId
+            );
         } else {
-            Log.d(TAG, "incoming deeplink stored; bridge not ready yet");
+            Log.d(
+                    TAG,
+                    "incoming deeplink retained; bridge not ready yet callId="
+                            + callId
+            );
         }
     }
 

@@ -239,7 +239,12 @@
       autoplay
       playsinline
       muted
+      (playing)="onLocalVideoPlaying()"
+      (loadeddata)="onLocalVideoPlaying()"
+      (canplay)="onLocalVideoPlaying()"
       (click)="swapVideo('partner-video')"
+      [style.visibility]="localVideoReady ? 'visible' : 'hidden'"
+      [style.opacity]="localVideoReady ? '1' : '0'"
       [ngClass]="topVideoFrame === 'my-video'
         ? 'main-video'
         : 'pip-video'">
