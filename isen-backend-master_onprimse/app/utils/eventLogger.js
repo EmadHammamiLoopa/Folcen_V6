@@ -19,10 +19,19 @@ async function createCallRequest({ initiatedBy, participants = [], initialEvent 
 }
 
 async function appendCallLifecycle(callId, { event, at = new Date(), durationSeconds = null }) {
-  const evt = await CallEvent.findOne({ callId });
-  if (!evt) return null;
-  evt.lifecycle.push({ event, at, durationSeconds });
-  return await evt.save();
+  try {
+    const evt = await CallEvent.findOne({ callId });
+    if (!evt) return null;
+    evt.lifecycle.push({ event, at, durationSeconds });
+    return await evt.save();
+  } catch (err) {
+    console.error('[CallEvent] Failed to append lifecycle event:', {
+      callId,
+      event,
+      error: err.message
+    });
+    return null;
+  }
 }
 
 async function recordMessageEvent({ messageId = null, from, to, event, reason = null, linkedReport = null }) {
