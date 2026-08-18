@@ -31,7 +31,7 @@
       <div class="visibility-grid" data-tour="post-visibility">
         <div class="visibility-item" 
              [class.active]="visibility === 'public'" 
-             (click)="visibility = 'public'"
+             (click)="setPostVisibility('public')"
              [style]="{'--active-color': postTextColor}">
           <div class="icon-wrapper">
             <ion-icon name="earth"></ion-icon>
@@ -41,7 +41,7 @@
 
         <div class="visibility-item" 
              [class.active]="visibility === 'friends-only'" 
-             (click)="visibility = 'friends-only'"
+             (click)="setPostVisibility('friends-only')"
              [style]="{'--active-color': postTextColor}">
           <div class="icon-wrapper">
             <ion-icon name="people"></ion-icon>
@@ -51,7 +51,7 @@
 
         <div class="visibility-item" 
              [class.active]="visibility === 'private'" 
-             (click)="visibility = 'private'"
+             (click)="setPostVisibility('private')"
              [style]="{'--active-color': postTextColor}">
           <div class="icon-wrapper">
             <ion-icon name="lock-closed"></ion-icon>
@@ -65,7 +65,11 @@
       <ion-item class="ion-item-clear anonymous-toggle" [style]="{'--color': postTextColor}" data-tour="post-anonymous">
         <ion-icon name="person-circle-outline" slot="start" class="mr-2"></ion-icon>
         <ion-label>Post Anonymously</ion-label>
-        <ion-toggle [(ngModel)]="anonyme" slot="end"></ion-toggle>
+        <ion-toggle
+          [(ngModel)]="anonyme"
+          slot="end"
+          (ionChange)="onPostMentionPolicyChanged()"
+        ></ion-toggle>
       </ion-item>
     </ion-card-content>
   </ion-card>
@@ -163,10 +167,28 @@
   <!-- Post Textarea Section -->
   <ion-card class="post-card post-textarea-card" [style]="{'--background': postBackColor, '--color': postTextColor}">
     <ion-card-content>
+      <div
+        class="post-mention-dropdown"
+        *ngIf="tagging && filteredTaggableUsers?.length"
+      >
+        <button
+          type="button"
+          class="post-mention-option"
+          *ngFor="let u of filteredTaggableUsers"
+          (mousedown)="$event.preventDefault()"
+          (click)="selectPostMention(u)"
+        >
+          <ion-icon name="at-circle-outline"></ion-icon>
+          <span>{{ u.name }}</span>
+        </button>
+      </div>
+
       <ion-textarea
         #postTextarea
         [(ngModel)]="postText"
         placeholder="What's on your mind?"
+        (ionInput)="onPostInput($event)"
+        (keydown)="onPostMentionKeyDown($event)"
         class="creative-textarea"
         [maxlength]="255"
         autoGrow="true"

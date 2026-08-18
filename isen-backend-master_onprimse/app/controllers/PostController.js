@@ -789,20 +789,150 @@ exports.storePost = async (req, res) => {
 
             // Send notifications and create Activity only for non-anonymous posts
             if (!populatedPost.anonyme) {
-                const notificationTitle = `${req.authUser.firstName} ${req.authUser.lastName}`;
-                const notificationBody = `shared a new post in ${req.channel.name}`;
+                // Resolve mentions before general post notifications so a
+                // mentioned user receives one mention notification, not two.
+                const mentionedUsers = new Set();
+                const structuredMentions =
+                    req.body.mentionMode === 'structured';
 
-                let recipients = [];
-                if (post.visibility === 'public') {
-                    recipients = [...(req.authUser.followers || []), ...(req.authUser.friends || [])];
-                } else if (post.visibility === 'friends-only') {
-                    recipients = [...(req.authUser.friends || [])];
+                const friendSet = new Set(
+                    (req.authUser.friends || [])
+                        .map(friend =>
+                            String(
+                                friend && friend._id
+                                    ? friend._id
+                                    : friend
+                            )
+                        )
+                );
+
+                if (post.visibility !== 'private') {
+                    const explicitIds = []
+                        .concat(req.body['mentionedUserIds'] || [])
+                        .concat(req.body['mentionedUserIds[]'] || []);
+
+                    for (const rawId of explicitIds) {
+                        try {
+                            const id = String(rawId || '');
+
+                            if (!mongoose.Types.ObjectId.isValid(id)) continue;
+                            if (id === req.auth._id.toString()) continue;
+                            if (!friendSet.has(id)) continue;
+
+                            const candidate = await User.findOne({
+                                _id: id,
+                                enabled: { $ne: false },
+                                isDeleted: { $ne: true },
+                                banned: { $ne: true },
+                                deletedAt: null
+                            }).select('_id blockedUsers');
+
+                            if (!candidate) continue;
+
+                            const blockedByTarget =
+                                (candidate.blockedUsers || [])
+                                    .some(blockedId =>
+                                        String(blockedId) ===
+                                        req.auth._id.toString()
+                                    );
+
+                            const blockedByMe =
+                                (req.authUser.blockedUsers || [])
+                                    .some(blockedId =>
+                                        String(blockedId) === id
+                                    );
+
+                            if (blockedByTarget || blockedByMe) continue;
+
+                            mentionedUsers.add(id);
+                        } catch (_) {}
+                    }
+
+                    // Legacy clients had no picker IDs. Keep their name parser,
+                    // but constrain resolved users to actual friends.
+                    if (!structuredMentions && savedPost.text) {
+                        const mentionRegex =
+                            /@([\w\s._-]+?)(?=\s|$|@)/g;
+
+                        let match;
+
+                        while (
+                            (match = mentionRegex.exec(savedPost.text)) !== null
+                        ) {
+                            const name = match[1].trim();
+
+                            let user = await User.findOne({
+                                firstName: new RegExp(`^${name}$`, 'i')
+                            });
+
+                            if (!user && name.includes(' ')) {
+                                const parts = name.split(' ');
+
+                                user = await User.findOne({
+                                    firstName: new RegExp(
+                                        `^${parts[0]}$`,
+                                        'i'
+                                    ),
+                                    lastName: new RegExp(
+                                        `^${parts.slice(1).join(' ')}$`,
+                                        'i'
+                                    )
+                                });
+                            }
+
+                            if (!user) continue;
+
+                            const id = user._id.toString();
+
+                            if (
+                                id !== req.auth._id.toString() &&
+                                friendSet.has(id)
+                            ) {
+                                mentionedUsers.add(id);
+                            }
+                        }
+                    }
                 }
 
-                // Filter out duplicates and the author
-                recipients = [...new Set(recipients.map(id => id.toString()))].filter(id => id !== req.auth._id.toString());
+                const notificationTitle =
+                    `${req.authUser.firstName} ${req.authUser.lastName}`;
 
-                if (recipients.length > 0) {
+                const notificationBody =
+                    `shared a new post in ${req.channel.name}`;
+
+                let recipients = [];
+
+                if (post.visibility === 'public') {
+                    recipients = [
+                        ...(req.authUser.followers || []),
+                        ...(req.authUser.friends || [])
+                    ];
+                } else if (post.visibility === 'friends-only') {
+                    recipients = [
+                        ...(req.authUser.friends || [])
+                    ];
+                }
+
+                // Keep the full realtime audience separate from generic
+                // notification recipients. Mentioned users should still get
+                // the post immediately in Feed/activity, but should not also
+                // receive the generic "shared a post" notification.
+                const feedRecipients = [
+                    ...new Set(
+                        recipients.map(id =>
+                            String(id && id._id ? id._id : id)
+                        )
+                    )
+                ].filter(id =>
+                    id !== req.auth._id.toString()
+                );
+
+                const notificationRecipients =
+                    feedRecipients.filter(id =>
+                        !mentionedUsers.has(id)
+                    );
+
+                if (notificationRecipients.length > 0) {
                     sendNotification(
                         { en: notificationTitle },
                         { en: notificationBody },
@@ -811,7 +941,7 @@ exports.storePost = async (req, res) => {
                             link: `/tabs/channels/post/${populatedPost._id}`
                         },
                         [],
-                        recipients
+                        notificationRecipients
                     );
                 }
 
@@ -828,32 +958,7 @@ exports.storePost = async (req, res) => {
                         meta: { media: savedPost.media }
                     });
 
-                    // --- Mentions Handling ---
-                    const mentionRegex = /@([\w\s._-]+?)(?=\s|$|@)/g;
-                    let match;
-                    const mentionedUsers = new Set();
-                    if (savedPost.text) {
-                        while ((match = mentionRegex.exec(savedPost.text)) !== null) {
-                            const name = match[1].trim();
-                            const user = await User.findOne({ firstName: new RegExp(`^${name}$`, 'i') });
-                            if (user && user._id.toString() !== req.auth._id.toString()) {
-                                mentionedUsers.add(user._id.toString());
-                            } else {
-                                // Try first name + last name match if name has space
-                                if (name.includes(' ')) {
-                                    const parts = name.split(' ');
-                                    const complexUser = await User.findOne({ 
-                                        firstName: new RegExp(`^${parts[0]}$`, 'i'),
-                                        lastName: new RegExp(`^${parts.slice(1).join(' ')}$`, 'i')
-                                    });
-                                    if (complexUser && complexUser._id.toString() !== req.auth._id.toString()) {
-                                        mentionedUsers.add(complexUser._id.toString());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
+                    // mentionedUsers was resolved above from structured picker IDs.
                     const { createNotification } = require('../helpers');
                     for (const userId of mentionedUsers) {
                         await createNotification({
@@ -874,12 +979,12 @@ exports.storePost = async (req, res) => {
                     // 🔥 REAL-TIME: Emit targeted feed activity
                     try { 
                         // Use the same refined recipients list as notifications
-                        realtime.emitFeedPost(recipients, savedPost);
+                        realtime.emitFeedPost(feedRecipients, savedPost);
                         
                         // Emit activity to followers
                         const activityPayload = { ...activity.toObject(), type: activity.type };
                         const { emitToUsers } = require('../helpers');
-                        emitToUsers(recipients, 'activity:created', activityPayload);
+                        emitToUsers(feedRecipients, 'activity:created', activityPayload);
                     } catch(e) { console.warn('emit activity failed', e); }
                 } catch (e) {
                     console.warn('Failed to create activity record:', e.message || e);

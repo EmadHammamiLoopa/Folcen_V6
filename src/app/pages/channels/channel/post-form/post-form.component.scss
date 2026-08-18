@@ -585,3 +585,45 @@ ion-content.light-bg {
     --background: rgba(0, 0, 0, 0.12);
   }
 }
+
+
+/* Structured @mention picker */
+.post-textarea-card ion-card-content {
+  position: relative;
+}
+
+.post-mention-dropdown {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(12px);
+}
+
+.post-mention-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  font: inherit;
+}
+
+.post-mention-option + .post-mention-option {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.post-mention-option ion-icon {
+  font-size: 20px;
+  flex: 0 0 auto;
+}

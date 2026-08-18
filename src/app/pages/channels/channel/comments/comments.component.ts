@@ -248,53 +248,217 @@ export class CommentsComponent implements OnInit, OnDestroy {
  
   
   filteredTaggableUsers: Array<{name: string, id: string}> = [];
-tagging = false;
+  tagging = false;
 
-onKeyDown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    this.tagging = false;
+  taggedUserIds: Set<string> = new Set();
+  private taggedUserLabels = new Map<string, string>();
+  private commentMentionStart = -1;
+  private commentMentionEnd = -1;
+  private activeCommentTextarea: any = null;
+
+  onKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      this.tagging = false;
+      this.filteredTaggableUsers = [];
+    }
   }
-}
 
-/** Called on every input change. Detects an unfinished @mention at the end of the current text. */
-onCommentInput(value: string) {
-  this.commentText = value ?? '';
-  const m = /(?:^|\s)@([^\s@]*)$/.exec(this.commentText);
-  if (m) {
-    const query = (m[1] || '').toLowerCase();
+  private mentionLabelExists(text: string, label: string): boolean {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    return new RegExp(
+      `(^|\\s)@${escaped}(?=$|\\s|[.,!?;:])`,
+      'i'
+    ).test(text || '');
+  }
+
+  private reconcileCommentMentions(text: string): void {
+    for (const [id, label] of Array.from(this.taggedUserLabels.entries())) {
+      if (!this.mentionLabelExists(text, label)) {
+        this.taggedUserLabels.delete(id);
+        this.taggedUserIds.delete(id);
+      }
+    }
+  }
+
+  private findCommentMentionAtCursor(
+    text: string,
+    cursor: number
+  ): { start: number; end: number; query: string } | null {
+    const beforeCursor = text.slice(0, cursor);
+    const at = beforeCursor.lastIndexOf('@');
+
+    if (at < 0) return null;
+
+    if (at > 0 && !/\s/.test(beforeCursor.charAt(at - 1))) {
+      return null;
+    }
+
+    const raw = beforeCursor.slice(at + 1);
+
+    if (
+      raw.includes('\n') ||
+      raw.includes('\r') ||
+      raw.length > 80 ||
+      /[,;:!?()[\]{}]/.test(raw)
+    ) {
+      return null;
+    }
+
+    for (const label of Array.from(this.taggedUserLabels.values())) {
+      if (raw.startsWith(label + ' ')) {
+        return null;
+      }
+    }
+
+    return {
+      start: at,
+      end: cursor,
+      query: raw.trim().toLowerCase()
+    };
+  }
+
+  /** Cursor-aware @mention detection. Supports full names with spaces. */
+  async onCommentInput(event: any) {
+    const value = String(
+      typeof event === 'string'
+        ? event
+        : (
+            event?.detail?.value ??
+            event?.target?.value ??
+            this.commentText ??
+            ''
+          )
+    );
+
+    this.commentText = value;
+
+    if (typeof event === 'object') {
+      this.activeCommentTextarea =
+        event?.target || this.activeCommentTextarea;
+    }
+
+    this.reconcileCommentMentions(value);
+
+    let cursor = value.length;
+
+    try {
+      const native =
+        await event?.target?.getInputElement?.();
+
+      if (
+        native &&
+        typeof native.selectionStart === 'number'
+      ) {
+        cursor = native.selectionStart;
+      }
+    } catch (_) {}
+
+    const active =
+      this.findCommentMentionAtCursor(value, cursor);
+
+    if (!active) {
+      this.tagging = false;
+      this.filteredTaggableUsers = [];
+      this.commentMentionStart = -1;
+      this.commentMentionEnd = -1;
+      return;
+    }
+
+    this.commentMentionStart = active.start;
+    this.commentMentionEnd = active.end;
+
     const all = this.getTaggableUsers();
-    this.filteredTaggableUsers = query
-      ? all.filter(u => u.name.toLowerCase().includes(query))
-      : all;
-    this.tagging = this.filteredTaggableUsers.length > 0;
-  } else {
+    const query = active.query;
+
+    this.filteredTaggableUsers = all
+      .filter(user =>
+        !query ||
+        user.name.toLowerCase().includes(query)
+      )
+      .slice(0, 10);
+
+    this.tagging =
+      this.filteredTaggableUsers.length > 0;
+  }
+
+  selectUser(user: { name: string; id: string }) {
+    const selectedId = this.idOf(user?.id);
+    const selectedName = String(user?.name || '').trim();
+
+    const allowed = this.getTaggableUsers()
+      .some(candidate => candidate.id === selectedId);
+
+    if (
+      !selectedId ||
+      !selectedName ||
+      selectedId === this.currentUserId() ||
+      !allowed ||
+      this.commentMentionStart < 0 ||
+      this.commentMentionEnd < this.commentMentionStart
+    ) {
+      return;
+    }
+
+    const before =
+      this.commentText.slice(0, this.commentMentionStart);
+
+    const after =
+      this.commentText.slice(this.commentMentionEnd);
+
+    const inserted = `@${selectedName} `;
+
+    this.commentText =
+      before + inserted + after;
+
+    this.taggedUserIds.add(selectedId);
+    this.taggedUserLabels.set(
+      selectedId,
+      selectedName
+    );
+
+    const newCursor =
+      before.length + inserted.length;
+
     this.tagging = false;
     this.filteredTaggableUsers = [];
+    this.commentMentionStart = -1;
+    this.commentMentionEnd = -1;
+
+    setTimeout(async () => {
+      try {
+        const native =
+          await this.activeCommentTextarea
+            ?.getInputElement?.();
+
+        native?.focus?.();
+        native?.setSelectionRange?.(
+          newCursor,
+          newCursor
+        );
+      } catch (_) {}
+    }, 0);
   }
-}
 
-selectUser(user: { name: string; id: string }) {
-  const selectedId = this.idOf(user?.id);
-  const allowed = this.getTaggableUsers().some(taggableUser => taggableUser.id === selectedId);
-  if (!selectedId || selectedId === this.currentUserId() || !allowed) return;
-  // Replace the trailing @query with @Name + space
-  this.commentText = this.commentText.replace(/(?:^|\s)@([^\s@]*)$/, (full, _q, offset) => {
-    const lead = offset === 0 ? '' : full[0];
-    return `${lead}@${user.name} `;
-  });
-  this.tagging = false;
-  this.filteredTaggableUsers = [];
-  this.taggedUserIds.add(selectedId);
-}
+  onAnonymeChanged() {
+    this.tagging = false;
+    this.filteredTaggableUsers = [];
 
-taggedUserIds: Set<string> = new Set();
+    const allowedIds = new Set(
+      this.getTaggableUsers().map(user => user.id)
+    );
 
-onAnonymeChanged() {
-  this.tagging = false;
-  this.filteredTaggableUsers = [];
-  const allowedIds = new Set(this.getTaggableUsers().map(user => user.id));
-  this.taggedUserIds = new Set(Array.from(this.taggedUserIds).filter(id => allowedIds.has(id)));
-}
+    for (const id of Array.from(this.taggedUserIds)) {
+      if (!allowedIds.has(id)) {
+        this.taggedUserIds.delete(id);
+        this.taggedUserLabels.delete(id);
+      }
+    }
+
+    this.reconcileCommentMentions(
+      this.commentText || ''
+    );
+  }
 
 
   private fetchUserFromLocalStorage() {
@@ -693,10 +857,14 @@ isValidMedia(file: File): boolean {
     return;
   }
 
+  this.reconcileCommentMentions(this.commentText);
+
   const formData = new FormData();
   formData.append('text', this.commentText.trim());
   formData.append('anonyme', this.anonyme.toString());
-  // Send structured mention IDs so the backend doesn't have to guess from text.
+  formData.append('mentionMode', 'structured');
+
+  // IDs selected by the mention picker are authoritative.
   if (this.taggedUserIds && this.taggedUserIds.size) {
     const allowedIds = new Set(this.getTaggableUsers().map(user => user.id));
     Array.from(this.taggedUserIds)
@@ -732,6 +900,9 @@ isValidMedia(file: File): boolean {
       this.mediaFileName = "";
       this.mediaMimeType = "";
       this.taggedUserIds.clear();
+      this.taggedUserLabels.clear();
+      this.tagging = false;
+      this.filteredTaggableUsers = [];
       try {
         localStorage.removeItem('pendingCommentCameraMedia');
         localStorage.removeItem('pendingCommentCameraReturn');
