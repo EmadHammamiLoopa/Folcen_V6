@@ -67,6 +67,8 @@ private loadingMessages = false;
 
   private lastLoadedPeerId: string | null = null;
   private relationshipChangedAt = 0;
+  private persistedOutgoingVideoState: { status: 'pending' | 'accepted' | null, messageId?: string } = { status: null };
+  private incomingVideoPermissionId: string | null = null;
 
   image: string | null = null;
   imageFile: ImageFileObject | null = null;
@@ -172,6 +174,8 @@ isLatestCall(message: Message): boolean {
           this.messages = [];
           this.groupedMessages = [];
           this.page = 0;
+          this.persistedOutgoingVideoState = { status: null, messageId: undefined };
+          this.incomingVideoPermissionId = null;
           if (this.infScroll) this.infScroll.disabled = false;
         }
 
@@ -478,12 +482,13 @@ private incomingAcceptedVideoRequest(): Message | null {
 }
 
 hasIncomingVideoPermission(): boolean {
-  return !this.user?.isFriend && !!this.incomingAcceptedVideoRequest();
+  return !this.user?.isFriend && !!(this.incomingVideoPermissionId || this.incomingAcceptedVideoRequest());
 }
 
 async confirmRevokeVideoAccess() {
-  const permission = this.incomingAcceptedVideoRequest();
-  if (!permission) return;
+  const loadedPermission = this.incomingAcceptedVideoRequest();
+  const messageId = this.incomingVideoPermissionId || loadedPermission?.id;
+  if (!messageId) return;
 
   const alert = await this.alertController.create({
     header: 'Video access',
@@ -493,32 +498,82 @@ async confirmRevokeVideoAccess() {
       {
         text: 'Revoke',
         cssClass: 'text-danger',
-        handler: () => this.revokeVideoAccess(permission)
+        handler: () => this.revokeVideoAccess(messageId, loadedPermission)
       }
     ]
   });
   await alert.present();
 }
 
-private async revokeVideoAccess(message: Message) {
-  (message as any).busy = true;
-  const realId = await this.ensureRealId(message);
-  if (!realId) {
-    (message as any).busy = false;
-    return this.toastService.presentErrorToastr('Unable to revoke video access yet. Please try again.');
-  }
+private async revokeVideoAccess(messageId: string, loadedPermission?: Message | null) {
+  if (loadedPermission) (loadedPermission as any).busy = true;
   if (!this.socket?.connected) {
     try {
       await this.initializeSocket();
     } catch (_) {}
   }
-  this.socket?.emit('video-call-cancelled', {
+  if (!this.socket?.connected) {
+    if (loadedPermission) (loadedPermission as any).busy = false;
+    return this.toastService.presentErrorToastr('Unable to revoke video access. Please try again.');
+  }
+
+  this.socket.emit('video-call-cancelled', {
     from: this.authUser.id,
     to: this.user.id,
-    messageId: realId,
+    messageId,
     status: 'revoked',
     reason: 'revoked'
+  }, (ack: any) => {
+    if (ack?.success === false) {
+      if (loadedPermission) (loadedPermission as any).busy = false;
+      this.toastService.presentErrorToastr('Unable to revoke video access. Please try again.');
+    }
   });
+}
+
+private async refreshPersistedVideoPermissionState(): Promise<void> {
+  if (!this.user?.id || !this.authUser?.id || this.user?.isFriend || !this.socket?.connected) {
+    if (this.user?.isFriend) {
+      this.persistedOutgoingVideoState = { status: null, messageId: undefined };
+      this.incomingVideoPermissionId = null;
+    }
+    return;
+  }
+
+  try {
+    const state: any = await new Promise(resolve => {
+      let finished = false;
+      const timer = setTimeout(() => {
+        if (finished) return;
+        finished = true;
+        resolve(null);
+      }, 5000);
+
+      this.socket.emit('video-call-permission-state', { peerId: this.user.id }, (ack: any) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        resolve(ack || null);
+      });
+    });
+
+    if (!state?.success) return;
+
+    const outgoingStatus = state?.outgoing?.status;
+    this.persistedOutgoingVideoState =
+      outgoingStatus === 'pending' || outgoingStatus === 'accepted'
+        ? { status: outgoingStatus, messageId: String(state.outgoing.messageId || '') || undefined }
+        : { status: null, messageId: undefined };
+
+    this.incomingVideoPermissionId = state?.incomingAccepted?.messageId
+      ? String(state.incomingAccepted.messageId)
+      : null;
+
+    this.recomputeActiveCall();
+    this.changeDetection.detectChanges();
+  } catch (e) {
+    console.warn('Failed to refresh persisted video permission state', e);
+  }
 }
 
 
@@ -638,6 +693,7 @@ async initializeSocket() {
     // been replaced by SocketService after a reconnect, leaving stale listeners.
     this.listenersBound = false;
     this.initSocketListeners();
+    if (this.user?.id) this.refreshPersistedVideoPermissionState();
   } catch (error) {
     console.error("❌ Socket initialization failed:", error);
     setTimeout(() => this.initializeSocket(), 5000);
@@ -800,6 +856,10 @@ async getMessages(event?: any) {
     } else if (this.page === 1) {
       this.recomputeActiveCall();
     }
+
+    if (this.page === 1) {
+      await this.refreshPersistedVideoPermissionState();
+    }
   } catch (err) {
     console.error('❌ getMessages error:', err);
     this.toastService.presentErrorToastr('Failed to load messages');
@@ -844,7 +904,10 @@ private recomputeActiveCall() {
     .pop();
 
   if (!last) {
-    this.activeVideoCall = { status: null, messageId: undefined };
+    this.activeVideoCall = {
+      status: this.persistedOutgoingVideoState.status,
+      messageId: this.persistedOutgoingVideoState.messageId
+    };
     return;
   }
 
@@ -868,7 +931,9 @@ private applyFriendshipState() {
   const resolved = localSaysFriend === undefined ? !!this.user.isFriend : !!localSaysFriend;
   this.user.isFriend = resolved;
   this.user.friend = resolved;
-  if (!resolved) {
+  if (resolved) {
+    this.activeVideoCall = { status: null, messageId: undefined };
+  } else {
     this.recomputeActiveCall();
   }
 }
@@ -944,7 +1009,12 @@ private idOf(value: any): string {
         const idx = this.messages.findIndex(m => m.id === msg.id);
         if (idx !== -1) this.messages[idx] = msg; else this.messages.push(msg);
       }
-      if (msg.type === 'video-call-request') this.recomputeActiveCall();
+      if (msg.type === 'video-call-request') {
+        if (String(msg.from) === selfId && msg.status === 'pending') {
+          this.persistedOutgoingVideoState = { status: 'pending', messageId: msg.id };
+        }
+        this.recomputeActiveCall();
+      }
       try { this.normalizeMessagesTimestamps(); } catch (_) {}
       this.groupMessagesByDate();
       this.changeDetection.detectChanges();
@@ -1029,14 +1099,22 @@ private idOf(value: any): string {
 // in accepted/cancelled listeners:
 this.socket.on('video-call-accepted', (data: any) => {
   this.zone.run(() => {
+    const selfId = String((this.authUser as any)?._id || this.authUser?.id || '');
+    if (String(data?.from || '') === selfId) {
+      this.persistedOutgoingVideoState = { status: 'accepted', messageId: String(data.messageId) };
+    }
+    if (String(data?.to || '') === selfId) {
+      this.incomingVideoPermissionId = String(data.messageId || '') || null;
+    }
+
     const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
     if (msg) {
       msg.status = 'accepted';
       (msg as any)['busy'] = false;
-      this.recomputeActiveCall();
-      this.groupMessagesByDate();
-      this.changeDetection.detectChanges();
     }
+    this.recomputeActiveCall();
+    this.groupMessagesByDate();
+    this.changeDetection.detectChanges();
   });
 });
 
@@ -1044,24 +1122,31 @@ this.socket.on('video-call-accepted', (data: any) => {
 this.socket.on('video-call-used', (data: any) => {
   this.zone.run(() => {
     const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
-    if (msg) {
-      (msg as any)['busy'] = false;
-      this.recomputeActiveCall();
-      this.changeDetection.detectChanges();
-    }
+    if (msg) (msg as any)['busy'] = false;
+    this.recomputeActiveCall();
+    this.changeDetection.detectChanges();
   });
 });
 
 this.socket.on('video-call-cancelled', (data: any) => {
   this.zone.run(() => {
+    const selfId = String((this.authUser as any)?._id || this.authUser?.id || '');
+    const status = String(data?.status || 'cancelled');
+    if (String(data?.from || '') === selfId && ['cancelled', 'rejected', 'revoked', 'expired'].includes(status)) {
+      this.persistedOutgoingVideoState = { status: null, messageId: undefined };
+    }
+    if (String(data?.to || '') === selfId && status === 'revoked') {
+      this.incomingVideoPermissionId = null;
+    }
+
     const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
     if (msg) {
-      msg.status = (data?.status || 'cancelled') as any;
+      msg.status = status as any;
       (msg as any)['busy'] = false;
-      this.recomputeActiveCall();
-      this.groupMessagesByDate();
-      this.changeDetection.detectChanges();
     }
+    this.recomputeActiveCall();
+    this.groupMessagesByDate();
+    this.changeDetection.detectChanges();
   });
 });
 
@@ -1306,7 +1391,7 @@ private dataURLtoFile(dataurl: string, filename: string): File {
   while (n--) {
     u8arr[n] = bstr.charCodeAt(n);
   }
-  return new File([u8arr], { type: mime });
+  return new File([u8arr], filename, { type: mime });
 }
 
 sanitizeImageUrl(url: string): SafeUrl {
@@ -1536,7 +1621,7 @@ showUserProfile() {
 }
 
 showUproduct() {
-  // Since ProfileEnabled now always return true, you don't need the else case anymore
+  // Since ProfileEnabled now always returns true, you don't need the else case anymore
   this.router.navigateByUrl('/tabs/buy-and-sell/product/' + this.productId);
 }
 
@@ -1679,6 +1764,7 @@ private async sendVideoCallRequest() {
 
   this.messages.push(tempMessage);
   this.groupMessagesByDate();
+  this.persistedOutgoingVideoState = { status: 'pending', messageId: tempId };
   this.recomputeActiveCall();
   this.scrollToBottom();
 
@@ -1692,6 +1778,9 @@ private async sendVideoCallRequest() {
 
   const removeOptimistic = () => {
     this.messages = this.messages.filter(m => m.id !== tempId && m.tempId !== tempId);
+    if (this.persistedOutgoingVideoState.messageId === tempId) {
+      this.persistedOutgoingVideoState = { status: null, messageId: undefined };
+    }
     this.recomputeActiveCall();
     this.groupMessagesByDate();
     this.changeDetection.detectChanges();
@@ -1704,6 +1793,8 @@ private async sendVideoCallRequest() {
       this.groupMessagesByDate();
       this.changeDetection.detectChanges();
     }
+    this.persistedOutgoingVideoState = { status: null, messageId: undefined };
+    this.recomputeActiveCall();
     this.toastService.presentErrorToastr(message);
   };
 
@@ -1773,6 +1864,7 @@ private async sendVideoCallRequest() {
     }
 
     const realId = String(ack.messageId || '');
+    this.persistedOutgoingVideoState = { status: 'pending', messageId: realId || undefined };
     const i = this.messages.findIndex(m => m.id === tempId || m.tempId === tempId);
     if (i !== -1) {
       const existing: any = this.messages[i];
