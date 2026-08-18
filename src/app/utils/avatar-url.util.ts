@@ -104,10 +104,18 @@ export class AvatarUrlUtil {
 
       const fullUrl = backendRoot + (url.startsWith('/') ? '' : '/') + url;
 
-      // Never use Date.now() as a render-time cache buster. Angular evaluates avatar
-      // bindings repeatedly; a changing query string turns every change-detection pass
-      // into a new network image request. Uploaded avatar filenames are already unique,
-      // and when updatedAt is available it provides a stable revision for cache refresh.
+      // Uploaded avatar filenames already contain their own unique revision.
+      // Do not tie their browser cache key to profile.updatedAt because unrelated
+      // profile updates (for example presence/peer state) can change updatedAt and
+      // force the exact same image to download again.
+      const isUploadedAvatar =
+        url.startsWith('/public/uploads/') ||
+        url.startsWith('public/uploads/');
+
+      if (isUploadedAvatar) return fullUrl;
+
+      // For any legacy relative avatar path that may not be uniquely named, retain
+      // updatedAt as a stable cache revision. Never use Date.now() here.
       const rawUpdatedAt = profile.updatedAt;
       if (!rawUpdatedAt) return fullUrl;
 

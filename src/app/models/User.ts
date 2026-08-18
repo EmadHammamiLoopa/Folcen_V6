@@ -298,17 +298,16 @@ export class User {
    */
   get avatars(): { path: string, url: string }[] {
     if (!Array.isArray(this._avatar)) return [];
-    const timestamp = this._updatedAt ? this._updatedAt.getTime() : Date.now();
+
+    // Uploaded avatar filenames already provide their own stable revision.
+    // Reusing profile.updatedAt (or Date.now()) here changes the browser cache
+    // key for the exact same image whenever the User object is refreshed.
     return this._avatar
       .filter(path => !this.isDefaultAvatar(path))
-      .map(path => {
-        const url = this.avatarUrl(path);
-        const separator = url.includes('?') ? '&' : '?';
-        return {
-          path: path,
-          url: `${url}${separator}v=${timestamp}`
-        };
-      });
+      .map(path => ({
+        path,
+        url: this.avatarUrl(path)
+      }));
   }
 
   /**
@@ -323,22 +322,16 @@ export class User {
   }
 
   get mainAvatar(): string {
-    const timestamp = this._updatedAt ? this._updatedAt.getTime() : Date.now();
-
     // 1. Prioritize real uploaded photo (mainAvatar) if it's not a DiceBear/Default URL
     if (this._mainAvatar && !this.isDefaultAvatar(this._mainAvatar)) {
-      const url = this.constructAvatarUrl(this._mainAvatar);
-      const separator = url.includes('?') ? '&' : '?';
-      return `${url}${separator}v=${timestamp}`;
+      return this.constructAvatarUrl(this._mainAvatar);
     }
 
     const firstUploadedAvatar = Array.isArray(this._avatar)
       ? this._avatar.find(path => path && !this.isDefaultAvatar(path))
       : '';
     if (firstUploadedAvatar) {
-      const url = this.constructAvatarUrl(firstUploadedAvatar);
-      const separator = url.includes('?') ? '&' : '?';
-      return `${url}${separator}v=${timestamp}`;
+      return this.constructAvatarUrl(firstUploadedAvatar);
     }
 
     // 2. Fallback to customized avataaars if style is set
