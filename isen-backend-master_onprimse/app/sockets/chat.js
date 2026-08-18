@@ -155,18 +155,18 @@ socket.on("video-call-request", async (data, ack) => {
       return;
     }
 
-    // A rejection does not permanently block future requests, but adds a short
-    // sender→recipient cooldown to prevent immediate notification spam.
-    const lastRejected = await Message.findOne({
+    // A rejection/revocation does not permanently block future requests, but
+    // adds a short sender→recipient cooldown to prevent immediate notification spam.
+    const lastDenied = await Message.findOne({
       from: callerId,
       to: receiverId,
       type: 'video-call-request',
-      status: 'rejected'
+      status: { $in: ['rejected', 'revoked'] }
     }).sort({ updatedAt: -1 }).select('updatedAt createdAt').lean();
-    if (lastRejected) {
-      const rejectedAt = new Date(lastRejected.updatedAt || lastRejected.createdAt || 0).getTime();
-      const elapsed = Date.now() - rejectedAt;
-      if (rejectedAt > 0 && elapsed < VIDEO_REQUEST_RETRY_COOLDOWN_MS) {
+    if (lastDenied) {
+      const deniedAt = new Date(lastDenied.updatedAt || lastDenied.createdAt || 0).getTime();
+      const elapsed = Date.now() - deniedAt;
+      if (deniedAt > 0 && elapsed < VIDEO_REQUEST_RETRY_COOLDOWN_MS) {
         if (ack) ack({
           success: false,
           error: 'request_cooldown',
@@ -243,6 +243,57 @@ socket.on("video-call-request", async (data, ack) => {
   } catch (err) {
     console.error("❌ Error in video-call-request:", err);
     if (ack) ack({ success: false, error: err.message, retryable: false });
+  }
+});
+
+// Authoritative persisted state for chat header. This keeps permission UI
+// correct even when the original request card is outside the loaded page.
+socket.on("video-call-permission-state", async (data, ack) => {
+  try {
+    const authUser = socket.userId;
+    const peerId = String(data?.peerId || '');
+    if (!authUser) {
+      if (ack) ack({ success: false, error: 'not_authenticated' });
+      return;
+    }
+    if (!mongoose.Types.ObjectId.isValid(peerId) || String(authUser) === peerId) {
+      if (ack) ack({ success: false, error: 'invalid_recipient' });
+      return;
+    }
+
+    const [outgoing, incomingAccepted] = await Promise.all([
+      Message.findOne({
+        from: authUser,
+        to: peerId,
+        type: 'video-call-request',
+        status: { $in: ['pending', 'accepted'] }
+      }).sort({ updatedAt: -1 }).select('_id status from to').lean(),
+      Message.findOne({
+        from: peerId,
+        to: authUser,
+        type: 'video-call-request',
+        status: 'accepted'
+      }).sort({ updatedAt: -1 }).select('_id status from to').lean()
+    ]);
+
+    if (ack) ack({
+      success: true,
+      outgoing: outgoing ? {
+        messageId: String(outgoing._id),
+        status: String(outgoing.status),
+        from: String(outgoing.from),
+        to: String(outgoing.to)
+      } : null,
+      incomingAccepted: incomingAccepted ? {
+        messageId: String(incomingAccepted._id),
+        status: 'accepted',
+        from: String(incomingAccepted.from),
+        to: String(incomingAccepted.to)
+      } : null
+    });
+  } catch (err) {
+    console.error("❌ Error loading video-call-permission-state:", err);
+    if (ack) ack({ success: false, error: err.message });
   }
 });
 
