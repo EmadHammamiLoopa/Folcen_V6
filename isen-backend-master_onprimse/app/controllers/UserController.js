@@ -2222,10 +2222,19 @@ exports.getUserProfile = async (req, res) => {
       const user = normalizeLeanDoc(userDoc.toObject());
       const isMe = authUserId === userId;
 
-      // Add pending counts for self
+      // Add pending counts for self. These queries are independent, so do them
+      // concurrently instead of adding two serial database round trips.
       if (isMe) {
-          user.pendingFollowRequestsCount = await Follow.countDocuments({ followed: authUserId, status: 'pending' });
-          user.pendingFriendRequestsCount = await Request.countDocuments({ to: authUserId, accepted: false });
+          const [
+            pendingFollowRequestsCount,
+            pendingFriendRequestsCount
+          ] = await Promise.all([
+            Follow.countDocuments({ followed: authUserId, status: 'pending' }),
+            Request.countDocuments({ to: authUserId, accepted: false })
+          ]);
+
+          user.pendingFollowRequestsCount = pendingFollowRequestsCount;
+          user.pendingFriendRequestsCount = pendingFriendRequestsCount;
       }
   
       // Default avatar if missing
@@ -2233,47 +2242,83 @@ exports.getUserProfile = async (req, res) => {
         user.mainAvatar = userDoc.getDefaultAvatar();
       }
   
-      // Relationship status — bidirectional check:
-      // The viewed user may have the auth user in their friends, OR the auth user may have the
-      // viewed user in their friends (DB can be inconsistent if one side was updated first).
-      // Fetch auth user's own friends to cross-check.
-      const authUserFriends = await User.findById(authUserId).select('friends').lean();
-      const authFriendIds = (authUserFriends?.friends || []).map(id => String(id));
-      const isFriendBidirectional = (doc, friendIdStr) => {
-        const inViewedSide = doc.friends && doc.friends.some(id => String(id) === friendIdStr);
-        const inAuthSide   = authFriendIds.includes(String(doc._id));
-        return inViewedSide || inAuthSide;
-      };
-      const isLoggedInUser = authUserId === userId;
-      const isFriendResult = isLoggedInUser ? false : isFriendBidirectional(userDoc, authUserId);
-      const relationshipStatus = {
-        isLoggedInUser,
-        isFriend: isFriendResult,
-        friend:   isFriendResult,
-      };
+      let isFriendResult = false;
+      let relationshipStatus;
 
-      // Add follow status
-      const followRecord = await Follow.findOne({
-        follower: authUserId,
-        followed: userId
-      });
+      if (isMe) {
+        // Self-profile does not need friend/follow/request lookups against itself.
+        // The authenticated user was already resolved by auth middleware, and none
+        // of these relationship queries can change the semantics of viewing self.
+        relationshipStatus = {
+          isLoggedInUser: true,
+          isFriend: false,
+          friend: false,
+          followStatus: null,
+          isFollowing: false,
+          isFollower: false,
+        };
+      } else {
+        // Relationship status — bidirectional check:
+        // The viewed user may have the auth user in their friends, OR the auth user
+        // may have the viewed user in their friends.
+        const authUserFriends = await User.findById(authUserId).select('friends').lean();
+        const authFriendIds = (authUserFriends?.friends || []).map(id => String(id));
 
-      const isFollowerRecord = await Follow.findOne({
-        follower: userId,
-        followed: authUserId
-      });
+        const inViewedSide =
+          userDoc.friends &&
+          userDoc.friends.some(id => String(id) === authUserId);
 
-      relationshipStatus.followStatus = followRecord ? followRecord.status : null;
-      relationshipStatus.isFollowing = !!(followRecord && followRecord.status === 'active');
-      relationshipStatus.isFollower = !!(isFollowerRecord && isFollowerRecord.status === 'active');
+        const inAuthSide =
+          authFriendIds.includes(String(userDoc._id));
 
-      // Friend request status: 'requested' = auth user sent request, 'requesting' = profile owner sent request to auth user
-      if (!isFriendResult && !isMe) {
-        const outgoingRequest = await Request.findOne({ from: authUserId, to: userId, accepted: false });
-        const incomingRequest = await Request.findOne({ from: userId, to: authUserId, accepted: false });
-        if (outgoingRequest) relationshipStatus.request = 'requested';
-        else if (incomingRequest) relationshipStatus.request = 'requesting';
-        else relationshipStatus.request = null;
+        isFriendResult = !!(inViewedSide || inAuthSide);
+
+        relationshipStatus = {
+          isLoggedInUser: false,
+          isFriend: isFriendResult,
+          friend: isFriendResult,
+        };
+
+        // Add follow status
+        const followRecord = await Follow.findOne({
+          follower: authUserId,
+          followed: userId
+        });
+
+        const isFollowerRecord = await Follow.findOne({
+          follower: userId,
+          followed: authUserId
+        });
+
+        relationshipStatus.followStatus =
+          followRecord ? followRecord.status : null;
+
+        relationshipStatus.isFollowing =
+          !!(followRecord && followRecord.status === 'active');
+
+        relationshipStatus.isFollower =
+          !!(isFollowerRecord && isFollowerRecord.status === 'active');
+
+        // Friend request status:
+        // requested = auth user sent it
+        // requesting = profile owner sent it
+        if (!isFriendResult) {
+          const outgoingRequest = await Request.findOne({
+            from: authUserId,
+            to: userId,
+            accepted: false
+          });
+
+          const incomingRequest = await Request.findOne({
+            from: userId,
+            to: authUserId,
+            accepted: false
+          });
+
+          if (outgoingRequest) relationshipStatus.request = 'requested';
+          else if (incomingRequest) relationshipStatus.request = 'requesting';
+          else relationshipStatus.request = null;
+        }
       }
 
       // If profile is private and not a friend/self, restrict exposed data.
