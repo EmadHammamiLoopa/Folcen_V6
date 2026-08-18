@@ -1217,16 +1217,15 @@ hasCancelledCall(): boolean {
 
 
 
-onVideoButtonPressed() {
-  // friends go straight to the already-working call UI
+async onVideoButtonPressed() {
   if (this.user?.isFriend) {
     return this.startFriendVideoCall();
   }
 
-  // Persistent accepted permission changes only availability. It does not
-  // modify the existing call setup/WebRTC flow.
-  if (this.activeVideoCall.status === 'accepted') {
-    return this.router.navigate(['/messages/video', this.user.id]);
+  // Do not rely only on realtime state. Accepted permission is persisted
+  // server-side and may have arrived while this socket/view was reconnecting.
+  if (await this.hasApprovedVideoCallAccess()) {
+    return this.openApprovedVideoCall();
   }
 
   if (this.activeVideoCall.status === 'pending') {
@@ -1234,22 +1233,133 @@ onVideoButtonPressed() {
   }
 
   if (this.user?.allowVideoRequestsFromNonFriends === false) {
-    return this.toastService.presentErrorToastr(`${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`);
+    return this.toastService.presentErrorToastr(
+      `${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`
+    );
   }
 
-  this.requestVideoCall();
+  return this.requestVideoCall();
 }
 
 canStartFriendVideoCall(): boolean {
   return !!(!this.isAdminChat() && this.features.friendVideoCall && this.user?.isFriend);
 }
 
-startFriendVideoCall() {
-  if (!this.canStartFriendVideoCall()) {
-    this.activeVideoCall = { status: null, messageId: undefined };
-    return this.toastService.presentErrorToastr('Video calls are available only for friends.');
+
+private openApprovedVideoCall() {
+  const requestId =
+    this.activeVideoCall?.messageId ||
+    this.persistedOutgoingVideoState?.messageId;
+
+  // VideoComponent intentionally requires videoRequestId for a
+  // non-friend outgoing call. Pass the persisted accepted permission
+  // into the existing, trusted video-call flow.
+  if (!this.user?.isFriend && requestId) {
+    console.log(
+      '[video-request] opening approved non-friend call',
+      { requestId }
+    );
+
+    return this.router.navigate(
+      ['/messages/video', this.user.id],
+      {
+        queryParams: {
+          videoRequestId: requestId
+        }
+      }
+    );
   }
+
+  // Friends keep the original route and original call behaviour.
   return this.router.navigate(['/messages/video', this.user.id]);
+}
+
+private async hasApprovedVideoCallAccess(): Promise<boolean> {
+  if (
+    !this.isAdminChat() &&
+    this.features.friendVideoCall &&
+    !!this.user?.isFriend
+  ) {
+    return true;
+  }
+
+  // Fast local path.
+  if (
+    this.activeVideoCall.status === 'accepted' ||
+    this.persistedOutgoingVideoState.status === 'accepted'
+  ) {
+    return true;
+  }
+
+  const peerId = String((this.user as any)?._id || this.user?.id || '');
+  if (!peerId) return false;
+
+  try {
+    await SocketService.ensureConnected();
+    const socket = this.socket?.connected
+      ? this.socket
+      : await SocketService.getSocket();
+
+    if (!socket?.connected) return false;
+
+    const state: any = await new Promise(resolve => {
+      let done = false;
+
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        resolve(null);
+      }, 3000);
+
+      socket.emit(
+        'video-call-permission-state',
+        { peerId },
+        (resp: any) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve(resp);
+        }
+      );
+    });
+
+    if (
+      state?.success &&
+      state?.outgoing?.status === 'accepted'
+    ) {
+      const messageId = String(state.outgoing.messageId || '');
+
+      this.persistedOutgoingVideoState = {
+        status: 'accepted',
+        messageId: messageId || undefined
+      };
+
+      this.activeVideoCall = {
+        status: 'accepted',
+        messageId: messageId || undefined
+      };
+
+      try { this.changeDetection.detectChanges(); } catch (_) {}
+
+      return true;
+    }
+  } catch (err) {
+    console.warn('[video-request] permission lookup failed', err);
+  }
+
+  return false;
+}
+
+async startFriendVideoCall() {
+  const hasVideoAccess = await this.hasApprovedVideoCallAccess();
+
+  if (!hasVideoAccess) {
+    return this.toastService.presentErrorToastr(
+      'Video calling requires friendship or approved video access.'
+    );
+  }
+
+  return this.openApprovedVideoCall();
 }
 
 private handleIncomingVideoCall(message: Message) {

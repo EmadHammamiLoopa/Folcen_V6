@@ -463,6 +463,76 @@ socket.on("video-call-cancelled", async (data, ack) => {
     emitToUser(sender, "video-call-cancelled", eventPayload);
     emitToUser(recipient, "video-call-cancelled", eventPayload);
 
+    // Socket.IO keeps the UI live. FCM independently provides the
+    // user-visible notification when foreground/background/killed.
+    if (['cancelled', 'rejected', 'revoked'].includes(requestedStatus)) {
+      const pushTarget =
+        requestedStatus === 'cancelled'
+          ? recipient
+          : sender;
+
+      const peerId =
+        requestedStatus === 'cancelled'
+          ? sender
+          : recipient;
+
+      const notificationType =
+        requestedStatus === 'cancelled'
+          ? 'video-call-cancelled'
+          : `video-call-${requestedStatus}`;
+
+      const title =
+        requestedStatus === 'cancelled'
+          ? 'Video request cancelled'
+          : requestedStatus === 'rejected'
+            ? 'Video request rejected'
+            : 'Video access revoked';
+
+      const body =
+        requestedStatus === 'cancelled'
+          ? 'A pending video call request was cancelled.'
+          : requestedStatus === 'rejected'
+            ? 'Your video call request was rejected.'
+            : 'Your video call access was revoked.';
+
+      sendPushToUser(pushTarget, {
+        title,
+        body,
+        data: {
+          type: notificationType,
+          event: notificationType,
+          category: 'message',
+          status: requestedStatus,
+          fromUserId: String(peerId),
+          messageId: String(msg._id),
+          link: `/messages/chat/${String(peerId)}`
+        },
+        android: {
+          priority: 'high'
+        },
+        apns: {
+          headers: {
+            'apns-priority': '10'
+          },
+          payload: {
+            aps: {
+              sound: 'default'
+            }
+          }
+        }
+      }).then(result => {
+        console.log(
+          `[chat] ${notificationType} push to ${pushTarget}:`,
+          result
+        );
+      }).catch(err => {
+        console.warn(
+          `[chat] ${notificationType} push failed:`,
+          err.message
+        );
+      });
+    }
+
     if (ack) ack({ success: true, ...eventPayload });
   } catch (err) {
     console.error("❌ Error in video-call-cancelled:", err);

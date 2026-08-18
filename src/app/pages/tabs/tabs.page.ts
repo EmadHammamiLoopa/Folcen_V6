@@ -10,6 +10,7 @@ import { SocketService } from 'src/app/services/socket.service';
 import { UserService } from 'src/app/services/user.service';
 import { environment } from 'src/environments/environment';
 import { GuidedTourService } from 'src/app/services/guided-tour.service';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 @Component({
   selector: 'app-tabs',
@@ -106,7 +107,10 @@ export class TabsPage implements OnInit, OnDestroy {
       this.recountFriends();
 
       // seed again on reconnect
-      if (this.socket) this.socket.on('connect', () => this.recountFriends());
+      if (this.socket) {
+        this.socket.on('connect', () => this.recountFriends());
+        this.socket.on('video-call-accepted', this.onVideoPermissionAccepted);
+      }
     } catch (error) {
       console.error('Failed to init Tabs sockets:', error);
     }
@@ -115,7 +119,18 @@ export class TabsPage implements OnInit, OnDestroy {
     // New incoming message → increment messages badge (skip only if already on messages tab)
     SocketService.newMessage$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
       this.zone.run(() => {
-        if (this.activeTab === 'messages') return; // on messages tab — no badge needed
+        const type = String(payload?.type || '').toLowerCase();
+        const isVideoRequest = type === 'video-call-request';
+
+        // Video permission requests are actionable message events and should
+        // remain visible as a Messages badge even if the chat is open.
+        if (isVideoRequest) {
+          this.badges.inc('messages', 1);
+
+          return;
+        }
+
+        if (this.activeTab === 'messages') return;
         const incomingFrom = payload?.from?._id || payload?.from;
         if (incomingFrom && this.isInChatWith(String(incomingFrom))) return;
         this.badges.inc('messages', 1);
@@ -193,7 +208,10 @@ export class TabsPage implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
     if (this.routerSub) this.routerSub.unsubscribe();
-    if (this.socket) this.socket.off('connect');
+    if (this.socket) {
+      this.socket.off('connect');
+      this.socket.off('video-call-accepted', this.onVideoPermissionAccepted);
+    }
   }
 
   // ----- template helpers -----
@@ -211,6 +229,61 @@ export class TabsPage implements OnInit, OnDestroy {
 
   private isTablessRoute(url: string): boolean {
     return /\/tabs\/channels\/post\/[^/?#]+/.test(url || '');
+  }
+
+  private onVideoPermissionAccepted = (payload: any) => {
+    const ownerId = SocketService.getOwnerId();
+
+    // The sender of the original request is the user whose access was granted.
+    if (!ownerId || String(payload?.from || '') !== String(ownerId)) return;
+
+    this.zone.run(() => {
+      this.badges.inc('messages', 1);
+    });
+
+
+  };
+
+  private async showVideoEventNotification(
+    kind: 'request' | 'accepted',
+    payload: any
+  ): Promise<void> {
+    try {
+      let permission = await LocalNotifications.checkPermissions();
+
+      if (
+        permission.display === 'prompt' ||
+        permission.display === 'prompt-with-rationale'
+      ) {
+        permission = await LocalNotifications.requestPermissions();
+      }
+
+      if (permission.display !== 'granted') {
+        console.warn('[video-request] Notification permission not granted');
+        return;
+      }
+
+      const accepted = kind === 'accepted';
+
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: Math.floor(Date.now() % 2147483647),
+          title: accepted
+            ? 'Video request accepted'
+            : 'Video call request',
+          body: accepted
+            ? 'Your video call request was accepted.'
+            : String(payload?.text || 'You received a video call request.'),
+          schedule: {
+            at: new Date(Date.now() + 250)
+          },
+          autoCancel: true,
+          extra: payload || {}
+        }]
+      });
+    } catch (err) {
+      console.warn('[video-request] Unable to show notification', err);
+    }
   }
 
   // ----- realtime / API -----

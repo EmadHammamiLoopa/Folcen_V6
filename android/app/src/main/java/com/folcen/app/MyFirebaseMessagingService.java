@@ -27,6 +27,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FolcenFcmService";
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
+    private static final String VIDEO_PERMISSION_CHANNEL_ID = "video_permissions_v1";
     public static final String CALL_CHANNEL_ID = "incoming_calls_v4";
     private static final long CALL_ALERT_DEDUPE_MS = 90000L;
 
@@ -489,22 +490,128 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     private void sendNotification(String title, String messageBody, Map<String, String> data) {
-        createDefaultChannel();
+        boolean videoPermissionEvent = isVideoPermissionEvent(data);
+        String channelId = videoPermissionEvent
+                ? VIDEO_PERMISSION_CHANNEL_ID
+                : DEFAULT_CHANNEL_ID;
+
+        if (videoPermissionEvent) {
+            createVideoPermissionChannel();
+        } else {
+            createDefaultChannel();
+        }
 
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, pendingIntentFlags());
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                pendingIntentFlags()
+        );
 
         NotificationCompat.Builder notificationBuilder =
-                new NotificationCompat.Builder(this, DEFAULT_CHANNEL_ID)
+                new NotificationCompat.Builder(this, channelId)
                         .setSmallIcon(R.mipmap.ic_launcher)
                         .setContentTitle(title)
                         .setContentText(messageBody)
-                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                        .setPriority(
+                                videoPermissionEvent
+                                        ? NotificationCompat.PRIORITY_HIGH
+                                        : NotificationCompat.PRIORITY_DEFAULT
+                        )
                         .setAutoCancel(true)
                         .setContentIntent(pendingIntent);
 
-        NotificationManagerCompat.from(this).notify(stableNotificationId(String.valueOf(System.currentTimeMillis())), notificationBuilder.build());
+        if (videoPermissionEvent) {
+            notificationBuilder
+                    .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setDefaults(
+                            NotificationCompat.DEFAULT_SOUND |
+                            NotificationCompat.DEFAULT_VIBRATE
+                    )
+                    .setNumber(1);
+        }
+
+        int notificationId = stableNotificationId(
+                firstNonEmpty(
+                        data != null ? data.get("messageId") : "",
+                        String.valueOf(System.currentTimeMillis())
+                )
+        );
+
+        NotificationManagerCompat.from(this)
+                .notify(notificationId, notificationBuilder.build());
+
+        if (videoPermissionEvent) {
+            Log.d(
+                    TAG,
+                    "Showing video permission notification type=" +
+                    firstNonEmpty(
+                            data != null ? data.get("type") : "",
+                            data != null ? data.get("event") : ""
+                    )
+            );
+        }
+    }
+
+    private boolean isVideoPermissionEvent(Map<String, String> data) {
+        if (data == null) return false;
+
+        String type = firstNonEmpty(
+                data.get("type"),
+                data.get("event")
+        );
+
+        return "video-call-request".equals(type)
+                || "video-call-accepted".equals(type)
+                || "video-call-rejected".equals(type)
+                || "video-call-revoked".equals(type)
+                || "video-call-cancelled".equals(type);
+    }
+
+    private void createVideoPermissionChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+
+        NotificationChannel channel = new NotificationChannel(
+                VIDEO_PERMISSION_CHANNEL_ID,
+                "Video requests",
+                NotificationManager.IMPORTANCE_HIGH
+        );
+
+        channel.setDescription(
+                "Video request and video access notifications"
+        );
+        channel.enableVibration(true);
+        channel.setShowBadge(true);
+        channel.setVibrationPattern(
+                new long[] { 0, 250, 150, 250 }
+        );
+
+        AudioAttributes attrs =
+                new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(
+                                AudioAttributes.CONTENT_TYPE_SONIFICATION
+                        )
+                        .build();
+
+        channel.setSound(
+                Settings.System.DEFAULT_NOTIFICATION_URI,
+                attrs
+        );
+
+        channel.setLockscreenVisibility(
+                NotificationCompat.VISIBILITY_PUBLIC
+        );
+
+        NotificationManager manager =
+                getSystemService(NotificationManager.class);
+
+        if (manager != null) {
+            manager.createNotificationChannel(channel);
+        }
     }
 
     private void createDefaultChannel() {
