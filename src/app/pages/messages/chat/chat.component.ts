@@ -90,7 +90,7 @@ private loadingMessages = false;
   allowToChat = false;
   business = false;
   showMediaOptions: boolean = false;
-activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'rejected' | 'expired' | 'used' | null, messageId?: string } = { status: null };
+activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'rejected' | 'expired' | 'used' | 'revoked' | null, messageId?: string } = { status: null };
 
 
   
@@ -142,7 +142,7 @@ isActionableCall(m: Message): boolean {
 }
 
 isLatestCall(message: Message): boolean {
-  const last = [...this.messages].filter(m => m.type === 'video-call-request').pop();
+  const last = [...this.messages].filter(m => m.type === 'video-call-request' && m.status === 'pending').pop();
   return !!last && (last.id === message.id || (last as any)._id === (message as any)._id);
 }
   ngOnInit() {
@@ -464,6 +464,63 @@ async cancelVideoCallRequest(message: Message) {
   // cleanup events here; those create missed-call entries for request rejects.
 }
 
+private incomingAcceptedVideoRequest(): Message | null {
+  if (!this.authUser?.id || !this.user?.id) return null;
+  const selfId = String(this.authUser.id);
+  const peerId = String(this.user.id);
+  const accepted = this.messages
+    .filter(m => m.type === 'video-call-request'
+      && m.status === 'accepted'
+      && String(m.from) === peerId
+      && String(m.to) === selfId)
+    .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+  return accepted.length ? accepted[accepted.length - 1] : null;
+}
+
+hasIncomingVideoPermission(): boolean {
+  return !this.user?.isFriend && !!this.incomingAcceptedVideoRequest();
+}
+
+async confirmRevokeVideoAccess() {
+  const permission = this.incomingAcceptedVideoRequest();
+  if (!permission) return;
+
+  const alert = await this.alertController.create({
+    header: 'Video access',
+    message: `${this.user?.fullName || 'This user'} can currently video call you. Revoke access? They will need to send a new video request before calling again.`,
+    buttons: [
+      { text: 'Keep access', role: 'cancel' },
+      {
+        text: 'Revoke',
+        cssClass: 'text-danger',
+        handler: () => this.revokeVideoAccess(permission)
+      }
+    ]
+  });
+  await alert.present();
+}
+
+private async revokeVideoAccess(message: Message) {
+  (message as any).busy = true;
+  const realId = await this.ensureRealId(message);
+  if (!realId) {
+    (message as any).busy = false;
+    return this.toastService.presentErrorToastr('Unable to revoke video access yet. Please try again.');
+  }
+  if (!this.socket?.connected) {
+    try {
+      await this.initializeSocket();
+    } catch (_) {}
+  }
+  this.socket?.emit('video-call-cancelled', {
+    from: this.authUser.id,
+    to: this.user.id,
+    messageId: realId,
+    status: 'revoked',
+    reason: 'revoked'
+  });
+}
+
 
   
   formatLastSeen(lastActive: Date): string {
@@ -740,6 +797,8 @@ async getMessages(event?: any) {
       this.groupMessagesByDate();
       this.recomputeActiveCall();
   if (!resp?.data?.more && this.infScroll) this.infScroll.disabled = true;
+    } else if (this.page === 1) {
+      this.recomputeActiveCall();
     }
   } catch (err) {
     console.error('❌ getMessages error:', err);
@@ -764,22 +823,22 @@ async getMessages(event?: any) {
   
 
 
-// helper: recompute the header state, but ignore calls from earlier sessions
+// Header state is directional: only requests sent by the authenticated user
+// can grant that user permission to call this peer.
 private recomputeActiveCall() {
+  const selfId = String(this.authUser?.id || (this.authUser as any)?._id || '');
+  const peerId = String(this.user?.id || (this.user as any)?._id || '');
+  if (!selfId || !peerId) {
+    this.activeVideoCall = { status: null, messageId: undefined };
+    return;
+  }
+
   const last = [...this.messages]
     .filter(m => {
       if (m.type !== 'video-call-request') return false;
+      if (String(m.from) !== selfId || String(m.to) !== peerId) return false;
       const status = String(m.status || 'pending');
-      if (!['pending', 'accepted'].includes(status)) return false;
-      if (status === 'accepted') {
-        const created = m.createdAt ? +new Date(m.createdAt) : 0;
-        if (created && Date.now() - created > 15 * 60 * 1000) return false;
-      }
-      if (!this.user?.isFriend && this.relationshipChangedAt) {
-        const created = m.createdAt ? +new Date(m.createdAt) : 0;
-        if (created && created < this.relationshipChangedAt) return false;
-      }
-      return true;
+      return status === 'pending' || status === 'accepted';
     })
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt))
     .pop();
@@ -810,7 +869,7 @@ private applyFriendshipState() {
   this.user.isFriend = resolved;
   this.user.friend = resolved;
   if (!resolved) {
-    this.activeVideoCall = { status: null, messageId: undefined };
+    this.recomputeActiveCall();
   }
 }
 
@@ -956,14 +1015,10 @@ private idOf(value: any): string {
     const normalize = this.normalizeMessagePayload;
 
 
+  // Kept for compatibility with older servers, but chat navigation must not
+  // destroy persistent request state anymore.
   this.socket.on('video-session-reset', () => {
     this.zone.run(() => {
-      this.messages.forEach(m => {
-        if (m.type === 'video-call-request' && m.status === 'pending') {
-          m.status = 'cancelled';
-          (m as any).busy = false;
-        }
-      });
       this.recomputeActiveCall();
       this.changeDetection.detectChanges();
     });
@@ -980,21 +1035,18 @@ this.socket.on('video-call-accepted', (data: any) => {
       (msg as any)['busy'] = false;
       this.recomputeActiveCall();
       this.groupMessagesByDate();
-      this.recomputeActiveCall(); // <— add here too
-
       this.changeDetection.detectChanges();
     }
   });
 });
 
+// Legacy event support only. New backend keeps accepted permissions persistent.
 this.socket.on('video-call-used', (data: any) => {
   this.zone.run(() => {
     const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
     if (msg) {
-      msg.status = 'used';
       (msg as any)['busy'] = false;
       this.recomputeActiveCall();
-      this.groupMessagesByDate();
       this.changeDetection.detectChanges();
     }
   });
@@ -1004,7 +1056,7 @@ this.socket.on('video-call-cancelled', (data: any) => {
   this.zone.run(() => {
     const msg = this.messages.find(m => m.id === data.messageId || m.tempId === data.messageId);
     if (msg) {
-      msg.status = 'cancelled';
+      msg.status = (data?.status || 'cancelled') as any;
       (msg as any)['busy'] = false;
       this.recomputeActiveCall();
       this.groupMessagesByDate();
@@ -1017,31 +1069,17 @@ this.socket.on('video-call-cancelled', (data: any) => {
   const handleCanceledEvent = (data: any) => {
     this.zone.run(() => {
       try {
-        // normalize: payload can be simple id or object
-        const messageId = data?.messageId || data?.id || data;
-        const from = data?.from || data?.callerId || null;
-
-        // find the message and mark cancelled if pending
-        const msg = this.messages.find(m => m.id === messageId || m.tempId === messageId || (m.type === 'video-call-request' && ((m as any).from === from || (m as any).to === from) && m.status === 'pending'));
-        if (msg) {
+        // Ignore real-call lifecycle cancellation for persistent request records.
+        // Request status changes arrive through video-call-cancelled above.
+        const messageId = data?.messageId || data?.id || null;
+        if (!messageId) return;
+        const msg = this.messages.find(m => m.id === messageId || m.tempId === messageId);
+        if (msg && msg.type === 'video-call-request' && msg.status === 'pending') {
           msg.status = 'cancelled';
           (msg as any).busy = false;
           this.recomputeActiveCall();
           this.groupMessagesByDate();
           this.changeDetection.detectChanges();
-
-          return;
-        }
-
-        // No matching message found: as a fallback, if the last call is pending, cancel it
-        const lastCall = [...this.messages].filter(m => m.type === 'video-call-request').pop();
-        if (lastCall && lastCall.status === 'pending') {
-          lastCall.status = 'cancelled';
-          (lastCall as any).busy = false;
-          this.recomputeActiveCall();
-          this.groupMessagesByDate();
-          this.changeDetection.detectChanges();
-
         }
       } catch (e) {
         console.warn('handleCanceledEvent failed', e, data);
@@ -1081,11 +1119,11 @@ getLatestVideoCallStatus(): string | null {
 }
 
 hasAcceptedCall(): boolean {
-  return this.getLatestVideoCallStatus() === 'accepted';
+  return this.activeVideoCall.status === 'accepted';
 }
 
 hasPendingCall(): boolean {
-  return this.getLatestVideoCallStatus() === 'pending';
+  return this.activeVideoCall.status === 'pending';
 }
 
 hasCancelledCall(): boolean {
@@ -1095,37 +1133,25 @@ hasCancelledCall(): boolean {
 
 
 onVideoButtonPressed() {
-  // friends go straight to call UI
+  // friends go straight to the already-working call UI
   if (this.user?.isFriend) {
     return this.startFriendVideoCall();
+  }
+
+  // Persistent accepted permission changes only availability. It does not
+  // modify the existing call setup/WebRTC flow.
+  if (this.activeVideoCall.status === 'accepted') {
+    return this.router.navigate(['/messages/video', this.user.id]);
+  }
+
+  if (this.activeVideoCall.status === 'pending') {
+    return this.toastService.presentSuccessToastr('Video request pending');
   }
 
   if (this.user?.allowVideoRequestsFromNonFriends === false) {
     return this.toastService.presentErrorToastr(`${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`);
   }
 
-  // non-friends:
-  if (this.activeVideoCall.status === 'accepted') {
-    // already accepted -> consume the one-time approval and jump to call UI
-    if (this.activeVideoCall.messageId && this.socket?.connected) {
-      this.socket.emit('video-call-used', { messageId: this.activeVideoCall.messageId });
-      const msg = this.messages.find(m => m.id === this.activeVideoCall.messageId || m.tempId === this.activeVideoCall.messageId);
-      if (msg) {
-        msg.status = 'used';
-        this.recomputeActiveCall();
-        this.groupMessagesByDate();
-      }
-    }
-    return this.router.navigate(['/messages/video', this.user.id], {
-      queryParams: { videoRequestId: this.activeVideoCall.messageId }
-    });
-  }
-
-  if (this.activeVideoCall.status === 'pending') {
-    return this.toastService.presentSuccessToastr(`Waiting for ${this.user?.fullName || 'this user'} to accept your one-time video request.`);
-  }
-
-  // no active request -> open confirm and send a request
   this.requestVideoCall();
 }
 
@@ -1280,7 +1306,7 @@ private dataURLtoFile(dataurl: string, filename: string): File {
   while (n--) {
     u8arr[n] = bstr.charCodeAt(n);
   }
-  return new File([u8arr], filename, { type: mime });
+  return new File([u8arr], { type: mime });
 }
 
 sanitizeImageUrl(url: string): SafeUrl {
@@ -1510,7 +1536,7 @@ showUserProfile() {
 }
 
 showUproduct() {
-  // Since ProfileEnabled now always returns true, you don't need the else case anymore
+  // Since ProfileEnabled now always return true, you don't need the else case anymore
   this.router.navigateByUrl('/tabs/buy-and-sell/product/' + this.productId);
 }
 
@@ -1581,15 +1607,19 @@ showUproduct() {
   }
   
   async requestVideoCall() {
-    if (!this.nonFriendsChatEnabled()) {
-      console.log("Cannot request video call: message limit reached.");
-      this.toastService.presentErrorToastr('You have reached the message limit for non-friends.');
-      return;
-    }
-  
     if (!this.authUser || !this.user) {
       console.log("Missing user information.");
       return;
+    }
+
+    if (this.activeVideoCall.status === 'pending') {
+      return this.toastService.presentSuccessToastr('Video request pending');
+    }
+    if (this.activeVideoCall.status === 'accepted') {
+      return this.onVideoButtonPressed();
+    }
+    if (this.user.allowVideoRequestsFromNonFriends === false) {
+      return this.toastService.presentErrorToastr(`${this.user.fullName || 'This user'} is not accepting video requests from non-friends.`);
     }
   
     // Ensure the socket is initialized
@@ -1604,15 +1634,15 @@ showUproduct() {
     }
   
     const alert = await this.alertController.create({
-      header: 'Request Video Call',
-      message: `Send a one-time video call request to ${this.user.fullName}? If accepted, you can start one call. After that, request again if needed.`,
+      header: 'Request Video Access',
+      message: `Ask ${this.user.fullName} for permission to video call? If accepted, the permission stays active until they revoke it.`,
       buttons: [
         {
           text: 'Cancel',
           role: 'cancel'
         },
         {
-          text: 'Request',
+          text: 'Send request',
           handler: () => this.sendVideoCallRequest()
         }
       ]
@@ -1621,16 +1651,26 @@ showUproduct() {
     await alert.present();
   }
   
+private async refreshVideoRequestState() {
+  if (!this.user?.id) return;
+  this.messageService.clearCacheForThread(this.user.id);
+  this.page = 0;
+  this.messages = [];
+  this.groupedMessages = [];
+  if (this.infScroll) this.infScroll.disabled = false;
+  await this.getMessages();
+}
+
 private async sendVideoCallRequest() {
   const tempId = `temp-${Date.now()}`;
 
-  // 1️⃣ Create optimistic temp message
+  // Create one optimistic request card. The backend deduplicates authoritative state.
   const tempMessage = new Message().initialize({
     id: tempId,
     tempId,
     from: this.authUser.id,
     to: this.user.id,
-    text: `${this.authUser.fullName} has requested a video call.`,
+    text: `${this.authUser.fullName} would like permission to video call you.`,
     state: 'sending',
     createdAt: new Date(),
     type: 'video-call-request',
@@ -1639,10 +1679,9 @@ private async sendVideoCallRequest() {
 
   this.messages.push(tempMessage);
   this.groupMessagesByDate();
-  this.recomputeActiveCall();   
+  this.recomputeActiveCall();
   this.scrollToBottom();
 
-  // 2️⃣ Build payload for backend
   const payload = {
     from: this.authUser.id,
     to: this.user.id,
@@ -1651,7 +1690,13 @@ private async sendVideoCallRequest() {
     requestOnly: true
   };
 
-  // 3️⃣ Emit to server
+  const removeOptimistic = () => {
+    this.messages = this.messages.filter(m => m.id !== tempId && m.tempId !== tempId);
+    this.recomputeActiveCall();
+    this.groupMessagesByDate();
+    this.changeDetection.detectChanges();
+  };
+
   const markFailed = (message = 'Video call request could not be sent. Please try again.') => {
     const i = this.messages.findIndex(m => m.id === tempId || m.tempId === tempId);
     if (i !== -1) {
@@ -1702,10 +1747,24 @@ private async sendVideoCallRequest() {
     }
 
     if (!ack?.success) {
+      if (ack?.error === 'request_pending' || ack?.error === 'already_allowed') {
+        removeOptimistic();
+        await this.refreshVideoRequestState();
+        if (ack?.error === 'request_pending') {
+          this.toastService.presentSuccessToastr('Video request pending');
+        }
+        return;
+      }
+
+      const retryMinutes = ack?.retryAfterMs
+        ? Math.max(1, Math.ceil(Number(ack.retryAfterMs) / 60000))
+        : null;
       const errorMap: any = {
         video_requests_disabled: `${this.user?.fullName || 'This user'} is not accepting video requests from non-friends.`,
         recipient_not_found: 'This user is not available anymore.',
         invalid_recipient: 'Unable to identify this user.',
+        already_friends: 'You can already video call this friend.',
+        request_cooldown: retryMinutes ? `Please wait about ${retryMinutes} minute${retryMinutes === 1 ? '' : 's'} before sending another video request.` : 'Please wait before sending another video request.',
         socket_disconnected: 'Video call request needs a live connection. Please try again.',
         timeout: 'Video call request timed out. Please try again.'
       };
@@ -1738,11 +1797,12 @@ private async sendVideoCallRequest() {
   
 canRequestVideoCall(): boolean {
   if (!this.user) return false;
-  if (this.user.isFriend) return true;  // Always allow friends
-  if (this.user.allowVideoRequestsFromNonFriends === false) return false;
+  if (this.user.isFriend) return true;
+  // Existing pending/accepted state remains visible even if the recipient later
+  // switches off new non-friend requests. Accepted access is revoked explicitly.
   if (this.activeVideoCall.status === 'pending' || this.activeVideoCall.status === 'accepted') return true;
-  if (this.videoCallDeclined) return false;  // Block after declined
-  return true;  // Allow a fresh request when there is no accepted one-time approval
+  if (this.user.allowVideoRequestsFromNonFriends === false) return false;
+  return true;
 }
 
   
