@@ -571,6 +571,7 @@ exports.showPost = async (req, res) => {
                 }
             })
             .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides enabled isDeleted banned deletedAt')
+            .populate('channel', 'name photo type category icon city country')
             .populate({ path: 'reports', model: 'Report' })
             .exec();
 

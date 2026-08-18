@@ -341,6 +341,22 @@ onAnonymeChanged() {
     this.channelService.getPost(this.postId).then(
       (resp: any) => {
         this.post = new Post().initialize(resp.data);
+
+        // A post can be opened from Feed, notifications, comments/replies,
+        // activity links, or directly by URL. Those routes do not always
+        // carry the channel query parameter.
+        //
+        // Prefer the authoritative channel returned with the post so static
+        // event/dating fields render exactly as they do inside the channel.
+        const postChannel = resp?.data?.channel;
+        if (
+          postChannel &&
+          typeof postChannel === 'object' &&
+          postChannel.type
+        ) {
+          this.channel = new Channel().initialize(postChannel);
+        }
+
         this.getComments(null, true);
       },
       err => {
