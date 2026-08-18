@@ -604,7 +604,18 @@ router.put('/:userId/avatar', [requireSignin, withAuthUser, upload.single('avata
 router.put('/:userId', [requireSignin, withAuthUser, userUpdateValidator], updateUser);
 
 router.get('/users', [requireSignin, withAuthUser], getUsers);
-router.get('/profile/:userId', [requireSignin, withAuthUser], getUserProfile);
+// Profile uses a distinct route-param name so the global
+// router.param('userId', userById) loader does not perform an unnecessary
+// full User.findById() before authentication/profile loading.
+// getUserProfile already normalizes the ID, including legacy Base64 IDs.
+router.get('/profile/:profileUserId', [
+  requireSignin,
+  (req, res, next) => {
+    req.params.userId = req.params.profileUserId;
+    next();
+  },
+  withAuthUser
+], getUserProfile);
 
 router.put('/', [requireSignin, withAuthUser, userUpdateValidator], updateUser);
 
