@@ -48,6 +48,33 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         logDeliveryDelay(data);
 
         /*
+         * Video permission lifecycle is independent from an actual
+         * WebRTC call lifecycle. In particular, a permission request
+         * can have status=cancelled without carrying a callId.
+         *
+         * Handle these first so video-call-cancelled is never mistaken
+         * for video_call_cancelled from the real incoming-call flow.
+         */
+        if (isVideoPermissionEvent(data)) {
+            String permissionTitle = firstNonEmpty(
+                    data.get("title"),
+                    "Folcen"
+            );
+
+            String permissionBody = firstNonEmpty(
+                    data.get("body"),
+                    "You have a new video request update"
+            );
+
+            sendNotification(
+                    permissionTitle,
+                    permissionBody,
+                    data
+            );
+            return;
+        }
+
+        /*
          * Terminal call lifecycle must be processed BEFORE the
          * generic call-category check.
          *

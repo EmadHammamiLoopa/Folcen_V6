@@ -110,6 +110,7 @@ export class TabsPage implements OnInit, OnDestroy {
       if (this.socket) {
         this.socket.on('connect', () => this.recountFriends());
         this.socket.on('video-call-accepted', this.onVideoPermissionAccepted);
+        this.socket.on('video-call-cancelled', this.onVideoPermissionCancelled);
       }
     } catch (error) {
       console.error('Failed to init Tabs sockets:', error);
@@ -211,6 +212,7 @@ export class TabsPage implements OnInit, OnDestroy {
     if (this.socket) {
       this.socket.off('connect');
       this.socket.off('video-call-accepted', this.onVideoPermissionAccepted);
+      this.socket.off('video-call-cancelled', this.onVideoPermissionCancelled);
     }
   }
 
@@ -242,6 +244,33 @@ export class TabsPage implements OnInit, OnDestroy {
     });
 
 
+  };
+
+  private onVideoPermissionCancelled = (payload: any) => {
+    const ownerId = String(SocketService.getOwnerId() || '');
+    if (!ownerId) return;
+
+    const status = String(
+      payload?.status || payload?.reason || ''
+    ).toLowerCase();
+
+    const sender = String(payload?.from || '');
+    const recipient = String(payload?.to || '');
+
+    // The socket event is broadcast to both parties, but the badge should
+    // mirror the push-notification target:
+    // cancelled -> recipient
+    // rejected/revoked -> original requester
+    const shouldBadge =
+      (status === 'cancelled' && ownerId === recipient) ||
+      (status === 'rejected' && ownerId === sender) ||
+      (status === 'revoked' && ownerId === sender);
+
+    if (!shouldBadge) return;
+
+    this.zone.run(() => {
+      this.badges.inc('messages', 1);
+    });
   };
 
   private async showVideoEventNotification(

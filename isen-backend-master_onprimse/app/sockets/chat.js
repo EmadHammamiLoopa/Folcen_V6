@@ -214,10 +214,12 @@ socket.on("video-call-request", async (data, ack) => {
       title: "Video call request",
       body: `${callerName} sent you a video call request`,
       data: {
-        ...safeCallPayload,
+        // Do not spread safeCallPayload here. FCM reserves keys such as
+        // "from", so permission pushes must contain only app-owned keys.
         type: "video-call-request",
         category: "message",
         event: "video-call-request",
+        status: "pending",
         fromUserId: String(callerId),
         callerId: String(callerId),
         messageId: String(saved._id),
