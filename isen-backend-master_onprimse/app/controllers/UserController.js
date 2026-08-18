@@ -2483,6 +2483,37 @@ exports.removeFriendship = async(req, res) => {
             ]
         });
 
+        // Friendship itself is the implicit follow relationship.
+        // Once users unfriend, that implicit relationship ends.
+        // Do not silently convert an old friendship into an explicit Follow.
+        // Also remove any stale legacy follow state that may predate this rule.
+        await Promise.all([
+            Follow.deleteMany({
+                $or: [
+                    { follower: authUser._id, followed: user._id },
+                    { follower: user._id, followed: authUser._id }
+                ]
+            }),
+            User.updateOne(
+                { _id: authUser._id },
+                {
+                    $pull: {
+                        following: user._id,
+                        followers: user._id
+                    }
+                }
+            ),
+            User.updateOne(
+                { _id: user._id },
+                {
+                    $pull: {
+                        following: authUser._id,
+                        followers: authUser._id
+                    }
+                }
+            )
+        ]);
+
         logger.info('removeFriendship: removed friendship and requests between', String(authUser._id), 'and', String(user._id));
 
         // 🔁 Notify both sides to refresh friends list

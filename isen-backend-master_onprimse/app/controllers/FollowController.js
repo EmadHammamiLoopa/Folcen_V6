@@ -47,6 +47,49 @@ exports.followUser = async (req, res) => {
             return Response.sendError(res, 403, 'Cannot follow due to block relationship');
         }
 
+        // Friends receive each other's feed implicitly.
+        // They must not also appear in Followers / Following.
+        const alreadyFriends =
+            (req.authUser.friends || []).some(
+                id => String(id && id._id ? id._id : id) === String(followedId)
+            ) ||
+            (targetUser.friends || []).some(
+                id => String(id && id._id ? id._id : id) === String(followerId)
+            );
+
+        if (alreadyFriends) {
+            // Clean stale legacy overlap defensively.
+            await Promise.all([
+                Follow.deleteMany({
+                    $or: [
+                        { follower: followerId, followed: followedId },
+                        { follower: followedId, followed: followerId }
+                    ]
+                }),
+                User.findByIdAndUpdate(followerId, {
+                    $pull: {
+                        following: followedId,
+                        followers: followedId
+                    }
+                }),
+                User.findByIdAndUpdate(followedId, {
+                    $pull: {
+                        following: followerId,
+                        followers: followerId
+                    }
+                })
+            ]);
+
+            return Response.sendResponse(
+                res,
+                {
+                    status: 'friend',
+                    implicitFollow: true
+                },
+                'Friends already receive each other in feed'
+            );
+        }
+
         // Check if already following or blocked
         const existingFollow = await Follow.findOne({ follower: followerId, followed: followedId });
         if (existingFollow) {

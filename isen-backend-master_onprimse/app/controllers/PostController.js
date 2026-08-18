@@ -310,9 +310,9 @@ exports.getFeed = async (req, res) => {
 
         const allBlockedIds = Array.from(new Set([...blockedByMe, ...blockedMeIds, ...inactiveUserIds]));
 
-        // 3. Find posts I've commented on (to include them in feed even if not followed)
-        const myComments = await Comment.find({ user: userId }).select('post');
-        const postsICommentedOn = myComments.map(c => c.post);
+        // 3. Feed membership is relationship-driven only:
+        // current friends + active explicit follows.
+        // Previous comments or mentions never grant ongoing feed access.
 
         // 4. Fetch Posts
         // build a per-follow OR clause so we only include posts from followed users made after they were followed
@@ -334,13 +334,8 @@ exports.getFeed = async (req, res) => {
             }
         });
 
-        // Mentioned in text
-        feedCriteria.push({ text: { $regex: `@${req.authUser.firstName}`, $options: 'i' } });
-
-        // Commented on
-        if (postsICommentedOn.length > 0) {
-            feedCriteria.push({ _id: { $in: postsICommentedOn } });
-        }
+        // Do not add mention/comment-history criteria here.
+        // A post enters Feed only through friendship or an active Follow.
 
         const postQuery = {
             moderationStatus: 'approved',
@@ -350,14 +345,21 @@ exports.getFeed = async (req, res) => {
             $or: feedCriteria.length > 0 ? feedCriteria : [{ _id: null }] // Match nothing if no criteria
         };
 
-        // Visibility constraints still apply unless it's a mention or my own comment? 
-        // Usually, mentions/comments bypass 'friends-only' if you're the one tagged.
+        // Current visibility always wins.
+        //
+        // Active followers can receive public posts.
+        // Friends can receive public + friends-only posts.
+        // Private posts remain owner-only and therefore never enter another
+        // user's Feed.
         const visibilityQuery = {
             $or: [
                 { visibility: 'public' },
-                { $and: [{ visibility: 'friends-only' }, { user: { $in: friendIds } }] },
-                { text: { $regex: `@${req.authUser.firstName}`, $options: 'i' } },
-                { _id: { $in: postsICommentedOn } }
+                {
+                    $and: [
+                        { visibility: 'friends-only' },
+                        { user: { $in: friendIds } }
+                    ]
+                }
             ]
         };
 
@@ -570,7 +572,7 @@ exports.showPost = async (req, res) => {
                     select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides'
                 }
             })
-            .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides enabled isDeleted banned deletedAt')
+            .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides enabled isDeleted banned deletedAt isPrivate')
             .populate('channel', 'name photo type category icon city country')
             .populate({ path: 'reports', model: 'Report' })
             .exec();
@@ -607,11 +609,44 @@ exports.showPost = async (req, res) => {
             }
         }
 
-        // Visibility Check
+        // Relationship / profile privacy check.
+        //
+        // Friends are implicit followers and need no Follow record.
+        // For a private profile, a non-friend must have an ACTIVE Follow.
+        // Pending requests never grant access.
         const isOwner = authorId === requesterId;
-        const isFriend = req.authUser.friends && req.authUser.friends.some(id => id.toString() === authorId);
-        const isFollower = req.authUser.following && req.authUser.following.some(id => id.toString() === authorId);
+        const isFriend =
+            req.authUser.friends &&
+            req.authUser.friends.some(
+                id => id.toString() === authorId
+            );
 
+        let isAcceptedFollower = false;
+
+        if (
+            !isOwner &&
+            !isFriend &&
+            author &&
+            author.isPrivate
+        ) {
+            isAcceptedFollower = !!(
+                await Follow.exists({
+                    follower: req.auth._id,
+                    followed: authorId,
+                    status: 'active'
+                })
+            );
+
+            if (!isAcceptedFollower) {
+                return Response.sendError(
+                    res,
+                    403,
+                    'This profile is private'
+                );
+            }
+        }
+
+        // Post visibility is a separate permission layer.
         if (!isOwner) {
             if (post.visibility === 'private') {
                 return Response.sendError(res, 403, 'This post is private');
