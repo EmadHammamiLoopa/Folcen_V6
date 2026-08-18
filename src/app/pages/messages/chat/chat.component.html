@@ -122,13 +122,13 @@
               <!-- Only the latest pending request can be processed -->
               <div class="action-buttons" *ngIf="isActionableCall(message)">
                 <ion-button *ngIf="message?.from !== authUser?.id"
-                            [disabled]="message?.busy"
+                            [disabled]="$any(message).busy"
                             fill="outline" size="small" color="success"
                             (click)="acceptVideoCall(message)">
                   Accept
                 </ion-button>
 
-                <ion-button [disabled]="message?.busy"
+                <ion-button [disabled]="$any(message).busy"
                             fill="outline" size="small" color="danger"
                             (click)="cancelVideoCallRequest(message)">
                   {{ message?.from === authUser?.id ? 'Cancel request' : 'Reject' }}
