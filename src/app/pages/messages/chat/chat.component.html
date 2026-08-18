@@ -25,11 +25,23 @@
     </div>
 
     <ion-buttons slot="end" *ngIf="!isAdminChat() && features.friendVideoCall">
+      <!-- Non-friend outgoing action: request, pending, or normal call after approval -->
       <ion-button *ngIf="!user?.isFriend && canRequestVideoCall()"
                   (click)="onVideoButtonPressed()"
+                  [disabled]="activeVideoCall.status === 'pending'"
+                  [attr.aria-label]="activeVideoCall.status === 'accepted' ? 'Start video call' : (activeVideoCall.status === 'pending' ? 'Video request pending' : 'Request video access')"
                   shape="round" fill="clear" class="video-btn">
-        <ion-icon [name]="activeVideoCall.status === 'accepted' ? 'videocam' : 'videocam-outline'"></ion-icon>
-        <div *ngIf="activeVideoCall.status !== 'accepted'" class="request-badge">?</div>
+        <ion-icon [name]="activeVideoCall.status === 'accepted' ? 'videocam' : (activeVideoCall.status === 'pending' ? 'time-outline' : 'videocam-outline')"></ion-icon>
+        <div *ngIf="!activeVideoCall.status" class="request-badge">?</div>
+      </ion-button>
+
+      <!-- Quick revoke: visible to the person who granted a non-friend access -->
+      <ion-button *ngIf="!user?.isFriend && hasIncomingVideoPermission()"
+                  (click)="confirmRevokeVideoAccess()"
+                  aria-label="Manage video access"
+                  title="Video access granted — tap to revoke"
+                  shape="round" fill="clear" color="success" class="video-btn">
+        <ion-icon name="shield-checkmark-outline"></ion-icon>
       </ion-button>
 
       <ion-button *ngIf="canStartFriendVideoCall()"
@@ -81,93 +93,98 @@
           <!-- Image message -->
           <img *ngIf="message?.image" [src]="message?.image" class="message-image" (click)="openImage(message?.image)" style="cursor:pointer">
           
-          <!-- Text content -->
-          <div class="message-text" *ngIf="message?.text">
+          <!-- Ordinary text only; video requests render as their own card -->
+          <div class="message-text" *ngIf="message?.text && message?.type !== 'video-call-request'">
             {{ message?.text }}
           </div>
           
-          <!-- Video call request -->
-<!-- IF message sent by me -->
-<!-- IF message sent by me -->
-<!-- Video Call Request Message -->
-<div *ngIf="message?.type === 'video-call-request'" 
-     class="video-call-request"
-     [ngClass]="{ 'improved-request': message?.from === authUser?.id,
-                  'fancy-request': message?.from !== authUser?.id }">
+          <!-- Video Call Request Message -->
+          <div *ngIf="message?.type === 'video-call-request'" 
+               class="video-call-request"
+               [ngClass]="{ 'improved-request': message?.from === authUser?.id,
+                            'fancy-request': message?.from !== authUser?.id }">
 
-  <!-- Icon -->
-  <div class="video-icon-container" *ngIf="message?.from !== authUser?.id">
-    <ion-icon name="videocam" class="video-icon pulse"></ion-icon>
-  </div>
-  <ion-icon *ngIf="message?.from === authUser?.id" name="videocam" class="video-icon"></ion-icon>
+            <div class="video-icon-container" *ngIf="message?.from !== authUser?.id">
+              <ion-icon name="videocam" class="video-icon" [class.pulse]="message?.status === 'pending'"></ion-icon>
+            </div>
+            <ion-icon *ngIf="message?.from === authUser?.id" name="videocam" class="video-icon"></ion-icon>
 
-  <!-- Request text -->
-  <div class="request-text">
-    <strong>
-      {{ message?.from === authUser?.id ? 'Video Call Request' : 'Incoming Video Call' }}
-    </strong><br />
-    {{ message?.text }}
+            <div class="request-text">
+              <strong>Video Call Request</strong><br />
 
-    <!-- Pending: buttons -->
-<!-- Pending: buttons -->
-<!-- actions are shown only for the latest pending request, during this session -->
-<div class="action-buttons" *ngIf="isActionableCall(message)">
-  <ion-button *ngIf="message?.from !== authUser?.id"
-              fill="outline" size="small" color="success"
-              (click)="acceptVideoCall(message)">
-    Accept
-  </ion-button>
+              <ng-container *ngIf="message?.from === authUser?.id; else incomingRequestCopy">
+                You asked {{ user?.fullName }} for permission to video call.
+              </ng-container>
+              <ng-template #incomingRequestCopy>
+                {{ message?.text }}
+              </ng-template>
 
-  <ion-button fill="outline" size="small" color="danger"
-              (click)="cancelVideoCallRequest(message)">
-    {{ message?.from === authUser?.id ? 'Cancel' : 'Reject' }}
-  </ion-button>
-</div>
+              <!-- Only the latest pending request can be processed -->
+              <div class="action-buttons" *ngIf="isActionableCall(message)">
+                <ion-button *ngIf="message?.from !== authUser?.id"
+                            [disabled]="message?.busy"
+                            fill="outline" size="small" color="success"
+                            (click)="acceptVideoCall(message)">
+                  Accept
+                </ion-button>
 
-    <div *ngIf="message?.status === 'pending' && message?.from === authUser?.id" class="resolved-text">
-      Waiting for {{ user?.fullName }} to accept. This request is valid for one call only.
-    </div>
+                <ion-button [disabled]="message?.busy"
+                            fill="outline" size="small" color="danger"
+                            (click)="cancelVideoCallRequest(message)">
+                  {{ message?.from === authUser?.id ? 'Cancel request' : 'Reject' }}
+                </ion-button>
+              </div>
 
-    <div *ngIf="message?.status === 'pending' && message?.from !== authUser?.id && !isActionableCall(message)" class="resolved-text">
-      Video call request pending.
-    </div>
+              <div *ngIf="message?.status === 'pending' && message?.from === authUser?.id" class="resolved-text">
+                Video request pending
+              </div>
 
-    <!-- Accepted: resolved text -->
-    <div *ngIf="message?.status === 'accepted'" class="resolved-text">
-      <ng-container *ngIf="message?.from === authUser?.id">
-        ✅ Accepted by {{ user?.fullName }}
-      </ng-container>
-      <ng-container *ngIf="message?.from !== authUser?.id">
-        ✅ You accepted the call
-      </ng-container>
-    </div>
+              <div *ngIf="message?.status === 'pending' && message?.from !== authUser?.id && !isActionableCall(message)" class="resolved-text">
+                Video request pending
+              </div>
 
-    <!-- Cancelled: resolved text -->
-    <div *ngIf="message?.status === 'cancelled'" class="resolved-text">
-      <ng-container *ngIf="message?.from === authUser?.id">
-        ❌ You cancelled the request
-      </ng-container>
-      <ng-container *ngIf="message?.from !== authUser?.id">
-        ❌ {{ user?.fullName }} cancelled the request
-      </ng-container>
-    </div>
+              <div *ngIf="message?.status === 'accepted'" class="resolved-text">
+                <ng-container *ngIf="message?.from === authUser?.id">
+                  ✅ {{ user?.fullName }} granted you video-call access
+                </ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">
+                  ✅ You granted {{ user?.fullName }} video-call access
+                </ng-container>
+              </div>
 
-    <div *ngIf="message?.status === 'rejected'" class="resolved-text">
-      <ng-container *ngIf="message?.from === authUser?.id">
-        Request rejected
-      </ng-container>
-      <ng-container *ngIf="message?.from !== authUser?.id">
-        You rejected the request
-      </ng-container>
-    </div>
+              <div *ngIf="message?.status === 'cancelled'" class="resolved-text">
+                <ng-container *ngIf="message?.from === authUser?.id">
+                  You cancelled the request
+                </ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">
+                  {{ user?.fullName }} cancelled the request
+                </ng-container>
+              </div>
 
-    <div *ngIf="message?.status === 'expired'" class="resolved-text">
-      Video request expired
-    </div>
-  </div>
-</div>
+              <div *ngIf="message?.status === 'rejected'" class="resolved-text">
+                <ng-container *ngIf="message?.from === authUser?.id">
+                  Request rejected
+                </ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">
+                  You rejected the request
+                </ng-container>
+              </div>
 
-          
+              <div *ngIf="message?.status === 'revoked'" class="resolved-text">
+                <ng-container *ngIf="message?.from === authUser?.id">
+                  Video-call access was revoked
+                </ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">
+                  You revoked video-call access
+                </ng-container>
+              </div>
+
+              <div *ngIf="message?.status === 'expired'" class="resolved-text">
+                Video request expired
+              </div>
+            </div>
+          </div>
+
           <!-- Message metadata -->
           <div class="message-meta">
             <span class="message-time">{{ formatMessageTime(message.createdAt) }}</span>
