@@ -1,6 +1,6 @@
-/* Page-level responsive refinements that must cross Angular view encapsulation. */
+/* Cross-component responsive refinements. */
 
-/* Android tablets can expose a CSS viewport around 600–700px even on large screens. */
+/* Profile gallery: keep Add Photo compact on Android tablets. */
 @media (min-width: 560px) and (max-width: 1199px) {
   app-display .modern-gallery-grid .add-photo-card {
     width: 132px !important;
@@ -10,4 +10,91 @@
   }
 }
 
-/* Settings already includes About Fol
+/* Settings: remove redundant branding footer and clear system navigation. */
+app-settings .branding-footer {
+  display: none !important;
+}
+
+app-settings .settings-container {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+}
+
+app-settings .account-actions-section {
+  margin-bottom: 0 !important;
+}
+
+@media (min-width: 768px) {
+  app-settings .settings-container {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Edit Profile: use only the bottom Save action. */
+app-form .save-profile-button {
+  display: none !important;
+}
+
+app-form .mobile-save-wrap {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 10px 0 18px !important;
+}
+
+app-form .mobile-save-button {
+  width: 100% !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  --border-radius: 16px !important;
+}
+
+/* The floating tab dock can be ~70px high and overlays the page. */
+app-form .edit-profile-container {
+  padding-bottom: calc(140px + env(safe-area-inset-bottom)) !important;
+}
+
+/* Avatar customization action. */
+app-form .customize-avatar-button {
+  --background: var(--f-accent-soft) !important;
+  --background-hover: rgba(124, 108, 255, 0.16) !important;
+  --background-activated: rgba(124, 108, 255, 0.20) !important;
+  --color: var(--f-accent) !important;
+  --border-radius: 999px !important;
+  --padding-start: 12px !important;
+  --padding-end: 14px !important;
+  min-height: 36px !important;
+  margin: 2px 0 0 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+app-form .customize-avatar-button::part(native) {
+  border: 1px solid rgba(124, 108, 255, 0.22) !important;
+  box-shadow: none !important;
+}
+
+app-form .customize-avatar-button ion-icon {
+  font-size: 16px !important;
+}
+
+@media (max-width: 420px) {
+  app-form .customize-avatar-button {
+    margin-inline: auto !important;
+  }
+
+  app-form .edit-profile-container {
+    padding-bottom: calc(152px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-form .mobile-save-wrap {
+    max-width: 520px !important;
+    margin-inline: auto !important;
+  }
+
+  app-form .edit-profile-container {
+    padding-bottom: calc(150px + env(safe-area-inset-bottom)) !important;
+  }
+}
