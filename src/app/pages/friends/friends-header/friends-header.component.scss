@@ -1,94 +1,191 @@
+@use '../../../../theme/design-system' as ds;
+
+@include ds.folcen-theme-tokens;
+
 .header-action-wrapper {
   position: relative;
-  margin-right: 8px;
+  margin-right: 4px;
 
   .glass-action-btn {
-    --background: rgba(255, 255, 255, 0.1);
-    --color: white;
-    --border-radius: 12px;
-    backdrop-filter: blur(10px);
-    height: 40px;
+    --background: var(--f-surface-muted);
+    --background-hover: var(--f-accent-soft);
+    --background-activated: var(--f-accent-soft);
+    --color: var(--f-text-muted);
+    --border-radius: 13px;
     width: 40px;
+    height: 40px;
+    margin: 0;
+
+    ion-icon {
+      font-size: 19px;
+    }
   }
 
   .vibrant-badge {
     position: absolute;
-    top: -5px;
+    top: -4px;
     right: -5px;
-    background: linear-gradient(135deg, #ef4444, #f43f5e);
-    color: white;
-    font-size: 0.7rem;
-    font-weight: 800;
     min-width: 18px;
     height: 18px;
-    border-radius: 9px;
+    padding: 0 5px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 4px;
-    border: 2px solid var(--ion-background-color);
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ef4444, #f43f5e);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    border: 2px solid var(--f-page-bg);
+    box-shadow: 0 5px 14px rgba(239, 68, 68, 0.32);
   }
 }
 
 .social-tabs-container {
-  padding: 8px clamp(12px, 4vw, 20px);
-  background: var(--ion-background-color);
+  position: relative;
+  z-index: 15;
   width: 100%;
+  padding: 9px var(--f-page-gutter) 7px;
   box-sizing: border-box;
-  overflow: hidden;
+  background: linear-gradient(180deg, var(--f-toolbar), rgba(0, 0, 0, 0));
+}
 
-  .glass-tabs {
-    display: flex;
-    background: var(--folcen-tabbar-background);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(var(--ion-text-color-rgb), 0.05);
-    border-radius: 16px;
-    padding: 6px;
+.glass-tabs {
+  display: flex;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 5px;
+  gap: 5px;
+  border-radius: 18px;
+  background: var(--f-surface);
+  border: 1px solid var(--f-border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.10);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+.tab-item {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--f-text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s ease, color .2s ease, transform .2s ease;
+
+  .tab-icon-shell {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+
+    ion-icon {
+      font-size: 19px;
+    }
+  }
+
+  .tab-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  .dot-badge {
+    position: absolute;
+    top: 1px;
+    right: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 1.5px solid var(--f-surface-solid);
+  }
+
+  .count-pill {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  &.active {
+    color: var(--f-text-strong);
+    background: linear-gradient(135deg, rgba(124, 108, 255, 0.18), rgba(56, 189, 248, 0.08));
+    box-shadow: inset 0 0 0 1px rgba(124, 108, 255, 0.17);
+
+    .tab-icon-shell {
+      color: var(--f-accent);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+@include ds.phone-xs {
+  .social-tabs-container {
+    padding-inline: 10px;
+  }
+
+  .tab-item {
+    padding-inline: 8px;
     gap: 6px;
 
-    .tab-item {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px;
-      border-radius: 12px;
-      color: #94a3b8;
-      font-weight: 600;
-      font-size: 0.9rem;
-      transition: all 0.3s ease;
-      cursor: pointer;
-
-      i {
-        font-size: 1rem;
-      }
-
-      &.active {
-        background: rgba(99, 102, 241, 0.15);
-        color: #818cf8;
-        box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.2);
-      }
-
-      .request-icon-wrapper {
-        position: relative;
-        .dot-badge {
-          position: absolute;
-          top: -2px;
-          right: -2px;
-          width: 8px;
-          height: 8px;
-          background: #ef4444;
-          border-radius: 50%;
-          border: 1.5px solid var(--ion-background-color);
-        }
-      }
-
-      .count-text {
-        font-size: 0.8rem;
-        opacity: 0.8;
-      }
+    .tab-label {
+      font-size: 13px;
     }
+  }
+}
+
+@include ds.tablet-up {
+  .social-tabs-container {
+    padding-top: 12px;
+  }
+
+  .glass-tabs {
+    max-width: 680px;
+  }
+
+  .tab-item {
+    min-height: 48px;
+
+    .tab-label {
+      font-size: 15px;
+    }
+
+    .tab-icon-shell ion-icon {
+      font-size: 20px;
+    }
+  }
+}
+
+@include ds.reduced-motion {
+  .tab-item {
+    transition: none !important;
   }
 }
