@@ -152,10 +152,22 @@ export class DisplayComponent implements OnInit, OnDestroy {
           }
           console.log('[PROFILE:followUpdate$] stats:', stats);
           if (stats) {
-            // Stats included in payload — patch directly for instant UI update
-            if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
-            if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
-            if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
+            // Counts are independent from relationship ID arrays.
+            // Never create placeholder IDs just to display a number.
+            if (stats.followers !== undefined) {
+              this.user.followersCount =
+                Number(stats.followers) || 0;
+            }
+
+            if (stats.following !== undefined) {
+              this.user.followingCount =
+                Number(stats.following) || 0;
+            }
+
+            if (stats.friends !== undefined) {
+              this.user.friendsCount =
+                Number(stats.friends) || 0;
+            }
             console.log('[PROFILE:followUpdate$] AFTER PATCH — friends:', this.user.friends?.length, 'followers:', this.user.followers?.length, 'following:', this.user.following?.length);
             if (this.myProfile && stats.pendingFollowRequests !== undefined) {
               this.pendingRequestsCount = stats.pendingFollowRequests;
@@ -191,9 +203,20 @@ export class DisplayComponent implements OnInit, OnDestroy {
             // ── Own profile ── statistics belong to the current user (= this.user)
             if (stats) {
               console.log('[PROFILE:friendRequestsUpdated$] own-profile stats:', stats);
-              if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
-              if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
-              if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
+              if (stats.friends !== undefined) {
+                this.user.friendsCount =
+                  Number(stats.friends) || 0;
+              }
+
+              if (stats.followers !== undefined) {
+                this.user.followersCount =
+                  Number(stats.followers) || 0;
+              }
+
+              if (stats.following !== undefined) {
+                this.user.followingCount =
+                  Number(stats.following) || 0;
+              }
               if (stats.pendingFollowRequests !== undefined) this.pendingRequestsCount = stats.pendingFollowRequests;
               // Sync into central store so navigation doesn't lose these values
               this.userService.setCurrentUser(this.user, { force: true });
@@ -672,16 +695,47 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   openImagePicker() {
-    if (this.platform.is('cordova') || this.platform.is('capacitor') || this.platform.is('hybrid')) {
-      // Native mobile: use existing uploadFile logic
-      this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'image')
-        .then(resp => this.processSelectedMedia(resp))
-        .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
-    } else {
-      // Browser: trigger file input manually
-      const input = document.getElementById('webImageInput') as HTMLInputElement;
-      input?.click();
-    }
+    this.uploadFile
+      .selectMedia('image', 'gallery')
+      .then(resp =>
+        this.processSelectedMedia(resp)
+      )
+      .catch((err: any) => {
+        const message =
+          String(err?.message || err || '');
+
+        if (/cancel|no media selected/i.test(message)) {
+          return;
+        }
+
+        this.toastService.presentErrorToastr(
+          'Could not open the gallery.'
+        );
+      });
+  }
+
+  async openPhotoSourceOptions() {
+    const alert = await this.alertCtrl.create({
+      header: 'Add photo',
+      buttons: [
+        {
+          text: 'Take photo',
+          handler: () =>
+            this.openCameraPicker()
+        },
+        {
+          text: 'Choose from gallery',
+          handler: () =>
+            this.openImagePicker()
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        }
+      ]
+    });
+
+    await alert.present();
   }
 
   async openAvatarMediaOptions() {
@@ -712,20 +766,47 @@ export class DisplayComponent implements OnInit, OnDestroy {
   
   openCameraPicker() {
     try {
-      localStorage.setItem('pendingProfileCameraReturn', JSON.stringify({
-        userId: this.user?._id,
-        url: this.router.url,
-        at: Date.now()
-      }));
-    } catch (e) {}
-    this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image')
+      localStorage.setItem(
+        'pendingProfileCameraReturn',
+        JSON.stringify({
+          userId: this.user?._id,
+          url: this.router.url,
+          at: Date.now()
+        })
+      );
+    } catch (_) {}
+
+    this.uploadFile
+      .selectMedia('image', 'camera')
       .then(resp => {
-        try { localStorage.removeItem('pendingProfileCameraReturn'); } catch (e) {}
+        try {
+          localStorage.removeItem(
+            'pendingProfileCameraReturn'
+          );
+        } catch (_) {}
+
         this.processSelectedMedia(resp);
       })
-      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
+      .catch((err: any) => {
+        try {
+          localStorage.removeItem(
+            'pendingProfileCameraReturn'
+          );
+        } catch (_) {}
+
+        const message =
+          String(err?.message || err || '');
+
+        if (/cancel|no media selected/i.test(message)) {
+          return;
+        }
+
+        this.toastService.presentErrorToastr(
+          'Could not open the camera.'
+        );
+      });
   }
-  
+
   openVideoPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'video')
       .then(resp => this.processSelectedMedia(resp))

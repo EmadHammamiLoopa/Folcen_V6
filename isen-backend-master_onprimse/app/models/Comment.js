@@ -65,4 +65,12 @@ const commentSchema = new mongoose.Schema({
 
 }, { timestamps: true }); // Automatically adds createdAt and updatedAt fields
 
+// Hot path: post comment list and visible comment-count aggregation.
+commentSchema.index({
+  post: 1,
+  deletedAt: 1,
+  moderationStatus: 1,
+  createdAt: -1
+});
+
 module.exports = mongoose.model('Comment', commentSchema);

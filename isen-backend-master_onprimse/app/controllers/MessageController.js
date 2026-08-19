@@ -73,12 +73,35 @@ exports.storeMessage = async (req, res) => {
             return Response.sendError(res, 403, 'You can no longer message this user');
         }
 
-        if (receiver.isPrivate) {
-            const isFriend = receiver.friends && receiver.friends.some(id => String(id) === String(senderId));
-            const follow = await Follow.findOne({ follower: senderId, followed: recipientId, status: 'active' }).select('_id').lean();
-            if (!isFriend && !follow) {
-                return Response.sendError(res, 403, 'You cannot message this private account yet');
-            }
+        const chatPolicy =
+            await helpers.canInitiateChat(
+                senderId,
+                recipientId
+            );
+
+        if (!chatPolicy.allowed) {
+            const status =
+                chatPolicy.reason === 'budget_exhausted'
+                    ? 429
+                    : 403;
+
+            const reasonMessage = {
+                awaiting_reply:
+                    'Please wait for this user to reply before sending another message.',
+                budget_exhausted:
+                    'You have reached today\'s new non-friend chat limit.',
+                blocked:
+                    'You can no longer message this user.',
+                user_not_found:
+                    'Recipient account is unavailable.'
+            };
+
+            return Response.sendError(
+                res,
+                status,
+                reasonMessage[chatPolicy.reason] ||
+                    'Chat is not available.'
+            );
         }
 
         const savedMessage = await Message.create({
@@ -98,16 +121,45 @@ exports.storeMessage = async (req, res) => {
 
         const safePayload = messagePayload(savedMessage, tempId);
         const delivered = await helpers.emitToUser(recipientId, 'new-message', safePayload);
+        // Android may keep Socket.IO connected while the app is backgrounded.
+        // A persisted normal chat message therefore always gets one FCM push.
+        try {
+            const senderName =
+                `${sender.firstName || ''} ${sender.lastName || ''}`
+                    .trim() ||
+                'New message';
 
-        if (!delivered) {
-            try {
-                const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'New message';
-                const preview = text ? text.substring(0, 100) : 'Image';
-                helpers.sendNotification([String(recipientId)], preview, senderName, String(senderId)).catch(() => {});
-            } catch (pushErr) {
-                logger.warn('[message.store] push failed for offline recipient:', pushErr.message);
-            }
+            const preview =
+                text
+                    ? text.substring(0, 100)
+                    : (
+                        image?.type &&
+                        String(image.type).startsWith('video/')
+                            ? 'Video'
+                            : 'Image'
+                      );
+
+            helpers
+                .sendNotification(
+                    [String(recipientId)],
+                    preview,
+                    senderName,
+                    String(senderId)
+                )
+                .catch(err => {
+                    logger.warn(
+                        '[message.store] push failed:',
+                        err.message
+                    );
+                });
+
+        } catch (pushErr) {
+            logger.warn(
+                '[message.store] push setup failed:',
+                pushErr.message
+            );
         }
+
 
         return Response.sendResponse(res, messagePayload(savedMessage, tempId, delivered ? 'delivered' : 'sent'));
     } catch (error) {
@@ -118,39 +170,108 @@ exports.storeMessage = async (req, res) => {
 
 exports.indexMessages = async (req, res) => {
     const limit = 20;
-    const page = +req.query.page || 0;
-    const authUserId = new mongoose.Types.ObjectId(req.auth._id);
-    const userId = new mongoose.Types.ObjectId(req.params.userId);
 
-    const filter = {
-        $or: [
-            { from: authUserId, to: userId },
-            { from: userId, to: authUserId }
-        ]
-    };
+    const page =
+        Math.max(
+            0,
+            +req.query.page || 0
+        );
 
     try {
-        const messages = await Message.find(filter)
-            .sort({ createdAt: -1 })
-            .skip(limit * page)
-            .limit(limit);
+        const authUserId =
+            new mongoose.Types.ObjectId(
+                req.auth._id
+            );
 
-        const count = await Message.countDocuments(filter);
-        
-        // Task 1: Use shared policy for initial state
-        const check = await helpers.canInitiateChat(authUserId, userId);
-        const allowToChat = check.allowed;
-        const budgetRemaining = check.budgetRemaining;
-    
-        return Response.sendResponse(res, {
+        const userId =
+            new mongoose.Types.ObjectId(
+                req.params.userId
+            );
+
+        const filter = {
+            $or: [
+                {
+                    from: authUserId,
+                    to: userId
+                },
+                {
+                    from: userId,
+                    to: authUserId
+                }
+            ]
+        };
+
+        const rowsPromise =
+            Message.find(filter)
+                .sort({
+                    createdAt: -1
+                })
+                .skip(
+                    limit * page
+                )
+                .limit(
+                    limit + 1
+                )
+                .lean();
+
+        // Chat permission is only consumed by the initial page.
+        // Infinite-scroll history pages do not need the extra DB reads.
+        const policyPromise =
+            page === 0
+                ? helpers.canInitiateChat(
+                    authUserId,
+                    userId
+                )
+                : Promise.resolve(null);
+
+        const [
+            rows,
+            check
+        ] = await Promise.all([
+            rowsPromise,
+            policyPromise
+        ]);
+
+        const more =
+            rows.length > limit;
+
+        const messages =
+            more
+                ? rows.slice(0, limit)
+                : rows;
+
+        const payload = {
             messages,
-            more: (count - (limit * (page + 1))) > 0,
-            allowToChat,
-            budgetRemaining
-        });
+            more
+        };
+
+        if (page === 0 && check) {
+            payload.allowToChat =
+                !!check.allowed;
+
+            payload.chatReason =
+                check.reason || null;
+
+            payload.budgetRemaining =
+                check.budgetRemaining;
+        }
+
+        return Response.sendResponse(
+            res,
+            payload
+        );
+
     } catch (error) {
-        logger.error('Error fetching messages:', error); // Log the error
-        return Response.sendError(res, 400, 'Failed to fetch messages');
+        logger.error(
+            'Error fetching messages:',
+            error
+        );
+
+        return Response.sendError(
+            res,
+            400,
+            'Failed to fetch messages'
+        );
     }
 };
 

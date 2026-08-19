@@ -28,6 +28,9 @@ export class FeedPage implements OnInit, OnDestroy {
   posts: any[] = [];
   page = 1;
 
+  private lastSuccessfulRefreshAt = 0;
+  private readonly warmRefreshMs = 15000;
+
   constructor(
     private channelService: ChannelService,
     private nativeStorage: NativeStorage,
@@ -58,8 +61,25 @@ export class FeedPage implements OnInit, OnDestroy {
 
   ionViewWillEnter() {
     this.page = 1;
-    this.posts = [];
-    this.getFeed(null, true);
+
+    // Socket newFeedPost$ already updates a recent rendered feed.
+    // Short tab switches should therefore be instant.
+    if (
+      this.posts.length > 0 &&
+      this.lastSuccessfulRefreshAt &&
+      (
+        Date.now() -
+        this.lastSuccessfulRefreshAt
+      ) < this.warmRefreshMs
+    ) {
+      this.pageLoading = false;
+      return;
+    }
+
+    this.getFeed(
+      null,
+      true
+    );
   }
 
   private getUserData() {
@@ -94,7 +114,10 @@ export class FeedPage implements OnInit, OnDestroy {
   getFeed(event = null, refresh = false) {
     if (refresh) {
       this.page = 1;
-      this.pageLoading = true;
+
+      // Block only on the first real load; keep warm feed visible on return.
+      this.pageLoading = this.posts.length === 0;
+
       if (this.infinitScroll) {
         this.infinitScroll.disabled = false;
       }
@@ -123,6 +146,12 @@ export class FeedPage implements OnInit, OnDestroy {
       }
 
       this.page++;
+
+      if (refresh) {
+        this.lastSuccessfulRefreshAt =
+          Date.now();
+      }
+
       this.pageLoading = false;
 
       if (event) {

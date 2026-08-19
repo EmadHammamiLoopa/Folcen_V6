@@ -94,4 +94,20 @@ const postSchema = new mongoose.Schema({
     
 }, { timestamps: true }); // Automatically adds createdAt and updatedAt fields
 
+// Hot path: channel timeline.
+postSchema.index({
+  channel: 1,
+  moderationStatus: 1,
+  deletedAt: 1,
+  createdAt: -1
+});
+
+// Hot path: relationship-driven Feed queries by author.
+postSchema.index({
+  user: 1,
+  moderationStatus: 1,
+  deletedAt: 1,
+  createdAt: -1
+});
+
 module.exports = mongoose.model('Post', postSchema);

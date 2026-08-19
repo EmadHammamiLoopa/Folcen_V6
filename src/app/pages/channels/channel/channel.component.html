@@ -65,7 +65,7 @@
     </div>
   </div>
 
-  <app-loader *ngIf="pageLoading"></app-loader>
+  <app-loader *ngIf="pageLoading && (!posts || posts.length === 0)"></app-loader>
 
   <ion-refresher slot="fixed" pullFactor="0.5" pullMin="100" pullMax="200" (ionRefresh)="getChannelPosts($event, true)">
     <ion-refresher-content></ion-refresher-content>
@@ -100,7 +100,7 @@
   </div>
 
   <!-- Posts List -->
-  <div *ngIf="!pageLoading && posts && posts.length" class="posts-container">
+  <div *ngIf="posts && posts.length" class="posts-container">
     <app-post 
       [user]="user" 
       [channel]="channel"

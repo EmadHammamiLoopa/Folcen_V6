@@ -52,4 +52,11 @@ const messageSchema = new mongoose.Schema({
 
 }, { timestamps: true }); // Automatically adds createdAt and updatedAt fields
 
+// Hot path: bidirectional chat history ordered newest-first.
+messageSchema.index({
+  from: 1,
+  to: 1,
+  createdAt: -1
+});
+
 module.exports = mongoose.model('Message', messageSchema);

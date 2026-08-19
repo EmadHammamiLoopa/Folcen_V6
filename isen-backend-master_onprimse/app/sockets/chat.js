@@ -5,6 +5,7 @@ const fsp = fs.promises;
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Follow = require("../models/Follow");
+const helpers = require("../helpers");
 const { sendPushToUser } = require("../services/fcmPushService");
 
 // ✅ Import from socketManager
@@ -662,17 +663,28 @@ socket.on("connect-user", async (user_id) => {
         return;
       }
 
-      // Privacy Check: If receiver is private, sender must be a friend or active follower
-      if (receiver.isPrivate) {
-        const isFriend = receiver.friends && receiver.friends.some(id => id.toString() === senderId.toString());
-        const follow = await Follow.findOne({ follower: senderId, followed: msg.to, status: 'active' });
-        
-        if (!isFriend && !follow) {
-          console.warn(`Message blocked: ${msg.to} is private and ${senderId} is not a friend or active follower`);
-          try { socket.emit('send-message-error', { tempId, reason: 'privacy_blocked' }); } catch (_) {}
-          emitToUser(senderId, 'message-blocked-privacy', { recipientId: msg.to });
-          return;
-        }
+      // Normal text/media chat uses the same server-authoritative policy
+      // as the REST endpoint. Video permission is separate.
+      const chatPolicy =
+        await helpers.canInitiateChat(
+          senderId,
+          msg.to
+        );
+
+      if (!chatPolicy.allowed) {
+        try {
+          socket.emit(
+            'send-message-error',
+            {
+              tempId,
+              reason:
+                chatPolicy.reason ||
+                'chat_not_allowed'
+            }
+          );
+        } catch (_) {}
+
+        return;
       }
 
       // Simple per-socket rate limiting (privacy-abuse protection)
@@ -767,21 +779,62 @@ socket.on("connect-user", async (user_id) => {
 
       // Deliver to receiver (ALL sockets)
       const delivered = await emitToUser(msg.to, "new-message", safePayload);
+
       if (delivered) {
         console.log(`📤 Delivered to receiver (${msg.to}) on ${getUserSockets(msg.to).length} socket(s)`);
-        try { await recordMessageEvent({ messageId: savedMessage._id, from: senderId, to: msg.to, event: 'delivered' }); } catch (e) { console.warn('Failed to record message delivered event', e); }
-      } else {
-        console.warn(`⚠️ User ${msg.to} offline - message saved but not delivered`);
-        // Do NOT record message content; record delivery missing for diagnostics
-        // Send FCM push so the recipient is notified on their device
         try {
-          const { sendNotification } = require('../helpers');
-          const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'New message';
-          const messagePreview = msg.text ? String(msg.text).substring(0, 100) : '📷 Image';
-          sendNotification([msg.to], messagePreview, senderName, senderId).catch(() => {});
-        } catch (pushErr) {
-          console.warn('[chat] FCM push failed for offline user:', pushErr.message);
+          await recordMessageEvent({
+            messageId: savedMessage._id,
+            from: senderId,
+            to: msg.to,
+            event: 'delivered'
+          });
+        } catch (e) {
+          console.warn('Failed to record message delivered event', e);
         }
+      } else {
+        console.warn(`⚠️ User ${msg.to} has no active socket - message remains persisted`);
+      }
+
+      // Socket connectivity is not equivalent to foreground visibility.
+      // Android may keep Socket.IO connected while Folcen is backgrounded,
+      // so suppressing FCM when `delivered === true` causes missing chat
+      // notifications. Send exactly one push for every persisted chat
+      // message; Socket.IO remains responsible for realtime in-app delivery.
+      try {
+        const { sendNotification } = require('../helpers');
+        const senderName =
+          `${sender.firstName || ''} ${sender.lastName || ''}`.trim()
+          || 'New message';
+
+        const messagePreview =
+          msg.text
+            ? String(msg.text).substring(0, 100)
+            : '📷 Image';
+
+        sendNotification(
+          [String(msg.to)],
+          messagePreview,
+          senderName,
+          senderId
+        )
+          .then(result => {
+            console.log(
+              `[chat] message push to ${msg.to}:`,
+              result
+            );
+          })
+          .catch(err => {
+            console.warn(
+              '[chat] message FCM push failed:',
+              err.message
+            );
+          });
+      } catch (pushErr) {
+        console.warn(
+          '[chat] message FCM push setup failed:',
+          pushErr.message
+        );
       }
 
       // Confirm to sender using server-authoritative senderId (not client-supplied msg.from).

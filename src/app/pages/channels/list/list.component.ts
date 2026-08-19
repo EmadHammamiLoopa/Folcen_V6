@@ -98,9 +98,8 @@ export class ListComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    if (!this.user) {
-        this.loadUserData(); 
-    }
+    // Route data is resolved when the Ionic view actually enters.
+    // Avoid starting a duplicate channels request here.
   }
 
   ionViewWillEnter() {
@@ -219,12 +218,26 @@ export class ListComponent implements OnInit {
   }
 
   getType() {
-    this.route.paramMap.subscribe(params => {
-      this.type = params.get('type') || '';
-      this.channels = []; 
-      this.page = 0;
+    // Ionic re-enters this view many times. Do not create a new paramMap
+    // subscription on every entry and do not discard an already-rendered
+    // channel list when the route type did not change.
+    const nextType = this.route.snapshot.paramMap.get('type') || '';
+    const typeChanged = nextType !== this.type;
+
+    this.type = nextType;
+    this.page = 0;
+
+    if (typeChanged) {
+      this.channels = [];
+      this.backupChannels = [];
+      this.nonSearchChannels = [];
+    }
+
+    if (!this.user) {
       this.loadUserData();
-    });
+    } else {
+      this.getChannels(null, true);
+    }
   }
 
   onCategoryChange(val: any) {

@@ -110,33 +110,272 @@ export class UserService {
   }
 
   private handleSocialRealtimeUpdate(payload: any) {
-    const myId = this.getCurrentUserId();
-    const current = this.currentUserSubject.value;
-    if (!myId || !current || !payload) return;
+    const myId =
+      String(this.getCurrentUserId() || '');
 
-    const isMeTarget = String(payload.targetId) === myId || String(payload.userId) === myId;
-    const isMeActor = String(payload.actorId) === myId;
+    const current =
+      this.currentUserSubject.value;
 
-    if (isMeTarget || isMeActor) {
-      const stats = isMeTarget ? payload.targetStatistics : payload.actorStatistics;
-      if (stats) {
-        // IMMUTABLE PATCH OF CANONICAL MODEL
-        const updatedUser = new User().initialize({
-          ...current.toObject(),
-          followersCount: stats.followers !== undefined ? stats.followers : current.followersCount,
-          followingCount: stats.following !== undefined ? stats.following : current.followingCount,
-          friendsCount: stats.friends !== undefined ? stats.friends : current.friendsCount,
-          pendingFollowRequestsCount: stats.pendingFollowers !== undefined ? stats.pendingFollowers : current.pendingFollowRequestsCount,
-          pendingFriendRequestsCount: stats.pendingFriends !== undefined ? stats.pendingFriends : current.pendingFriendRequestsCount
-        });
-        this.currentUserSubject.next(updatedUser);
-        // NOTE: badge updates (friends, followers) are owned by tabs.page.ts \u2014 do NOT set here.
-      }
-      this.triggerFriendsRefresh();
+    if (!myId || !current || !payload) {
+      return;
     }
+
+    const raw =
+      current.toObject();
+
+    const normalizeIds = (value: any[]): string[] =>
+      (Array.isArray(value) ? value : [])
+        .map(item =>
+          String(
+            typeof item === 'string'
+              ? item
+              : (
+                  item?._id ||
+                  item?.id ||
+                  ''
+                )
+          )
+        )
+        .filter(Boolean);
+
+    const addUnique = (
+      arr: any[],
+      id: string
+    ): string[] => {
+      const values =
+        normalizeIds(arr);
+
+      if (
+        id &&
+        !values.includes(id)
+      ) {
+        values.push(id);
+      }
+
+      return values;
+    };
+
+    const removeId = (
+      arr: any[],
+      id: string
+    ): string[] =>
+      normalizeIds(arr)
+        .filter(
+          value =>
+            value !== id
+        );
+
+    let followers =
+      normalizeIds(raw.followers);
+
+    let following =
+      normalizeIds(raw.following);
+
+    let friends =
+      normalizeIds(raw.friends);
+
+    let changed = false;
+    let stats: any = null;
+
+    // --------------------------------------------------------
+    // Follow events have explicit actor/target relationship IDs.
+    // --------------------------------------------------------
+    const followerId =
+      String(
+        payload.followerId || ''
+      );
+
+    const followedId =
+      String(
+        payload.followedId || ''
+      );
+
+    if (
+      followerId &&
+      followedId &&
+      (
+        myId === followerId ||
+        myId === followedId
+      )
+    ) {
+      const status =
+        String(payload.status || '');
+
+      if (myId === followerId) {
+        stats =
+          payload.actorStatistics ||
+          stats;
+
+        if (status === 'active') {
+          following =
+            addUnique(
+              following,
+              followedId
+            );
+        }
+
+        if (
+          [
+            'unfollowed',
+            'removed',
+            'blocked'
+          ].includes(status)
+        ) {
+          following =
+            removeId(
+              following,
+              followedId
+            );
+        }
+      }
+
+      if (myId === followedId) {
+        stats =
+          payload.targetStatistics ||
+          stats;
+
+        if (status === 'active') {
+          followers =
+            addUnique(
+              followers,
+              followerId
+            );
+        }
+
+        if (
+          [
+            'unfollowed',
+            'removed',
+            'blocked'
+          ].includes(status)
+        ) {
+          followers =
+            removeId(
+              followers,
+              followerId
+            );
+        }
+      }
+
+      changed = true;
+    }
+
+    // --------------------------------------------------------
+    // friend-requests-updated is emitted individually to each
+    // user's socket. payload.statistics therefore belongs to ME.
+    // payload.userId is the peer, not the current user.
+    // --------------------------------------------------------
+    if (payload.statistics) {
+      stats =
+        payload.statistics;
+
+      changed = true;
+    }
+
+    const peerId =
+      String(
+        payload.userId ||
+        payload.from ||
+        ''
+      );
+
+    if (
+      peerId &&
+      peerId !== myId
+    ) {
+      if (
+        payload.type === 'accepted' ||
+        payload.friend === true
+      ) {
+        friends =
+          addUnique(
+            friends,
+            peerId
+          );
+
+        // Friendship and Follow are mutually exclusive.
+        followers =
+          removeId(
+            followers,
+            peerId
+          );
+
+        following =
+          removeId(
+            following,
+            peerId
+          );
+
+        changed = true;
+      }
+
+      if (
+        payload.type === 'removed' ||
+        payload.action === 'unfriend' ||
+        payload.friend === false
+      ) {
+        friends =
+          removeId(
+            friends,
+            peerId
+          );
+
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      return;
+    }
+
+    raw.followers =
+      followers;
+
+    raw.following =
+      following;
+
+    raw.friends =
+      friends;
+
+    raw.followersCount =
+      stats?.followers !== undefined
+        ? Number(stats.followers)
+        : followers.length;
+
+    raw.followingCount =
+      stats?.following !== undefined
+        ? Number(stats.following)
+        : following.length;
+
+    raw.friendsCount =
+      stats?.friends !== undefined
+        ? Number(stats.friends)
+        : friends.length;
+
+    raw.pendingFollowRequestsCount =
+      stats?.pendingFollowRequests !== undefined
+        ? Number(
+            stats.pendingFollowRequests
+          )
+        : current.pendingFollowRequestsCount;
+
+    raw.pendingFriendRequestsCount =
+      stats?.pendingFriendRequests !== undefined
+        ? Number(
+            stats.pendingFriendRequests
+          )
+        : current.pendingFriendRequestsCount;
+
+    const updatedUser =
+      new User()
+        .initialize(raw);
+
+    this.currentUserSubject
+      .next(updatedUser);
+
+    this.triggerFriendsRefresh();
   }
   
-
   private async initCurrentUser() {
     this.callCounters.initCalls += 1;
     try {

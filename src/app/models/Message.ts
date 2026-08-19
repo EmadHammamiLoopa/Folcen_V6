@@ -17,6 +17,7 @@ export class Message {
   public productId?: string; // Property to store product ID
   public product?: Product;  // Property to store product details
   public safeImage?: SafeUrl; // sanitized image
+  public mediaMimeType?: string;
 
   constructor() {}
 
@@ -75,6 +76,17 @@ export class Message {
     this.to = message.to;
     this.text = message.text;
     this.createdAt = parseDate(message.createdAt);
+
+    this.mediaMimeType =
+      message.mediaMimeType ||
+      (
+        message.image &&
+        typeof message.image === 'object'
+          ? message.image.type
+          : ''
+      ) ||
+      '';
+
     this.image = message.image;
     this.state = message.state;
     this.type = message.type;
@@ -140,20 +152,54 @@ export class Message {
   set image(image: any) {
     if (!image || image === 'undefined' || image === 'null') {
       this._image = null;
-    } else if (typeof image === 'string') {
-      if (image.startsWith('data:image/')) {
-        this._image = image; // base64
-      } else if (image.startsWith('http')) {
-        this._image = image; // full URL
-      } else {
-        this._image = constants.DOMAIN_URL + image;
-      }
-    } else if (typeof image === 'object' && image.path) {
-      this._image = constants.DOMAIN_URL + image.path;
-    } else {
-      this._image = null;
+      return;
     }
+
+    if (typeof image === 'object' && image.path) {
+      const path = String(image.path);
+
+      if (image.type) {
+        this.mediaMimeType = String(image.type);
+      }
+
+      if (
+        path.startsWith('http://') ||
+        path.startsWith('https://') ||
+        path.startsWith('blob:') ||
+        path.startsWith('data:')
+      ) {
+        this._image = path;
+      } else {
+        this._image =
+          constants.DOMAIN_URL +
+          (path.startsWith('/') ? '' : '/') +
+          path;
+      }
+
+      return;
+    }
+
+    if (typeof image === 'string') {
+      if (
+        image.startsWith('http://') ||
+        image.startsWith('https://') ||
+        image.startsWith('blob:') ||
+        image.startsWith('data:')
+      ) {
+        this._image = image;
+      } else {
+        this._image =
+          constants.DOMAIN_URL +
+          (image.startsWith('/') ? '' : '/') +
+          image;
+      }
+
+      return;
+    }
+
+    this._image = null;
   }
+
   set type(type: string) {
     this._type = type;
   }

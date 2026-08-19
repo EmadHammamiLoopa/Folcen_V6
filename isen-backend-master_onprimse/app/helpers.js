@@ -189,55 +189,162 @@ async function canInitiateChat(senderId, receiverId) {
   const Follow = require('./models/Follow');
   const { userSubscribed } = require('./middlewares/subscription');
 
-  // Fetch users with minimal projection to avoid overhead
-  const [sender, receiver] = await Promise.all([
-    User.findById(senderId).select('friends blockedUsers subscription'),
-    User.findById(receiverId).select('friends blockedUsers isPrivate')
+  // Video permission lifecycle is completely separate from normal chat.
+  const normalMessageFilter = {
+    type: { $ne: 'video-call-request' }
+  };
+
+  const [
+    sender,
+    receiver,
+    peerHasReplied,
+    senderHasSent
+  ] = await Promise.all([
+    User.findById(senderId)
+      .select('friends blockedUsers subscription'),
+
+    User.findById(receiverId)
+      .select('friends blockedUsers isPrivate'),
+
+    Message.exists({
+      from: receiverId,
+      to: senderId,
+      ...normalMessageFilter
+    }),
+
+    Message.exists({
+      from: senderId,
+      to: receiverId,
+      ...normalMessageFilter
+    })
   ]);
 
-  if (!sender || !receiver) return { allowed: false, reason: 'user_not_found' };
+  if (!sender || !receiver) {
+    return {
+      allowed: false,
+      reason: 'user_not_found'
+    };
+  }
 
-  // 1. Block Check (Highest Priority)
-  const isBlockedByReceiver = receiver.blockedUsers && receiver.blockedUsers.some(id => id.toString() === String(senderId));
-  const isBlockedBySender = sender.blockedUsers && sender.blockedUsers.some(id => id.toString() === String(receiverId));
-  if (isBlockedByReceiver || isBlockedBySender) return { allowed: false, reason: 'blocked' };
+  const blockedByReceiver =
+    (receiver.blockedUsers || []).some(
+      id => String(id) === String(senderId)
+    );
 
-  // 2. Friendship / Unlock Bypass
-  const isFriend = (sender.friends || []).map(String).includes(String(receiverId));
-  if (isFriend) return { allowed: true, budgetRemaining: Infinity };
+  const blockedBySender =
+    (sender.blockedUsers || []).some(
+      id => String(id) === String(receiverId)
+    );
 
-  // If receiver has ever replied, the conversation is "unlocked"
-  const hasReplied = await Message.exists({ from: receiverId, to: senderId });
-  if (hasReplied) return { allowed: true, budgetRemaining: Infinity };
+  if (blockedByReceiver || blockedBySender) {
+    return {
+      allowed: false,
+      reason: 'blocked'
+    };
+  }
 
-  // 3. Privacy Check (Follow Fallback)
+  const isFriend =
+    (sender.friends || [])
+      .map(String)
+      .includes(String(receiverId));
+
+  if (isFriend) {
+    return {
+      allowed: true,
+      reason: null,
+      budgetRemaining: Infinity
+    };
+  }
+
+  // Once the other user has sent one NORMAL message back,
+  // this normal-chat thread is unlocked.
+  if (peerHasReplied) {
+    return {
+      allowed: true,
+      reason: null,
+      budgetRemaining: Infinity
+    };
+  }
+
+  // Private accounts keep their privacy rule for first contact.
+  // Friendship is NOT required; an active follow is enough.
   if (receiver.isPrivate) {
-    const follow = await Follow.findOne({ follower: senderId, followed: receiverId, status: 'active' });
-    if (!follow) return { allowed: false, reason: 'privacy_restricted' };
+    const activeFollow =
+      await Follow.findOne({
+        follower: senderId,
+        followed: receiverId,
+        status: 'active'
+      })
+      .select('_id')
+      .lean();
+
+    if (!activeFollow) {
+      return {
+        allowed: false,
+        reason: 'privacy_restricted'
+      };
+    }
   }
 
-  // 4. Recipient Budget Check (Max 3 unique non-friends / 24h)
-  if (await userSubscribed(sender)) return { allowed: true, budgetRemaining: Infinity };
-
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  
-  // Get unique recipients messaged in last 24h who are NOT friends
-  const recentRecipients = await Message.find({
-    from: senderId,
-    createdAt: { $gte: yesterday },
-    to: { $nin: (sender.friends || []) }
-  }).distinct('to');
-
-  const distinctCount = recentRecipients.length;
-  const alreadyMessagedThisTarget = recentRecipients.some(id => String(id) === String(receiverId));
-
-  if (!alreadyMessagedThisTarget && distinctCount >= 3) {
-    return { allowed: false, reason: 'budget_exhausted', budgetRemaining: 0 };
+  // A non-friend has already used their opening message.
+  if (senderHasSent) {
+    return {
+      allowed: false,
+      reason: 'awaiting_reply'
+    };
   }
 
-  // Calculate remaining budget (for UI indicator)
-  const budget = alreadyMessagedThisTarget ? Infinity : Math.max(0, 3 - distinctCount);
-  return { allowed: true, budgetRemaining: budget };
+  // Premium can contact unlimited new recipients,
+  // but reply-first remains enforced above.
+  if (await userSubscribed(sender)) {
+    return {
+      allowed: true,
+      reason: null,
+      budgetRemaining: Infinity
+    };
+  }
+
+  const yesterday =
+    new Date(
+      Date.now() -
+      24 * 60 * 60 * 1000
+    );
+
+  // Video request records MUST NOT consume this budget.
+  const recentRecipients =
+    await Message.find({
+      from: senderId,
+      createdAt: {
+        $gte: yesterday
+      },
+      to: {
+        $nin: sender.friends || []
+      },
+      ...normalMessageFilter
+    }).distinct('to');
+
+  const uniqueRecipients =
+    new Set(
+      recentRecipients.map(String)
+    );
+
+  if (uniqueRecipients.size >= 3) {
+    return {
+      allowed: false,
+      reason: 'budget_exhausted',
+      budgetRemaining: 0
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: null,
+    budgetRemaining:
+      Math.max(
+        0,
+        3 - uniqueRecipients.size
+      )
+  };
 }
 
 /** Simple memory-based rate limiting per user/type for reliability */
