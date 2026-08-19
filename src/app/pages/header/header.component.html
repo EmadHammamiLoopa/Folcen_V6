@@ -1,36 +1,33 @@
-<ion-header
-  class="ion-no-border"
->
+<ion-header class="ion-no-border folcen-app-header">
   <ion-toolbar
+    class="folcen-toolbar"
     [style.--background]="backgroundColor ? (backgroundColor + '!important') : null"
     [style.--color]="textColor ? (textColor + '!important') : null"
   >
-    <ion-buttons class="ion-no-padding ion-no-margin" slot="start">
-      <ion-button shape="round" (click)="goBack()" *ngIf="back">
+    <ion-buttons class="header-actions header-actions-start ion-no-padding ion-no-margin" slot="start">
+      <ion-button class="header-action" shape="round" (click)="goBack()" *ngIf="back" aria-label="Back">
         <i class="fas fa-arrow-left"></i>
       </ion-button>
-      <ion-menu-button *ngIf="menu"></ion-menu-button>
+      <ion-menu-button class="header-action" *ngIf="menu"></ion-menu-button>
     </ion-buttons>
 
-    <ion-title (click)="titleClicked.emit()" class="ion-no-margin ion-no-padding">
+    <ion-title (click)="titleClicked.emit()" class="folcen-title ion-no-margin ion-no-padding">
       <div class="title-content">
         <app-avatar *ngIf="avatar" [profile]="profile" [size]="32" class="header-avatar"></app-avatar>
-        <span>{{ title }}</span>
+        <span class="title-text">{{ title }}</span>
+        <span class="title-accent" aria-hidden="true"></span>
       </div>
     </ion-title>
 
-    <ion-buttons slot="end">
+    <ion-buttons class="header-actions header-actions-end" slot="end">
       <ng-content select="#end-buttons"></ng-content>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<div class="px-2">
+<div class="header-search-shell" *ngIf="search">
   <ion-searchbar
-    color="light"
-    *ngIf="search"
+    class="folcen-search"
     (ionChange)="doSearch($event)"
-  >
-  </ion-searchbar>
-
+  ></ion-searchbar>
 </div>
