@@ -152,10 +152,22 @@ export class DisplayComponent implements OnInit, OnDestroy {
           }
           console.log('[PROFILE:followUpdate$] stats:', stats);
           if (stats) {
-            // Stats included in payload — patch directly for instant UI update
-            if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
-            if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
-            if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
+            // Counts are independent from relationship ID arrays.
+            // Never create placeholder IDs just to display a number.
+            if (stats.followers !== undefined) {
+              this.user.followersCount =
+                Number(stats.followers) || 0;
+            }
+
+            if (stats.following !== undefined) {
+              this.user.followingCount =
+                Number(stats.following) || 0;
+            }
+
+            if (stats.friends !== undefined) {
+              this.user.friendsCount =
+                Number(stats.friends) || 0;
+            }
             console.log('[PROFILE:followUpdate$] AFTER PATCH — friends:', this.user.friends?.length, 'followers:', this.user.followers?.length, 'following:', this.user.following?.length);
             if (this.myProfile && stats.pendingFollowRequests !== undefined) {
               this.pendingRequestsCount = stats.pendingFollowRequests;
@@ -191,9 +203,20 @@ export class DisplayComponent implements OnInit, OnDestroy {
             // ── Own profile ── statistics belong to the current user (= this.user)
             if (stats) {
               console.log('[PROFILE:friendRequestsUpdated$] own-profile stats:', stats);
-              if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
-              if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
-              if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
+              if (stats.friends !== undefined) {
+                this.user.friendsCount =
+                  Number(stats.friends) || 0;
+              }
+
+              if (stats.followers !== undefined) {
+                this.user.followersCount =
+                  Number(stats.followers) || 0;
+              }
+
+              if (stats.following !== undefined) {
+                this.user.followingCount =
+                  Number(stats.following) || 0;
+              }
               if (stats.pendingFollowRequests !== undefined) this.pendingRequestsCount = stats.pendingFollowRequests;
               // Sync into central store so navigation doesn't lose these values
               this.userService.setCurrentUser(this.user, { force: true });

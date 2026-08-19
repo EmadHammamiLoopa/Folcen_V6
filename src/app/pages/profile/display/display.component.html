@@ -56,20 +56,20 @@
         <!-- Quick Stats -->
         <div class="stats-bar">
           <div class="stat-item clickable" (click)="openFollowModal('friends')">
-            <span class="value">{{ user.friends?.length || 0 }}</span>
+            <span class="value">{{ user.friendsCount || 0 }}</span>
             <span class="label">Friends</span>
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item" [class.clickable]="myProfile" (click)="myProfile && openFollowModal('followers')">
             <span class="value" style="position:relative; display:inline-block;">
-              {{ user.followers?.length || 0 }}
+              {{ user.followersCount || 0 }}
               <ion-badge *ngIf="myProfile && pendingRequestsCount > 0" color="danger" class="pending-badge">{{ pendingRequestsCount }}</ion-badge>
             </span>
             <span class="label">Followers</span>
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item" [class.clickable]="myProfile" (click)="myProfile && openFollowModal('following')">
-            <span class="value">{{ user.following?.length || 0 }}</span>
+            <span class="value">{{ user.followingCount || 0 }}</span>
             <span class="label">Following</span>
           </div>
         </div>

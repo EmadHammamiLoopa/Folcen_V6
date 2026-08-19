@@ -93,6 +93,21 @@ export class User {
     const followersLen = Array.isArray(payload.followers) ? payload.followers.length : 0;
     const followingLen = Array.isArray(payload.following) ? payload.following.length : 0;
     const friendsLen = Array.isArray(payload.friends) ? payload.friends.length : 0;
+
+    const followersCount =
+      payload.followersCount !== undefined
+        ? Number(payload.followersCount)
+        : followersLen;
+
+    const followingCount =
+      payload.followingCount !== undefined
+        ? Number(payload.followingCount)
+        : followingLen;
+
+    const friendsCount =
+      payload.friendsCount !== undefined
+        ? Number(payload.friendsCount)
+        : friendsLen;
     const interestsStr = Array.isArray(payload.interests)
       ? payload.interests.join('|')
       : (payload.interests || '');
@@ -115,7 +130,24 @@ export class User {
       Array.isArray(payload.avatar) ? payload.avatar.join(',') : (payload.avatar || '')
     ].join('|');
     const videoRequests = payload.allowVideoRequestsFromNonFriends === false ? 'videoRequests:false' : 'videoRequests:true';
-    return [id, updated, payload.email || '', payload.birthDate || '', followersLen, followingLen, friendsLen, interestsStr, languagesStr, avatarFields, videoRequests].join('|');
+    return [
+      id,
+      updated,
+      payload.email || '',
+      payload.birthDate || '',
+      followersLen,
+      followingLen,
+      friendsLen,
+      followersCount,
+      followingCount,
+      friendsCount,
+      Number(payload.pendingFollowRequestsCount || 0),
+      Number(payload.pendingFriendRequestsCount || 0),
+      interestsStr,
+      languagesStr,
+      avatarFields,
+      videoRequests
+    ].join('|');
   }
 
   private static decodeMaybeEncodedList(value: string): string[] | null {
@@ -976,6 +1008,55 @@ set peerId(peerId: string | null) {
     this._friends = normalizeIdArray(user.friends);
     this._blockedUsers = normalizeIdArray(user.blockedUsers);
 
+    const safeCount = (
+      explicit: any,
+      fallback: number
+    ): number => {
+      if (
+        explicit === undefined ||
+        explicit === null ||
+        explicit === ''
+      ) {
+        return fallback;
+      }
+
+      const value = Number(explicit);
+
+      return Number.isFinite(value)
+        ? Math.max(0, value)
+        : fallback;
+    };
+
+    this._followersCount =
+      safeCount(
+        user.followersCount,
+        this._followers.length
+      );
+
+    this._followingCount =
+      safeCount(
+        user.followingCount,
+        this._following.length
+      );
+
+    this._friendsCount =
+      safeCount(
+        user.friendsCount,
+        this._friends.length
+      );
+
+    this._pendingFollowRequestsCount =
+      safeCount(
+        user.pendingFollowRequestsCount,
+        0
+      );
+
+    this._pendingFriendRequestsCount =
+      safeCount(
+        user.pendingFriendRequestsCount,
+        0
+      );
+
     // Handle followedChannels - allow populated objects
     this._followedChannels = Array.isArray(user.followedChannels) ? user.followedChannels.map((c: any) => {
       if (c && typeof c === 'object' && (c._id || c.id)) return c;
@@ -1090,6 +1171,15 @@ set peerId(peerId: string | null) {
       followers: this._followers,
       following: this._following,
       friends: this._friends,
+
+      followersCount: this._followersCount,
+      followingCount: this._followingCount,
+      friendsCount: this._friendsCount,
+      pendingFollowRequestsCount:
+        this._pendingFollowRequestsCount,
+      pendingFriendRequestsCount:
+        this._pendingFriendRequestsCount,
+
       isFriend: this._isFriend,
       blockedUsers: this._blockedUsers,
       followedChannels: this._followedChannels,
