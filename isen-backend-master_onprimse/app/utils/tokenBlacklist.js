@@ -7,6 +7,7 @@
 let redisClient = null;
 let useRedis = false;
 let redisErrorLogged = false;
+let redisReadyPromise = null;
 const rawRedisUrl = process.env.REDIS_URL || process.env.REDIS || null;
 let redisUrl = rawRedisUrl;
 if (!redisUrl && process.env.REDIS_HOST) {
@@ -30,6 +31,15 @@ if (redisUrl) {
     }
     redisClient = new IORedis(redisUrl, redisOptions);
     useRedis = true;
+
+    // With lazyConnect + offline queue disabled, the first command can arrive
+    // before the socket is writable. Start the connection explicitly and let
+    // Redis operations await this one cold-start readiness promise.
+    redisReadyPromise = redisClient.connect().then(
+      () => ({ error: null }),
+      error => ({ error })
+    );
+
     redisClient.on('error', (e) => {
       if (!redisErrorLogged) {
         redisErrorLogged = true;
@@ -61,6 +71,22 @@ const ENV_TAG = (process.env.NODE_ENV || 'dev').replace(/[^a-zA-Z0-9_-]/g, '');
 const KEY_PREFIX = `${APP_PREFIX}:${ENV_TAG}:revoked:jti`;
 const USER_KEY_PREFIX = `${APP_PREFIX}:${ENV_TAG}:revoked:user`;
 
+async function ensureRedisReady() {
+  if (!useRedis || !redisClient) return;
+
+  if (redisClient.status === 'ready') return;
+
+  if (!redisReadyPromise) {
+    throw new Error('TokenBlacklist: Redis connection was not initialized');
+  }
+
+  const ready = await redisReadyPromise;
+
+  if (ready && ready.error) {
+    throw ready.error;
+  }
+}
+
 /**
  * Blacklist by `jti` claim (preferred): store revoked JWT IDs with TTL matching token expiry.
  */
@@ -68,6 +94,7 @@ async function revokeByJti(jti, ttlSeconds = 3600) {
   if (!jti) return;
   if (useRedis && redisClient) {
     try {
+      await ensureRedisReady();
       // setex ensures key expires automatically when token would naturally expire
       await redisClient.setex(`${KEY_PREFIX}:${jti}`, ttlSeconds, '1');
       return true;
@@ -85,6 +112,7 @@ async function isRevokedByJti(jti) {
   if (!jti) return true; // treat missing jti as revoked/invalid
   if (useRedis && redisClient) {
     try {
+      await ensureRedisReady();
       const v = await redisClient.get(`${KEY_PREFIX}:${jti}`);
       return v === '1';
     } catch (e) {
@@ -100,6 +128,7 @@ async function revokeUser(userId, ttlSeconds = null) {
   if (!userId) return;
   if (useRedis && redisClient) {
     try {
+      await ensureRedisReady();
       const key = `${USER_KEY_PREFIX}:${userId}`;
       if (ttlSeconds && Number.isFinite(ttlSeconds)) {
         await redisClient.setex(key, ttlSeconds, '1');
@@ -121,6 +150,7 @@ async function isUserRevoked(userId) {
   if (!userId) return false;
   if (useRedis && redisClient) {
     try {
+      await ensureRedisReady();
       const v = await redisClient.get(`${USER_KEY_PREFIX}:${userId}`);
       return v === '1';
     } catch (e) {
@@ -135,6 +165,7 @@ async function unrevokeUser(userId) {
   if (!userId) return;
   if (useRedis && redisClient) {
     try {
+      await ensureRedisReady();
       await redisClient.del(`${USER_KEY_PREFIX}:${userId}`);
       return true;
     } catch (e) {
