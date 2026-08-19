@@ -13,19 +13,16 @@ export class AvatarComponent implements OnChanges {
   @Input() premium: boolean = false;
   @Input() shape: 'circle' | 'rounded' = 'circle';
   @Input() showCameraIcon: boolean = false;
-  @Input() refreshKey: string | number | null = null;
-  @Input() priority: boolean = false;
 
   avatarUrl: string = '';
   initials: string = '';
   hasError: boolean = false;
-  isLoading: boolean = false;
   private triedGeneratedFallback: boolean = false;
 
   constructor(private cdr: ChangeDetectorRef) {}
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes.profile || changes.size || changes.refreshKey) {
+    if (changes.profile || changes.size) {
       this.updateAvatar();
     }
   }
@@ -33,26 +30,18 @@ export class AvatarComponent implements OnChanges {
   updateAvatar() {
     this.hasError = false;
     this.triedGeneratedFallback = false;
-
     if (this.profile) {
-      const nextUrl = AvatarUrlUtil.getAvatarUrl(this.profile, constants.DOMAIN_URL);
-      this.avatarUrl = nextUrl;
+      // Use the centralized AvatarUrlUtil with the domain for relative paths
+      this.avatarUrl = AvatarUrlUtil.getAvatarUrl(this.profile, constants.DOMAIN_URL);
+      
       this.initials = this.getInitials(this.profile);
-      this.isLoading = !!nextUrl;
+      console.log('AvatarComponent updated:', { url: this.avatarUrl, profile: this.profile });
       this.cdr.detectChanges();
-      return;
+    } else {
+      this.avatarUrl = '';
+      this.initials = '?';
+      this.cdr.detectChanges();
     }
-
-    this.avatarUrl = '';
-    this.initials = '?';
-    this.isLoading = false;
-    this.cdr.detectChanges();
-  }
-
-  handleLoad() {
-    if (!this.isLoading) return;
-    this.isLoading = false;
-    this.cdr.detectChanges();
   }
 
   getInitials(profile: any): string {
@@ -71,14 +60,10 @@ export class AvatarComponent implements OnChanges {
         this.triedGeneratedFallback = true;
         this.avatarUrl = fallbackUrl;
         this.hasError = false;
-        this.isLoading = true;
         this.cdr.detectChanges();
         return;
       }
     }
-
-    this.isLoading = false;
     this.hasError = true;
-    this.cdr.detectChanges();
   }
 }
