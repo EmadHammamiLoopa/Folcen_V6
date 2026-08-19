@@ -30,13 +30,29 @@ app-settings .account-actions-section {
   }
 }
 
-/* Edit Profile uses the persistent header Save action; a second footer Save is redundant. */
-app-form .mobile-save-wrap {
+/* Edit Profile: keep one clear save action at the end of the form. */
+app-form .save-profile-button {
   display: none !important;
 }
 
+app-form .mobile-save-wrap {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 8px 0 calc(28px + env(safe-area-inset-bottom)) !important;
+  margin: 0 !important;
+}
+
+app-form .mobile-save-button {
+  width: 100% !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  --border-radius: 16px !important;
+}
+
+/* Extra breathing room ensures the save button never meets Android system navigation. */
 app-form .edit-profile-container {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(36px + env(safe-area-inset-bottom)) !important;
 }
 
 /* Make avatar customization read as a deliberate profile action, not plain text. */
@@ -68,7 +84,19 @@ app-form .customize-avatar-button ion-icon {
     margin-inline: auto !important;
   }
 
+  app-form .mobile-save-wrap {
+    padding-bottom: calc(34px + env(safe-area-inset-bottom)) !important;
+  }
+
   app-form .edit-profile-container {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(40px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-form .mobile-save-wrap {
+    max-width: 520px !important;
+    margin-inline: auto !important;
+    padding-bottom: calc(26px + env(safe-area-inset-bottom)) !important;
   }
 }
