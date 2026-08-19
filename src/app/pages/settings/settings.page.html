@@ -1,7 +1,12 @@
-<ion-header class="ion-no-border">
+<ion-header class="settings-header ion-no-border">
   <ion-toolbar class="settings-toolbar">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/profile" text="" icon="chevron-back-outline"></ion-back-button>
+      <ion-back-button
+        defaultHref="/tabs/profile"
+        text=""
+        icon="arrow-back-outline"
+        aria-label="Back to profile">
+      </ion-back-button>
     </ion-buttons>
     <ion-title>Settings</ion-title>
   </ion-toolbar>
@@ -11,18 +16,41 @@
 
 <ion-content *ngIf="user && !pageLoading" class="settings-content">
   <ion-progress-bar *ngIf="loading" type="indeterminate" class="top-progress"></ion-progress-bar>
+  <div class="settings-aurora" aria-hidden="true"></div>
 
-  <div class="settings-container">
-    <!-- Account Section -->
-    <div class="settings-section">
-      <h3 class="section-title">Account</h3>
+  <main class="settings-container">
+    <header class="settings-intro">
+      <div class="intro-icon">
+        <ion-icon name="options-outline"></ion-icon>
+      </div>
+      <div>
+        <span class="intro-kicker">Preferences</span>
+        <h1>Make Folcen yours</h1>
+        <p>Manage your account, privacy, calls and appearance.</p>
+      </div>
+    </header>
+
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Account</span>
+          <h2>Account & Security</h2>
+        </div>
+        <ion-icon name="person-circle-outline"></ion-icon>
+      </div>
+
       <div class="settings-card">
-        <ion-item lines="none" button="true" routerLink="/tabs/subscription" class="premium-item" *ngIf="features.premiumTier">
-          <div class="icon-box premium">
+        <ion-item
+          lines="none"
+          button="true"
+          routerLink="/tabs/subscription"
+          class="settings-row premium-item"
+          *ngIf="features.premiumTier">
+          <div class="icon-box premium" slot="start">
             <ion-icon name="diamond-outline"></ion-icon>
           </div>
           <ion-label>
-            <h2>Upgrade to Premium</h2>
+            <h3>Upgrade to Premium</h3>
             <p>Unlock all exclusive features</p>
           </ion-label>
           <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
@@ -30,34 +58,48 @@
 
         <div class="divider" *ngIf="features.premiumTier"></div>
 
-        <ion-item lines="none" button="true" (click)="changeEmail()">
-          <div class="icon-box">
+        <ion-item lines="none" button="true" (click)="changeEmail()" class="settings-row">
+          <div class="icon-box mail" slot="start">
             <ion-icon name="mail-outline"></ion-icon>
           </div>
-          <ion-label>Change Email</ion-label>
+          <ion-label>
+            <h3>Change Email</h3>
+            <p>Update the email linked to your account</p>
+          </ion-label>
           <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
         </ion-item>
 
-        <ion-item lines="none" button="true" (click)="changePassword()">
-          <div class="icon-box">
-            <ion-icon name="lock-closed-outline"></ion-icon>
+        <div class="divider"></div>
+
+        <ion-item lines="none" button="true" (click)="changePassword()" class="settings-row">
+          <div class="icon-box security" slot="start">
+            <ion-icon name="key-outline"></ion-icon>
           </div>
-          <ion-label>Change Password</ion-label>
+          <ion-label>
+            <h3>Change Password</h3>
+            <p>Keep your account secure with a new password</p>
+          </ion-label>
           <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
         </ion-item>
       </div>
-    </div>
+    </section>
 
-    <!-- Privacy Section -->
-    <div class="settings-section">
-      <h3 class="section-title">Privacy & Visibility</h3>
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Controls</span>
+          <h2>Privacy & Calls</h2>
+        </div>
+        <ion-icon name="shield-checkmark-outline"></ion-icon>
+      </div>
+
       <div class="settings-card" data-tour="settings-privacy">
-        <ion-item lines="none" *ngIf="false">
-          <div class="icon-box">
+        <ion-item lines="none" class="settings-row toggle-row" *ngIf="false">
+          <div class="icon-box" slot="start">
             <ion-icon name="people-outline"></ion-icon>
           </div>
           <ion-label>
-            <h2>Random Visibility</h2>
+            <h3>Random Visibility</h3>
             <p>Accept requests from random users</p>
           </ion-label>
           <ion-toggle slot="end" [checked]="randomVisibility" (ionChange)="toggleRandomVisibility($event)"></ion-toggle>
@@ -65,85 +107,102 @@
 
         <div class="divider" *ngIf="false"></div>
 
-        <ion-item lines="none">
-          <div class="icon-box">
+        <ion-item lines="none" class="settings-row toggle-row">
+          <div class="icon-box video" slot="start">
             <ion-icon name="videocam-outline"></ion-icon>
           </div>
           <ion-label>
-            <h2>Video Requests</h2>
-            <p>Allow non-friends to request one-time video access</p>
+            <h3>Video Requests</h3>
+            <p>Allow non-friends to request video access</p>
           </ion-label>
-          <ion-toggle slot="end" [checked]="allowVideoRequestsFromNonFriends" [disabled]="loading || isUpdating" (ionChange)="toggleNonFriendVideoRequests($event)"></ion-toggle>
+          <ion-toggle
+            slot="end"
+            [checked]="allowVideoRequestsFromNonFriends"
+            [disabled]="loading || isUpdating"
+            (ionChange)="toggleNonFriendVideoRequests($event)">
+          </ion-toggle>
         </ion-item>
 
         <div class="divider"></div>
 
-        <ion-item lines="none" data-tour="settings-theme">
-          <div class="icon-box">
+        <ion-item lines="none" class="settings-row toggle-row" data-tour="settings-theme">
+          <div class="icon-box birthday" slot="start">
             <ion-icon name="calendar-outline"></ion-icon>
           </div>
           <ion-label>
-            <h2>Age Visibility</h2>
-            <p>Show age and birthday to everyone</p>
+            <h3>Age Visibility</h3>
+            <p>Show your age and birthday to others</p>
           </ion-label>
           <ion-toggle slot="end" [checked]="ageVisibility" (ionChange)="toggleAgeVisibility($event)"></ion-toggle>
         </ion-item>
 
         <div class="divider"></div>
 
-        <ion-item lines="none">
-          <div class="icon-box">
-            <ion-icon name="shield-checkmark-outline"></ion-icon>
+        <ion-item lines="none" class="settings-row toggle-row">
+          <div class="icon-box privacy" slot="start">
+            <ion-icon name="lock-closed-outline"></ion-icon>
           </div>
           <ion-label>
-            <h2>Private Profile</h2>
-            <p>Only followers can see your content</p>
+            <h3>Private Profile</h3>
+            <p>Limit profile content to approved followers</p>
           </ion-label>
           <ion-toggle slot="end" [checked]="isPrivate" (ionChange)="togglePrivacy($event)"></ion-toggle>
         </ion-item>
 
         <div class="divider"></div>
 
-        <ion-item lines="none" button="true" (click)="openBlockedModal()">
-          <div class="icon-box">
+        <ion-item lines="none" button="true" (click)="openBlockedModal()" class="settings-row">
+          <div class="icon-box blocked" slot="start">
             <ion-icon name="ban-outline"></ion-icon>
           </div>
           <ion-label>
-            <h2>Blocked Users</h2>
-            <p>Manage users you've blocked</p>
+            <h3>Blocked Users</h3>
+            <p>Review and manage blocked accounts</p>
           </ion-label>
           <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
         </ion-item>
       </div>
-    </div>
+    </section>
 
-    <!-- Appearance Section -->
-    <div class="settings-section">
-      <h3 class="section-title">Appearance</h3>
+    <section class="settings-section compact-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Display</span>
+          <h2>Appearance</h2>
+        </div>
+        <ion-icon name="color-palette-outline"></ion-icon>
+      </div>
+
       <div class="settings-card">
-        <ion-item lines="none">
-          <div class="icon-box">
-            <ion-icon name="moon-outline"></ion-icon>
+        <ion-item lines="none" class="settings-row toggle-row">
+          <div class="icon-box appearance" slot="start">
+            <ion-icon [name]="isLightMode ? 'sunny-outline' : 'moon-outline'"></ion-icon>
           </div>
           <ion-label>
-            <h2>Light Mode</h2>
-            <p>Switch to light theme</p>
+            <h3>Light Mode</h3>
+            <p>{{ isLightMode ? 'Light appearance is active' : 'Switch to the light appearance' }}</p>
           </ion-label>
           <ion-toggle slot="end" [checked]="isLightMode" (ionChange)="toggleTheme($event)"></ion-toggle>
         </ion-item>
       </div>
-    </div>
+    </section>
 
-    <!-- Support & Legal -->
-    <div class="settings-section">
-      <h3 class="section-title">Support & Legal</h3>
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Resources</span>
+          <h2>Help & Legal</h2>
+        </div>
+        <ion-icon name="help-circle-outline"></ion-icon>
+      </div>
+
       <div class="settings-card">
-        <ion-item lines="none" button="true" (click)="replayGuideTour()" data-tour="settings-guide">
-          <div class="icon-box">
+        <ion-item lines="none" button="true" (click)="replayGuideTour()" class="settings-row" data-tour="settings-guide">
+          <div class="icon-box guide" slot="start">
             <ion-icon name="sparkles-outline"></ion-icon>
           </div>
           <ion-label>
-            <h2>Replay guide tour</h2>
+            <h3>Replay Guide Tour</h3>
             <p>Take the quick app walkthrough again</p>
           </ion-label>
           <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
@@ -151,61 +210,85 @@
 
         <div class="divider"></div>
 
-        <ion-item lines="none" button="true" (click)="openPrivacyPolicy()">
-          <div class="icon-box">
+        <ion-item lines="none" button="true" (click)="openPrivacyPolicy()" class="settings-row">
+          <div class="icon-box legal" slot="start">
             <ion-icon name="document-text-outline"></ion-icon>
           </div>
-          <ion-label>Privacy Policy</ion-label>
-          <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
-        </ion-item>
-
-        <ion-item lines="none" button="true" (click)="openTermsOfService()">
-          <div class="icon-box">
-            <ion-icon name="shield-outline"></ion-icon>
-          </div>
-          <ion-label>Terms of Service</ion-label>
-          <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
-        </ion-item>
-
-        <ion-item lines="none" class="version-item">
-          <div class="icon-box">
-            <ion-icon name="information-circle-outline"></ion-icon>
-          </div>
           <ion-label>
-            <h2>About Folcen</h2>
-            <p>Version {{ appVersion }}</p>
+            <h3>Privacy Policy</h3>
+            <p>How Folcen handles your information</p>
           </ion-label>
-        </ion-item>
-      </div>
-    </div>
-
-    <!-- Danger Zone -->
-    <div class="settings-section">
-      <div class="settings-card danger-card">
-        <ion-item lines="none" button="true" (click)="signout()" class="logout-item">
-          <div class="icon-box">
-            <ion-icon name="log-out-outline"></ion-icon>
-          </div>
-          <ion-label>Log Out</ion-label>
+          <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
         </ion-item>
 
         <div class="divider"></div>
 
-        <ion-item lines="none" button="true" (click)="deleteAccount()" class="delete-item">
-          <div class="icon-box">
-            <ion-icon name="trash-outline"></ion-icon>
+        <ion-item lines="none" button="true" (click)="openTermsOfService()" class="settings-row">
+          <div class="icon-box legal" slot="start">
+            <ion-icon name="reader-outline"></ion-icon>
           </div>
-          <ion-label>Delete Account</ion-label>
+          <ion-label>
+            <h3>Terms of Service</h3>
+            <p>Review the rules for using Folcen</p>
+          </ion-label>
+          <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
+        </ion-item>
+
+        <div class="divider"></div>
+
+        <ion-item lines="none" class="settings-row version-item">
+          <div class="icon-box info" slot="start">
+            <ion-icon name="information-circle-outline"></ion-icon>
+          </div>
+          <ion-label>
+            <h3>About Folcen</h3>
+            <p>Version {{ appVersion }}</p>
+          </ion-label>
+          <span slot="end" class="version-chip">v{{ appVersion }}</span>
         </ion-item>
       </div>
-    </div>
+    </section>
 
-    <!-- Branding -->
-    <div class="branding-footer">
-      <div class="logo-container">
-        <img src="assets/images/logo.png" class="infinity-logo" alt="Folcen Logo">
-        <div class="logo-text">Folcen</div>
+    <section class="settings-section account-actions-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Account</span>
+          <h2>Account Actions</h2>
+        </div>
+        <ion-icon name="warning-outline"></ion-icon>
       </div>
-    </div>
-  </div>
+
+      <div class="settings-card danger-card">
+        <ion-item lines="none" button="true" (click)="signout()" class="settings-row logout-item">
+          <div class="icon-box logout" slot="start">
+            <ion-icon name="log-out-outline"></ion-icon>
+          </div>
+          <ion-label>
+            <h3>Log Out</h3>
+            <p>Sign out of this device</p>
+          </ion-label>
+          <ion-icon name="chevron-forward-outline" slot="end" class="arrow"></ion-icon>
+        </ion-item>
+
+        <div class="divider"></div>
+
+        <ion-item lines="none" button="true" (click)="deleteAccount()" class="settings-row delete-item">
+          <div class="icon-box delete" slot="start">
+            <ion-icon name="trash-outline"></ion-icon>
+          </div>
+          <ion-label>
+            <h3>Delete Account</h3>
+            <p>Permanently remove your Folcen account</p>
+          </ion-label>
+          <ion-icon name="chevron-forward-outline" slot="end" class="arrow danger-arrow"></ion-icon>
+        </ion-item>
+      </div>
+    </section>
+
+    <footer class="branding-footer">
+      <img src="assets/images/logo.png" class="brand-mark" alt="Folcen">
+      <span>Folcen</span>
+      <small>Connect with purpose</small>
+    </footer>
+  </main>
 </ion-content>
