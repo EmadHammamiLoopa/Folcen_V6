@@ -328,6 +328,26 @@ exports.storeComment = async (req, res) => {
 
                 const savedComment = await comment.save();
 
+                // Start the participant read early so its Mongo RTT overlaps
+                // comment population, post persistence, and activity work.
+                // Private posts skip notification processing entirely.
+                const participantsPromise =
+                    post.visibility === 'private'
+                        ? null
+                        : Comment.find({ post: post._id })
+                            .distinct('user')
+                            .exec()
+                            .then(
+                                participantsRaw => ({
+                                    participantsRaw,
+                                    error: null
+                                }),
+                                error => ({
+                                    participantsRaw: null,
+                                    error
+                                })
+                            );
+
                 // Populate and enrich
                 const populatedComment = await Comment.populate(savedComment, { path: 'user', select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides' });
                 if (!populatedComment) return Response.sendError(res, 400, 'Error populating comment data');
@@ -362,8 +382,21 @@ exports.storeComment = async (req, res) => {
                     const postOwnerId = post.user.toString();
 
                     // Build participants and friends list
-                    const participantsRaw = await Comment.find({ post: post._id }).distinct('user');
-                    const participants = new Set(participantsRaw.map(u => u.toString()));
+                    const participantRead =
+                        await participantsPromise;
+
+                    if (participantRead?.error) {
+                        throw participantRead.error;
+                    }
+
+                    const participantsRaw =
+                        participantRead?.participantsRaw || [];
+
+                    const participants = new Set(
+                        participantsRaw.map(
+                            u => u.toString()
+                        )
+                    );
                     participants.add(postOwnerId);
                     const friends = (req.authUser.friends || []).map(f => f.toString());
 
