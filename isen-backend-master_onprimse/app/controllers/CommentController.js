@@ -348,10 +348,40 @@ exports.storeComment = async (req, res) => {
                                 })
                             );
 
-                // Populate and enrich
-                const populatedComment = await Comment.populate(savedComment, { path: 'user', select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides' });
-                if (!populatedComment) return Response.sendError(res, 400, 'Error populating comment data');
-                const commentWithVotes = withVotesInfo(populatedComment, req.auth._id, post._id);
+                // Reuse the authenticated user already loaded for this request
+                // instead of paying another Mongo RTT to populate comment.user.
+                // Build the same narrow User document shape used by populate().
+                const commentUserData = {
+                    _id: req.authUser._id,
+                    firstName: req.authUser.firstName,
+                    lastName: req.authUser.lastName,
+                    mainAvatar: req.authUser.mainAvatar,
+                    avatarStyle: req.authUser.avatarStyle,
+                    avatarSeed: req.authUser.avatarSeed,
+                    avatarVariant: req.authUser.avatarVariant,
+                    avatarOverrides: req.authUser.avatarOverrides
+                };
+
+                for (const key of Object.keys(commentUserData)) {
+                    if (commentUserData[key] === undefined) {
+                        delete commentUserData[key];
+                    }
+                }
+
+                const commentUser = new User(
+                    commentUserData,
+                    null,
+                    { defaults: false }
+                );
+
+                const commentForResponse = savedComment.toObject();
+                commentForResponse.user = commentUser;
+
+                const commentWithVotes = withVotesInfo(
+                    commentForResponse,
+                    req.auth._id,
+                    post._id
+                );
 
                 // Push to post
                 post.comments.push(commentWithVotes._id);

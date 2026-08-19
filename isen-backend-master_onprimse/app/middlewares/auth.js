@@ -195,8 +195,17 @@ exports.withAuthUser = async (req, res, next) => {
         }
 
         // Only select the minimal necessary fields to avoid transferring/storing full docs
+        const authUserBaseFields =
+            '_id email role banned banUntil isDeleted emailVerified ' +
+            'bannedReason lastSeen friends followers city country createdAt';
+
+        const authUserExtraFields =
+            req._authUserExtraSelect || '';
+
         let user = await User.findById(userId)
-            .select('_id email role banned banUntil isDeleted emailVerified bannedReason lastSeen friends followers city country createdAt')
+            .select(
+                `${authUserBaseFields} ${authUserExtraFields}`.trim()
+            )
             .lean();
         if (!user) {
             logger.info('withAuthUser error: User not found in DB for ID:', userId);
