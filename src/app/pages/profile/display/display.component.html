@@ -182,44 +182,38 @@
           <div class="section-header-row">
             <div>
               <h3 class="section-header">Gallery</h3>
-              <p class="section-subtitle" *ngIf="myProfile">Keep your profile fresh with a few recent photos.</p>
+              <p class="section-subtitle" *ngIf="myProfile">Add photos from your camera or gallery.</p>
             </div>
             <span class="photo-count">{{ user?.avatars?.length || 0 }} photos</span>
           </div>
           
           <div class="modern-gallery-grid">
-            <button
-              type="button"
+            <div
               class="gallery-item add-photo-card animate__animated animate__fadeIn"
               *ngIf="myProfile"
-              [disabled]="isUploading"
+              [class.uploading]="isUploading"
               (click)="!isUploading && openPhotoSourceOptions()"
+              role="button"
+              tabindex="0"
               aria-label="Add a photo to your gallery">
 
               <div class="add-content" *ngIf="!isUploading">
-                <span class="add-icon-shell">
-                  <ion-icon name="images-outline"></ion-icon>
-                  <ion-icon name="add-circle" class="add-badge-icon"></ion-icon>
-                </span>
-                <strong>Add photo</strong>
-                <small>Camera or gallery</small>
+                <ion-icon name="add-circle-outline"></ion-icon>
+                <span>Add Photo</span>
               </div>
 
               <div class="upload-loader" *ngIf="isUploading">
                 <ion-spinner name="crescent"></ion-spinner>
-                <strong>Uploading</strong>
-                <small>Adding your photo…</small>
+                <span>Uploading...</span>
               </div>
-            </button>
+            </div>
 
-            <button
-              type="button"
+            <div
               *ngFor="let avatarObj of user?.avatars; let i = index; trackBy: trackByAvatar"
               class="gallery-item gallery-photo animate__animated animate__fadeIn"
               [class.is-main]="mainAvatar === avatarObj.path"
               [style.animation-delay]="(i * 0.05) + 's'"
-              (click)="viewPhoto(i)"
-              [attr.aria-label]="mainAvatar === avatarObj.path ? 'View main profile photo' : 'View gallery photo'">
+              (click)="viewPhoto(i)">
 
               <img
                 [src]="avatarObj.url"
@@ -235,9 +229,8 @@
 
               <div class="main-badge" *ngIf="mainAvatar === avatarObj.path">
                 <ion-icon name="star"></ion-icon>
-                <span>Main</span>
               </div>
-            </button>
+            </div>
           </div>
 
           <div class="gallery-empty-state" *ngIf="!myProfile && (!user?.avatars || user?.avatars?.length === 0)">
