@@ -168,6 +168,9 @@ userSchema.index({ location: '2dsphere' });
 userSchema.index({ lastSeen: -1 });
 userSchema.index({ followers: 1 });
 
+// Feed/channel block exclusion uses this reverse lookup frequently.
+userSchema.index({ blockedUsers: 1 });
+
 // Virtual for full name
 userSchema.virtual('fullName').get(function() {
     return `${this.firstName} ${this.lastName}`;

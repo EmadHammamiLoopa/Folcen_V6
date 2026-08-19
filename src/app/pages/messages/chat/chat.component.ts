@@ -946,7 +946,16 @@ async getMessages(event?: any) {
     }
 
     if (this.page === 1) {
-      await this.refreshPersistedVideoPermissionState();
+      // Video permission is independent from message rendering.
+      // Do not keep the chat loader open for this socket round-trip.
+      void this.refreshPersistedVideoPermissionState()
+        .catch(
+          e =>
+            console.warn(
+              'Video permission background refresh failed',
+              e
+            )
+        );
     }
   } catch (err) {
     console.error('❌ getMessages error:', err);

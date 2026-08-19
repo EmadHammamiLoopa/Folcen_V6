@@ -201,10 +201,7 @@ exports.indexMessages = async (req, res) => {
             ]
         };
 
-        const [
-            rows,
-            check
-        ] = await Promise.all([
+        const rowsPromise =
             Message.find(filter)
                 .sort({
                     createdAt: -1
@@ -215,12 +212,24 @@ exports.indexMessages = async (req, res) => {
                 .limit(
                     limit + 1
                 )
-                .lean(),
+                .lean();
 
-            helpers.canInitiateChat(
-                authUserId,
-                userId
-            )
+        // Chat permission is only consumed by the initial page.
+        // Infinite-scroll history pages do not need the extra DB reads.
+        const policyPromise =
+            page === 0
+                ? helpers.canInitiateChat(
+                    authUserId,
+                    userId
+                )
+                : Promise.resolve(null);
+
+        const [
+            rows,
+            check
+        ] = await Promise.all([
+            rowsPromise,
+            policyPromise
         ]);
 
         const more =
@@ -231,18 +240,25 @@ exports.indexMessages = async (req, res) => {
                 ? rows.slice(0, limit)
                 : rows;
 
+        const payload = {
+            messages,
+            more
+        };
+
+        if (page === 0 && check) {
+            payload.allowToChat =
+                !!check.allowed;
+
+            payload.chatReason =
+                check.reason || null;
+
+            payload.budgetRemaining =
+                check.budgetRemaining;
+        }
+
         return Response.sendResponse(
             res,
-            {
-                messages,
-                more,
-                allowToChat:
-                    !!check.allowed,
-                chatReason:
-                    check.reason || null,
-                budgetRemaining:
-                    check.budgetRemaining
-            }
+            payload
         );
 
     } catch (error) {
