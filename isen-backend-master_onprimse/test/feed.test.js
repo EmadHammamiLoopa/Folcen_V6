@@ -57,7 +57,7 @@ describe('Feed scenarios', function() {
     const author = await User.create({ firstName: 'Author', lastName: 'Two' });
     await Follow.create({ follower: viewer._id, followed: author._id, status: 'active' });
 
-    const channel = await Channel.create({ name: 'General', followers: [] });
+    const channel = await Channel.create({ name: 'General', followers: [], country: 'Test', city: 'Test', user: author._id, category: 'general', type: 'user' });
 
     const post = await Post.create({ text: 'Hello world', user: author._id, channel: channel._id, anonyme: false, visibility: 'public', moderationStatus: 'approved' });
 
@@ -72,14 +72,17 @@ describe('Feed scenarios', function() {
     expect(found).to.equal(true);
   });
 
-  it('shows followers-only post to follower', async () => {
+  it('shows friends-only post to friend', async () => {
     const viewer = await User.create({ firstName: 'Viewer', lastName: 'One' });
     const author = await User.create({ firstName: 'Author', lastName: 'Two' });
-    await Follow.create({ follower: viewer._id, followed: author._id, status: 'active' });
 
-    const channel = await Channel.create({ name: 'General', followers: [] });
+    viewer.friends = [author._id];
+    author.friends = [viewer._id];
+    await Promise.all([viewer.save(), author.save()]);
 
-    const post = await Post.create({ text: 'Followers only', user: author._id, channel: channel._id, anonyme: false, visibility: 'followers-only', moderationStatus: 'approved' });
+    const channel = await Channel.create({ name: 'General', followers: [], country: 'Test', city: 'Test', user: author._id, category: 'general', type: 'user' });
+
+    const post = await Post.create({ text: 'Friends only', user: author._id, channel: channel._id, anonyme: false, visibility: 'friends-only', moderationStatus: 'approved' });
 
     const req = makeReq(viewer);
     const res = makeRes();
@@ -87,7 +90,7 @@ describe('Feed scenarios', function() {
     await PostController.getFeed(req, res);
 
     const docs = res.body && res.body.data && res.body.data.docs;
-    expect(docs.some(p => p.text === 'Followers only')).to.equal(true);
+    expect(docs.some(p => p.text === 'Friends only')).to.equal(true);
   });
 
   it('does not show anonymous post from followed user to follower', async () => {
@@ -95,7 +98,7 @@ describe('Feed scenarios', function() {
     const author = await User.create({ firstName: 'Author', lastName: 'Two' });
     await Follow.create({ follower: viewer._id, followed: author._id, status: 'active' });
 
-    const channel = await Channel.create({ name: 'General', followers: [] });
+    const channel = await Channel.create({ name: 'General', followers: [], country: 'Test', city: 'Test', user: author._id, category: 'general', type: 'user' });
 
     const post = await Post.create({ text: 'Secret', user: author._id, channel: channel._id, anonyme: true, visibility: 'public', moderationStatus: 'approved' });
 
@@ -115,7 +118,7 @@ describe('Feed scenarios', function() {
     author.blockedUsers = [viewer._id];
     await author.save();
 
-    const channel = await Channel.create({ name: 'General', followers: [] });
+    const channel = await Channel.create({ name: 'General', followers: [], country: 'Test', city: 'Test', user: author._id, category: 'general', type: 'user' });
     const post = await Post.create({ text: 'Blocked post', user: author._id, channel: channel._id, anonyme: false, visibility: 'public', moderationStatus: 'approved' });
 
     const req = makeReq(viewer);
