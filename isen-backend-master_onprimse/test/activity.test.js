@@ -17,7 +17,9 @@ describe('ActivityController visibility', function() {
 
   after(async () => {
     await mongoose.disconnect();
-    await mongod.stop();
+    if (mongod) {
+      await mongod.stop();
+    }
   });
 
   beforeEach(async () => {
@@ -26,11 +28,11 @@ describe('ActivityController visibility', function() {
 
   it('returns only public activities to strangers', async () => {
     // actor A creates public and private activities
-    const actorA = mongoose.Types.ObjectId();
+    const actorA = new mongoose.Types.ObjectId();
     await Activity.create({ type: 'post', actor: actorA, content: 'public', visibility: 'public' });
     await Activity.create({ type: 'post', actor: actorA, content: 'private', visibility: 'private' });
 
-    const req = { query: { actorId: String(actorA) }, auth: { _id: mongoose.Types.ObjectId() }, authUser: { friends: [], followers: [] } };
+    const req = { query: { actorId: String(actorA) }, auth: { _id: new mongoose.Types.ObjectId() }, authUser:{ friends: [], followers: [] } };
     let jsonData = null;
     const res = { json: (payload) => (jsonData = payload) };
     await ActivityController.list(req, res);
@@ -41,12 +43,12 @@ describe('ActivityController visibility', function() {
   });
 
   it('returns friends-only to friends', async () => {
-    const actorA = mongoose.Types.ObjectId();
+    const actorA = new mongoose.Types.ObjectId();
     await Activity.create({ type: 'post', actor: actorA, content: 'public', visibility: 'public' });
     await Activity.create({ type: 'post', actor: actorA, content: 'friends', visibility: 'friends-only' });
 
     // requester has friends list containing actorA
-    const req = { query: { actorId: String(actorA) }, auth: { _id: mongoose.Types.ObjectId() }, authUser: { friends: [String(actorA)], followers: [] } };
+    const req = { query: { actorId: String(actorA) }, auth: { _id: new mongoose.Types.ObjectId() }, authUser:{ friends: [String(actorA)], followers: [] } };
     let jsonData = null;
     const res = { json: (payload) => (jsonData = payload) };
     await ActivityController.list(req, res);
@@ -55,7 +57,7 @@ describe('ActivityController visibility', function() {
   });
 
   it('returns all to actor himself', async () => {
-    const actorA = mongoose.Types.ObjectId();
+    const actorA = new mongoose.Types.ObjectId();
     await Activity.create({ type: 'post', actor: actorA, content: 'public', visibility: 'public' });
     await Activity.create({ type: 'post', actor: actorA, content: 'private', visibility: 'private' });
 
