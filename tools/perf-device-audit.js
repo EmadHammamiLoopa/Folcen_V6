@@ -513,8 +513,8 @@ async function main() {
     results.push(parseStartup(raw));
     await sleep(1200);
   } else {
-    try { adb(['shell', 'monkey', '-p', PACKAGE, '-c', 'android.intent.category.LAUNCHER', '1']); } catch (_) {}
-    await sleep(1000);
+    console.log('\n===== ATTACH TO RUNNING APP =====');
+    console.log('startup disabled: leaving the current app process and screen untouched');
   }
 
   const pid = getPid();
@@ -537,10 +537,21 @@ async function main() {
   console.log(`page=${page.url()}`);
   const monitor = createNetworkMonitor(page);
 
-  const tabs = await visibleTabs(page);
-  if (!tabs.length) {
-    throw new Error('No visible tab buttons found. Keep the app logged in and on the main tabs screen before running the audit.');
+  let tabs = [];
+  const tabDeadline = Date.now() + TIMEOUT_MS;
+
+  while (Date.now() < tabDeadline) {
+    tabs = await visibleTabs(page);
+    if (tabs.length) break;
+    await sleep(250);
   }
+
+  if (!tabs.length) {
+    throw new Error(
+      'No visible tab buttons found after waiting. Keep the app logged in and on a main tab screen before running the audit.'
+    );
+  }
+
   console.log(`tabs=${tabs.join(', ')}`);
 
   for (let run = 1; run <= RUNS; run += 1) {

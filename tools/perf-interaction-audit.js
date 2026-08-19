@@ -153,11 +153,29 @@ function createNetworkMonitor(page) {
     const api = /\/api\//i.test(url) || /folcenv6-production\.up\.railway\.app/i.test(url);
     current.inflight = Math.max(0, current.inflight - 1);
     current.lastActivity = end;
+    const failure =
+      failed && typeof req.failure === 'function'
+        ? req.failure()
+        : null;
+
+    let status = null;
+    try {
+      status = req.response()?.status() ?? null;
+    } catch (_) {}
+
     current.requests.push({
       url,
+      method:
+        typeof req.method === 'function'
+          ? req.method()
+          : '',
+      status,
       type,
       api,
       failed: !!failed,
+      failureText: failure?.errorText || '',
+      startOffsetMs: start - current.startedAt,
+      endOffsetMs: end - current.startedAt,
       durationMs: end - start,
     });
   };
@@ -185,6 +203,10 @@ function summarizeNetwork(w) {
     apiMedianMs: durations.length ? durations[Math.floor((durations.length - 1) / 2)] : 0,
     failedCount: reqs.filter(r => r.failed).length,
     slowApis: api.slice().sort((a, b) => b.durationMs - a.durationMs).slice(0, 5),
+
+    // Preserve the raw request timeline for latency/root-cause analysis.
+    // This is audit output only; it does not affect app behavior.
+    requests: reqs,
   };
 }
 
@@ -347,6 +369,18 @@ async function waitForText(page, text, timeout = TIMEOUT_MS) {
   );
 }
 
+async function waitForCommentText(page, text, timeout = TIMEOUT_MS) {
+  await page.waitForFunction(
+    t => Array.from(
+      document.querySelectorAll('.comments-list app-comment')
+    ).some(el =>
+      String(el.innerText || el.textContent || '').includes(t)
+    ),
+    { timeout },
+    text
+  );
+}
+
 async function findPostableChannel(page, monitor, results) {
   await openTab(page, 'channels');
   await page.waitForSelector('.channel-card', { visible: true, timeout: TIMEOUT_MS });
@@ -385,7 +419,14 @@ function writeResults(results, metadata) {
   const columns = [
     'stage','name','totalMs','apiCount','apiMedianMs','apiMaxMs','requestCount','failedCount',
     'taskDeltaMs','scriptDeltaMs','layoutDeltaMs','heapDeltaMB','channelName','postCount','canPost',
-    'marker','writes','url','error'
+    'marker','writes','url',
+    'userVisibleMs',
+    'commentPostStartOffsetMs',
+    'commentPostEndOffsetMs',
+    'commentPostDurationMs',
+    'responseToVisibleMs',
+    'visibleToStableMs',
+    'error'
   ];
   const lines = [columns.join(',')];
   for (const row of results) lines.push(columns.map(c => csvEscape(row[c])).join(','));
@@ -533,12 +574,110 @@ async function main() {
       return { writes: true, marker: MARKER };
     });
 
-    await measure(page, monitor, results, 'comment', 'submit_text_comment', async () => {
+    await measure(page, monitor, results, 'comment', 'type_comment_text', async () => {
       await fillIonicTextarea(page, '.comment-textarea', COMMENT_TEXT);
+      return { writes: false, marker: MARKER };
+    });
+
+    await measure(page, monitor, results, 'comment', 'submit_text_comment', async () => {
+      const commentsBefore =
+        await page.$$eval(
+          '.comments-list app-comment',
+          els => els.length
+        ).catch(() => 0);
+
+      const activeMeasurement = monitor.current();
+      const measureStartedAt =
+        activeMeasurement?.startedAt || Date.now();
+
+      const clickAt = Date.now();
+
       await clickSelector(page, '.send-btn');
-      await waitForText(page, COMMENT_TEXT, TIMEOUT_MS);
+
+      // User-visible completion: the newly-created audit comment has actually
+      // rendered inside the comment list. Do not use whole-body text here.
+      await waitForCommentText(
+        page,
+        COMMENT_TEXT,
+        TIMEOUT_MS
+      );
+
+      const visibleAt = Date.now();
+      const commentVisibleOffsetMs =
+        visibleAt - measureStartedAt;
+
+      const commentsAfter =
+        await page.$$eval(
+          '.comments-list app-comment',
+          els => els.length
+        ).catch(() => 0);
+
+      // By the time Angular renders the returned comment, the XHR should have
+      // finished and therefore be present in the raw network timeline.
+      const networkAtVisible =
+        monitor.current();
+
+      const commentPostRequest =
+        ((networkAtVisible?.requests || [])
+          .filter(r =>
+            !r.failed &&
+            r.type === 'xhr' &&
+            /\/api\/.*\/channel\/post\/[^/]+\/comment(?:[/?#]|$)/i
+              .test(r.url)
+          )
+          .sort(
+            (a, b) =>
+              b.endOffsetMs - a.endOffsetMs
+          )[0]) || null;
+
+      const postEndOffsetMs =
+        commentPostRequest?.endOffsetMs ?? null;
+
+      const responseToVisibleMs =
+        postEndOffsetMs == null
+          ? null
+          : Math.max(
+              0,
+              commentVisibleOffsetMs -
+                postEndOffsetMs
+            );
+
+      // Keep the historical quiet/stable metric separately. It is not part
+      // of user-visible comment latency.
       await waitUiStable(page, 5000);
-      return { writes: true, marker: MARKER };
+
+      const stableAt = Date.now();
+
+      return {
+        writes: true,
+        marker: MARKER,
+        commentsBefore,
+        commentsAfter,
+
+        userVisibleMs:
+          visibleAt - clickAt,
+
+        clickOffsetMs:
+          clickAt - measureStartedAt,
+
+        commentVisibleOffsetMs,
+
+        commentPostStartOffsetMs:
+          commentPostRequest?.startOffsetMs ??
+          null,
+
+        commentPostEndOffsetMs:
+          postEndOffsetMs,
+
+        commentPostDurationMs:
+          commentPostRequest?.durationMs ??
+          null,
+
+        responseToVisibleMs,
+
+        visibleToStableMs:
+          stableAt - visibleAt
+      };
     });
   }
 
@@ -559,7 +698,18 @@ async function main() {
 
   const files = writeResults(results, metadata);
   console.log('\n===== INTERACTION RESULTS =====');
-  console.table(results.map(r => ({ stage: r.stage, name: r.name, totalMs: r.totalMs, apiCount: r.apiCount, apiMaxMs: r.apiMaxMs, error: r.error || '' })));
+  console.table(results.map(r => ({
+    stage: r.stage,
+    name: r.name,
+    totalMs: r.totalMs,
+    userVisibleMs: r.userVisibleMs ?? '',
+    commentPostMs: r.commentPostDurationMs ?? '',
+    responseToVisibleMs: r.responseToVisibleMs ?? '',
+    visibleToStableMs: r.visibleToStableMs ?? '',
+    apiCount: r.apiCount,
+    apiMaxMs: r.apiMaxMs,
+    error: r.error || ''
+  })));
   console.log(files.json);
   console.log(files.csv);
   if (WRITES) {
