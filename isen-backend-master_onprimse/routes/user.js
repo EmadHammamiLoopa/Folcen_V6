@@ -289,6 +289,7 @@ const {
   getUsers,
   follow,
   getUserProfile,
+  prefetchUserProfile,
   getFriends,
   removeFriendship,
   blockUser,
@@ -620,6 +621,7 @@ router.get('/profile/:profileUserId', [
     req.params.userId = userId;
     next();
   },
+  prefetchUserProfile,
   withAuthUser
 ], getUserProfile);
 

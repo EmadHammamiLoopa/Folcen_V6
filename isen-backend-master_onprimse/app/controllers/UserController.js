@@ -2124,6 +2124,79 @@ function formatLastSeen(lastSeenDate) {
     return `${diffDays} day(s) ago`;
 }
 
+function findUserProfileDoc(userId) {
+  return User.findOne({ _id: userId })
+    .select({
+      firstName: 1,
+      lastName: 1,
+      email: 1,
+      emailVerified: 1,
+      country: 1,
+      city: 1,
+      gender: 1,
+      avatar: 1,
+      mainAvatar: 1,
+      birthDate: 1,
+      profession: 1,
+      interests: 1,
+      languages: 1,
+      education: 1,
+      school: 1,
+      loggedIn: 1,
+      enabled: 1,
+      is2FAEnabled: 1,
+      twoFAToken: 1,
+      role: 1,
+      banned: 1,
+      followers: 1,
+      following: 1,
+      friends: 1,
+      missedCallBudget: 1,
+      blockedUsers: 1,
+      followedChannels: 1,
+      messagedUsers: 1,
+      randomVisible: 1,
+      ageVisible: 1,
+      allowVideoRequestsFromNonFriends: 1,
+      genderVisible: 1,
+      visitProfile: 1,
+      isPrivate: 1,
+      lastSeen: 1,
+      aboutMe: 1,
+      avatarStyle: 1,
+      avatarSeed: 1,
+      avatarVariant: 1,
+      avatarOverrides: 1,
+      subscription: 1,
+      themePreference: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      deletedAt: 1
+    })
+    .populate({
+      path: "subscription._id",
+      model: "Subscription",
+      select: "dayPrice weekPrice monthPrice yearPrice currency offers",
+    })
+    .populate({
+      path: "followedChannels",
+      select: "name title image photo description type"
+    }).exec();
+}
+
+exports.prefetchUserProfile = (req, res, next) => {
+  // Start the target-profile read now. withAuthUser runs next, so its
+  // authenticated-user read can overlap this database round trip.
+  // Resolve errors into the promise value immediately to avoid an
+  // unhandled rejection if authentication rejects the request first.
+  req._profileUserPromise = findUserProfileDoc(req.params.userId).then(
+    userDoc => ({ userDoc, error: null }),
+    error => ({ userDoc: null, error })
+  );
+
+  next();
+};
+
 exports.getUserProfile = async (req, res) => {
     if (process.env.DEBUG_PROFILE === '1') logger.info(`Fetching user profile for ID: ${req.params.userId}`);
   
@@ -2133,64 +2206,21 @@ exports.getUserProfile = async (req, res) => {
   
       if (process.env.DEBUG_PROFILE === '1') logger.info(`Authenticated user ID: ${authUserId}`);
   
-      // Find the user by ID and populate subscription details
-      const userDoc = await User.findOne({ _id: userId })
-        .select({
-          firstName: 1,
-          lastName: 1,
-          email: 1,
-          emailVerified: 1,
-          country: 1,
-          city: 1,
-          gender: 1,
-          avatar: 1,
-          mainAvatar: 1,
-          birthDate: 1,
-          profession: 1,
-          interests: 1,
-          languages: 1,
-          education: 1,
-          school: 1,
-          loggedIn: 1,
-          enabled: 1,
-          is2FAEnabled: 1,
-          twoFAToken: 1,
-          role: 1,
-          banned: 1,
-          followers: 1,
-          following: 1,
-          friends: 1,
-          missedCallBudget: 1,
-          blockedUsers: 1,
-          followedChannels: 1,
-          messagedUsers: 1,
-          randomVisible: 1,
-          ageVisible: 1,
-          allowVideoRequestsFromNonFriends: 1,
-          genderVisible: 1,
-          visitProfile: 1,
-          isPrivate: 1,
-          lastSeen: 1,
-          aboutMe: 1,
-          avatarStyle: 1,
-          avatarSeed: 1,
-          avatarVariant: 1,
-          avatarOverrides: 1,
-          subscription: 1,
-          themePreference: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          deletedAt: 1
-        })
-        .populate({
-          path: "subscription._id",
-          model: "Subscription",
-          select: "dayPrice weekPrice monthPrice yearPrice currency offers",
-        })
-        .populate({
-          path: "followedChannels",
-          select: "name title image photo description type"
-        });
+      // The route may have started this query before withAuthUser so the
+      // profile read and authenticated-user read overlap instead of running
+      // as two sequential Mongo round trips.
+      const prefetchedProfile = req._profileUserPromise
+        ? await req._profileUserPromise
+        : {
+            userDoc: await findUserProfileDoc(userId),
+            error: null
+          };
+
+      if (prefetchedProfile.error) {
+        throw prefetchedProfile.error;
+      }
+
+      const userDoc = prefetchedProfile.userDoc;
   
       if (!userDoc) {
         return Response.sendError(res, 404, "User not found");
