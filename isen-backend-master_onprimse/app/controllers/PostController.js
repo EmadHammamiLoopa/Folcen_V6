@@ -11,7 +11,6 @@ const User = require("../models/User");
 const Product = require("../models/Product");
 const Job = require("../models/Job");
 const Service = require("../models/Service");
-const { destroyComment } = require("./CommentController");
 const Response = require("./Response");
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
 const logger = require('../utils/logger');
@@ -310,9 +309,9 @@ exports.getFeed = async (req, res) => {
 
         const allBlockedIds = Array.from(new Set([...blockedByMe, ...blockedMeIds, ...inactiveUserIds]));
 
-        // 3. Find posts I've commented on (to include them in feed even if not followed)
-        const myComments = await Comment.find({ user: userId }).select('post');
-        const postsICommentedOn = myComments.map(c => c.post);
+        // 3. Feed membership is relationship-driven only:
+        // current friends + active explicit follows.
+        // Previous comments or mentions never grant ongoing feed access.
 
         // 4. Fetch Posts
         // build a per-follow OR clause so we only include posts from followed users made after they were followed
@@ -334,13 +333,8 @@ exports.getFeed = async (req, res) => {
             }
         });
 
-        // Mentioned in text
-        feedCriteria.push({ text: { $regex: `@${req.authUser.firstName}`, $options: 'i' } });
-
-        // Commented on
-        if (postsICommentedOn.length > 0) {
-            feedCriteria.push({ _id: { $in: postsICommentedOn } });
-        }
+        // Do not add mention/comment-history criteria here.
+        // A post enters Feed only through friendship or an active Follow.
 
         const postQuery = {
             moderationStatus: 'approved',
@@ -350,14 +344,21 @@ exports.getFeed = async (req, res) => {
             $or: feedCriteria.length > 0 ? feedCriteria : [{ _id: null }] // Match nothing if no criteria
         };
 
-        // Visibility constraints still apply unless it's a mention or my own comment? 
-        // Usually, mentions/comments bypass 'friends-only' if you're the one tagged.
+        // Current visibility always wins.
+        //
+        // Active followers can receive public posts.
+        // Friends can receive public + friends-only posts.
+        // Private posts remain owner-only and therefore never enter another
+        // user's Feed.
         const visibilityQuery = {
             $or: [
                 { visibility: 'public' },
-                { $and: [{ visibility: 'friends-only' }, { user: { $in: friendIds } }] },
-                { text: { $regex: `@${req.authUser.firstName}`, $options: 'i' } },
-                { _id: { $in: postsICommentedOn } }
+                {
+                    $and: [
+                        { visibility: 'friends-only' },
+                        { user: { $in: friendIds } }
+                    ]
+                }
             ]
         };
 
@@ -570,7 +571,8 @@ exports.showPost = async (req, res) => {
                     select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides'
                 }
             })
-            .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides enabled isDeleted banned deletedAt')
+            .populate('user', 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides enabled isDeleted banned deletedAt isPrivate')
+            .populate('channel', 'name photo type category icon city country')
             .populate({ path: 'reports', model: 'Report' })
             .exec();
 
@@ -606,11 +608,44 @@ exports.showPost = async (req, res) => {
             }
         }
 
-        // Visibility Check
+        // Relationship / profile privacy check.
+        //
+        // Friends are implicit followers and need no Follow record.
+        // For a private profile, a non-friend must have an ACTIVE Follow.
+        // Pending requests never grant access.
         const isOwner = authorId === requesterId;
-        const isFriend = req.authUser.friends && req.authUser.friends.some(id => id.toString() === authorId);
-        const isFollower = req.authUser.following && req.authUser.following.some(id => id.toString() === authorId);
+        const isFriend =
+            req.authUser.friends &&
+            req.authUser.friends.some(
+                id => id.toString() === authorId
+            );
 
+        let isAcceptedFollower = false;
+
+        if (
+            !isOwner &&
+            !isFriend &&
+            author &&
+            author.isPrivate
+        ) {
+            isAcceptedFollower = !!(
+                await Follow.exists({
+                    follower: req.auth._id,
+                    followed: authorId,
+                    status: 'active'
+                })
+            );
+
+            if (!isAcceptedFollower) {
+                return Response.sendError(
+                    res,
+                    403,
+                    'This profile is private'
+                );
+            }
+        }
+
+        // Post visibility is a separate permission layer.
         if (!isOwner) {
             if (post.visibility === 'private') {
                 return Response.sendError(res, 403, 'This post is private');
@@ -788,20 +823,150 @@ exports.storePost = async (req, res) => {
 
             // Send notifications and create Activity only for non-anonymous posts
             if (!populatedPost.anonyme) {
-                const notificationTitle = `${req.authUser.firstName} ${req.authUser.lastName}`;
-                const notificationBody = `shared a new post in ${req.channel.name}`;
+                // Resolve mentions before general post notifications so a
+                // mentioned user receives one mention notification, not two.
+                const mentionedUsers = new Set();
+                const structuredMentions =
+                    req.body.mentionMode === 'structured';
 
-                let recipients = [];
-                if (post.visibility === 'public') {
-                    recipients = [...(req.authUser.followers || []), ...(req.authUser.friends || [])];
-                } else if (post.visibility === 'friends-only') {
-                    recipients = [...(req.authUser.friends || [])];
+                const friendSet = new Set(
+                    (req.authUser.friends || [])
+                        .map(friend =>
+                            String(
+                                friend && friend._id
+                                    ? friend._id
+                                    : friend
+                            )
+                        )
+                );
+
+                if (post.visibility !== 'private') {
+                    const explicitIds = []
+                        .concat(req.body['mentionedUserIds'] || [])
+                        .concat(req.body['mentionedUserIds[]'] || []);
+
+                    for (const rawId of explicitIds) {
+                        try {
+                            const id = String(rawId || '');
+
+                            if (!mongoose.Types.ObjectId.isValid(id)) continue;
+                            if (id === req.auth._id.toString()) continue;
+                            if (!friendSet.has(id)) continue;
+
+                            const candidate = await User.findOne({
+                                _id: id,
+                                enabled: { $ne: false },
+                                isDeleted: { $ne: true },
+                                banned: { $ne: true },
+                                deletedAt: null
+                            }).select('_id blockedUsers');
+
+                            if (!candidate) continue;
+
+                            const blockedByTarget =
+                                (candidate.blockedUsers || [])
+                                    .some(blockedId =>
+                                        String(blockedId) ===
+                                        req.auth._id.toString()
+                                    );
+
+                            const blockedByMe =
+                                (req.authUser.blockedUsers || [])
+                                    .some(blockedId =>
+                                        String(blockedId) === id
+                                    );
+
+                            if (blockedByTarget || blockedByMe) continue;
+
+                            mentionedUsers.add(id);
+                        } catch (_) {}
+                    }
+
+                    // Legacy clients had no picker IDs. Keep their name parser,
+                    // but constrain resolved users to actual friends.
+                    if (!structuredMentions && savedPost.text) {
+                        const mentionRegex =
+                            /@([\w\s._-]+?)(?=\s|$|@)/g;
+
+                        let match;
+
+                        while (
+                            (match = mentionRegex.exec(savedPost.text)) !== null
+                        ) {
+                            const name = match[1].trim();
+
+                            let user = await User.findOne({
+                                firstName: new RegExp(`^${name}$`, 'i')
+                            });
+
+                            if (!user && name.includes(' ')) {
+                                const parts = name.split(' ');
+
+                                user = await User.findOne({
+                                    firstName: new RegExp(
+                                        `^${parts[0]}$`,
+                                        'i'
+                                    ),
+                                    lastName: new RegExp(
+                                        `^${parts.slice(1).join(' ')}$`,
+                                        'i'
+                                    )
+                                });
+                            }
+
+                            if (!user) continue;
+
+                            const id = user._id.toString();
+
+                            if (
+                                id !== req.auth._id.toString() &&
+                                friendSet.has(id)
+                            ) {
+                                mentionedUsers.add(id);
+                            }
+                        }
+                    }
                 }
 
-                // Filter out duplicates and the author
-                recipients = [...new Set(recipients.map(id => id.toString()))].filter(id => id !== req.auth._id.toString());
+                const notificationTitle =
+                    `${req.authUser.firstName} ${req.authUser.lastName}`;
 
-                if (recipients.length > 0) {
+                const notificationBody =
+                    `shared a new post in ${req.channel.name}`;
+
+                let recipients = [];
+
+                if (post.visibility === 'public') {
+                    recipients = [
+                        ...(req.authUser.followers || []),
+                        ...(req.authUser.friends || [])
+                    ];
+                } else if (post.visibility === 'friends-only') {
+                    recipients = [
+                        ...(req.authUser.friends || [])
+                    ];
+                }
+
+                // Keep the full realtime audience separate from generic
+                // notification recipients. Mentioned users should still get
+                // the post immediately in Feed/activity, but should not also
+                // receive the generic "shared a post" notification.
+                const feedRecipients = [
+                    ...new Set(
+                        recipients.map(id =>
+                            String(id && id._id ? id._id : id)
+                        )
+                    )
+                ].filter(id =>
+                    id !== req.auth._id.toString()
+                );
+
+                const notificationRecipients =
+                    feedRecipients.filter(id =>
+                        !mentionedUsers.has(id)
+                    );
+
+                if (notificationRecipients.length > 0) {
                     sendNotification(
                         { en: notificationTitle },
                         { en: notificationBody },
@@ -810,7 +975,7 @@ exports.storePost = async (req, res) => {
                             link: `/tabs/channels/post/${populatedPost._id}`
                         },
                         [],
-                        recipients
+                        notificationRecipients
                     );
                 }
 
@@ -827,32 +992,7 @@ exports.storePost = async (req, res) => {
                         meta: { media: savedPost.media }
                     });
 
-                    // --- Mentions Handling ---
-                    const mentionRegex = /@([\w\s._-]+?)(?=\s|$|@)/g;
-                    let match;
-                    const mentionedUsers = new Set();
-                    if (savedPost.text) {
-                        while ((match = mentionRegex.exec(savedPost.text)) !== null) {
-                            const name = match[1].trim();
-                            const user = await User.findOne({ firstName: new RegExp(`^${name}$`, 'i') });
-                            if (user && user._id.toString() !== req.auth._id.toString()) {
-                                mentionedUsers.add(user._id.toString());
-                            } else {
-                                // Try first name + last name match if name has space
-                                if (name.includes(' ')) {
-                                    const parts = name.split(' ');
-                                    const complexUser = await User.findOne({ 
-                                        firstName: new RegExp(`^${parts[0]}$`, 'i'),
-                                        lastName: new RegExp(`^${parts.slice(1).join(' ')}$`, 'i')
-                                    });
-                                    if (complexUser && complexUser._id.toString() !== req.auth._id.toString()) {
-                                        mentionedUsers.add(complexUser._id.toString());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
+                    // mentionedUsers was resolved above from structured picker IDs.
                     const { createNotification } = require('../helpers');
                     for (const userId of mentionedUsers) {
                         await createNotification({
@@ -873,12 +1013,12 @@ exports.storePost = async (req, res) => {
                     // 🔥 REAL-TIME: Emit targeted feed activity
                     try { 
                         // Use the same refined recipients list as notifications
-                        realtime.emitFeedPost(recipients, savedPost);
+                        realtime.emitFeedPost(feedRecipients, savedPost);
                         
                         // Emit activity to followers
                         const activityPayload = { ...activity.toObject(), type: activity.type };
                         const { emitToUsers } = require('../helpers');
-                        emitToUsers(recipients, 'activity:created', activityPayload);
+                        emitToUsers(feedRecipients, 'activity:created', activityPayload);
                     } catch(e) { console.warn('emit activity failed', e); }
                 } catch (e) {
                     console.warn('Failed to create activity record:', e.message || e);
@@ -1148,24 +1288,43 @@ exports.deletePost = (req, res) => {
 
 exports.destroyPost = async (res, postId, callback) => {
     try {
-        // Find related comments first
-        const comments = await Comment.find({ post: postId });
+        // Collect related comment IDs once for bulk cleanup.
+        const comments = await Comment.find({ post: postId })
+            .select('_id')
+            .lean();
+        const commentIds = comments.map(comment => comment._id);
         
         // Delete the post
         await Post.deleteOne({ _id: postId });
         
         // Delete related reports for the post
         await Report.deleteMany({ "entity.id": postId, "entity.name": 'post' });
-        
-        // Delete reports for comments
-        if (comments.length > 0) {
-            await Report.deleteMany({ "entity.id": { $in: comments.map(comment => comment._id) }, "entity.name": 'comment' });
+
+        // Remove post activity plus any legacy/current comment activity
+        // in one bulk operation.
+        const activityCleanup = [
+            { targetType: 'post', targetId: postId }
+        ];
+
+        if (commentIds.length > 0) {
+            activityCleanup.push(
+                { 'meta.commentId': { $in: commentIds } },
+                { targetType: 'comment', targetId: { $in: commentIds } }
+            );
         }
 
-        // Delete related comments
-        for (const comment of comments) {
-            await exports.destroyComment(res, comment._id);
+        await Activity.deleteMany({ $or: activityCleanup });
+
+        // Delete comment reports and comments in bulk instead of issuing
+        // several delete queries per comment.
+        if (commentIds.length > 0) {
+            await Report.deleteMany({
+                "entity.id": { $in: commentIds },
+                "entity.name": 'comment'
+            });
         }
+
+        await Comment.deleteMany({ post: postId });
 
         // If a callback is provided, call it after everything is deleted
         if (callback) {

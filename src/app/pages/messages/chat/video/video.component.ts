@@ -79,6 +79,29 @@ private hasAnswered = false;
     void this.handleNativeCallTerminalEvent(event);
   };
 
+  private peerCallErrorListener = (_event: any) => {
+    const remote =
+      this.partnerEl?.srcObject as MediaStream | null;
+
+    const hasLiveRemoteMedia =
+      this.remoteVideoReady ||
+      !!remote?.getTracks().some(
+        track => track.readyState === 'live'
+      );
+
+    if (hasLiveRemoteMedia) {
+      console.warn(
+        '[video] ignoring stale peer-call-error after remote media attached'
+      );
+      return;
+    }
+
+    this.toastService.presentErrorToastr(
+      'Call could not be established'
+    );
+    this.cancel(true);
+  };
+
 callDuration: string = '00:00';
 private callStartTime: number | null = null;
 private callTimerInterval: any;
@@ -145,6 +168,10 @@ ngOnDestroy() {
     'folcen-call-terminal',
     this.nativeCallTerminalListener
   );
+  window.removeEventListener(
+    'peer-call-error',
+    this.peerCallErrorListener
+  );
 }
 
 
@@ -200,10 +227,14 @@ async ngOnInit() {
       this.getUser();
 
       window.addEventListener('partner-answered', this.partnerAnsweredListener, { once:false });
-      window.addEventListener('peer-call-error', () => {
-        this.toastService.presentErrorToastr('Call could not be established');
-        this.cancel(true);
-      });
+      window.removeEventListener(
+        'peer-call-error',
+        this.peerCallErrorListener
+      );
+      window.addEventListener(
+        'peer-call-error',
+        this.peerCallErrorListener
+      );
 
       /* caller / callee mode */
       this.route.queryParamMap.subscribe(qp => {

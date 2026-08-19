@@ -10,6 +10,9 @@ import { SocketService } from 'src/app/services/socket.service';
 import { UserService } from 'src/app/services/user.service';
 import { environment } from 'src/environments/environment';
 import { GuidedTourService } from 'src/app/services/guided-tour.service';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { App as CapacitorApp } from '@capacitor/app';
 
 @Component({
   selector: 'app-tabs',
@@ -24,6 +27,7 @@ export class TabsPage implements OnInit, OnDestroy {
   private currentUrl = '';
   private activeTab = ''; // track active tab directly from ionTabsDidChange
   private routerSub: any;
+  private appStateListener: any = null;
   private badgeCounts = new Map<TabKey, number>();
   notificationCount = 0;
   showTabs = true;
@@ -106,7 +110,11 @@ export class TabsPage implements OnInit, OnDestroy {
       this.recountFriends();
 
       // seed again on reconnect
-      if (this.socket) this.socket.on('connect', () => this.recountFriends());
+      if (this.socket) {
+        this.socket.on('connect', () => this.recountFriends());
+        this.socket.on('video-call-accepted', this.onVideoPermissionAccepted);
+        this.socket.on('video-call-cancelled', this.onVideoPermissionCancelled);
+      }
     } catch (error) {
       console.error('Failed to init Tabs sockets:', error);
     }
@@ -115,7 +123,18 @@ export class TabsPage implements OnInit, OnDestroy {
     // New incoming message → increment messages badge (skip only if already on messages tab)
     SocketService.newMessage$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
       this.zone.run(() => {
-        if (this.activeTab === 'messages') return; // on messages tab — no badge needed
+        const type = String(payload?.type || '').toLowerCase();
+        const isVideoRequest = type === 'video-call-request';
+
+        // Video permission requests are actionable message events and should
+        // remain visible as a Messages badge even if the chat is open.
+        if (isVideoRequest) {
+          this.badges.inc('messages', 1);
+
+          return;
+        }
+
+        if (this.activeTab === 'messages') return;
         const incomingFrom = payload?.from?._id || payload?.from;
         if (incomingFrom && this.isInChatWith(String(incomingFrom))) return;
         this.badges.inc('messages', 1);
@@ -186,6 +205,29 @@ export class TabsPage implements OnInit, OnDestroy {
         setTimeout(() => this.guidedTour.maybeStartAfterSignup(), 450);
       });
 
+    // Recover video-permission activity that arrived while Angular/Socket.IO
+    // was suspended or the application process was not active.
+    await this.syncVideoPermissionBadgeFromDeliveredNotifications();
+
+    try {
+      this.appStateListener = await CapacitorApp.addListener(
+        'appStateChange',
+        ({ isActive }: any) => {
+          if (!isActive) return;
+
+          setTimeout(
+            () => this.syncVideoPermissionBadgeFromDeliveredNotifications(),
+            250
+          );
+        }
+      );
+    } catch (err) {
+      console.warn(
+        '[video-request] Unable to attach app-state badge sync',
+        err
+      );
+    }
+
     setTimeout(() => this.guidedTour.maybeStartAfterSignup(), 900);
   }
 
@@ -193,7 +235,108 @@ export class TabsPage implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
     if (this.routerSub) this.routerSub.unsubscribe();
-    if (this.socket) this.socket.off('connect');
+
+    try {
+      this.appStateListener?.remove?.();
+    } catch (_) {}
+    this.appStateListener = null;
+
+    if (this.socket) {
+      this.socket.off('connect');
+      this.socket.off('video-call-accepted', this.onVideoPermissionAccepted);
+      this.socket.off('video-call-cancelled', this.onVideoPermissionCancelled);
+    }
+  }
+
+  private isVideoPermissionDeliveredNotification(
+    notification: any
+  ): boolean {
+    const data = notification?.data || {};
+
+    const type = String(
+      data?.type ||
+      data?.event ||
+      ''
+    ).toLowerCase();
+
+    if ([
+      'video-call-request',
+      'video-call-accepted',
+      'video-call-cancelled',
+      'video-call-rejected',
+      'video-call-revoked'
+    ].includes(type)) {
+      return true;
+    }
+
+    // Native Folcen notifications are created directly by
+    // MyFirebaseMessagingService. Some Android builds expose title/body but
+    // omit the original FCM data when enumerating delivered notifications.
+    const title = String(notification?.title || '').trim();
+
+    return [
+      'Video call request',
+      'Video request accepted',
+      'Video request cancelled',
+      'Video request rejected',
+      'Video access revoked'
+    ].includes(title);
+  }
+
+  private async syncVideoPermissionBadgeFromDeliveredNotifications():
+    Promise<void> {
+    try {
+      const delivered =
+        await PushNotifications.getDeliveredNotifications();
+
+      const videoNotifications =
+        (delivered?.notifications || []).filter(
+          notification =>
+            this.isVideoPermissionDeliveredNotification(notification)
+        );
+
+      if (!videoNotifications.length) return;
+
+      this.zone.run(() => {
+        this.badges.set(
+          'messages',
+          Math.max(
+            this.badges.get('messages'),
+            videoNotifications.length
+          )
+        );
+      });
+    } catch (err) {
+      console.warn(
+        '[video-request] Unable to sync delivered notification badge',
+        err
+      );
+    }
+  }
+
+  private async clearVideoPermissionDeliveredNotifications():
+    Promise<void> {
+    try {
+      const delivered =
+        await PushNotifications.getDeliveredNotifications();
+
+      const videoNotifications =
+        (delivered?.notifications || []).filter(
+          notification =>
+            this.isVideoPermissionDeliveredNotification(notification)
+        );
+
+      if (!videoNotifications.length) return;
+
+      await PushNotifications.removeDeliveredNotifications({
+        notifications: videoNotifications
+      });
+    } catch (err) {
+      console.warn(
+        '[video-request] Unable to clear delivered video notifications',
+        err
+      );
+    }
   }
 
   // ----- template helpers -----
@@ -211,6 +354,88 @@ export class TabsPage implements OnInit, OnDestroy {
 
   private isTablessRoute(url: string): boolean {
     return /\/tabs\/channels\/post\/[^/?#]+/.test(url || '');
+  }
+
+  private onVideoPermissionAccepted = (payload: any) => {
+    const ownerId = SocketService.getOwnerId();
+
+    // The sender of the original request is the user whose access was granted.
+    if (!ownerId || String(payload?.from || '') !== String(ownerId)) return;
+
+    this.zone.run(() => {
+      this.badges.inc('messages', 1);
+    });
+
+
+  };
+
+  private onVideoPermissionCancelled = (payload: any) => {
+    const ownerId = String(SocketService.getOwnerId() || '');
+    if (!ownerId) return;
+
+    const status = String(
+      payload?.status || payload?.reason || ''
+    ).toLowerCase();
+
+    const sender = String(payload?.from || '');
+    const recipient = String(payload?.to || '');
+
+    // The socket event is broadcast to both parties, but the badge should
+    // mirror the push-notification target:
+    // cancelled -> recipient
+    // rejected/revoked -> original requester
+    const shouldBadge =
+      (status === 'cancelled' && ownerId === recipient) ||
+      (status === 'rejected' && ownerId === sender) ||
+      (status === 'revoked' && ownerId === sender);
+
+    if (!shouldBadge) return;
+
+    this.zone.run(() => {
+      this.badges.inc('messages', 1);
+    });
+  };
+
+  private async showVideoEventNotification(
+    kind: 'request' | 'accepted',
+    payload: any
+  ): Promise<void> {
+    try {
+      let permission = await LocalNotifications.checkPermissions();
+
+      if (
+        permission.display === 'prompt' ||
+        permission.display === 'prompt-with-rationale'
+      ) {
+        permission = await LocalNotifications.requestPermissions();
+      }
+
+      if (permission.display !== 'granted') {
+        console.warn('[video-request] Notification permission not granted');
+        return;
+      }
+
+      const accepted = kind === 'accepted';
+
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: Math.floor(Date.now() % 2147483647),
+          title: accepted
+            ? 'Video request accepted'
+            : 'Video call request',
+          body: accepted
+            ? 'Your video call request was accepted.'
+            : String(payload?.text || 'You received a video call request.'),
+          schedule: {
+            at: new Date(Date.now() + 250)
+          },
+          autoCancel: true,
+          extra: payload || {}
+        }]
+      });
+    } catch (err) {
+      console.warn('[video-request] Unable to show notification', err);
+    }
   }
 
   // ----- realtime / API -----
@@ -244,8 +469,13 @@ export class TabsPage implements OnInit, OnDestroy {
     }
 
     if (activeTab === 'messages') {
-      // visually clear when entering messages root
-      if (this.isMessagesRoot()) this.badges.reset('messages');
+      // Entering Messages means these video-permission updates have been seen.
+      // Clear both the in-app badge and the corresponding Android delivered
+      // notifications so launcher + in-app state stay aligned.
+      if (this.isMessagesRoot()) {
+        this.badges.reset('messages');
+        void this.clearVideoPermissionDeliveredNotifications();
+      }
     }
 
     if (activeTab === 'feed') {

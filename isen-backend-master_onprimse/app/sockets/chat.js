@@ -11,6 +11,10 @@ const { sendPushToUser } = require("../services/fcmPushService");
 const { connectedUsers } = require("../utils/socketManager");
 const { recordMessageEvent } = require('../utils/eventLogger');
 
+const VIDEO_REQUEST_RETRY_COOLDOWN_MS = Number(
+  process.env.VIDEO_REQUEST_RETRY_COOLDOWN_MS || 5 * 60 * 1000
+);
+
 module.exports = (io, socket) => {
   /* ───────────── helpers ───────────── */
 
@@ -74,39 +78,110 @@ module.exports = (io, socket) => {
 socket.on("video-call-request", async (data, ack) => {
   try {
     const callerId = socket.userId; // use server-authoritative ID
-    if (!callerId) { if (ack) ack({ success: false, error: 'not_authenticated' }); return; }
-    if (!mongoose.Types.ObjectId.isValid(data?.to)) {
-      if (ack) ack({ success: false, error: 'invalid_recipient' });
+    const receiverId = String(data?.to || '');
+    if (!callerId) {
+      if (ack) ack({ success: false, error: 'not_authenticated', retryable: false });
+      return;
+    }
+    if (!mongoose.Types.ObjectId.isValid(receiverId) || String(callerId) === receiverId) {
+      if (ack) ack({ success: false, error: 'invalid_recipient', retryable: false });
       return;
     }
 
     const [caller, receiver] = await Promise.all([
       User.findById(callerId).select('friends firstName lastName').lean(),
-      User.findById(data.to).select('friends firstName lastName allowVideoRequestsFromNonFriends').lean()
+      User.findById(receiverId).select('friends firstName lastName allowVideoRequestsFromNonFriends').lean()
     ]);
-    if (!receiver) {
-      if (ack) ack({ success: false, error: 'recipient_not_found' });
+    if (!caller || !receiver) {
+      if (ack) ack({ success: false, error: 'recipient_not_found', retryable: false });
       return;
     }
+
     const isFriend =
-      (caller?.friends || []).some(id => String(id) === String(data.to)) ||
+      (caller?.friends || []).some(id => String(id) === receiverId) ||
       (receiver?.friends || []).some(id => String(id) === String(callerId));
-    const receiverAllowsVideoRequests = !(receiver.allowVideoRequestsFromNonFriends === false || receiver.allowVideoRequestsFromNonFriends === 'false' || receiver.allowVideoRequestsFromNonFriends === 0 || receiver.allowVideoRequestsFromNonFriends === '0');
-    if (!isFriend && !receiverAllowsVideoRequests) {
-      if (ack) ack({ success: false, error: 'video_requests_disabled' });
+
+    if (isFriend) {
+      if (ack) ack({ success: false, error: 'already_friends', retryable: false });
       return;
     }
 
-    // Cancel any previous pending requests in this thread
-    await Message.updateMany(
-      { from: { $in: [callerId, data.to] }, to: { $in: [callerId, data.to] }, type: "video-call-request", status: "pending" },
-      { $set: { status: "cancelled" } }
+    const receiverAllowsVideoRequests = !(
+      receiver.allowVideoRequestsFromNonFriends === false ||
+      receiver.allowVideoRequestsFromNonFriends === 'false' ||
+      receiver.allowVideoRequestsFromNonFriends === 0 ||
+      receiver.allowVideoRequestsFromNonFriends === '0'
     );
+    if (!receiverAllowsVideoRequests) {
+      if (ack) ack({ success: false, error: 'video_requests_disabled', retryable: false });
+      return;
+    }
 
+    // Accepted requests are persistent directional permission records.
+    const acceptedPermission = await Message.findOne({
+      from: callerId,
+      to: receiverId,
+      type: 'video-call-request',
+      status: 'accepted'
+    }).sort({ updatedAt: -1 }).select('_id').lean();
+    if (acceptedPermission) {
+      if (ack) ack({
+        success: false,
+        error: 'already_allowed',
+        retryable: false,
+        messageId: String(acceptedPermission._id)
+      });
+      return;
+    }
+
+    // There can be only one pending video permission request between a pair,
+    // regardless of which side sent it. Never cancel-and-recreate it.
+    const pending = await Message.findOne({
+      from: { $in: [callerId, receiverId] },
+      to: { $in: [callerId, receiverId] },
+      type: 'video-call-request',
+      status: 'pending'
+    }).sort({ createdAt: -1 }).select('_id from to status').lean();
+    if (pending) {
+      if (ack) ack({
+        success: false,
+        error: 'request_pending',
+        retryable: false,
+        messageId: String(pending._id),
+        from: String(pending.from),
+        to: String(pending.to),
+        status: 'pending'
+      });
+      return;
+    }
+
+    // A rejection/revocation does not permanently block future requests, but
+    // adds a short sender→recipient cooldown to prevent immediate notification spam.
+    const lastDenied = await Message.findOne({
+      from: callerId,
+      to: receiverId,
+      type: 'video-call-request',
+      status: { $in: ['rejected', 'revoked'] }
+    }).sort({ updatedAt: -1 }).select('updatedAt createdAt').lean();
+    if (lastDenied) {
+      const deniedAt = new Date(lastDenied.updatedAt || lastDenied.createdAt || 0).getTime();
+      const elapsed = Date.now() - deniedAt;
+      if (deniedAt > 0 && elapsed < VIDEO_REQUEST_RETRY_COOLDOWN_MS) {
+        if (ack) ack({
+          success: false,
+          error: 'request_cooldown',
+          retryable: false,
+          retryAfterMs: VIDEO_REQUEST_RETRY_COOLDOWN_MS - elapsed
+        });
+        return;
+      }
+    }
+
+    const callerName = [caller?.firstName, caller?.lastName].filter(Boolean).join(" ") || "Someone";
     const payload = {
-      text: data.text,
+      text: `${callerName} would like permission to video call you.`,
       from: new mongoose.Types.ObjectId(callerId),
-      to: new mongoose.Types.ObjectId(data.to),
+      to: new mongoose.Types.ObjectId(receiverId),
       type: "video-call-request",
       status: "pending",
       state: "sent",
@@ -118,7 +193,7 @@ socket.on("video-call-request", async (data, ack) => {
 
     await Promise.all([
       User.findByIdAndUpdate(callerId, { $push: { messages: saved._id } }),
-      User.findByIdAndUpdate(data.to, { $push: { messages: saved._id } }),
+      User.findByIdAndUpdate(receiverId, { $push: { messages: saved._id } }),
     ]);
 
     const safeCallPayload = {
@@ -132,17 +207,19 @@ socket.on("video-call-request", async (data, ack) => {
       createdAt: saved.createdAt
     };
 
-    emitToUser(data.to,   "new-message",   safeCallPayload);
-    emitToUser(callerId,  "message-sent",  { ...safeCallPayload, tempId: data.messageId });
-    const callerName = [caller?.firstName, caller?.lastName].filter(Boolean).join(" ") || "Someone";
-    sendPushToUser(String(data.to), {
-      title: "Video request",
-      body: `${callerName} sent you a one-time video request`,
+    emitToUser(receiverId, "new-message", safeCallPayload);
+    emitToUser(callerId, "message-sent", { ...safeCallPayload, tempId: data.messageId });
+
+    sendPushToUser(receiverId, {
+      title: "Video call request",
+      body: `${callerName} sent you a video call request`,
       data: {
-        ...safeCallPayload,
+        // Do not spread safeCallPayload here. FCM reserves keys such as
+        // "from", so permission pushes must contain only app-owned keys.
         type: "video-call-request",
         category: "message",
         event: "video-call-request",
+        status: "pending",
         fromUserId: String(callerId),
         callerId: String(callerId),
         messageId: String(saved._id),
@@ -161,12 +238,63 @@ socket.on("video-call-request", async (data, ack) => {
         payload: { aps: { sound: "default" } }
       }
     }).then(result => {
-      console.log(`[chat] video request push to ${data.to}:`, result);
+      console.log(`[chat] video request push to ${receiverId}:`, result);
     }).catch(err => console.warn("[chat] video request push failed:", err.message));
 
     if (ack) ack({ success: true, messageId: saved._id });
   } catch (err) {
     console.error("❌ Error in video-call-request:", err);
+    if (ack) ack({ success: false, error: err.message, retryable: false });
+  }
+});
+
+// Authoritative persisted state for chat header. This keeps permission UI
+// correct even when the original request card is outside the loaded page.
+socket.on("video-call-permission-state", async (data, ack) => {
+  try {
+    const authUser = socket.userId;
+    const peerId = String(data?.peerId || '');
+    if (!authUser) {
+      if (ack) ack({ success: false, error: 'not_authenticated' });
+      return;
+    }
+    if (!mongoose.Types.ObjectId.isValid(peerId) || String(authUser) === peerId) {
+      if (ack) ack({ success: false, error: 'invalid_recipient' });
+      return;
+    }
+
+    const [outgoing, incomingAccepted] = await Promise.all([
+      Message.findOne({
+        from: authUser,
+        to: peerId,
+        type: 'video-call-request',
+        status: { $in: ['pending', 'accepted'] }
+      }).sort({ updatedAt: -1 }).select('_id status from to').lean(),
+      Message.findOne({
+        from: peerId,
+        to: authUser,
+        type: 'video-call-request',
+        status: 'accepted'
+      }).sort({ updatedAt: -1 }).select('_id status from to').lean()
+    ]);
+
+    if (ack) ack({
+      success: true,
+      outgoing: outgoing ? {
+        messageId: String(outgoing._id),
+        status: String(outgoing.status),
+        from: String(outgoing.from),
+        to: String(outgoing.to)
+      } : null,
+      incomingAccepted: incomingAccepted ? {
+        messageId: String(incomingAccepted._id),
+        status: 'accepted',
+        from: String(incomingAccepted.from),
+        to: String(incomingAccepted.to)
+      } : null
+    });
+  } catch (err) {
+    console.error("❌ Error loading video-call-permission-state:", err);
     if (ack) ack({ success: false, error: err.message });
   }
 });
@@ -174,28 +302,46 @@ socket.on("video-call-request", async (data, ack) => {
 
 
 // Video call accepted
-// Video call accepted
-// Video call accepted
-socket.on("video-call-accepted", async (data) => {
+socket.on("video-call-accepted", async (data, ack) => {
   try {
-    // 🛑 Ignore if client sent a temp id
-    if (!mongoose.Types.ObjectId.isValid(data.messageId)) {
-      console.warn("⚠️ Ignoring invalid messageId:", data.messageId);
+    const authUser = socket.userId;
+    if (!authUser) {
+      if (ack) ack({ success: false, error: 'not_authenticated' });
+      return;
+    }
+    if (!mongoose.Types.ObjectId.isValid(data?.messageId)) {
+      if (ack) ack({ success: false, error: 'invalid_request' });
       return;
     }
 
-    const msg = await Message.findByIdAndUpdate(
-      data.messageId,
-      { status: "accepted" },
+    // Only the recipient of a pending request may grant access.
+    const msg = await Message.findOneAndUpdate(
+      {
+        _id: data.messageId,
+        type: 'video-call-request',
+        status: 'pending',
+        to: authUser
+      },
+      { $set: { status: 'accepted' } },
       { new: true }
     );
 
-    if (!msg) return;
+    if (!msg) {
+      if (ack) ack({ success: false, error: 'request_not_actionable' });
+      return;
+    }
 
-    emitToUser(data.to, "video-call-accepted", { messageId: msg.id, status: "accepted" });
-    emitToUser(data.from, "video-call-accepted", { messageId: msg.id, status: "accepted" });
-    User.findById(data.from).select("firstName lastName").lean().then(accepter => {
-      const accepterName = [accepter?.firstName, accepter?.lastName].filter(Boolean).join(" ") || "Your video request";
+    const eventPayload = {
+      messageId: String(msg._id),
+      status: 'accepted',
+      from: String(msg.from),
+      to: String(msg.to)
+    };
+    emitToUser(String(msg.from), "video-call-accepted", eventPayload);
+    emitToUser(String(msg.to), "video-call-accepted", eventPayload);
+
+    User.findById(authUser).select("firstName lastName").lean().then(accepter => {
+      const accepterName = [accepter?.firstName, accepter?.lastName].filter(Boolean).join(" ") || "The recipient";
       return sendPushToUser(String(msg.from), {
         title: "Video request accepted",
         body: `${accepterName} accepted your video call request`,
@@ -220,96 +366,187 @@ socket.on("video-call-accepted", async (data) => {
         }
       });
     }).catch(err => console.warn("[chat] accepted video request push failed:", err.message));
+
+    if (ack) ack({ success: true, ...eventPayload });
   } catch (err) {
     console.error("❌ Error in video-call-accepted:", err);
+    if (ack) ack({ success: false, error: err.message });
   }
 });
 
+// Backwards-compatible event from the existing video screen. Accepted video
+// requests are now persistent permissions, so starting a call must NOT consume
+// the permission or change the chat message status.
 socket.on("video-call-used", async (data) => {
   try {
     const authUser = socket.userId;
     if (!authUser || !mongoose.Types.ObjectId.isValid(data?.messageId)) return;
-
-    const msg = await Message.findOneAndUpdate(
-      {
-        _id: data.messageId,
-        type: "video-call-request",
-        status: "accepted",
-        $or: [{ from: authUser }, { to: authUser }]
-      },
-      { status: "used" },
-      { new: true }
-    );
-    if (!msg) return;
-
-    const payload = { messageId: msg.id, status: "used" };
-    emitToUser(String(msg.from), "video-call-used", payload);
-    emitToUser(String(msg.to), "video-call-used", payload);
+    await Message.exists({
+      _id: data.messageId,
+      type: 'video-call-request',
+      status: 'accepted',
+      from: authUser
+    });
   } catch (err) {
-    console.error("Error in video-call-used:", err);
+    console.error("Error validating persistent video permission:", err);
   }
 });
 
-// Video call cancelled
-socket.on("video-call-cancelled", async (data) => {
+// Video request cancelled / rejected / permission revoked
+socket.on("video-call-cancelled", async (data, ack) => {
   try {
-    let msg = null;
-    const requestedStatus = ['cancelled', 'rejected', 'expired'].includes(String(data?.status))
+    const authUser = socket.userId;
+    if (!authUser) {
+      if (ack) ack({ success: false, error: 'not_authenticated' });
+      return;
+    }
+    if (!mongoose.Types.ObjectId.isValid(data?.messageId)) {
+      if (ack) ack({ success: false, error: 'invalid_request' });
+      return;
+    }
+
+    const requestedStatus = ['cancelled', 'rejected', 'expired', 'revoked'].includes(String(data?.status))
       ? String(data.status)
-      : (String(data?.reason) === 'rejected' ? 'rejected' : String(data?.reason) === 'timeout' ? 'expired' : 'cancelled');
-    const reason = requestedStatus === 'rejected' ? 'rejected' : requestedStatus === 'expired' ? 'timeout' : 'cancel';
+      : (String(data?.reason) === 'rejected'
+          ? 'rejected'
+          : String(data?.reason) === 'revoked'
+            ? 'revoked'
+            : String(data?.reason) === 'timeout'
+              ? 'expired'
+              : 'cancelled');
 
-    if (mongoose.Types.ObjectId.isValid(data.messageId)) {
-      // normal path: real id
-      msg = await Message.findByIdAndUpdate(
-        data.messageId,
-        { status: requestedStatus },
-        { new: true }
-      );
+    const existing = await Message.findOne({
+      _id: data.messageId,
+      type: 'video-call-request'
+    });
+    if (!existing) {
+      if (ack) ack({ success: false, error: 'request_not_found' });
+      return;
     }
 
-    if (!msg) {
-      // fallback: cancel the latest pending call between these two users
-      msg = await Message.findOneAndUpdate(
-        {
-          from: { $in: [data.from, data.to] },
-          to:   { $in: [data.from, data.to] },
-          type: "video-call-request",
-          status: "pending",
+    const actor = String(authUser);
+    const sender = String(existing.from);
+    const recipient = String(existing.to);
+    const currentStatus = String(existing.status || 'pending');
+
+    let allowed = false;
+    if (requestedStatus === 'cancelled') {
+      allowed = currentStatus === 'pending' && actor === sender;
+    } else if (requestedStatus === 'rejected') {
+      allowed = currentStatus === 'pending' && actor === recipient;
+    } else if (requestedStatus === 'revoked') {
+      allowed = currentStatus === 'accepted' && actor === recipient;
+    } else if (requestedStatus === 'expired') {
+      allowed = currentStatus === 'pending' && (actor === sender || actor === recipient);
+    }
+
+    if (!allowed) {
+      if (ack) ack({ success: false, error: 'request_not_actionable' });
+      return;
+    }
+
+    existing.status = requestedStatus;
+    const msg = await existing.save();
+    const reason = requestedStatus === 'rejected'
+      ? 'rejected'
+      : requestedStatus === 'revoked'
+        ? 'revoked'
+        : requestedStatus === 'expired'
+          ? 'timeout'
+          : 'cancel';
+
+    const eventPayload = {
+      messageId: String(msg._id),
+      status: requestedStatus,
+      reason,
+      from: sender,
+      to: recipient
+    };
+    emitToUser(sender, "video-call-cancelled", eventPayload);
+    emitToUser(recipient, "video-call-cancelled", eventPayload);
+
+    // Socket.IO keeps the UI live. FCM independently provides the
+    // user-visible notification when foreground/background/killed.
+    if (['cancelled', 'rejected', 'revoked'].includes(requestedStatus)) {
+      const pushTarget =
+        requestedStatus === 'cancelled'
+          ? recipient
+          : sender;
+
+      const peerId =
+        requestedStatus === 'cancelled'
+          ? sender
+          : recipient;
+
+      const notificationType =
+        requestedStatus === 'cancelled'
+          ? 'video-call-cancelled'
+          : `video-call-${requestedStatus}`;
+
+      const title =
+        requestedStatus === 'cancelled'
+          ? 'Video request cancelled'
+          : requestedStatus === 'rejected'
+            ? 'Video request rejected'
+            : 'Video access revoked';
+
+      const body =
+        requestedStatus === 'cancelled'
+          ? 'A pending video call request was cancelled.'
+          : requestedStatus === 'rejected'
+            ? 'Your video call request was rejected.'
+            : 'Your video call access was revoked.';
+
+      sendPushToUser(pushTarget, {
+        title,
+        body,
+        data: {
+          type: notificationType,
+          event: notificationType,
+          category: 'message',
+          status: requestedStatus,
+          fromUserId: String(peerId),
+          messageId: String(msg._id),
+          link: `/messages/chat/${String(peerId)}`
         },
-        { $set: { status: requestedStatus } },
-        { sort: { createdAt: -1 }, new: true }
-      );
-      if (!msg) return; // nothing to cancel
+        android: {
+          priority: 'high'
+        },
+        apns: {
+          headers: {
+            'apns-priority': '10'
+          },
+          payload: {
+            aps: {
+              sound: 'default'
+            }
+          }
+        }
+      }).then(result => {
+        console.log(
+          `[chat] ${notificationType} push to ${pushTarget}:`,
+          result
+        );
+      }).catch(err => {
+        console.warn(
+          `[chat] ${notificationType} push failed:`,
+          err.message
+        );
+      });
     }
 
-  emitToUser(data.to,   "video-call-cancelled", { messageId: msg.id, status: requestedStatus, reason });
-  emitToUser(data.from, "video-call-cancelled", { messageId: msg.id, status: requestedStatus, reason });
+    if (ack) ack({ success: true, ...eventPayload });
   } catch (err) {
     console.error("❌ Error in video-call-cancelled:", err);
+    if (ack) ack({ success: false, error: err.message });
   }
 });
 
 
-socket.on("leave-chat", async ({ withUser }) => {
-  try {
-    if (!socket.userId || !mongoose.Types.ObjectId.isValid(withUser)) return;
-
-    await Message.updateMany(
-      {
-        from: { $in: [socket.userId, withUser] },
-        to:   { $in: [socket.userId, withUser] },
-        type: "video-call-request",
-        status: "pending",
-      },
-      { $set: { status: "cancelled" } }
-    );
-
-    emitToUser(withUser,   "video-session-reset", { by: socket.userId });
-    emitToUser(socket.userId, "video-session-reset", { by: socket.userId });
-  } catch (e) {
-    console.error("leave-chat failed", e);
-  }
+// Leaving a chat must not mutate video-request state. Pending requests and
+// accepted permissions are persisted in Message and survive close/reopen/login.
+socket.on("leave-chat", ({ withUser } = {}) => {
+  if (!socket.userId || !withUser) return;
 });
 
 socket.on("mark-thread-read", async ({ peerId } = {}) => {

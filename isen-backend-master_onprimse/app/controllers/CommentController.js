@@ -256,12 +256,30 @@ exports.storeComment = async (req, res) => {
                 const commenterId = req.auth._id.toString();
 
                 // Block checks
-                const isBlockedByAuthor = await User.findOne({ _id: authorId, blockedUsers: commenterId });
-                const isBlockedByMe = req.authUser.blockedUsers && req.authUser.blockedUsers.some(id => id.toString() === authorId);
-                if (isBlockedByAuthor || isBlockedByMe) return Response.sendError(res, 403, 'You cannot comment on this post');
+                const isOwner = authorId === commenterId;
+                const isBlockedByAuthor = isOwner
+                    ? null
+                    : await User.findOne({
+                        _id: authorId,
+                        blockedUsers: commenterId
+                    });
+
+                const isBlockedByMe =
+                    !isOwner &&
+                    req.authUser.blockedUsers &&
+                    req.authUser.blockedUsers.some(
+                        id => id.toString() === authorId
+                    );
+
+                if (isBlockedByAuthor || isBlockedByMe) {
+                    return Response.sendError(
+                        res,
+                        403,
+                        'You cannot comment on this post'
+                    );
+                }
 
                 // Visibility Check
-                const isOwner = authorId === commenterId;
                 const isFriend = req.authUser.friends && req.authUser.friends.some(id => id.toString() === authorId);
                 if (!isOwner) {
                     if (post.visibility === 'private') return Response.sendError(res, 403, 'This post is private');
@@ -310,10 +328,60 @@ exports.storeComment = async (req, res) => {
 
                 const savedComment = await comment.save();
 
-                // Populate and enrich
-                const populatedComment = await Comment.populate(savedComment, { path: 'user', select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides' });
-                if (!populatedComment) return Response.sendError(res, 400, 'Error populating comment data');
-                const commentWithVotes = withVotesInfo(populatedComment, req.auth._id, post._id);
+                // Start the participant read early so its Mongo RTT overlaps
+                // comment population, post persistence, and activity work.
+                // Private posts skip notification processing entirely.
+                const participantsPromise =
+                    post.visibility === 'private'
+                        ? null
+                        : Comment.find({ post: post._id })
+                            .distinct('user')
+                            .exec()
+                            .then(
+                                participantsRaw => ({
+                                    participantsRaw,
+                                    error: null
+                                }),
+                                error => ({
+                                    participantsRaw: null,
+                                    error
+                                })
+                            );
+
+                // Reuse the authenticated user already loaded for this request
+                // instead of paying another Mongo RTT to populate comment.user.
+                // Build the same narrow User document shape used by populate().
+                const commentUserData = {
+                    _id: req.authUser._id,
+                    firstName: req.authUser.firstName,
+                    lastName: req.authUser.lastName,
+                    mainAvatar: req.authUser.mainAvatar,
+                    avatarStyle: req.authUser.avatarStyle,
+                    avatarSeed: req.authUser.avatarSeed,
+                    avatarVariant: req.authUser.avatarVariant,
+                    avatarOverrides: req.authUser.avatarOverrides
+                };
+
+                for (const key of Object.keys(commentUserData)) {
+                    if (commentUserData[key] === undefined) {
+                        delete commentUserData[key];
+                    }
+                }
+
+                const commentUser = new User(
+                    commentUserData,
+                    null,
+                    { defaults: false }
+                );
+
+                const commentForResponse = savedComment.toObject();
+                commentForResponse.user = commentUser;
+
+                const commentWithVotes = withVotesInfo(
+                    commentForResponse,
+                    req.auth._id,
+                    post._id
+                );
 
                 // Push to post
                 post.comments.push(commentWithVotes._id);
@@ -344,54 +412,126 @@ exports.storeComment = async (req, res) => {
                     const postOwnerId = post.user.toString();
 
                     // Build participants and friends list
-                    const participantsRaw = await Comment.find({ post: post._id }).distinct('user');
-                    const participants = new Set(participantsRaw.map(u => u.toString()));
+                    const participantRead =
+                        await participantsPromise;
+
+                    if (participantRead?.error) {
+                        throw participantRead.error;
+                    }
+
+                    const participantsRaw =
+                        participantRead?.participantsRaw || [];
+
+                    const participants = new Set(
+                        participantsRaw.map(
+                            u => u.toString()
+                        )
+                    );
                     participants.add(postOwnerId);
                     const friends = (req.authUser.friends || []).map(f => f.toString());
 
-                    // Mentions parsing (resolve real users and anonymName->user)
+                    // Mentions:
+                    // Modern clients send authoritative Mongo user IDs from
+                    // the picker. Name parsing is legacy-only.
                     const mentionRegex = /@([\w\s._-]+?)(?=\s|$|@)/g;
-                    let match;
                     const mentionedUsers = new Set();
+                    const structuredMentions =
+                        req.body.mentionMode === 'structured';
 
-                    // Prefer structured IDs from the frontend tag picker when present.
                     const explicitIds = []
-                      .concat(req.body['mentionedUserIds'] || [])
-                      .concat(req.body['mentionedUserIds[]'] || []);
+                        .concat(req.body['mentionedUserIds'] || [])
+                        .concat(req.body['mentionedUserIds[]'] || []);
+
                     for (const rawId of explicitIds) {
-                      try {
-                        const id = String(rawId);
-                        if (!mongoose.Types.ObjectId.isValid(id)) continue;
-                        if (id === req.auth._id.toString()) continue;
-                        if (isAnon) { if (!participants.has(id)) continue; }
-                        else { if (!participants.has(id) && !friends.includes(id)) continue; }
-                        mentionedUsers.add(id);
-                      } catch (_) {}
+                        try {
+                            const id = String(rawId || '');
+                            if (!mongoose.Types.ObjectId.isValid(id)) continue;
+                            if (id === req.auth._id.toString()) continue;
+
+                            if (isAnon) {
+                                if (!participants.has(id)) continue;
+                            } else {
+                                if (!participants.has(id) && !friends.includes(id)) continue;
+                            }
+
+                            const candidate = await User.findOne({
+                                _id: id,
+                                enabled: { $ne: false },
+                                isDeleted: { $ne: true },
+                                banned: { $ne: true },
+                                deletedAt: null
+                            }).select('_id blockedUsers');
+
+                            if (!candidate) continue;
+
+                            const blockedByTarget =
+                                (candidate.blockedUsers || [])
+                                    .some(blockedId =>
+                                        String(blockedId) ===
+                                        req.auth._id.toString()
+                                    );
+
+                            const blockedByMe =
+                                (req.authUser.blockedUsers || [])
+                                    .some(blockedId =>
+                                        String(blockedId) === id
+                                    );
+
+                            if (blockedByTarget || blockedByMe) continue;
+
+                            mentionedUsers.add(id);
+                        } catch (_) {}
                     }
 
-                    while ((match = mentionRegex.exec(commentText)) !== null) {
-                        const name = match[1].trim();
-                        let user = await User.findOne({ firstName: new RegExp(`^${name}$`, 'i') });
-                        if (!user && name.includes(' ')) {
-                            const parts = name.split(' ');
-                            user = await User.findOne({ 
-                                firstName: new RegExp(`^${parts[0]}$`, 'i'),
-                                lastName: new RegExp(`^${parts.slice(1).join(' ')}$`, 'i')
+                    // Backward compatibility only.
+                    // Structured clients must never trigger a second,
+                    // name-based recipient resolution pass.
+                    if (!structuredMentions) {
+                        let match;
+
+                        while ((match = mentionRegex.exec(commentText)) !== null) {
+                            const name = match[1].trim();
+
+                            let user = await User.findOne({
+                                firstName: new RegExp(`^${name}$`, 'i')
                             });
+
+                            if (!user && name.includes(' ')) {
+                                const parts = name.split(' ');
+                                user = await User.findOne({
+                                    firstName: new RegExp(`^${parts[0]}$`, 'i'),
+                                    lastName: new RegExp(
+                                        `^${parts.slice(1).join(' ')}$`,
+                                        'i'
+                                    )
+                                });
+                            }
+
+                            if (!user) {
+                                const anonComment = await Comment.findOne({
+                                    post: post._id,
+                                    anonymName: new RegExp(`^${name}$`, 'i')
+                                });
+
+                                if (anonComment) {
+                                    user = await User.findById(anonComment.user);
+                                }
+                            }
+
+                            if (!user) continue;
+
+                            const uid = user._id.toString();
+
+                            if (uid === req.auth._id.toString()) continue;
+
+                            if (isAnon) {
+                                if (!participants.has(uid)) continue;
+                            } else {
+                                if (!participants.has(uid) && !friends.includes(uid)) continue;
+                            }
+
+                            mentionedUsers.add(uid);
                         }
-                        if (!user) {
-                            const anonComment = await Comment.findOne({ post: post._id, anonymName: new RegExp(`^${name}$`, 'i') });
-                            if (anonComment) user = await User.findById(anonComment.user);
-                        }
-                        if (!user) continue;
-                        const uid = user._id.toString();
-                        if (uid === req.auth._id.toString()) continue; // cannot tag self
-                        if (isAnon) {
-                            if (!participants.has(uid)) continue; // anon can only tag participants
-                        } else {
-                            if (!participants.has(uid) && !friends.includes(uid)) continue; // non-anon must be participant or friend
-                        }
-                        mentionedUsers.add(uid);
                     }
 
                     // Send notifications and realtime mentions
@@ -620,6 +760,14 @@ exports.destroyComment = async (res, commentId, callback) => {
 
         // Remove any associated reports for the comment
         await Report.deleteMany({ 'entity.id': commentId, 'entity.name': 'comment' });
+
+        // Remove the Archive/Activity entry created for this comment.
+        await Activity.deleteMany({
+            $or: [
+                { 'meta.commentId': commentId },
+                { targetType: 'comment', targetId: commentId }
+            ]
+        });
 
         // If a callback exists, call it
         if (callback) return callback(res);

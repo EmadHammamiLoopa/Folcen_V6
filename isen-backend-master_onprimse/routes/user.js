@@ -23,7 +23,7 @@ const Activity = require('../app/models/Activity');
 const AuditLog = require('../app/models/AuditLog');
 const MessageEvent = require('../app/models/MessageEvent');
 const peerStore = require('.././app/utils/peerStorage');
-const { notifyPeerNeeded, emitToUser } = require('../app/helpers');
+const { notifyPeerNeeded, emitToUser, normalizeId } = require('../app/helpers');
 const callSessions = require('../app/utils/callSessionStore');
 const { sendVideoCallLifecyclePush } = require('../app/services/videoCallPushService');
 
@@ -289,6 +289,7 @@ const {
   getUsers,
   follow,
   getUserProfile,
+  prefetchUserProfile,
   getFriends,
   removeFriendship,
   blockUser,
@@ -390,7 +391,7 @@ router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeU
 });
 
 
-/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ GET   /:userId/peer ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ GET   /:userId/peer ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
  * The caller hits this to find out whether the callee is online.
  *  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ If a fresh record exists      ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ return {peerId, expires}
  *  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ If missing/expired            ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ nudge callee + return {peerId:null}
@@ -414,26 +415,22 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
     const callerHasCallee = (callerDoc.friends || []).map(String).includes(String(userId));
     const calleeHasCaller = (calleeDoc.friends || []).map(String).includes(callerId);
     const isFriend = callerHasCallee || calleeHasCaller;
-    let validOneTimeRequest = false;
+    let persistentVideoPermission = null;
 
-    if (!isFriend && req.query?.videoRequestId) {
-      const request = await Message.findOne({
-        _id: req.query.videoRequestId,
+    if (!isFriend) {
+      persistentVideoPermission = await Message.findOne({
         type: 'video-call-request',
         status: 'accepted',
-        $or: [
-          { from: callerId, to: userId },
-          { from: userId, to: callerId }
-        ]
-      }).select('_id').lean();
-      validOneTimeRequest = !!request;
+        from: callerId,
+        to: userId
+      }).sort({ updatedAt: -1 }).select('_id').lean();
     }
 
-    if (!isFriend && !validOneTimeRequest) {
+    if (!isFriend && !persistentVideoPermission) {
       return res.status(403).json({
         success: false,
-        code: 'not_friends',
-        message: 'Video calls are available only for friends or an accepted one-time request'
+        code: 'video_permission_required',
+        message: 'Video calls require friendship or accepted video-call permission'
       });
     }
 
@@ -443,7 +440,9 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
     const callInvite = {
       callId: req.query?.callId || `call-${callerId}-${userId}-${Date.now()}`,
       callType: req.query?.callType || 'video',
-      videoRequestId: req.query?.videoRequestId,
+      videoRequestId: persistentVideoPermission?._id
+        ? String(persistentVideoPermission._id)
+        : req.query?.videoRequestId,
       callerName,
       callerAvatar: caller.mainAvatar || caller.avatar || '',
       expiresAt: Date.now() + callSessions.RING_TIMEOUT_MS
@@ -606,7 +605,25 @@ router.put('/:userId/avatar', [requireSignin, withAuthUser, upload.single('avata
 router.put('/:userId', [requireSignin, withAuthUser, userUpdateValidator], updateUser);
 
 router.get('/users', [requireSignin, withAuthUser], getUsers);
-router.get('/profile/:userId', [requireSignin, withAuthUser], getUserProfile);
+// Profile uses a distinct route-param name so the global
+// router.param('userId', userById) loader does not perform an unnecessary
+// full User.findById() before authentication/profile loading.
+// getUserProfile already normalizes the ID, including legacy Base64 IDs.
+router.get('/profile/:profileUserId', [
+  requireSignin,
+  (req, res, next) => {
+    const userId = normalizeId(req.params.profileUserId);
+
+    if (!userId || !User.db.base.Types.ObjectId.isValid(userId)) {
+      return Response.sendError(res, 400, 'Invalid User ID format');
+    }
+
+    req.params.userId = userId;
+    next();
+  },
+  prefetchUserProfile,
+  withAuthUser
+], getUserProfile);
 
 router.put('/', [requireSignin, withAuthUser, userUpdateValidator], updateUser);
 

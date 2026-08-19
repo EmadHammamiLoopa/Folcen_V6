@@ -50,6 +50,12 @@ export class DisplayComponent implements OnInit, OnDestroy {
   private userSub: Subscription | null = null;
   private subs: Subscription[] = [];
 
+  // Keep own-profile refreshes cheap. Realtime events already patch social counts,
+  // so repeatedly re-entering the tab should not trigger another profile fetch.
+  private ownProfileRefreshInFlight = false;
+  private lastOwnProfileRefreshAt = 0;
+  private readonly ownProfileRefreshMinIntervalMs = 30_000;
+
   constructor(
     private auth: AuthService, private userService: UserService, private requestService: RequestService,
     private toastService: ToastService, private alertCtrl: AlertController, private router: Router,
@@ -343,28 +349,57 @@ export class DisplayComponent implements OnInit, OnDestroy {
 
   ionViewWillEnter() {
     console.log("Entering view...");
-    this.pageLoading = true;
-    this.getUserId();
-    // Refresh own profile counts (friends/followers/following) from server
-    // every time the view is entered so stats are always up-to-date.
-    if (this.myProfile) {
-      this.userService.refreshCurrentUser().subscribe({
-        next: (fresh) => {
-          if (fresh) {
-            console.log('[PROFILE:ionViewWillEnter] refreshCurrentUser result — friends:', fresh.friends?.length, 'followers:', fresh.followers?.length, 'following:', fresh.following?.length, 'raw:', fresh);
-            this.user = fresh;
-            this.mainAvatar = this.user.mainAvatarPath;
-            this.pageLoading = false;
-            this.changeDetectorRef.detectChanges();
-          }
-        },
-        error: () => { /* non-critical, display already shows cached data */ }
-      });
+
+    // Keep already-rendered profile content visible while a background refresh runs.
+    if (this.user) {
+      this.pageLoading = false;
     }
+
+    if (!this.myProfile) {
+      return;
+    }
+
+    const now = Date.now();
+    const recentlyRefreshed =
+      this.lastOwnProfileRefreshAt > 0 &&
+      now - this.lastOwnProfileRefreshAt < this.ownProfileRefreshMinIntervalMs;
+
+    if (this.ownProfileRefreshInFlight || recentlyRefreshed) {
+      return;
+    }
+
+    this.ownProfileRefreshInFlight = true;
+
+    this.userService.refreshCurrentUser().subscribe({
+      next: (fresh) => {
+        this.ownProfileRefreshInFlight = false;
+        this.lastOwnProfileRefreshAt = Date.now();
+
+        if (fresh) {
+          console.log(
+            '[PROFILE:ionViewWillEnter] refreshCurrentUser result — friends:',
+            fresh.friends?.length,
+            'followers:',
+            fresh.followers?.length,
+            'following:',
+            fresh.following?.length
+          );
+
+          this.user = fresh;
+          this.mainAvatar = this.user.mainAvatarPath;
+          this.pageLoading = false;
+          this.changeDetectorRef.detectChanges();
+        }
+      },
+      error: () => {
+        this.ownProfileRefreshInFlight = false;
+        // Non-critical: cached/current profile remains visible.
+      }
+    });
   }
 
   getUserId() {
-    this.route.paramMap.subscribe(params => {
+    const routeSub = this.route.paramMap.subscribe(params => {
       this.userId = params.get('id') || '';
       console.log('Route userId:', this.userId);
       // Defensive: decode URL-safe base64 transport ids if present
@@ -399,6 +434,8 @@ export class DisplayComponent implements OnInit, OnDestroy {
         this.loadUserData();
       }
     });
+
+    this.subs.push(routeSub);
   }
 
   private normalizeCachedUser(raw: any): any {
@@ -461,24 +498,43 @@ export class DisplayComponent implements OnInit, OnDestroy {
 
   loadUserData() {
     if (this.myProfile) {
-      // forceRefresh: true skips both the in-memory short-circuit and the profile cache,
-      // so we always get live friends/followers/following arrays from the server.
-      this.userService.getUserProfile(this.userId, { forceRefresh: true }).subscribe({
+      // Own profile already exists in the canonical UserService state in normal
+      // authenticated sessions. Render it immediately instead of issuing another
+      // force-refresh. ionViewWillEnter performs at most one throttled background refresh.
+      const cached =
+        this.userService.currentUserValue ||
+        this.userService.getCachedProfile(this.userId);
+
+      const cachedId = String(
+        (cached as any)?._id ||
+        (cached as any)?.id ||
+        ''
+      );
+
+      if (cached && cachedId === String(this.userId)) {
+        this.user = new User().initialize(cached);
+        this.mainAvatar = this.user.mainAvatarPath;
+        this.pageLoading = false;
+        this.usedCached = true;
+        this.changeDetectorRef.detectChanges();
+        return;
+      }
+
+      // Fallback for an unusual cold state where no canonical user is available.
+      // Do not force-refresh so UserService can still dedupe/cache the request.
+      this.userService.getUserProfile(this.userId).subscribe({
         next: (user) => {
           if (user && user._id) {
-              this.user = new User().initialize(user);
-              this.mainAvatar = this.user.mainAvatarPath;
-              this.pageLoading = false;
-              console.log('[PROFILE:loadUserData] API response — friends:', this.user.friends?.length, 'followers:', this.user.followers?.length, 'following:', this.user.following?.length, 'raw friends:', this.user.friends, 'raw followers:', this.user.followers);
-              // Push fresh data into the central store so userSub doesn't
-              // overwrite this with the stale localStorage copy.
-              this.userService.setCurrentUser(this.user, { force: true });
-            console.log('Loaded user data for own profile:', this.user);
+            this.user = new User().initialize(user);
+            this.mainAvatar = this.user.mainAvatarPath;
+            this.pageLoading = false;
+            this.userService.setCurrentUser(this.user, { force: true });
           } else {
             console.error('User data is undefined or missing _id for own profile:', user);
             this.handleUserDataError();
           }
-          this.changeDetectorRef.detectChanges(); // Trigger change detection
+
+          this.changeDetectorRef.detectChanges();
         },
         error: (err) => {
           console.error('Error fetching user profile for own profile:', err);

@@ -2124,6 +2124,116 @@ function formatLastSeen(lastSeenDate) {
     return `${diffDays} day(s) ago`;
 }
 
+function findUserProfileDoc(userId) {
+  return User.findOne({ _id: userId })
+    .select({
+      firstName: 1,
+      lastName: 1,
+      email: 1,
+      emailVerified: 1,
+      country: 1,
+      city: 1,
+      gender: 1,
+      avatar: 1,
+      mainAvatar: 1,
+      birthDate: 1,
+      profession: 1,
+      interests: 1,
+      languages: 1,
+      education: 1,
+      school: 1,
+      loggedIn: 1,
+      enabled: 1,
+      is2FAEnabled: 1,
+      twoFAToken: 1,
+      role: 1,
+      banned: 1,
+      followers: 1,
+      following: 1,
+      friends: 1,
+      missedCallBudget: 1,
+      blockedUsers: 1,
+      followedChannels: 1,
+      messagedUsers: 1,
+      randomVisible: 1,
+      ageVisible: 1,
+      allowVideoRequestsFromNonFriends: 1,
+      genderVisible: 1,
+      visitProfile: 1,
+      isPrivate: 1,
+      lastSeen: 1,
+      aboutMe: 1,
+      avatarStyle: 1,
+      avatarSeed: 1,
+      avatarVariant: 1,
+      avatarOverrides: 1,
+      subscription: 1,
+      themePreference: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      deletedAt: 1
+    })
+    .populate({
+      path: "subscription._id",
+      model: "Subscription",
+      select: "dayPrice weekPrice monthPrice yearPrice currency offers",
+    })
+    .populate({
+      path: "followedChannels",
+      select: "name title image photo description type"
+    }).exec();
+}
+
+function findSelfPendingCounts(userId) {
+  return Promise.all([
+    Follow.countDocuments({
+      followed: userId,
+      status: 'pending'
+    }),
+    Request.countDocuments({
+      to: userId,
+      accepted: false
+    })
+  ]).then(([
+    pendingFollowRequestsCount,
+    pendingFriendRequestsCount
+  ]) => ({
+    pendingFollowRequestsCount,
+    pendingFriendRequestsCount
+  }));
+}
+
+exports.prefetchUserProfile = (req, res, next) => {
+  // Start the target-profile read now. withAuthUser runs next, so its
+  // authenticated-user read can overlap this database round trip.
+  // Resolve errors into the promise value immediately to avoid an
+  // unhandled rejection if authentication rejects the request first.
+  req._profileUserPromise = findUserProfileDoc(req.params.userId).then(
+    userDoc => ({ userDoc, error: null }),
+    error => ({ userDoc: null, error })
+  );
+
+  // For self-profile requests, the pending counters are also independent of
+  // withAuthUser and the profile read. Start them here so all Mongo reads can
+  // overlap instead of adding another database round trip afterward.
+  const authUserId = req.auth?._id
+    ? String(req.auth._id)
+    : null;
+
+  if (
+    authUserId &&
+    authUserId === String(req.params.userId)
+  ) {
+    req._profilePendingCountsPromise =
+      findSelfPendingCounts(authUserId).then(
+        counts => ({ counts, error: null }),
+        error => ({ counts: null, error })
+      );
+  }
+
+  next();
+};
+
 exports.getUserProfile = async (req, res) => {
     if (process.env.DEBUG_PROFILE === '1') logger.info(`Fetching user profile for ID: ${req.params.userId}`);
   
@@ -2133,64 +2243,21 @@ exports.getUserProfile = async (req, res) => {
   
       if (process.env.DEBUG_PROFILE === '1') logger.info(`Authenticated user ID: ${authUserId}`);
   
-      // Find the user by ID and populate subscription details
-      const userDoc = await User.findOne({ _id: userId })
-        .select({
-          firstName: 1,
-          lastName: 1,
-          email: 1,
-          emailVerified: 1,
-          country: 1,
-          city: 1,
-          gender: 1,
-          avatar: 1,
-          mainAvatar: 1,
-          birthDate: 1,
-          profession: 1,
-          interests: 1,
-          languages: 1,
-          education: 1,
-          school: 1,
-          loggedIn: 1,
-          enabled: 1,
-          is2FAEnabled: 1,
-          twoFAToken: 1,
-          role: 1,
-          banned: 1,
-          followers: 1,
-          following: 1,
-          friends: 1,
-          missedCallBudget: 1,
-          blockedUsers: 1,
-          followedChannels: 1,
-          messagedUsers: 1,
-          randomVisible: 1,
-          ageVisible: 1,
-          allowVideoRequestsFromNonFriends: 1,
-          genderVisible: 1,
-          visitProfile: 1,
-          isPrivate: 1,
-          lastSeen: 1,
-          aboutMe: 1,
-          avatarStyle: 1,
-          avatarSeed: 1,
-          avatarVariant: 1,
-          avatarOverrides: 1,
-          subscription: 1,
-          themePreference: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          deletedAt: 1
-        })
-        .populate({
-          path: "subscription._id",
-          model: "Subscription",
-          select: "dayPrice weekPrice monthPrice yearPrice currency offers",
-        })
-        .populate({
-          path: "followedChannels",
-          select: "name title image photo description type"
-        });
+      // The route may have started this query before withAuthUser so the
+      // profile read and authenticated-user read overlap instead of running
+      // as two sequential Mongo round trips.
+      const prefetchedProfile = req._profileUserPromise
+        ? await req._profileUserPromise
+        : {
+            userDoc: await findUserProfileDoc(userId),
+            error: null
+          };
+
+      if (prefetchedProfile.error) {
+        throw prefetchedProfile.error;
+      }
+
+      const userDoc = prefetchedProfile.userDoc;
   
       if (!userDoc) {
         return Response.sendError(res, 404, "User not found");
@@ -2222,10 +2289,27 @@ exports.getUserProfile = async (req, res) => {
       const user = normalizeLeanDoc(userDoc.toObject());
       const isMe = authUserId === userId;
 
-      // Add pending counts for self
+      // Add pending counts for self. The profile route starts these reads before
+      // withAuthUser so they overlap auth/profile Mongo latency. Keep a direct
+      // fallback for callers that invoke getUserProfile without the prefetch.
       if (isMe) {
-          user.pendingFollowRequestsCount = await Follow.countDocuments({ followed: authUserId, status: 'pending' });
-          user.pendingFriendRequestsCount = await Request.countDocuments({ to: authUserId, accepted: false });
+          const prefetchedPendingCounts =
+            req._profilePendingCountsPromise
+              ? await req._profilePendingCountsPromise
+              : {
+                  counts: await findSelfPendingCounts(authUserId),
+                  error: null
+                };
+
+          if (prefetchedPendingCounts.error) {
+            throw prefetchedPendingCounts.error;
+          }
+
+          user.pendingFollowRequestsCount =
+            prefetchedPendingCounts.counts.pendingFollowRequestsCount;
+
+          user.pendingFriendRequestsCount =
+            prefetchedPendingCounts.counts.pendingFriendRequestsCount;
       }
   
       // Default avatar if missing
@@ -2233,47 +2317,92 @@ exports.getUserProfile = async (req, res) => {
         user.mainAvatar = userDoc.getDefaultAvatar();
       }
   
-      // Relationship status — bidirectional check:
-      // The viewed user may have the auth user in their friends, OR the auth user may have the
-      // viewed user in their friends (DB can be inconsistent if one side was updated first).
-      // Fetch auth user's own friends to cross-check.
-      const authUserFriends = await User.findById(authUserId).select('friends').lean();
-      const authFriendIds = (authUserFriends?.friends || []).map(id => String(id));
-      const isFriendBidirectional = (doc, friendIdStr) => {
-        const inViewedSide = doc.friends && doc.friends.some(id => String(id) === friendIdStr);
-        const inAuthSide   = authFriendIds.includes(String(doc._id));
-        return inViewedSide || inAuthSide;
-      };
-      const isLoggedInUser = authUserId === userId;
-      const isFriendResult = isLoggedInUser ? false : isFriendBidirectional(userDoc, authUserId);
-      const relationshipStatus = {
-        isLoggedInUser,
-        isFriend: isFriendResult,
-        friend:   isFriendResult,
-      };
+      let isFriendResult = false;
+      let relationshipStatus;
 
-      // Add follow status
-      const followRecord = await Follow.findOne({
-        follower: authUserId,
-        followed: userId
-      });
+      if (isMe) {
+        // Self-profile does not need friend/follow/request lookups against itself.
+        // The authenticated user was already resolved by auth middleware, and none
+        // of these relationship queries can change the semantics of viewing self.
+        relationshipStatus = {
+          isLoggedInUser: true,
+          isFriend: false,
+          friend: false,
+          followStatus: null,
+          isFollowing: false,
+          isFollower: false,
+        };
+      } else {
+        // Relationship status — bidirectional check.
+        // withAuthUser already loaded the authenticated user's friends, so reuse
+        // that request-local data instead of paying for another User.findById().
+        const authFriendIds =
+          (req.authUser?.friends || []).map(id => String(id));
 
-      const isFollowerRecord = await Follow.findOne({
-        follower: userId,
-        followed: authUserId
-      });
+        const inViewedSide =
+          userDoc.friends &&
+          userDoc.friends.some(id => String(id) === authUserId);
 
-      relationshipStatus.followStatus = followRecord ? followRecord.status : null;
-      relationshipStatus.isFollowing = !!(followRecord && followRecord.status === 'active');
-      relationshipStatus.isFollower = !!(isFollowerRecord && isFollowerRecord.status === 'active');
+        const inAuthSide =
+          authFriendIds.includes(String(userDoc._id));
 
-      // Friend request status: 'requested' = auth user sent request, 'requesting' = profile owner sent request to auth user
-      if (!isFriendResult && !isMe) {
-        const outgoingRequest = await Request.findOne({ from: authUserId, to: userId, accepted: false });
-        const incomingRequest = await Request.findOne({ from: userId, to: authUserId, accepted: false });
-        if (outgoingRequest) relationshipStatus.request = 'requested';
-        else if (incomingRequest) relationshipStatus.request = 'requesting';
-        else relationshipStatus.request = null;
+        isFriendResult = !!(inViewedSide || inAuthSide);
+
+        relationshipStatus = {
+          isLoggedInUser: false,
+          isFriend: isFriendResult,
+          friend: isFriendResult,
+        };
+
+        // These relationship reads are independent. Run them concurrently so
+        // cross-region database latency is paid once rather than serially.
+        const [
+          followRecord,
+          isFollowerRecord,
+          outgoingRequest,
+          incomingRequest
+        ] = await Promise.all([
+          Follow.findOne({
+            follower: authUserId,
+            followed: userId
+          }),
+          Follow.findOne({
+            follower: userId,
+            followed: authUserId
+          }),
+          !isFriendResult
+            ? Request.findOne({
+                from: authUserId,
+                to: userId,
+                accepted: false
+              })
+            : Promise.resolve(null),
+          !isFriendResult
+            ? Request.findOne({
+                from: userId,
+                to: authUserId,
+                accepted: false
+              })
+            : Promise.resolve(null)
+        ]);
+
+        relationshipStatus.followStatus =
+          followRecord ? followRecord.status : null;
+
+        relationshipStatus.isFollowing =
+          !!(followRecord && followRecord.status === 'active');
+
+        relationshipStatus.isFollower =
+          !!(isFollowerRecord && isFollowerRecord.status === 'active');
+
+        // Friend request status:
+        // requested = auth user sent it
+        // requesting = profile owner sent it
+        if (!isFriendResult) {
+          if (outgoingRequest) relationshipStatus.request = 'requested';
+          else if (incomingRequest) relationshipStatus.request = 'requesting';
+          else relationshipStatus.request = null;
+        }
       }
 
       // If profile is private and not a friend/self, restrict exposed data.
@@ -2482,6 +2611,37 @@ exports.removeFriendship = async(req, res) => {
                 { from: user._id, to: authUser._id }
             ]
         });
+
+        // Friendship itself is the implicit follow relationship.
+        // Once users unfriend, that implicit relationship ends.
+        // Do not silently convert an old friendship into an explicit Follow.
+        // Also remove any stale legacy follow state that may predate this rule.
+        await Promise.all([
+            Follow.deleteMany({
+                $or: [
+                    { follower: authUser._id, followed: user._id },
+                    { follower: user._id, followed: authUser._id }
+                ]
+            }),
+            User.updateOne(
+                { _id: authUser._id },
+                {
+                    $pull: {
+                        following: user._id,
+                        followers: user._id
+                    }
+                }
+            ),
+            User.updateOne(
+                { _id: user._id },
+                {
+                    $pull: {
+                        following: authUser._id,
+                        followers: authUser._id
+                    }
+                }
+            )
+        ]);
 
         logger.info('removeFriendship: removed friendship and requests between', String(authUser._id), 'and', String(user._id));
 

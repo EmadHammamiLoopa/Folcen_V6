@@ -98,7 +98,10 @@ export class UserService {
     SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe(payload => {
       try {
         if (payload && payload.userId) {
-          this.invalidateProfile(payload.userId);
+          // Realtime listeners on the active screen decide whether fresh profile
+          // data is actually needed. Globally, only invalidate the cached copy;
+          // otherwise the same socket event can trigger duplicate profile GETs.
+          this.invalidateProfile(payload.userId, { refreshCurrentUser: false });
         }
       } catch (e) { devLogger.warn('Error handling userProfileUpdated payload', e); }
     });
@@ -616,14 +619,26 @@ getCurrentUserId(): string | null {
   }
 
   /** Invalidate a single user's cached profile and optionally refresh current user */
-  invalidateProfile(id: string) {
+  invalidateProfile(
+    id: string,
+    options: { refreshCurrentUser?: boolean } = {}
+  ) {
     if (!id) return;
     try {
       this.profileCache.delete(id);
       this.inflightProfiles.delete(id);
-      // If this is the authenticated user, re-fetch and update currentUser
+
+      const shouldRefreshCurrentUser =
+        options.refreshCurrentUser !== false;
+
+      // Preserve existing behavior for explicit invalidation callers.
+      // Realtime cache-only invalidation can opt out to avoid duplicate GETs.
       const cu = this.currentUserSubject && this.currentUserSubject.value;
-      if (cu && (cu._id === id || cu.id === id)) {
+      if (
+        shouldRefreshCurrentUser &&
+        cu &&
+        (cu._id === id || cu.id === id)
+      ) {
         this.getUserProfile(id, { forceRefresh: true }).subscribe({
           next: (u) => { if (u) this.setCurrentUser(u); },
           error: () => { /* ignore */ }

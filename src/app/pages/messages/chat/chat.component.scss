@@ -146,7 +146,13 @@
 }
 
 .chat-content {
-  padding-bottom: 140px; /* ensure space for fixed footer */
+  /* Reserve real scroll space above the fixed message composer. */
+  --padding-bottom: calc(180px + env(safe-area-inset-bottom));
+
+  &::part(scroll) {
+    padding-bottom: calc(180px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(180px + env(safe-area-inset-bottom));
+  }
 }
 
 .product-glass-card {

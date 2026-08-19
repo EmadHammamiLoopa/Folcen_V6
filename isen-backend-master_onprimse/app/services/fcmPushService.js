@@ -71,6 +71,22 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     stringData.event === 'call:invite' ||
     stringData.category === 'call';
 
+  const videoPermissionType =
+    stringData.type || stringData.event || '';
+
+  const isVideoPermissionEvent = [
+    'video-call-request',
+    'video-call-accepted',
+    'video-call-rejected',
+    'video-call-revoked',
+    'video-call-cancelled'
+  ].includes(videoPermissionType);
+
+  // These Android events must be data-only so Folcen's native
+  // FirebaseMessagingService always owns notification presentation.
+  const isNativeHandledAndroid =
+    isIncomingCall || isVideoPermissionEvent;
+
   const message = {
     data: {
       ...stringData,
@@ -81,24 +97,61 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     tokens,
   };
 
-  // Android call pushes must be data-only so the native Firebase service can
-  // build the full-screen incoming-call UI even when the WebView is killed.
-  if (!isIncomingCall) {
+  // Incoming calls and video-permission events are data-only on Android.
+  // The native Folcen Firebase service creates their actual notifications.
+  if (!isNativeHandledAndroid) {
     message.notification = {
       title: safeTitle,
-      body:  safeBody,
+      body: safeBody,
     };
   }
+
   if (android) {
-    message.android = isIncomingCall
+    message.android = isNativeHandledAndroid
       ? {
           priority: android.priority || 'high',
-          ttl: android.ttl || 90 * 1000,
-          collapseKey: stringData.callId || stringData.fromUserId || stringData.callerId || 'incoming_call'
+          ttl: android.ttl || (isIncomingCall ? 90 * 1000 : 5 * 60 * 1000),
+          collapseKey: isIncomingCall
+            ? (
+                stringData.callId ||
+                stringData.fromUserId ||
+                stringData.callerId ||
+                'incoming_call'
+              )
+            : (
+                stringData.messageId ||
+                videoPermissionType ||
+                'video_permission'
+              )
         }
       : android;
   }
-  if (apns) message.apns = apns;
+
+  // Keep normal visible APNs alerts while Android uses the data-only
+  // native path above.
+  if (apns) {
+    if (isVideoPermissionEvent) {
+      const existingAps =
+        (apns.payload && apns.payload.aps) || {};
+
+      message.apns = {
+        ...apns,
+        payload: {
+          ...(apns.payload || {}),
+          aps: {
+            ...existingAps,
+            alert: existingAps.alert || {
+              title: safeTitle,
+              body: safeBody
+            },
+            sound: existingAps.sound || 'default'
+          }
+        }
+      };
+    } else {
+      message.apns = apns;
+    }
+  }
 
   let successCount  = 0;
   let failureCount  = 0;

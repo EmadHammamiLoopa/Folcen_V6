@@ -198,10 +198,25 @@ export class ListComponent implements OnInit, OnDestroy {
         }
         // keep a latest snapshot for template use
         this.missedMapLatest = map;
-        // Update badges from computed total
-        const total = Object.values(map).reduce((sum, n) => sum + (Number(n) || 0), 0);
+        // Missed calls may contribute to the Messages badge, but must
+        // never erase unread message/video-permission activity.
+        const total = Object.values(map).reduce(
+          (sum, n) => sum + (Number(n) || 0),
+          0
+        );
         this.prevMissedCount = total;
-        try { this.badges.set('messages', total); } catch(e) {}
+
+        try {
+          if (total > 0) {
+            this.badges.set(
+              'messages',
+              Math.max(
+                this.badges.get('messages'),
+                total
+              )
+            );
+          }
+        } catch(e) {}
 
         this.cdr.markForCheck();
         return map;

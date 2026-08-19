@@ -83,6 +83,7 @@ export interface AvatarProfile {
   username?: string;
   userName?: string;
   mainAvatar?: string;
+  updatedAt?: string | Date;
   [key: string]: any;
 }
 
@@ -100,9 +101,27 @@ export class AvatarUrlUtil {
     const normalizeUrl = (url: string) => {
       if (!url) return '';
       if (url.startsWith('http') || url.startsWith('data:')) return url;
-      
+
       const fullUrl = backendRoot + (url.startsWith('/') ? '' : '/') + url;
-      const timestamp = profile.updatedAt ? new Date(profile.updatedAt).getTime() : Date.now();
+
+      // Uploaded avatar filenames already contain their own unique revision.
+      // Do not tie their browser cache key to profile.updatedAt because unrelated
+      // profile updates (for example presence/peer state) can change updatedAt and
+      // force the exact same image to download again.
+      const isUploadedAvatar =
+        url.startsWith('/public/uploads/') ||
+        url.startsWith('public/uploads/');
+
+      if (isUploadedAvatar) return fullUrl;
+
+      // For any legacy relative avatar path that may not be uniquely named, retain
+      // updatedAt as a stable cache revision. Never use Date.now() here.
+      const rawUpdatedAt = profile.updatedAt;
+      if (!rawUpdatedAt) return fullUrl;
+
+      const timestamp = new Date(rawUpdatedAt).getTime();
+      if (!Number.isFinite(timestamp) || timestamp <= 0) return fullUrl;
+
       const separator = fullUrl.includes('?') ? '&' : '?';
       return `${fullUrl}${separator}v=${timestamp}`;
     };
@@ -132,14 +151,14 @@ export class AvatarUrlUtil {
     const params = new URLSearchParams();
 
     params.set('seed', seed);
-    
+
     const overrides: AvatarOverrides = profile.avatarOverrides || {};
 
     // Use overrides or defaults
     params.set('mouth', overrides.mouth && overrides.mouth !== 'auto' ? overrides.mouth : 'smile');
     params.set('eyes', overrides.eyes && overrides.eyes !== 'auto' ? overrides.eyes : 'happy');
     params.set('eyebrows', overrides.eyebrows && overrides.eyebrows !== 'auto' ? overrides.eyebrows : 'raisedExcitedNatural');
-    
+
     // Top / Hair
     if (overrides.top === 'none') {
       params.set('topProbability', '0');
@@ -171,7 +190,7 @@ export class AvatarUrlUtil {
     if (overrides.clothingGraphic && overrides.clothingGraphic !== 'auto') params.set('clothingGraphic', overrides.clothingGraphic);
     if (overrides.hatColor && overrides.hatColor !== 'auto') params.set('hatColor', overrides.hatColor);
     if (overrides.accessoriesColor && overrides.accessoriesColor !== 'auto') params.set('accessoriesColor', overrides.accessoriesColor);
-    
+
     // Fix skinColor parameter name for DiceBear
     if (overrides.skinTone && overrides.skinTone !== 'auto') {
       params.set('skinColor', overrides.skinTone);
@@ -185,7 +204,7 @@ export class AvatarUrlUtil {
 
     params.set('backgroundColor', bgColor);
     params.set('backgroundType', overrides.backgroundType === 'gradientLinear' ? 'gradientLinear' : 'solid');
-    
+
     if (params.get('backgroundType') === 'gradientLinear') {
       params.set('backgroundRotation', '45');
     }
