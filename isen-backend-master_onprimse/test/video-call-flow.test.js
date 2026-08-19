@@ -74,13 +74,16 @@ describe('video call request flow', function () {
 
   it('creates an answerable ringing session from peer wake push and accepts by payload callId', async function () {
     const User = require('../app/models/User');
+    const CallEvent = require('../app/models/CallEvent');
     const peerStore = require('../app/utils/peerStorage');
     const pushSvc = require('../app/utils/pushService');
+    const helpers = require('../app/helpers');
     const router = require('../routes/user');
     const callSessions = require('../app/utils/callSessionStore');
     const registerVideoSocket = require('../app/sockets/video');
 
     const originalFindById = User.findById;
+    const originalCallEventUpdateOne = CallEvent.updateOne;
     const originalPeerGet = peerStore.get;
     const originalSendPush = pushSvc.sendPush;
     let pushCount = 0;
@@ -96,6 +99,11 @@ describe('video call request flow', function () {
           friends: [String(id) === callerId ? calleeId : callerId]
         })
       })
+    });
+    CallEvent.updateOne = async () => ({ modifiedCount: 1, matchedCount: 1 });
+    helpers.initSocket({
+      to: () => ({ emit: () => {} }),
+      emit: () => {}
     });
     peerStore.get = async () => null;
     pushSvc.sendPush = () => { pushCount += 1; return Promise.resolve(); };
@@ -179,7 +187,9 @@ describe('video call request flow', function () {
       assert.strictEqual(afterStarted.answerable, false);
       assert.strictEqual(afterStarted.status, 'connected');
     } finally {
+      helpers.initSocket(null);
       User.findById = originalFindById;
+      CallEvent.updateOne = originalCallEventUpdateOne;
       peerStore.get = originalPeerGet;
       pushSvc.sendPush = originalSendPush;
     }
@@ -212,11 +222,19 @@ describe('video call request flow', function () {
     const registerChatSocket = require('../app/sockets/chat');
 
     const originalUpdateMany = Message.updateMany;
+    const originalFindOne = Message.findOne;
     const originalSave = Message.prototype.save;
     const originalFindById = User.findById;
     const originalFindByIdAndUpdate = User.findByIdAndUpdate;
 
     Message.updateMany = async () => ({ modifiedCount: 0 });
+    Message.findOne = () => ({
+      sort: () => ({
+        select: () => ({
+          lean: async () => null
+        })
+      })
+    });
     Message.prototype.save = async function () {
       this._id = new mongoose.Types.ObjectId('64b000000000000000000099');
       return this;
@@ -263,6 +281,7 @@ describe('video call request flow', function () {
       assert.ok(emitted.some(e => e.sid === 'caller-socket' && e.event === 'message-sent' && e.payload.tempId === 'temp-1'));
     } finally {
       Message.updateMany = originalUpdateMany;
+      Message.findOne = originalFindOne;
       Message.prototype.save = originalSave;
       User.findById = originalFindById;
       User.findByIdAndUpdate = originalFindByIdAndUpdate;
@@ -319,63 +338,63 @@ describe('video call request flow', function () {
     }
   });
 
-  it('marks an accepted one-time video request used when either participant starts it', async function () {
+  it('keeps accepted video permission persistent when the sender starts a call', async function () {
     const Message = require('../app/models/Message');
-    const { connectedUsers } = require('../app/utils/socketManager');
     const registerChatSocket = require('../app/sockets/chat');
 
-    const originalFindOneAndUpdate = Message.findOneAndUpdate;
+    const originalExists = Message.exists;
     let query;
-    Message.findOneAndUpdate = async (q) => {
-      query = q;
-      return {
-        id: '64b000000000000000000099',
-        _id: new mongoose.Types.ObjectId('64b000000000000000000099'),
-        from: new mongoose.Types.ObjectId(callerId),
-        to: new mongoose.Types.ObjectId(calleeId),
-        status: 'used'
-      };
-    };
 
-    connectedUsers.set(callerId, new Set(['caller-socket']));
-    connectedUsers.set(calleeId, new Set(['callee-socket']));
+    Message.exists = async q => {
+      query = q;
+      return { _id: new mongoose.Types.ObjectId('64b000000000000000000099') };
+    };
 
     const emitted = [];
     const socket = {
-      id: 'callee-socket',
-      userId: calleeId,
+      id: 'caller-socket',
+      userId: callerId,
       handlers: {},
       on(event, handler) { this.handlers[event] = handler; }
     };
-    const io = { to: sid => ({ emit: (event, payload) => emitted.push({ sid, event, payload }) }) };
+    const io = {
+      to: sid => ({
+        emit: (event, payload) => emitted.push({ sid, event, payload })
+      })
+    };
 
     try {
       registerChatSocket(io, socket);
-      await socket.handlers['video-call-used']({ messageId: '64b000000000000000000099' });
+      await socket.handlers['video-call-used']({
+        messageId: '64b000000000000000000099'
+      });
 
+      assert.ok(query, 'persistent permission should be checked');
+      assert.strictEqual(String(query._id), '64b000000000000000000099');
       assert.strictEqual(query.type, 'video-call-request');
       assert.strictEqual(query.status, 'accepted');
-      assert.deepStrictEqual(query.$or.map(item => Object.keys(item)[0]).sort(), ['from', 'to']);
-      assert.ok(emitted.some(e => e.sid === 'caller-socket' && e.event === 'video-call-used'));
-      assert.ok(emitted.some(e => e.sid === 'callee-socket' && e.event === 'video-call-used'));
+      assert.strictEqual(String(query.from), callerId);
+
+      // Starting a call validates permission; it does not consume it.
+      assert.deepStrictEqual(emitted, []);
     } finally {
-      Message.findOneAndUpdate = originalFindOneAndUpdate;
+      Message.exists = originalExists;
     }
   });
-
   it('rejects request-only video messages without emitting real-call missed cleanup', async function () {
     const Message = require('../app/models/Message');
     const { connectedUsers } = require('../app/utils/socketManager');
     const registerChatSocket = require('../app/sockets/chat');
 
-    const originalFindByIdAndUpdate = Message.findByIdAndUpdate;
-    Message.findByIdAndUpdate = async () => ({
+    const originalFindOne = Message.findOne;
+    Message.findOne = async () => ({
       id: '64b000000000000000000099',
       _id: new mongoose.Types.ObjectId('64b000000000000000000099'),
       from: new mongoose.Types.ObjectId(callerId),
       to: new mongoose.Types.ObjectId(calleeId),
       type: 'video-call-request',
-      status: 'rejected'
+      status: 'pending',
+      async save() { return this; }
     });
 
     connectedUsers.set(callerId, new Set(['caller-socket']));
@@ -404,7 +423,7 @@ describe('video call request flow', function () {
       assert.ok(!emitted.some(e => e.event === 'video-canceled'));
       assert.ok(!emitted.some(e => e.event === 'missed-call'));
     } finally {
-      Message.findByIdAndUpdate = originalFindByIdAndUpdate;
+      Message.findOne = originalFindOne;
     }
   });
 
@@ -476,17 +495,34 @@ describe('video call request flow', function () {
     }
   });
 
-  it('rejects non-friend peer lookup without an accepted one-time video request', async function () {
+  it('rejects non-friend peer lookup without accepted persistent video permission', async function () {
+    const Message = require('../app/models/Message');
     const User = require('../app/models/User');
     const peerStore = require('../app/utils/peerStorage');
     const router = require('../routes/user');
     const originalFindById = User.findById;
+    const originalFindOne = Message.findOne;
     const originalPeerGet = peerStore.get;
 
     let peerLookupCalled = false;
     User.findById = id => ({
       select: () => ({
         lean: async () => ({ _id: id, friends: [] })
+      })
+    });
+    Message.findOne = query => ({
+      sort: sortSpec => ({
+        select: fields => ({
+          lean: async () => {
+            assert.strictEqual(query.type, 'video-call-request');
+            assert.strictEqual(query.status, 'accepted');
+            assert.strictEqual(String(query.from), callerId);
+            assert.strictEqual(String(query.to), calleeId);
+            assert.deepStrictEqual(sortSpec, { updatedAt: -1 });
+            assert.strictEqual(fields, '_id');
+            return null;
+          }
+        })
       })
     });
     peerStore.get = async () => {
@@ -506,15 +542,16 @@ describe('video call request flow', function () {
       );
 
       assert.strictEqual(statusCode, 403);
-      assert.strictEqual(body.code, 'not_friends');
+      assert.strictEqual(body.code, 'video_permission_required');
       assert.strictEqual(peerLookupCalled, false);
     } finally {
       User.findById = originalFindById;
+      Message.findOne = originalFindOne;
       peerStore.get = originalPeerGet;
     }
   });
 
-  it('allows non-friend peer lookup only with an accepted one-time video request', async function () {
+  it('allows non-friend peer lookup with accepted persistent video permission', async function () {
     const Message = require('../app/models/Message');
     const User = require('../app/models/User');
     const peerStore = require('../app/utils/peerStorage');
@@ -529,12 +566,20 @@ describe('video call request flow', function () {
       })
     });
     Message.findOne = query => ({
-      select: () => ({
-        lean: async () => {
-          assert.strictEqual(String(query._id), '64b000000000000000000099');
-          assert.strictEqual(query.status, 'accepted');
-          return { _id: query._id };
-        }
+      sort: sortSpec => ({
+        select: fields => ({
+          lean: async () => {
+            assert.strictEqual(query.type, 'video-call-request');
+            assert.strictEqual(query.status, 'accepted');
+            assert.strictEqual(String(query.from), callerId);
+            assert.strictEqual(String(query.to), calleeId);
+            assert.deepStrictEqual(sortSpec, { updatedAt: -1 });
+            assert.strictEqual(fields, '_id');
+            return {
+              _id: new mongoose.Types.ObjectId('64b000000000000000000099')
+            };
+          }
+        })
       })
     });
     peerStore.get = async () => ({ peerId: `${calleeId}-peer-live` });
@@ -546,7 +591,7 @@ describe('video call request flow', function () {
       await handler(
         {
           params: { userId: calleeId },
-          query: { videoRequestId: '64b000000000000000000099' },
+          query: {},
           auth: { _id: callerId },
           authUser: { _id: callerId }
         },
