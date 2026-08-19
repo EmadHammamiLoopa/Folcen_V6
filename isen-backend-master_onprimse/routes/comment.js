@@ -30,6 +30,11 @@ const withStoreCommentAuthFields = (req, res, next) => {
     req._authUserExtraSelect =
         'blockedUsers firstName lastName mainAvatar avatarStyle ' +
         'avatarSeed avatarVariant avatarOverrides';
+
+    // Allow requireSignin to overlap this route's auth-user Mongo read
+    // with the Redis token-revocation checks.
+    req._prefetchAuthUser = true;
+
     next();
 };
 
@@ -45,7 +50,7 @@ router.put('/:commentId', [requireSignin, isAdmin], updateComment)
 
 router.post(
     '/post/:postId/comment',
-    [requireSignin, withStoreCommentAuthFields, withAuthUser],
+    [withStoreCommentAuthFields, requireSignin, withAuthUser],
     storeComment
 )
 router.get('/post/:postId/comment', [requireSignin, withAuthUser], getComments)

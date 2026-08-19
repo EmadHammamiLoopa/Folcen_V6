@@ -6,6 +6,55 @@ require('dotenv').config();
 const tokenBlacklist = require('../utils/tokenBlacklist');
 const logger = require('../utils/logger');
 
+const AUTH_USER_BASE_FIELDS =
+    '_id email role banned banUntil isDeleted emailVerified ' +
+    'bannedReason lastSeen friends followers city country createdAt';
+
+function authUserSelect(req) {
+    const extra =
+        req._authUserExtraSelect || '';
+
+    return `${AUTH_USER_BASE_FIELDS} ${extra}`.trim();
+}
+
+function loadAuthUser(req, userId) {
+    return User.findById(userId)
+        .select(authUserSelect(req))
+        .lean();
+}
+
+function startAuthUserPrefetch(req, userId) {
+    if (
+        !req._prefetchAuthUser ||
+        !userId ||
+        req._authUserPrefetchPromise
+    ) {
+        return;
+    }
+
+    if (
+        req._userLoaded &&
+        req.user &&
+        String(req.user._id) === String(userId)
+    ) {
+        return;
+    }
+
+    // Always resolve the promise so a rejected Mongo read cannot become
+    // unhandled if revocation rejects the request before withAuthUser runs.
+    req._authUserPrefetchPromise =
+        loadAuthUser(req, userId).then(
+            user => ({
+                user,
+                error: null
+            }),
+            error => ({
+                user: null,
+                error
+            })
+        );
+}
+
 exports.requireSignin = (req, res, next) => {
     // Short-circuit if we've already processed auth for this request
     if (req._requireSigninRun) return next();
@@ -24,6 +73,11 @@ exports.requireSignin = (req, res, next) => {
             try {
                 const jti = req.auth && req.auth.jti;
                 const userId = req.auth && req.auth._id;
+
+                startAuthUserPrefetch(
+                    req,
+                    userId
+                );
 
                 const [jtiRevoked, userRevoked] = await Promise.all([
                     jti
@@ -119,6 +173,11 @@ exports.requireSignin = (req, res, next) => {
                 logger.warn('requireSignin: token missing jti claim');
             }
 
+            startAuthUserPrefetch(
+                req,
+                userId
+            );
+
             const [jtiRevoked, userRevoked] = await Promise.all([
                 jti
                     ? tokenBlacklist.isRevokedByJti(jti)
@@ -194,19 +253,28 @@ exports.withAuthUser = async (req, res, next) => {
             return next();
         }
 
-        // Only select the minimal necessary fields to avoid transferring/storing full docs
-        const authUserBaseFields =
-            '_id email role banned banUntil isDeleted emailVerified ' +
-            'bannedReason lastSeen friends followers city country createdAt';
+        // Reuse a route-scoped user read started during token revocation
+        // when available; all other routes retain the normal direct lookup.
+        let user;
 
-        const authUserExtraFields =
-            req._authUserExtraSelect || '';
+        if (req._authUserPrefetchPromise) {
+            const prefetched =
+                await req._authUserPrefetchPromise;
 
-        let user = await User.findById(userId)
-            .select(
-                `${authUserBaseFields} ${authUserExtraFields}`.trim()
-            )
-            .lean();
+            delete req._authUserPrefetchPromise;
+
+            if (prefetched.error) {
+                throw prefetched.error;
+            }
+
+            user = prefetched.user;
+        } else {
+            user = await loadAuthUser(
+                req,
+                userId
+            );
+        }
+
         if (!user) {
             logger.info('withAuthUser error: User not found in DB for ID:', userId);
             return Response.sendError(res, 404, 'User not found');
