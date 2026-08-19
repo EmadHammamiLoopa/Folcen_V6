@@ -767,21 +767,62 @@ socket.on("connect-user", async (user_id) => {
 
       // Deliver to receiver (ALL sockets)
       const delivered = await emitToUser(msg.to, "new-message", safePayload);
+
       if (delivered) {
         console.log(`📤 Delivered to receiver (${msg.to}) on ${getUserSockets(msg.to).length} socket(s)`);
-        try { await recordMessageEvent({ messageId: savedMessage._id, from: senderId, to: msg.to, event: 'delivered' }); } catch (e) { console.warn('Failed to record message delivered event', e); }
-      } else {
-        console.warn(`⚠️ User ${msg.to} offline - message saved but not delivered`);
-        // Do NOT record message content; record delivery missing for diagnostics
-        // Send FCM push so the recipient is notified on their device
         try {
-          const { sendNotification } = require('../helpers');
-          const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'New message';
-          const messagePreview = msg.text ? String(msg.text).substring(0, 100) : '📷 Image';
-          sendNotification([msg.to], messagePreview, senderName, senderId).catch(() => {});
-        } catch (pushErr) {
-          console.warn('[chat] FCM push failed for offline user:', pushErr.message);
+          await recordMessageEvent({
+            messageId: savedMessage._id,
+            from: senderId,
+            to: msg.to,
+            event: 'delivered'
+          });
+        } catch (e) {
+          console.warn('Failed to record message delivered event', e);
         }
+      } else {
+        console.warn(`⚠️ User ${msg.to} has no active socket - message remains persisted`);
+      }
+
+      // Socket connectivity is not equivalent to foreground visibility.
+      // Android may keep Socket.IO connected while Folcen is backgrounded,
+      // so suppressing FCM when `delivered === true` causes missing chat
+      // notifications. Send exactly one push for every persisted chat
+      // message; Socket.IO remains responsible for realtime in-app delivery.
+      try {
+        const { sendNotification } = require('../helpers');
+        const senderName =
+          `${sender.firstName || ''} ${sender.lastName || ''}`.trim()
+          || 'New message';
+
+        const messagePreview =
+          msg.text
+            ? String(msg.text).substring(0, 100)
+            : '📷 Image';
+
+        sendNotification(
+          [String(msg.to)],
+          messagePreview,
+          senderName,
+          senderId
+        )
+          .then(result => {
+            console.log(
+              `[chat] message push to ${msg.to}:`,
+              result
+            );
+          })
+          .catch(err => {
+            console.warn(
+              '[chat] message FCM push failed:',
+              err.message
+            );
+          });
+      } catch (pushErr) {
+        console.warn(
+          '[chat] message FCM push setup failed:',
+          pushErr.message
+        );
       }
 
       // Confirm to sender using server-authoritative senderId (not client-supplied msg.from).

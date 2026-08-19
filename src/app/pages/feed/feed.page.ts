@@ -58,7 +58,8 @@ export class FeedPage implements OnInit, OnDestroy {
 
   ionViewWillEnter() {
     this.page = 1;
-    this.posts = [];
+
+    // Keep the already-rendered feed visible while refreshing.
     this.getFeed(null, true);
   }
 
@@ -94,7 +95,10 @@ export class FeedPage implements OnInit, OnDestroy {
   getFeed(event = null, refresh = false) {
     if (refresh) {
       this.page = 1;
-      this.pageLoading = true;
+
+      // Block only on the first real load; keep warm feed visible on return.
+      this.pageLoading = this.posts.length === 0;
+
       if (this.infinitScroll) {
         this.infinitScroll.disabled = false;
       }
