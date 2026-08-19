@@ -1,8 +1,8 @@
-<app-header title="Friends Chat" [back]="true"></app-header>
+<app-header title="Messages" [back]="true"></app-header>
 
-<div class="header-bell-wrap" style="position: fixed; top: 6px; right: 12px; z-index: 10001; width: 44px; min-width: 44px; height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; visibility: visible;">
-  <button class="fancy-bell" style="width: 40px; min-width: 40px; height: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; visibility: visible;" (click)="showMissedCalls()" aria-label="Missed calls">
-    <ion-icon name="notifications-outline"></ion-icon>
+<div class="header-bell-wrap">
+  <button class="fancy-bell" (click)="showMissedCalls()" aria-label="Open missed calls" title="Missed calls">
+    <ion-icon name="call-outline"></ion-icon>
     <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
       <span *ngIf="getMissedBellCount(missedCalls) > 0" class="fancy-badge">
         {{ getMissedBellCount(missedCalls) > 99 ? '99+' : getMissedBellCount(missedCalls) }}
@@ -12,7 +12,7 @@
 </div>
 
 <ion-content class="list-content">
-  <div class="mesh-bg"></div>
+  <div class="mesh-bg" aria-hidden="true"></div>
 
   <app-loader *ngIf="pageLoading"></app-loader>
 
@@ -22,7 +22,6 @@
     </ion-refresher-content>
   </ion-refresher>
 
-  <!-- Empty State -->
   <div class="empty-state" *ngIf="(!users || !users.length) && !pageLoading">
     <div class="empty-card">
       <div class="empty-icon-wrap">
@@ -33,49 +32,44 @@
     </div>
   </div>
 
-  <!-- Conversation List -->
   <div class="conversations-container" *ngIf="users && users.length">
     <ion-list lines="none" class="conv-list">
       <ion-item-sliding *ngFor="let user of users; trackBy: trackByUserId">
-
-        <!-- bare ion-item: no internal padding, we control everything inside the card div -->
         <ion-item
           lines="none"
           button
           detail="false"
           (click)="openThread(user)"
-          class="bare-item"
-        >
+          class="bare-item">
+
           <div class="conv-card"
                [class.unread]="user.hasUnread"
                [class.product-card]="user.messages?.length && user.messages[0]?.type === 'product'">
 
-            <!-- unread accent stripe -->
             <div class="unread-stripe" *ngIf="user.hasUnread"></div>
 
-            <!-- avatar -->
             <div class="av-wrap">
               <app-avatar [profile]="user" [size]="50"></app-avatar>
               <span class="online-dot" *ngIf="user.online && !isAdmin(user)"></span>
               <span class="missed-pill" *ngIf="getMissedCountFor(user) as mc; mc">
+                <ion-icon name="videocam-outline" aria-hidden="true"></ion-icon>
                 {{ mc > 99 ? '99+' : mc }}
               </span>
             </div>
 
-            <!-- text body -->
             <div class="conv-body">
               <div class="conv-row">
                 <span class="conv-name">{{ isAdmin(user) ? 'System' : user.fullName }}</span>
                 <span class="badge-new" *ngIf="user.hasUnread">New</span>
                 <span class="badge-product" *ngIf="user.messages?.length && user.messages[0]?.type === 'product'">Product</span>
               </div>
+
               <div class="conv-preview">
                 <ion-icon name="image-outline" class="preview-ico" *ngIf="user.messages?.[0]?.image"></ion-icon>
                 <span class="preview-txt">{{ user.messages?.[0]?.text }}</span>
               </div>
             </div>
 
-            <!-- timestamp -->
             <span class="conv-time" *ngIf="user.messages?.length">
               {{ (getMessageDate(user.messages[0]) | extractDiffTime) || formatShortTime(getMessageDate(user.messages[0])) }}
             </span>
@@ -83,11 +77,10 @@
         </ion-item>
 
         <ion-item-options side="end">
-          <ion-item-option color="danger" expandable (click)="removeUser(user)">
+          <ion-item-option color="danger" expandable (click)="removeUser(user)" aria-label="Delete conversation">
             <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
           </ion-item-option>
         </ion-item-options>
-
       </ion-item-sliding>
     </ion-list>
   </div>
