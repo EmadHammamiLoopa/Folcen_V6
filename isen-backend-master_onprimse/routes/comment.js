@@ -19,12 +19,14 @@ const {
 const { requireSignin, withAuthUser, isAdmin } = require('../app/middlewares/auth');
 const { requireLatestTermsPrivacy } = require('../app/middlewares/legal');
 const { commentById, commentOwner } = require('../app/middlewares/comment');
-const { postById } = require('../app/middlewares/post');
+const {
+    commentPostById
+} = require('../app/middlewares/post');
 const { storeCommentValidator } = require('../app/middlewares/validators/CommentValidator');
 
 const router = express.Router()
 router.param('commentId', commentById)
-router.param('postId', postById)
+router.param('postId', commentPostById)
 
 router.get('/all', [requireSignin, isAdmin], getAllCommentsForAdmin)
 router.get('/post/:postId/comments', [requireSignin, isAdmin], postComments)

@@ -3,6 +3,68 @@ const { adminCheck } = require('../helpers')
 const Post = require('../models/Post')
 const mongoose = require('mongoose');
 
+const normalizePostId = (rawId) => {
+    let id = rawId;
+
+    // Preserve the existing Base64 compatibility behavior.
+    if (id && !mongoose.Types.ObjectId.isValid(id)) {
+        try {
+            const safe = id.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = safe.padEnd(
+                safe.length + (4 - safe.length % 4) % 4,
+                '='
+            );
+            const decoded = Buffer.from(
+                padded,
+                'base64'
+            ).toString('utf8');
+
+            if (mongoose.Types.ObjectId.isValid(decoded)) {
+                id = decoded;
+            }
+        } catch (_) {}
+    }
+
+    return id;
+};
+
+exports.commentPostById = async (req, res, next, rawId) => {
+    try {
+        const id = normalizePostId(rawId);
+
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return Response.sendError(
+                res,
+                400,
+                'Invalid Post ID format'
+            );
+        }
+
+        // Comment flows only require the Post document itself.
+        // Avoid the additional Channel populate round trip.
+        const post = await Post.findOne({
+            _id: id
+        }).exec();
+
+        if (!post) {
+            return Response.sendError(
+                res,
+                400,
+                'Post not found'
+            );
+        }
+
+        req.post = post;
+        next();
+    } catch (err) {
+        return Response.sendError(
+            res,
+            500,
+            'Server error'
+        );
+    }
+};
+
 exports.postById = async (req, res, next, id) => {
     try {
         // Handle Base64 encoded IDs from frontend
