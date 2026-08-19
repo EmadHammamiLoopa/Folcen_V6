@@ -11,20 +11,18 @@
   </ion-refresher>
 
   <div class="requests-container">
-    <!-- Empty State -->
     <div class="empty-state animate__animated animate__fadeIn" *ngIf="(!requests || !requests.length) && !pageLoading">
       <div class="empty-icon">
-        <i class="fas fa-user-plus"></i>
+        <ion-icon name="person-add-outline"></ion-icon>
       </div>
       <h3>No Pending Requests</h3>
       <p>When people send you friend requests, they'll appear here.</p>
     </div>
 
-    <!-- Requests List -->
     <div class="requests-list" *ngIf="requests && requests.length > 0">
-      <div class="request-card animate__animated animate__fadeInUp" 
+      <article class="request-card animate__animated animate__fadeInUp" 
            *ngFor="let request of requests; let i = index"
-           [style.animation-delay]="(i * 0.1) + 's'">
+           [style.animation-delay]="(i * 0.06) + 's'">
         
         <div class="request-info" (click)="goToProfile(request.from?._id || request.from?.id)">
           <div class="avatar-wrapper">
@@ -35,7 +33,7 @@
             <div class="meta-info">
               <span class="request-time">{{ request.createdAt | extractDiffTime }}</span>
               <span class="location" *ngIf="(request.from.city && request.from.city !== '-') || (request.from.country && request.from.country !== '-')">
-                <i class="fas fa-map-marker-alt"></i>
+                <ion-icon name="location-outline"></ion-icon>
                 {{ (request.from.city && request.from.city !== '-') ? request.from.city : '' }}{{ (request.from.city && request.from.city !== '-' && request.from.country && request.from.country !== '-') ? ', ' : '' }}{{ (request.from.country && request.from.country !== '-') ? request.from.country : '' }}
               </span>
             </div>
@@ -43,15 +41,15 @@
         </div>
 
         <div class="request-actions">
-          <button class="action-btn accept" (click)="acceptRequest(request)">
-            <i class="fas fa-check"></i>
+          <button class="action-btn accept" (click)="acceptRequest(request)" aria-label="Accept friend request">
+            <ion-icon name="checkmark-outline"></ion-icon>
             <span>Accept</span>
           </button>
-          <button class="action-btn reject" (click)="rejectRequestConf(request)">
-            <i class="fas fa-times"></i>
+          <button class="action-btn reject" (click)="rejectRequestConf(request)" aria-label="Reject friend request" title="Reject">
+            <ion-icon name="close-outline"></ion-icon>
           </button>
         </div>
-      </div>
+      </article>
     </div>
   </div>
 
