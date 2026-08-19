@@ -29,6 +29,13 @@ app-settings .account-actions-section {
   }
 }
 
+/* My Archive: keep only the rounded segment visible, without a dark rectangular strip behind it. */
+app-activity .filters-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-top: 0 !important;
+}
+
 /* Edit Profile: use only the bottom Save action. */
 app-form .save-profile-button {
   display: none !important;
