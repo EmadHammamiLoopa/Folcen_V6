@@ -7,7 +7,6 @@ const Comment = require('../models/Comment');
 const Message = require('../models/Message');
 const { connectedUsers, socketUserMap } = require('../utils/socketManager');
 const { purgeUser, userSocketIds } = require('../helpers');
-const io = require('../../index').io;
 
 // Allowed fields for rectification (minimization principle)
 const ALLOWED_RECTIFY_FIELDS = ['firstName','lastName','email','gender','birthDate','aboutMe','school','education','profession','interests'];
@@ -228,6 +227,9 @@ exports.rectify = async (req, res) => {
 // Soft delete (erase) with immediate revocation and scheduled purge
 exports.erase = async (req, res) => {
   try {
+    const io = req.app && typeof req.app.get === 'function'
+      ? req.app.get('io')
+      : null;
     const actor = req.authUser;
     let target = actor;
     const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
