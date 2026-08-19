@@ -1,8 +1,9 @@
 /* Page-level responsive refinements that must cross Angular view encapsulation. */
 
-@media (min-width: 768px) and (max-width: 1199px) {
+/* Android tablets can expose a CSS viewport around 600–700px even on large screens. */
+@media (min-width: 560px) and (max-width: 1199px) {
   app-display .modern-gallery-grid .add-photo-card {
-    width: min(100%, 152px);
-    justify-self: start;
-  }
-}
+    width: 132px !important;
+    max-width: 132px !important;
+    aspect-ratio: 1 / 1 !important;
+    justify-self: start !important
