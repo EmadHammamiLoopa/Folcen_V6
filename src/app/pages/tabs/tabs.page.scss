@@ -1,130 +1,205 @@
-// ─── Tab bar ─────────────────────────────────────────────────────
-ion-tab-bar {
-  --background: var(--folcen-tabbar-background);
-  backdrop-filter: blur(22px) saturate(200%);
-  -webkit-backdrop-filter: blur(22px) saturate(200%);
-  border: 1px solid var(--folcen-tabbar-border);
-  border-radius: clamp(18px, 4vw, 26px);
-  height: clamp(56px, 11vw, 66px);
-  margin: 0 clamp(8px, 3.5vw, 24px) clamp(10px, 2.5vw, 18px);
+@use '../../../theme/design-system' as ds;
+
+@include ds.folcen-theme-tokens;
+
+.folcen-tab-dock {
+  --background: rgba(10, 15, 29, 0.82);
+  --border: transparent;
+
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.28),
-    0 2px 8px  rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255,255,255,0.06);
-  // Do NOT clip — overflow:hidden causes labels to wrap/hide on small screens
+  left: 50%;
+  right: auto;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(calc(100% - 18px), 760px);
+  height: clamp(58px, 11vw, 68px);
+  padding: 5px 6px;
+  margin: 0;
   overflow: visible;
+  border: 1px solid var(--f-border-strong);
+  border-radius: clamp(20px, 4vw, 28px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    var(--f-toolbar);
+  box-shadow: var(--f-shadow-float), inset 0 1px 0 var(--f-glass-highlight);
+  backdrop-filter: blur(26px) saturate(155%);
+  -webkit-backdrop-filter: blur(26px) saturate(155%);
+  isolation: isolate;
 
   &::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 0;
+    inset: 0;
+    z-index: -2;
     border-radius: inherit;
+    background:
+      radial-gradient(circle at 18% 20%, rgba(124,108,255,.20), transparent 34%),
+      radial-gradient(circle at 82% 75%, rgba(14,165,233,.12), transparent 34%);
+    pointer-events: none;
   }
-}
-
-// ─── Individual tab buttons ───────────────────────────────────────
-ion-tab-button {
-  --color:          var(--folcen-text-muted);
-  --color-selected: #6366f1;
-  // Ionic intrinsic CSS vars — pin them so the framework can't override our values
-  --padding-top:    4px;
-  --padding-bottom: 4px;
-  --padding-start:  0px;
-  --padding-end:    0px;
-  position: relative;
-  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  flex: 1;
-  min-width: 0;
-  overflow: visible;
-  padding: 6px 0 4px;
 
   &::after {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    width: 52px;
-    height: 52px;
-    background: rgba(99, 102, 241, 0.12);
-    border-radius: 50%;
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    inset: 1px;
+    z-index: -1;
+    border-radius: calc(clamp(20px, 4vw, 28px) - 1px);
+    border: 1px solid rgba(255,255,255,.025);
     pointer-events: none;
   }
 
-  &.tab-selected {
-    --color: #6366f1;
-
-    &::after { transform: translate(-50%, -50%) scale(1); }
-
-    .icon {
-      transform: translateY(-2px) scale(1.18);
-      filter: drop-shadow(0 0 7px rgba(99, 102, 241, 0.65));
-      color: #6366f1;
-    }
-
-
+  :host-context(body.light-theme) & {
+    --background: rgba(255,255,255,.86);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.68)),
+      var(--f-toolbar);
   }
 }
 
-// ─── Icon ─────────────────────────────────────────────────────────
-.icon {
-  font-size: clamp(14px, 4.5vw, 19px);
-  color: inherit;
-  display: block;
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
-              filter 0.28s ease, color 0.28s ease;
+.folcen-tab-button {
+  --background: transparent;
+  --color: var(--f-text-faint);
+  --color-selected: var(--f-text-strong);
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  overflow: visible;
+  border-radius: 16px;
+  transition: transform .22s ease, color .22s ease;
+
+  .tab-icon-shell {
+    width: clamp(38px, 9vw, 46px);
+    height: clamp(38px, 9vw, 46px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: clamp(13px, 3vw, 16px);
+    position: relative;
+    z-index: 1;
+    transition:
+      transform .24s cubic-bezier(.2,.8,.2,1),
+      background .24s ease,
+      box-shadow .24s ease;
+  }
+
+  .icon {
+    font-size: clamp(15px, 4vw, 19px);
+    color: inherit;
+    transition: transform .24s cubic-bezier(.2,.8,.2,1), filter .24s ease, color .24s ease;
+  }
+
+  &.tab-selected {
+    --color: var(--f-text-strong);
+
+    .tab-icon-shell {
+      background:
+        linear-gradient(145deg, rgba(124,108,255,.26), rgba(124,108,255,.12)),
+        var(--f-surface-muted);
+      box-shadow:
+        0 8px 22px rgba(64,55,170,.24),
+        inset 0 1px 0 rgba(255,255,255,.12),
+        0 0 0 1px rgba(124,108,255,.16);
+      transform: translateY(-2px);
+    }
+
+    .icon {
+      color: #8b80ff;
+      transform: scale(1.08);
+      filter: drop-shadow(0 0 7px rgba(124,108,255,.40));
+    }
+  }
+
+  @include ds.hover-capable {
+    &:not(.tab-selected):hover {
+      --color: var(--f-text-muted);
+      .tab-icon-shell { background: var(--f-surface-muted); }
+    }
+  }
 }
 
-// ─── Badge ───────────────────────────────────────────────────────
-ion-badge {
-  --background: #ef4444;
-  --color: white;
-  font-size: clamp(8px, 2vw, 10px);
-  font-weight: 700;
-  border: 2px solid var(--ion-background-color);
-  border-radius: 50%;
-  padding: 3px;
-  min-width: 16px;
-  height: 16px;
-  position: absolute;
-  top: clamp(8px, 2vw, 12px);
-  right: clamp(14%, 4vw, 22%);
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
-  z-index: 10;
-}
+.tab-badge {
+  --background: #ef476f;
+  --color: #fff;
 
-// ─── Budget / missed-call indicator ──────────────────────────────
-.budget-indicator {
   position: absolute;
-  top: clamp(8px, 2vw, 10px);
-  right: clamp(8px, 3vw, 14px);
-  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-  color: white;
-  font-size: clamp(7px, 2vw, 9px);
+  top: 4px;
+  right: clamp(7%, 2.2vw, 18%);
+  z-index: 5;
+  min-width: 17px;
+  height: 17px;
+  padding: 2px 5px;
+  border: 2px solid var(--f-page-bg);
+  border-radius: 999px;
+  font-size: 9px;
   font-weight: 800;
-  min-width: 15px;
-  height: 15px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
-  border: 1.5px solid rgba(255,255,255,0.2);
-  z-index: 10;
-  pointer-events: none;
-  animation: budget-pulse 2s infinite ease-in-out;
+  line-height: 11px;
+  letter-spacing: -.02em;
+  box-shadow: 0 4px 12px rgba(239,71,111,.36);
 }
 
-@keyframes budget-pulse {
-  0%   { transform: scale(1);    opacity: 0.9; }
-  50%  { transform: scale(1.15); opacity: 1;   }
-  100% { transform: scale(1);    opacity: 0.9; }
+.profile-badge {
+  transform: translateX(4px);
+}
+
+@include ds.phone-xs {
+  .folcen-tab-dock {
+    width: calc(100% - 10px);
+    bottom: max(5px, env(safe-area-inset-bottom));
+    padding-inline: 3px;
+    border-radius: 19px;
+  }
+
+  .folcen-tab-button {
+    .tab-icon-shell {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+    }
+
+    .icon { font-size: 14px; }
+  }
+
+  .tab-badge {
+    right: 2%;
+    top: 3px;
+  }
+}
+
+@include ds.tablet-up {
+  .folcen-tab-dock {
+    width: min(calc(100% - 40px), 720px);
+    height: 70px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    padding: 7px 10px;
+  }
+
+  .folcen-tab-button {
+    .tab-icon-shell {
+      width: 48px;
+      height: 48px;
+      border-radius: 17px;
+    }
+
+    .icon { font-size: 19px; }
+  }
+}
+
+@include ds.desktop-up {
+  .folcen-tab-dock {
+    width: min(680px, calc(100% - 56px));
+  }
+}
+
+@include ds.reduced-motion {
+  .folcen-tab-button,
+  .folcen-tab-button *,
+  .folcen-tab-dock {
+    transition: none !important;
+    animation: none !important;
+  }
 }
