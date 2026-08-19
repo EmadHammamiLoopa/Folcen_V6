@@ -672,16 +672,47 @@ export class DisplayComponent implements OnInit, OnDestroy {
   }
 
   openImagePicker() {
-    if (this.platform.is('cordova') || this.platform.is('capacitor') || this.platform.is('hybrid')) {
-      // Native mobile: use existing uploadFile logic
-      this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'image')
-        .then(resp => this.processSelectedMedia(resp))
-        .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
-    } else {
-      // Browser: trigger file input manually
-      const input = document.getElementById('webImageInput') as HTMLInputElement;
-      input?.click();
-    }
+    this.uploadFile
+      .selectMedia('image', 'gallery')
+      .then(resp =>
+        this.processSelectedMedia(resp)
+      )
+      .catch((err: any) => {
+        const message =
+          String(err?.message || err || '');
+
+        if (/cancel|no media selected/i.test(message)) {
+          return;
+        }
+
+        this.toastService.presentErrorToastr(
+          'Could not open the gallery.'
+        );
+      });
+  }
+
+  async openPhotoSourceOptions() {
+    const alert = await this.alertCtrl.create({
+      header: 'Add photo',
+      buttons: [
+        {
+          text: 'Take photo',
+          handler: () =>
+            this.openCameraPicker()
+        },
+        {
+          text: 'Choose from gallery',
+          handler: () =>
+            this.openImagePicker()
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        }
+      ]
+    });
+
+    await alert.present();
   }
 
   async openAvatarMediaOptions() {
@@ -712,20 +743,47 @@ export class DisplayComponent implements OnInit, OnDestroy {
   
   openCameraPicker() {
     try {
-      localStorage.setItem('pendingProfileCameraReturn', JSON.stringify({
-        userId: this.user?._id,
-        url: this.router.url,
-        at: Date.now()
-      }));
-    } catch (e) {}
-    this.uploadFile.takePicture(this.camera.PictureSourceType.CAMERA, 'image')
+      localStorage.setItem(
+        'pendingProfileCameraReturn',
+        JSON.stringify({
+          userId: this.user?._id,
+          url: this.router.url,
+          at: Date.now()
+        })
+      );
+    } catch (_) {}
+
+    this.uploadFile
+      .selectMedia('image', 'camera')
       .then(resp => {
-        try { localStorage.removeItem('pendingProfileCameraReturn'); } catch (e) {}
+        try {
+          localStorage.removeItem(
+            'pendingProfileCameraReturn'
+          );
+        } catch (_) {}
+
         this.processSelectedMedia(resp);
       })
-      .catch(err => this.toastService.presentErrorToastr('Failed: ' + err));
+      .catch((err: any) => {
+        try {
+          localStorage.removeItem(
+            'pendingProfileCameraReturn'
+          );
+        } catch (_) {}
+
+        const message =
+          String(err?.message || err || '');
+
+        if (/cancel|no media selected/i.test(message)) {
+          return;
+        }
+
+        this.toastService.presentErrorToastr(
+          'Could not open the camera.'
+        );
+      });
   }
-  
+
   openVideoPicker() {
     this.uploadFile.takePicture(this.camera.PictureSourceType.PHOTOLIBRARY, 'video')
       .then(resp => this.processSelectedMedia(resp))

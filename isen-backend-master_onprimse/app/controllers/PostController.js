@@ -269,45 +269,136 @@ exports.getFeed = async (req, res) => {
             try { return new mongoose.Types.ObjectId((f && f._id) ? f._id : f); } catch (e) { return f; }
         });
 
-        // 1. Get followed channels
-        const followedChannels = await Channel.find({ followers: userId }).select('_id');
-        const channelIds = followedChannels.map(c => c._id);
+        // Independent Feed prerequisite reads run concurrently.
+        const blockedByMe =
+            (req.authUser.blockedUsers || [])
+                .map(b => {
+                    try {
+                        return new mongoose.Types.ObjectId(
+                            (b && b._id)
+                                ? b._id
+                                : b
+                        );
+                    } catch (_) {
+                        return b;
+                    }
+                });
 
-        // 2. Get followed users (include follow timestamp so we can show only posts/comments after the follow time)
-        const following = await Follow.find({ follower: userId, status: 'active' }).select('followed createdAt');
-        
-        // build entries with id and follow timestamp
-        const followedEntries = following.map(f => {
-            let fid = null;
-            try { fid = new mongoose.Types.ObjectId((f.followed && f.followed._id) ? f.followed._id : f.followed); } catch (e) { fid = f.followed; }
-            return { id: fid, since: f.createdAt || null };
-        });
+        const [
+            following,
+            blockedMe,
+            inactiveUsers
+        ] = await Promise.all([
+            Follow.find({
+                follower: userId,
+                status: 'active'
+            })
+            .select(
+                'followed createdAt'
+            )
+            .lean(),
 
-        const followedUserIds = followedEntries.map(e => e.id);
+            User.find({
+                blockedUsers: userId
+            })
+            .select('_id')
+            .lean(),
 
-        const dashParams = extractDashParams(req, ['text']);
-        const limit = dashParams.limit || 20;
-        const skip = dashParams.skip || 0;
+            User.find({
+                $or: [
+                    { enabled: false },
+                    { isDeleted: true },
+                    {
+                        deletedAt: {
+                            $ne: null
+                        }
+                    },
+                    { banned: true }
+                ]
+            })
+            .select('_id')
+            .lean()
+        ]);
 
-        // 2.5 Get blocked users (both ways)
-        const blockedByMe = (req.authUser.blockedUsers || []).map(b => {
-            try { return new mongoose.Types.ObjectId((b && b._id) ? b._id : b); } catch (e) { return b; }
-        });
-        const blockedMe = await User.find({ blockedUsers: userId }).select('_id');
-        const blockedMeIds = blockedMe.map(u => new mongoose.Types.ObjectId(u._id));
-        
-        // Get all disabled, soft-deleted, or banned users to exclude them from the feed
-        const inactiveUsers = await User.find({ 
-            $or: [
-                { enabled: false },
-                { isDeleted: true },
-                { deletedAt: { $ne: null } },
-                { banned: true }
-            ] 
-        }).select('_id');
-        const inactiveUserIds = inactiveUsers.map(u => new mongoose.Types.ObjectId(u._id));
+        const followedEntries =
+            following.map(f => {
+                let fid = null;
 
-        const allBlockedIds = Array.from(new Set([...blockedByMe, ...blockedMeIds, ...inactiveUserIds]));
+                try {
+                    fid =
+                        new mongoose.Types.ObjectId(
+                            (f.followed &&
+                             f.followed._id)
+                                ? f.followed._id
+                                : f.followed
+                        );
+                } catch (_) {
+                    fid = f.followed;
+                }
+
+                return {
+                    id: fid,
+                    since:
+                        f.createdAt ||
+                        null
+                };
+            });
+
+        const followedUserIds =
+            followedEntries.map(
+                e => e.id
+            );
+
+        const dashParams =
+            extractDashParams(
+                req,
+                ['text']
+            );
+
+        const limit =
+            dashParams.limit || 20;
+
+        const skip =
+            dashParams.skip || 0;
+
+        const blockedMeIds =
+            blockedMe.map(
+                u =>
+                    new mongoose.Types.ObjectId(
+                        u._id
+                    )
+            );
+
+        const inactiveUserIds =
+            inactiveUsers.map(
+                u =>
+                    new mongoose.Types.ObjectId(
+                        u._id
+                    )
+            );
+
+        const uniqueExcluded =
+            new Set(
+                [
+                    ...blockedByMe,
+                    ...blockedMeIds,
+                    ...inactiveUserIds
+                ].map(String)
+            );
+
+        const allBlockedIds =
+            [...uniqueExcluded]
+                .filter(
+                    id =>
+                        mongoose.Types.ObjectId
+                            .isValid(id)
+                )
+                .map(
+                    id =>
+                        new mongoose.Types.ObjectId(
+                            id
+                        )
+                );
 
         // 3. Feed membership is relationship-driven only:
         // current friends + active explicit follows.
@@ -1095,7 +1186,7 @@ exports.getPosts = async (req, res) => {
             .populate('user', '_id firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides')
             .sort({ createdAt: -1 })
             .skip(page * limit)
-            .limit(limit)
+            .limit(limit + 1)
             .lean() // Drastically faster than full Mongoose documents
             .exec();
 
@@ -1105,6 +1196,15 @@ exports.getPosts = async (req, res) => {
 
         // Normalize all ObjectIds to strings to prevent buffer serialization
         posts = normalizeLeanDoc(posts);
+
+        const more =
+            posts.length > limit;
+
+        posts =
+            posts.slice(
+                0,
+                limit
+            );
 
         // Filter out posts with missing users (due to deleted/invalid user references)
         // This prevents frontend errors when posts reference non-existent users
@@ -1168,12 +1268,10 @@ exports.getPosts = async (req, res) => {
             return pw;
         });
 
-        // 4. Counts & Response
-        const count = await Post.countDocuments(visibilityQuery).exec();
-
+        // limit + 1 above already tells us whether another page exists.
         return Response.sendResponse(res, {
             posts: postsWithVotes,
-            more: (count - (limit * (parseInt(page) + 1))) > 0
+            more
         });
     } catch (err) {
         logger.error('getPosts critical error:', err);

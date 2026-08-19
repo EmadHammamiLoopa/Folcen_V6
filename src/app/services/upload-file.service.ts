@@ -74,6 +74,131 @@ export class UploadFileService {
     });
   }
 
+  /**
+   * Unified media picker for chat/profile.
+   *
+   * gallery -> Android/iOS system photo/video picker
+   * camera  -> native capture UI through the WebView file chooser
+   *
+   * Returning a real File avoids content:// / file:// conversion problems
+   * before multipart upload.
+   */
+  selectMedia(
+    mediaType: 'image' | 'video',
+    source: 'gallery' | 'camera'
+  ): Promise<{
+    file: File,
+    imageData: string,
+    name: string,
+    mimeType: string,
+    mediaType: 'image' | 'video',
+    source: 'gallery' | 'camera'
+  }> {
+    return this.platform.ready().then(() => {
+      return new Promise((resolve, reject) => {
+        const input = document.createElement('input');
+
+        input.type = 'file';
+        input.accept =
+          mediaType === 'image'
+            ? 'image/*'
+            : 'video/*';
+
+        input.multiple = false;
+
+        // On supported mobile WebViews this requests direct camera capture
+        // instead of opening the normal gallery picker.
+        if (source === 'camera') {
+          input.setAttribute('capture', 'environment');
+        }
+
+        input.style.position = 'fixed';
+        input.style.left = '-10000px';
+        input.style.top = '-10000px';
+        input.style.opacity = '0';
+
+        const cleanup = () => {
+          try {
+            if (input.parentNode) {
+              input.parentNode.removeChild(input);
+            }
+          } catch (_) {}
+        };
+
+        input.onchange = () => {
+          const file =
+            input.files && input.files.length
+              ? input.files[0]
+              : null;
+
+          if (!file) {
+            cleanup();
+            reject(new Error('No media selected'));
+            return;
+          }
+
+          const fallbackMime =
+            mediaType === 'image'
+              ? 'image/jpeg'
+              : 'video/mp4';
+
+          const mimeType =
+            file.type || fallbackMime;
+
+          if (
+            mediaType === 'image' &&
+            !mimeType.startsWith('image/')
+          ) {
+            cleanup();
+            reject(new Error('Selected file is not an image'));
+            return;
+          }
+
+          if (
+            mediaType === 'video' &&
+            !mimeType.startsWith('video/')
+          ) {
+            cleanup();
+            reject(new Error('Selected file is not a video'));
+            return;
+          }
+
+          const extension =
+            mediaType === 'image'
+              ? 'jpg'
+              : 'mp4';
+
+          const name =
+            file.name ||
+            `${mediaType}-${Date.now()}.${extension}`;
+
+          // blob: URL is directly usable by img/video for local preview.
+          const previewUrl =
+            URL.createObjectURL(file);
+
+          cleanup();
+
+          resolve({
+            file,
+            imageData: previewUrl,
+            name,
+            mimeType,
+            mediaType,
+            source
+          });
+        };
+
+        input.onerror = () => {
+          cleanup();
+          reject(new Error('Unable to open media picker'));
+        };
+
+        document.body.appendChild(input);
+        input.click();
+      });
+    });
+  }
+
   // Browser file picker
   getFileFromBrowser(): Promise<any> {
     return new Promise((resolve, reject) => {

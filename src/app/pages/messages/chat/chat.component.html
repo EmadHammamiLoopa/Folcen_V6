@@ -90,8 +90,22 @@
              [class.their-message]="!message?.isMine(authUser?.id)"
              [class.failed]="message?.state === 'failed'">
           
-          <!-- Image message -->
-          <img *ngIf="message?.image" [src]="message?.image" class="message-image" (click)="openImage(message?.image)" style="cursor:pointer">
+          <!-- Image / video message -->
+          <img
+            *ngIf="message?.image && !isVideoMessage(message)"
+            [src]="message?.image"
+            class="message-image"
+            (click)="openImage(message?.image)"
+            style="cursor:pointer">
+
+          <video
+            *ngIf="message?.image && isVideoMessage(message)"
+            [src]="message?.image"
+            class="message-image message-video"
+            controls
+            playsinline
+            preload="metadata">
+          </video>
           
           <!-- Ordinary text only; video requests render as their own card -->
           <div class="message-text" *ngIf="message?.text && message?.type !== 'video-call-request'">
@@ -222,12 +236,6 @@
       <p>You can't send more messages until <strong>{{ user?.fullName }}</strong> responds</p>
     </div>
   </div>
-  <div class="chat-limits animate__animated animate__fadeInUp" *ngIf="user && messages && !nonFriendsChatEnabled()">
-    <div class="limit-content">
-      <ion-icon name="shield-outline"></ion-icon>
-      <p>You have reached the message limit for non-friends</p>
-    </div>
-  </div>
 
   <!-- Admin/System Chat Notice -->
   <div class="admin-chat-notice animate__animated animate__fadeIn" *ngIf="isAdminChat()">
@@ -260,22 +268,40 @@
       <ion-input
         [(ngModel)]="messageText"
         (keyup.enter)="addMessage()"
-        [readonly]="!conversationStarted() || !nonFriendsChatEnabled()"
+        [readonly]="!conversationStarted()"
         placeholder="Type a message"
         class="message-input">
       </ion-input>
 
-      <!-- Image Preview -->
+      <!-- Media Preview -->
       <div *ngIf="image" class="image-preview">
-        <img [src]="image" alt="Preview" style="max-height: 150px;">
-        <ion-button fill="clear" size="small" color="danger" (click)="removeImage()">
+        <img
+          *ngIf="selectedMediaType !== 'video'"
+          [src]="image"
+          alt="Preview"
+          style="max-height: 150px;">
+
+        <video
+          *ngIf="selectedMediaType === 'video'"
+          [src]="image"
+          controls
+          playsinline
+          preload="metadata"
+          style="max-height: 180px; max-width: 220px;">
+        </video>
+
+        <ion-button
+          fill="clear"
+          size="small"
+          color="danger"
+          (click)="removeImage()">
           <ion-icon name="close-circle"></ion-icon>
         </ion-button>
       </div>
 
       <!-- Send Button -->
       <ion-button slot="end" fill="clear" (click)="addMessage()"
-        [disabled]="(!messageText && !image) || !conversationStarted() || !nonFriendsChatEnabled()"
+        [disabled]="(!messageText && !image) || !conversationStarted()"
         class="send-button">
         <ion-icon name="send"></ion-icon>
       </ion-button>

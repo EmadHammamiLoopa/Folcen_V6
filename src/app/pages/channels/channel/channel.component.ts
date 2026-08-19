@@ -34,6 +34,9 @@ export class ChannelComponent implements OnInit {
   private destroy$ = new Subject<void>();
   private feedRefreshTimer: any;
 
+  private hasEnteredView = false;
+  private postsRequestInFlight = false;
+
   constructor(
     private channelService: ChannelService,
     private route: ActivatedRoute,
@@ -93,9 +96,18 @@ export class ChannelComponent implements OnInit {
   }
 
   ionViewWillEnter() {
-    this.page = 0;
-    this.pageLoading = true;
-    this.getChannelPosts(null, true);
+    if (!this.hasEnteredView) {
+      this.hasEnteredView = true;
+      return;
+    }
+
+    // Refresh returning views without blanking existing posts.
+    if (this.channel?.id) {
+      this.getChannelPosts(
+        null,
+        true
+      );
+    }
   }
 
   private getUserData() {
@@ -144,58 +156,197 @@ export class ChannelComponent implements OnInit {
   
 
   getChannelParams() {
-    this.route.queryParamMap.subscribe(params => {
-      this.pageLoading = false;
-      const channelData = JSON.parse(params.get('channel') || '{}');
-      this.channel = Channel.createFromData(channelData);
-      // fetch fresh channel data from server to ensure populated user/followers
-      if (this.channel && this.channel.id) {
-        this.channelService.show(this.channel.id).then((resp: any) => {
-          if (resp && resp.data && resp.data.channel) {
-            this.channel = Channel.createFromData(resp.data.channel);
-          }
-          this.getChannelPosts(null, true);
-        }, err => {
-          // fallback to local channel data
-          this.getChannelPosts(null, true);
-        });
-      } else {
-        this.getChannelPosts(null, true);
-      }
-    });
+    this.route.queryParamMap
+      .pipe(
+        takeUntil(this.destroy$)
+      )
+      .subscribe(params => {
+        let channelData: any = {};
+
+        try {
+          channelData =
+            JSON.parse(
+              params.get('channel') ||
+              '{}'
+            );
+        } catch (_) {
+          channelData = {};
+        }
+
+        const incoming =
+          Channel.createFromData(
+            channelData
+          );
+
+        const oldId =
+          String(
+            this.channel?.id || ''
+          );
+
+        const newId =
+          String(
+            incoming?.id || ''
+          );
+
+        if (
+          oldId &&
+          newId &&
+          oldId !== newId
+        ) {
+          this.posts = [];
+          this.page = 0;
+        }
+
+        this.channel =
+          incoming;
+
+        if (!this.channel?.id) {
+          this.pageLoading = false;
+          return;
+        }
+
+        // Critical path: show posts immediately.
+        this.getChannelPosts(
+          null,
+          true
+        );
+
+        // Header/follower data refreshes in parallel.
+        this.channelService
+          .show(this.channel.id)
+          .then(
+            (resp: any) => {
+              if (
+                resp?.data?.channel
+              ) {
+                this.channel =
+                  Channel.createFromData(
+                    resp.data.channel
+                  );
+
+                this.changeDetectorRef
+                  .detectChanges();
+              }
+            },
+            () => {
+              // Route-provided channel data is already usable.
+            }
+          );
+      });
   }
 
-  
-  getChannelPosts(event?, refresh?) {
-    if (!event) this.pageLoading = true;
-    if (refresh) this.page = 0;
 
-    console.log("channelchannelchannel", this.channel.id);
-    console.log("this.page++this.page++this.page++", this.page);
-    console.log("Fetching posts for channel ID:", this.channel.id);
+  getChannelPosts(
+    event?,
+    refresh = false
+  ) {
+    if (!this.channel?.id) {
+      this.pageLoading = false;
+      event?.target?.complete?.();
+      return;
+    }
 
-    this.channelService.getPosts(this.channel.id, this.page).then(
+    if (this.postsRequestInFlight) {
+      event?.target?.complete?.();
+      return;
+    }
+
+    this.postsRequestInFlight =
+      true;
+
+    if (refresh) {
+      this.page = 0;
+
+      if (this.infinitScroll) {
+        this.infinitScroll.disabled =
+          false;
+      }
+    }
+
+    // Loader only when absolutely nothing is rendered.
+    this.pageLoading =
+      !this.posts ||
+      this.posts.length === 0;
+
+    const requestPage =
+      this.page;
+
+    this.channelService
+      .getPosts(
+        this.channel.id,
+        requestPage
+      )
+      .then(
         (resp: any) => {
-          console.log("Posts fetched", resp);
+          const incoming =
+            (resp?.data?.posts || [])
+              .map(
+                (pst: any) =>
+                  new Post()
+                    .initialize(pst)
+              );
 
-            if (!event || refresh) this.posts = [];
-            if (refresh && this.infinitScroll) this.infinitScroll.disabled = false;
-            if (event) event.target.complete();
+          if (refresh) {
+            // Swap only after fresh response arrives.
+            this.posts =
+              incoming;
+          } else {
+            const existing =
+              new Set(
+                this.posts.map(
+                  (post: any) =>
+                    String(
+                      post.id ||
+                      post._id
+                    )
+                )
+              );
 
-            resp.data.posts.forEach(pst => {
-                this.posts.push(new Post().initialize(pst));
-            });
+            for (const post of incoming) {
+              const id =
+                String(
+                  (post as any).id ||
+                  (post as any)._id
+                );
 
-            this.page++;
-            this.pageLoading = false;
+              if (!existing.has(id)) {
+                this.posts.push(post);
+                existing.add(id);
+              }
+            }
+          }
+
+          this.page =
+            requestPage + 1;
+
+          if (
+            resp?.data?.more === false &&
+            this.infinitScroll
+          ) {
+            this.infinitScroll.disabled =
+              true;
+          }
+
+          this.pageLoading = false;
+          this.postsRequestInFlight =
+            false;
+
+          event?.target?.complete?.();
         },
         err => {
-          console.error('Error fetching posts:', err);
+          console.error(
+            'Error fetching posts:',
+            err
+          );
+
           this.pageLoading = false;
-          
+          this.postsRequestInFlight =
+            false;
+
+          event?.target?.complete?.();
         }
-    );
-}
+      );
+  }
 
   addPost(post: Post) {
     this.posts.unshift(post);

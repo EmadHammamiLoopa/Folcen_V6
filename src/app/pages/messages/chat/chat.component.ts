@@ -31,6 +31,9 @@ import { SessionStoreService } from 'src/app/services/session-store.service';
 interface ImageFileObject {
   file: any;
   imageData: string;
+  name?: string;
+  mimeType?: string;
+  mediaType?: 'image' | 'video';
 }
 
 // ⬇️  put this just above the class or anywhere in the file ­- it’s private to the module
@@ -72,6 +75,7 @@ private loadingMessages = false;
 
   image: string | null = null;
   imageFile: ImageFileObject | null = null;
+  selectedMediaType: 'image' | 'video' | null = null;
   messageText = "";
   private activityListeners: any[] = [];
   private lastActivityTime = Date.now();
@@ -90,6 +94,12 @@ private loadingMessages = false;
   private sendMessageCounter = 0;
 
   allowToChat = false;
+  chatPermissionLoaded = false;
+  chatPermissionReason: string | null = null;
+
+  private lastThreadSyncAt = 0;
+  private readonly warmThreadRefreshMs = 15000;
+
   business = false;
   showMediaOptions: boolean = false;
 activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'rejected' | 'expired' | 'used' | 'revoked' | null, messageId?: string } = { status: null };
@@ -105,6 +115,22 @@ activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'rejected' | '
               private webRTC: WebrtcService, private idService: IdService, private sessionStore: SessionStoreService) {
                 // Backwards-compatible alias: some files expect `webrtcService`
                 (this as any).webrtcService = this.webRTC;
+  }
+
+  isVideoMessage(message: any): boolean {
+    const mime =
+      String(message?.mediaMimeType || '').toLowerCase();
+
+    if (mime.startsWith('video/')) {
+      return true;
+    }
+
+    const url =
+      String(message?.image || '')
+        .split('?')[0]
+        .toLowerCase();
+
+    return /\.(mp4|m4v|mov|webm|3gp|mkv)$/.test(url);
   }
 
   async openImage(url: string) {
@@ -123,11 +149,10 @@ activeVideoCall: { status: 'pending' | 'accepted' | 'cancelled' | 'rejected' | '
   }
 
 ionViewWillLeave() {
-  // Reset so re-entering this conversation always reloads messages from the server
-  this.lastLoadedPeerId = null;
+  // Keep this thread rendered in Ionic's cached page.
+  // Realtime messages continue updating it while away.
   this.teardownCallSession();
 }
-
 
 private teardownCallSession() {
   this.inSession = false;
@@ -179,7 +204,7 @@ isLatestCall(message: Message): boolean {
           if (this.infScroll) this.infScroll.disabled = false;
         }
 
-        this.getUserProfile(normalized, true);
+        this.getUserProfile(normalized, false);
         this.videoCallDeclined = false;
       }
     });
@@ -363,22 +388,53 @@ ngOnDestroy() {
   ionViewWillEnter() {
     this.inSession = true;
     this.sessionStart = Date.now();
-    this.activeVideoCall = { status: null, messageId: undefined }
-    
-    // Reload messages every time the view becomes active so the user always sees
-    // the latest conversation state (handles messages sent while they were away).
+
+    this.activeVideoCall = {
+      status: null,
+      messageId: undefined
+    };
+
     if (this.user?.id) {
-      this.page = 0;
-      this.messages = [];
-      this.groupedMessages = [];
-      this.getUserProfile(this.user.id, true);
+      const warm =
+        !!this.messages?.length;
+
+      if (warm) {
+        // Render immediately. Never blank a warm conversation.
+        this.pageLoading = false;
+        this.groupMessagesByDate();
+        this.markThreadRead();
+      }
+
+      const stale =
+        !this.lastThreadSyncAt ||
+        (
+          Date.now() -
+          this.lastThreadSyncAt
+        ) > this.warmThreadRefreshMs;
+
+      if (!warm || stale) {
+        this.page = 0;
+
+        if (stale) {
+          this.messageService
+            .clearCacheForThread(
+              this.user.id
+            );
+        }
+
+        // Background refresh keeps existing messages visible.
+        this.getMessages();
+      } else {
+        // Video permission remains independently authoritative.
+        this.refreshPersistedVideoPermissionState();
+      }
     }
 
-    console.log("ionViewWillEnter called");
-    // Do not reset global messages badge when entering a chat thread —
-    // clearing should be handled by markThreadRead() so we only clear per-user counts.
+    console.log(
+      'ionViewWillEnter called'
+    );
   }
-  
+
   toggleMediaOptions() {
     this.showMediaOptions = !this.showMediaOptions;
   }
@@ -660,8 +716,15 @@ getUserProfile(userId: string, forceRefresh = false) {
 
       // ✅ Always fetch messages to ensure history is loaded, but clear cache first
       // to avoid showing stale data if a message was just sent from another view.
-      this.messageService.clearCacheForThread(this.user.id);
-      await this.getMessages();
+      if (
+        !this.messages.length ||
+        !this.lastThreadSyncAt
+      ) {
+        this.page = 0;
+        await this.getMessages();
+      } else {
+        this.pageLoading = false;
+      }
     },
     err => {
       this.pageLoading = false;
@@ -829,18 +892,43 @@ async getMessages(event?: any) {
   }
 
   this.loadingMessages = true;
-  if (!event) this.pageLoading = true;
+  if (!event) {
+    this.pageLoading =
+      !this.messages ||
+      this.messages.length === 0;
+  }
 
   try {
     if (!this.socket && this.user?.id) {
       this.initializeSocket().catch(e => console.warn('Socket warmup failed while loading messages', e));
     }
 
-    const resp: any = await this.messageService.indexMessages(this.user?.id || this.productId, this.page++);
+    const requestedPage =
+      this.page;
+
+    const resp: any =
+      await this.messageService.indexMessages(
+        this.user?.id || this.productId,
+        requestedPage
+      );
+
+    this.page++;
+
+    if (requestedPage === 0) {
+      this.allowToChat =
+        resp?.data?.allowToChat !== false;
+
+      this.chatPermissionLoaded = true;
+
+      this.chatPermissionReason =
+        resp?.data?.chatReason || null;
+
+      this.lastThreadSyncAt =
+        Date.now();
+    }
 
     if (resp?.data?.messages?.length) {
       const newMessages = (resp?.data?.messages || []).map((m: any) => {
-        if (m.image && typeof m.image === 'object' && m.image.path) m.image = m.image.path;
         return new Message().initialize(m);
       });
 
@@ -954,9 +1042,6 @@ private idOf(value: any): string {
     copy.id = copy.id || copy._id || `${copy.from}-${copy.to}-${copy.createdAt || Date.now()}`;
     copy.tempId = copy.tempId ?? m.tempId;
     copy.createdAt = copy.createdAt ? new Date(copy.createdAt) : null;
-    if (copy.image && typeof copy.image === 'object' && copy.image.path) {
-      copy.image = copy.image.path;
-    }
     if (copy.type !== 'video-call-request') copy.status = null;
     return new Message().initialize(copy);
   };
@@ -1531,7 +1616,15 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     to: toId,
     text: message.text ?? '',
     state: 'sending',
-    image: message.image ?? null,
+    image: message.image
+      ? {
+          path: message.image,
+          type:
+            message.mediaMimeType ||
+            (message.image ? 'image/jpeg' : '')
+        }
+      : null,
+    mediaMimeType: message.mediaMimeType || '',
     type: message.type || (this.productId ? 'product' : 'friend'),
     productId: message.productId ?? this.productId ?? null,
     createdAt: message.createdAt ?? null,
@@ -1550,6 +1643,36 @@ async sendMessage(message: any /*, ind?: number */): Promise<boolean> {
     const saved = resp?.data ?? resp;
     this.handleMessageSent({ ...saved, tempId: payload.tempId });
     this.messageService.clearCacheForThread(this.user.id);
+
+    if (!this.user?.isFriend) {
+      const selfId = String(
+        (this.authUser as any)?._id ||
+        this.authUser?.id ||
+        ''
+      );
+
+      const peerId = String(
+        (this.user as any)?._id ||
+        this.user?.id ||
+        ''
+      );
+
+      const peerAlreadyReplied =
+        this.messages.some(
+          (m: any) =>
+            m.type !== 'video-call-request' &&
+            String(m.from || '') === peerId &&
+            String(m.to || '') === selfId
+        );
+
+      if (!peerAlreadyReplied) {
+        this.allowToChat = false;
+        this.chatPermissionLoaded = true;
+        this.chatPermissionReason =
+          'awaiting_reply';
+      }
+    }
+
     return true;
   } catch (err: any) {
     const i = this.messages.findIndex(m => m.tempId === payload.tempId || m.id === payload.tempId);
@@ -1589,12 +1712,22 @@ async addMessage() {
     
     // ✅ STEP 1: Upload the image FIRST
     let imageUrl = null;
+    let mediaMimeType = '';
+
     if (this.imageFile?.file) {
       imageUrl = await this.uploadImageAndGetUrl();
       if (!imageUrl) return;
+
+      mediaMimeType =
+        this.imageFile.mimeType ||
+        (
+          this.imageFile.mediaType === 'video'
+            ? 'video/mp4'
+            : 'image/jpeg'
+        );
     }
 
-    // ✅ STEP 2: Create final message with real image URL
+    // ✅ STEP 2: Create final message with real media URL
     const message = {
       id: tempId,
       tempId,
@@ -1602,7 +1735,8 @@ async addMessage() {
       to: this.user.id,
       text: this.messageText,
       state: 'sending',
-      image: imageUrl,  // Now it’s a string URL, not SafeUrl
+      image: imageUrl,
+      mediaMimeType,
       type: this.productId ? 'product' : 'friend',
       productId: this.productId || null,
       createdAt: new Date()
@@ -1618,8 +1752,7 @@ async addMessage() {
     if (sendSuccess) {
       // ✅ STEP 5: Clear form
       this.messageText = "";
-      this.image = null;
-      this.imageFile = null;
+      this.removeImage();
     }
 
   } catch (err) {
@@ -1631,50 +1764,111 @@ async addMessage() {
 removeImage() {
   this.image = null;
   this.imageFile = null;
+  this.selectedMediaType = null;
 }
 
 
 async pickMedia(mediaType: 'image' | 'video') {
-  try {
-    if (this.platform.is('cordova')) {
-      // Use takePicture (handles fetch + File-plugin fallback + proper MIME type)
-      const resp = await this.uploadFileService.takePicture(
-        this.camera.PictureSourceType.PHOTOLIBRARY,
-        mediaType
-      );
-      if (!resp?.file) {
-        this.toastService.presentErrorToastr('Could not read the selected file. Please try again.');
-        return;
+  const isImage = mediaType === 'image';
+
+  const alert = await this.alertController.create({
+    header: isImage ? 'Add photo' : 'Add video',
+    buttons: [
+      {
+        text: isImage ? 'Take photo' : 'Record video',
+        handler: () =>
+          this.pickMediaFromSource(
+            mediaType,
+            'camera'
+          )
+      },
+      {
+        text: 'Choose from gallery',
+        handler: () =>
+          this.pickMediaFromSource(
+            mediaType,
+            'gallery'
+          )
+      },
+      {
+        text: 'Cancel',
+        role: 'cancel'
       }
-      const previewUrl = this.webView.convertFileSrc(resp.imageData);
-      this.imageFile = { file: resp.file, imageData: resp.imageData };
-      this.image = this.sanitizeImageUrl(previewUrl) as string;
-      this.changeDetection.detectChanges();
+    ]
+  });
 
-    } else {
-      // Browser fallback
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = mediaType === 'image' ? 'image/*' : 'video/*';
-      input.onchange = () => {
-        const file = input.files![0];
-        if (file) {
-          const objectUrl = URL.createObjectURL(file);
-          this.imageFile = { file, imageData: objectUrl };
-          this.image = this.sanitizeImageUrl(objectUrl) as string;
-          
-        }
-      };
-      input.click();
-    }
-
-  } catch (err) {
-    console.error('Error capturing media:', err);
-    this.toastService.presentErrorToastr('Failed to capture media');
-  }
+  await alert.present();
 }
 
+private async pickMediaFromSource(
+  mediaType: 'image' | 'video',
+  source: 'gallery' | 'camera'
+) {
+  try {
+    const resp =
+      await this.uploadFileService.selectMedia(
+        mediaType,
+        source
+      );
 
+    if (!resp?.file) {
+      this.toastService.presentErrorToastr(
+        'Could not read the selected file. Please try again.'
+      );
+      return;
+    }
+
+    const mimeType =
+      resp.mimeType ||
+      resp.file.type ||
+      (
+        mediaType === 'video'
+          ? 'video/mp4'
+          : 'image/jpeg'
+      );
+
+    this.removeImage();
+
+    this.imageFile = {
+      file: resp.file,
+      imageData: resp.imageData,
+      name: resp.name,
+      mimeType,
+      mediaType
+    };
+
+    this.selectedMediaType = mediaType;
+
+    this.image =
+      this.sanitizeImageUrl(
+        resp.imageData
+      ) as string;
+
+    this.showMediaOptions = false;
+
+    this.changeDetection.detectChanges();
+
+  } catch (err: any) {
+    const message =
+      String(err?.message || err || '');
+
+    // A user closing a picker is not an application error.
+    if (
+      /cancel|no media selected/i.test(message)
+    ) {
+      return;
+    }
+
+    console.error(
+      'Chat media selection failed:',
+      err
+    );
+
+    this.toastService.presentErrorToastr(
+      'Failed to open the selected media.'
+    );
+  }
+}
 
 
 // Helper function to convert base64 into File object
@@ -1706,18 +1900,66 @@ allowToShowDate(ind: number): boolean {
 
 
   conversationStarted() {
-    if (this.user && this.user.isFriend) return true;
+    if (this.user?.isFriend) {
+      return true;
+    }
 
-    if (!this.messages || this.messages.length === 0) return true;
+    const selfId = String(
+      (this.authUser as any)?._id ||
+      this.authUser?.id ||
+      ''
+    );
 
-    const normalMessages = this.messages
-      .filter(m => m.type !== 'video-call-request')
-      .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+    const peerId = String(
+      (this.user as any)?._id ||
+      this.user?.id ||
+      ''
+    );
 
-    if (!normalMessages.length) return true;
+    if (!selfId || !peerId) {
+      return false;
+    }
 
-    const last = normalMessages[normalMessages.length - 1];
-    return !last.isMine(this.authUser.id);
+    // Video request lifecycle never affects text/media chat.
+    const normalMessages =
+      (this.messages || [])
+        .filter(
+          m =>
+            m.type !==
+            'video-call-request'
+        );
+
+    // Realtime reply unlocks immediately,
+    // even before the next REST refresh.
+    const peerHasReplied =
+      normalMessages.some(
+        m =>
+          String(m.from || '') === peerId &&
+          String(m.to || '') === selfId
+      );
+
+    if (peerHasReplied) {
+      return true;
+    }
+
+    // After page 0 arrives, server policy is authoritative.
+    if (this.chatPermissionLoaded) {
+      return !!this.allowToChat;
+    }
+
+    // Fast fallback before first response.
+    if (!normalMessages.length) {
+      return true;
+    }
+
+    const selfHasSent =
+      normalMessages.some(
+        m =>
+          String(m.from || '') === selfId &&
+          String(m.to || '') === peerId
+      );
+
+    return !selfHasSent;
   }
 
 // Modify ProfileEnabled to always return true
@@ -1790,16 +2032,6 @@ showUproduct() {
     await alert.present();
   }
 
-  nonFriendsChatEnabled() {
-   // console.log('Friend status:', this.user?.isFriend);
-   // console.log('Messages count:', this.messages.length);
-  
-    if (this.user && this.user.isFriend) {
-      return true; // No limit for friends
-    }
-    
-    return this.messages.length < 10; // Limit for non-friends
-  }
   
   async requestVideoCall() {
     if (!this.authUser || !this.user) {

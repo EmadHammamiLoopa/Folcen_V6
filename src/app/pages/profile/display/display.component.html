@@ -189,7 +189,7 @@
           
           <div class="modern-gallery-grid">
             <!-- Add Photo Card (Only for My Profile) -->
-            <div class="gallery-item add-photo-card animate__animated animate__fadeIn" *ngIf="myProfile" (click)="!isUploading && openImagePicker()">
+            <div class="gallery-item add-photo-card animate__animated animate__fadeIn" *ngIf="myProfile" (click)="!isUploading && openPhotoSourceOptions()">
               <div class="add-content" *ngIf="!isUploading">
                 <ion-icon name="add-outline"></ion-icon>
                 <span>Add Photo</span>

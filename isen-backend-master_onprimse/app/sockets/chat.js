@@ -5,6 +5,7 @@ const fsp = fs.promises;
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Follow = require("../models/Follow");
+const helpers = require("../helpers");
 const { sendPushToUser } = require("../services/fcmPushService");
 
 // ✅ Import from socketManager
@@ -662,17 +663,28 @@ socket.on("connect-user", async (user_id) => {
         return;
       }
 
-      // Privacy Check: If receiver is private, sender must be a friend or active follower
-      if (receiver.isPrivate) {
-        const isFriend = receiver.friends && receiver.friends.some(id => id.toString() === senderId.toString());
-        const follow = await Follow.findOne({ follower: senderId, followed: msg.to, status: 'active' });
-        
-        if (!isFriend && !follow) {
-          console.warn(`Message blocked: ${msg.to} is private and ${senderId} is not a friend or active follower`);
-          try { socket.emit('send-message-error', { tempId, reason: 'privacy_blocked' }); } catch (_) {}
-          emitToUser(senderId, 'message-blocked-privacy', { recipientId: msg.to });
-          return;
-        }
+      // Normal text/media chat uses the same server-authoritative policy
+      // as the REST endpoint. Video permission is separate.
+      const chatPolicy =
+        await helpers.canInitiateChat(
+          senderId,
+          msg.to
+        );
+
+      if (!chatPolicy.allowed) {
+        try {
+          socket.emit(
+            'send-message-error',
+            {
+              tempId,
+              reason:
+                chatPolicy.reason ||
+                'chat_not_allowed'
+            }
+          );
+        } catch (_) {}
+
+        return;
       }
 
       // Simple per-socket rate limiting (privacy-abuse protection)
