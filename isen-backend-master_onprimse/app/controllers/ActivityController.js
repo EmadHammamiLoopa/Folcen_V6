@@ -96,6 +96,65 @@ exports.list = async (req, res) => {
     // If there are no docs or requester is the actor, return as-is (actor should see private activities)
     const requester = requesterId;
 
+    // Fast path for My Archive.
+    // Visibility checks below do not change the result when users view
+    // their own activity, so avoid those extra database queries.
+    const isOwnArchive =
+      filter.actor &&
+      String(filter.actor) === requester;
+
+    if (isOwnArchive) {
+      try {
+        const extrasPostIds = rawDocs
+          .filter(d => d.targetType === 'post' && d.targetId)
+          .map(d => d.targetId);
+
+        if (extrasPostIds.length) {
+          const Post = require('../models/Post');
+
+          const extras = await Post.find({
+            _id: { $in: extrasPostIds }
+          })
+            .select(
+              '_id eventDate eventLocation eventTime relationshipGoals ageRange interests hintAboutMe'
+            )
+            .lean();
+
+          const extrasMap = new Map(
+            extras.map(post => [String(post._id), post])
+          );
+
+          rawDocs.forEach(d => {
+            if (d.targetType === 'post' && d.targetId) {
+              const ex = extrasMap.get(String(d.targetId));
+
+              if (ex) {
+                d.postExtras = {
+                  eventDate: ex.eventDate || null,
+                  eventLocation: ex.eventLocation || null,
+                  eventTime: ex.eventTime || null,
+                  relationshipGoals: ex.relationshipGoals || [],
+                  ageRange: ex.ageRange || null,
+                  interests: ex.interests || [],
+                  hintAboutMe: ex.hintAboutMe || null
+                };
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.warn(
+          'activity extras enrichment failed',
+          e && e.message ? e.message : e
+        );
+      }
+
+      return Response.sendResponse(
+        res,
+        { docs: rawDocs, page, limit }
+      );
+    }
+
     // Collect referenced post/comment ids
     const postIds = rawDocs.filter(d => d.targetType === 'post' && d.targetId).map(d => d.targetId);
     const commentIds = rawDocs.filter(d => d.type === 'comment' && d.meta && d.meta.commentId).map(d => d.meta.commentId);

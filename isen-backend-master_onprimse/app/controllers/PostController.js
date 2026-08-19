@@ -11,7 +11,6 @@ const User = require("../models/User");
 const Product = require("../models/Product");
 const Job = require("../models/Job");
 const Service = require("../models/Service");
-const { destroyComment } = require("./CommentController");
 const Response = require("./Response");
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
 const logger = require('../utils/logger');
@@ -1289,24 +1288,43 @@ exports.deletePost = (req, res) => {
 
 exports.destroyPost = async (res, postId, callback) => {
     try {
-        // Find related comments first
-        const comments = await Comment.find({ post: postId });
+        // Collect related comment IDs once for bulk cleanup.
+        const comments = await Comment.find({ post: postId })
+            .select('_id')
+            .lean();
+        const commentIds = comments.map(comment => comment._id);
         
         // Delete the post
         await Post.deleteOne({ _id: postId });
         
         // Delete related reports for the post
         await Report.deleteMany({ "entity.id": postId, "entity.name": 'post' });
-        
-        // Delete reports for comments
-        if (comments.length > 0) {
-            await Report.deleteMany({ "entity.id": { $in: comments.map(comment => comment._id) }, "entity.name": 'comment' });
+
+        // Remove post activity plus any legacy/current comment activity
+        // in one bulk operation.
+        const activityCleanup = [
+            { targetType: 'post', targetId: postId }
+        ];
+
+        if (commentIds.length > 0) {
+            activityCleanup.push(
+                { 'meta.commentId': { $in: commentIds } },
+                { targetType: 'comment', targetId: { $in: commentIds } }
+            );
         }
 
-        // Delete related comments
-        for (const comment of comments) {
-            await exports.destroyComment(res, comment._id);
+        await Activity.deleteMany({ $or: activityCleanup });
+
+        // Delete comment reports and comments in bulk instead of issuing
+        // several delete queries per comment.
+        if (commentIds.length > 0) {
+            await Report.deleteMany({
+                "entity.id": { $in: commentIds },
+                "entity.name": 'comment'
+            });
         }
+
+        await Comment.deleteMany({ post: postId });
 
         // If a callback is provided, call it after everything is deleted
         if (callback) {

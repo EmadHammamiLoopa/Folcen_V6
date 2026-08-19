@@ -761,6 +761,14 @@ exports.destroyComment = async (res, commentId, callback) => {
         // Remove any associated reports for the comment
         await Report.deleteMany({ 'entity.id': commentId, 'entity.name': 'comment' });
 
+        // Remove the Archive/Activity entry created for this comment.
+        await Activity.deleteMany({
+            $or: [
+                { 'meta.commentId': commentId },
+                { targetType: 'comment', targetId: commentId }
+            ]
+        });
+
         // If a callback exists, call it
         if (callback) return callback(res);
     } catch (err) {
