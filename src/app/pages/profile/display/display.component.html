@@ -11,23 +11,23 @@
       <div class="hero-bg-pattern"></div>
       
       <div class="hero-top-actions">
-        <ion-button fill="clear" (click)="goBack()" class="back-btn">
-          <ion-icon name="chevron-back-outline"></ion-icon>
+        <ion-button fill="clear" (click)="goBack()" class="back-btn" aria-label="Back">
+          <ion-icon name="arrow-back-outline"></ion-icon>
         </ion-button>
         <div class="right-actions" *ngIf="myProfile">
-          <ion-button fill="clear" routerLink="/tabs/profile/form">
-            <ion-icon name="create-outline"></ion-icon>
+          <ion-button fill="clear" routerLink="/tabs/profile/form" aria-label="Edit profile" title="Edit profile">
+            <ion-icon name="pencil-outline"></ion-icon>
           </ion-button>
-          <ion-button fill="clear" [routerLink]="['/activity']" [queryParams]="{ actorId: 'me' }" title="My Archive">
-            <ion-icon name="pulse-outline"></ion-icon>
+          <ion-button fill="clear" [routerLink]="['/activity']" [queryParams]="{ actorId: 'me' }" aria-label="My archive" title="My Archive">
+            <ion-icon name="archive-outline"></ion-icon>
           </ion-button>
-          <ion-button fill="clear" routerLink="/tabs/profile/settings">
+          <ion-button fill="clear" routerLink="/tabs/profile/settings" aria-label="Settings" title="Settings">
             <ion-icon name="settings-outline"></ion-icon>
           </ion-button>
         </div>
         <div class="right-actions" *ngIf="!myProfile">
-          <ion-button fill="clear" (click)="presentPopover($event)">
-            <ion-icon name="ellipsis-vertical-outline"></ion-icon>
+          <ion-button fill="clear" (click)="presentPopover($event)" aria-label="More profile actions" title="More">
+            <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
           </ion-button>
         </div>
       </div>
@@ -38,8 +38,8 @@
           <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
           
           <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end" data-tour="profile-avatar-tools">
-            <ion-fab-button size="small" (click)="openAvatarMediaOptions(); $event.stopPropagation()">
-              <ion-icon name="camera"></ion-icon>
+            <ion-fab-button size="small" (click)="openAvatarMediaOptions(); $event.stopPropagation()" aria-label="Change profile photo">
+              <ion-icon name="camera-outline"></ion-icon>
             </ion-fab-button>
           </ion-fab>
         </div>
@@ -47,7 +47,7 @@
         <div class="user-identity">
           <h1 class="name">{{ user.fullName }}<span class="age" *ngIf="user.getAge(myProfile)">, {{ user.getAge(myProfile) }}</span></h1>
           <p class="location">
-            <ion-icon name="location-sharp"></ion-icon> 
+            <ion-icon name="location-outline"></ion-icon> 
             {{ (user.city && user.city !== 'Unknown') ? user.city : '' }}{{ (user.city && user.city !== 'Unknown' && user.country && user.country !== 'Unknown') ? ', ' : '' }}{{ (user.country && user.country !== 'Unknown') ? user.country : '' }}
             <span *ngIf="(!user.city || user.city === 'Unknown') && (!user.country || user.country === 'Unknown')">Location not specified</span>
           </p>
@@ -83,7 +83,7 @@
         <!-- Add Friend / Unfriend — hidden on private profiles for non-friends (followers use Follow button only) -->
         <ion-button class="primary-action" (click)="request()" [color]="user.isFriend ? 'light' : 'primary'"
             *ngIf="!user.isPrivate || user.isFriend">
-          <ion-icon [name]="user.isFriend ? 'person-remove' : (user.request === 'requesting' ? 'checkmark-circle' : (user.request === 'requested' ? 'paper-plane' : 'person-add'))" slot="start"></ion-icon>
+          <ion-icon [name]="user.isFriend ? 'person-remove-outline' : (user.request === 'requesting' ? 'checkmark-circle-outline' : (user.request === 'requested' ? 'paper-plane-outline' : 'person-add-outline'))" slot="start"></ion-icon>
           {{ user.isFriend ? 'Unfriend' : (user.request === 'requesting' ? 'Accept' : (user.request === 'requested' ? 'Cancel Request' : 'Add Friend')) }}
         </ion-button>
 
@@ -94,12 +94,12 @@
         </ion-button>
         
         <ion-button class="secondary-action" [routerLink]="['/messages/chat/', user.id]" color="secondary" *ngIf="user.isFriend || isFriend || !user.isPrivate">
-          <ion-icon name="chatbubble-ellipses" slot="start"></ion-icon>
+          <ion-icon name="chatbubble-ellipses-outline" slot="start"></ion-icon>
           Chat
         </ion-button>
 
         <ion-button class="secondary-action" *ngIf="user.isFriend && features.friendVideoCall" (click)="videoCall()" color="tertiary">
-          <ion-icon name="videocam" slot="start"></ion-icon>
+          <ion-icon name="videocam-outline" slot="start"></ion-icon>
           Call
         </ion-button>
       </div>
@@ -169,12 +169,12 @@
           <div class="tags-container">
             <ng-container *ngIf="user.interests && isArray(user.interests)">
               <span *ngFor="let interest of user.interests" class="tag interest-tag">
-                <ion-icon name="heart"></ion-icon> {{ interest }}
+                <ion-icon name="heart-outline"></ion-icon> {{ interest }}
               </span>
             </ng-container>
             <ng-container *ngIf="user.languages && isArray(user.languages)">
               <span *ngFor="let lang of user.languages" class="tag language-tag">
-                <ion-icon name="language"></ion-icon> {{ lang }}
+                <ion-icon name="language-outline"></ion-icon> {{ lang }}
               </span>
             </ng-container>
           </div>
@@ -191,7 +191,7 @@
             <!-- Add Photo Card (Only for My Profile) -->
             <div class="gallery-item add-photo-card animate__animated animate__fadeIn" *ngIf="myProfile" (click)="!isUploading && openPhotoSourceOptions()">
               <div class="add-content" *ngIf="!isUploading">
-                <ion-icon name="add-outline"></ion-icon>
+                <ion-icon name="add-circle-outline"></ion-icon>
                 <span>Add Photo</span>
               </div>
               <div class="upload-loader" *ngIf="isUploading">
