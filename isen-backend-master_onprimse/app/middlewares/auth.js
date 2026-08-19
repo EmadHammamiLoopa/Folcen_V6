@@ -23,14 +23,23 @@ exports.requireSignin = (req, res, next) => {
         (async () => {
             try {
                 const jti = req.auth && req.auth.jti;
-                if (jti) {
-                    if (await tokenBlacklist.isRevokedByJti(jti)) {
-                        logger.warn('Rejected request with revoked token jti');
-                        return Response.sendError(res, 401, 'Unauthorized: token revoked');
-                    }
-                }
                 const userId = req.auth && req.auth._id;
-                if (userId && (await tokenBlacklist.isUserRevoked(userId))) {
+
+                const [jtiRevoked, userRevoked] = await Promise.all([
+                    jti
+                        ? tokenBlacklist.isRevokedByJti(jti)
+                        : Promise.resolve(false),
+                    userId
+                        ? tokenBlacklist.isUserRevoked(userId)
+                        : Promise.resolve(false)
+                ]);
+
+                if (jtiRevoked) {
+                    logger.warn('Rejected request with revoked token jti');
+                    return Response.sendError(res, 401, 'Unauthorized: token revoked');
+                }
+
+                if (userRevoked) {
                     logger.warn('Rejected request: user has been revoked/erased');
                     return Response.sendError(res, 401, 'Unauthorized: token revoked');
                 }
@@ -104,17 +113,27 @@ exports.requireSignin = (req, res, next) => {
         // After decoding, require a `jti` claim and reject tokens that are revoked.
         try {
             const jti = req.auth && req.auth.jti;
-            if (jti) {
-                if (await tokenBlacklist.isRevokedByJti(jti)) {
-                    logger.warn('Rejected request with revoked token jti');
-                    return Response.sendError(res, 401, 'Unauthorized: token revoked');
-                }
-            } else {
+            const userId = req.auth && req.auth._id;
+
+            if (!jti) {
                 logger.warn('requireSignin: token missing jti claim');
             }
 
-            const userId = req.auth && req.auth._id;
-            if (userId && (await tokenBlacklist.isUserRevoked(userId))) {
+            const [jtiRevoked, userRevoked] = await Promise.all([
+                jti
+                    ? tokenBlacklist.isRevokedByJti(jti)
+                    : Promise.resolve(false),
+                userId
+                    ? tokenBlacklist.isUserRevoked(userId)
+                    : Promise.resolve(false)
+            ]);
+
+            if (jtiRevoked) {
+                logger.warn('Rejected request with revoked token jti');
+                return Response.sendError(res, 401, 'Unauthorized: token revoked');
+            }
+
+            if (userRevoked) {
                 logger.warn('Rejected request: user has been revoked/erased');
                 return Response.sendError(res, 401, 'Unauthorized: token revoked');
             }
