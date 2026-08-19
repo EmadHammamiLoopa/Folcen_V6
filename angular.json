@@ -44,7 +44,8 @@
             "styles": [
               "./node_modules/bootstrap/dist/css/bootstrap.min.css",
               "src/theme/variables.scss",
-              "src/global.scss"
+              "src/global.scss",
+              "src/theme/page-overrides.scss"
             ],
             "scripts": [
               "./node_modules/@fortawesome/fontawesome-free/js/all.min.js",
@@ -109,7 +110,7 @@
               "browserTarget": "folcen:build:production"
             },
             "ci": {
-              "progress": false
+              "browserTarget": "folcen:build:ci"
             }
           }
         },
