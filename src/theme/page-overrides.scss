@@ -9,3 +9,23 @@
     justify-self: start !important;
   }
 }
+
+/* Settings already includes About Folcen, so the extra branded footer is redundant. */
+app-settings .branding-footer {
+  display: none !important;
+}
+
+/* Keep the final account actions comfortably above Android/iOS system navigation. */
+app-settings .settings-container {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+}
+
+app-settings .account-actions-section {
+  margin-bottom: 0 !important;
+}
+
+@media (min-width: 768px) {
+  app-settings .settings-container {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  }
+}
