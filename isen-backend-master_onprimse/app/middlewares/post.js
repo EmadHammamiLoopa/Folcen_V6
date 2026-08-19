@@ -28,6 +28,88 @@ const normalizePostId = (rawId) => {
     return id;
 };
 
+
+// Start the comment-post Mongo read without awaiting it so the route can
+// overlap that RTT with token revocation and authenticated-user loading.
+exports.startCommentPostPrefetch = (req, res, next) => {
+    const id = normalizePostId(
+        req.params && req.params.postId
+    );
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+        return Response.sendError(
+            res,
+            400,
+            'Invalid Post ID format'
+        );
+    }
+
+    req._commentPostPrefetchPromise =
+        Post.findOne({
+            _id: id
+        })
+        .exec()
+        .then(
+            post => ({
+                post,
+                error: null
+            }),
+            error => ({
+                post: null,
+                error
+            })
+        );
+
+    next();
+};
+
+// Consume the route-scoped post read after authentication has completed.
+// The promise always resolves to an object, so an auth rejection cannot
+// leave an unhandled Mongo promise behind.
+exports.finishCommentPostPrefetch = async (req, res, next) => {
+    try {
+        const pending =
+            req._commentPostPrefetchPromise;
+
+        delete req._commentPostPrefetchPromise;
+
+        if (!pending) {
+            return Response.sendError(
+                res,
+                500,
+                'Server error'
+            );
+        }
+
+        const result = await pending;
+
+        if (result.error) {
+            return Response.sendError(
+                res,
+                500,
+                'Server error'
+            );
+        }
+
+        if (!result.post) {
+            return Response.sendError(
+                res,
+                400,
+                'Post not found'
+            );
+        }
+
+        req.post = result.post;
+        next();
+    } catch (_) {
+        return Response.sendError(
+            res,
+            500,
+            'Server error'
+        );
+    }
+};
+
 exports.commentPostById = async (req, res, next, rawId) => {
     try {
         const id = normalizePostId(rawId);

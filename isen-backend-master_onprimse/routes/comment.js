@@ -20,7 +20,9 @@ const { requireSignin, withAuthUser, isAdmin } = require('../app/middlewares/aut
 const { requireLatestTermsPrivacy } = require('../app/middlewares/legal');
 const { commentById, commentOwner } = require('../app/middlewares/comment');
 const {
-    commentPostById
+    commentPostById,
+    startCommentPostPrefetch,
+    finishCommentPostPrefetch
 } = require('../app/middlewares/post');
 const { storeCommentValidator } = require('../app/middlewares/validators/CommentValidator');
 
@@ -39,10 +41,21 @@ const withStoreCommentAuthFields = (req, res, next) => {
 };
 
 router.param('commentId', commentById)
-router.param('postId', commentPostById)
+
+const loadCommentPostForRead = (req, res, next) =>
+    commentPostById(
+        req,
+        res,
+        next,
+        req.params.postId
+    );
 
 router.get('/all', [requireSignin, isAdmin], getAllCommentsForAdmin)
-router.get('/post/:postId/comments', [requireSignin, isAdmin], postComments)
+router.get(
+    '/post/:postId/comments',
+    [loadCommentPostForRead, requireSignin, isAdmin],
+    postComments
+)
 
 router.get('/:commentId', [requireSignin], showComment)
 router.get('/dash/:commentId', [requireSignin, isAdmin], showDashComment)
@@ -50,10 +63,20 @@ router.put('/:commentId', [requireSignin, isAdmin], updateComment)
 
 router.post(
     '/post/:postId/comment',
-    [withStoreCommentAuthFields, requireSignin, withAuthUser],
+    [
+        withStoreCommentAuthFields,
+        startCommentPostPrefetch,
+        requireSignin,
+        withAuthUser,
+        finishCommentPostPrefetch
+    ],
     storeComment
 )
-router.get('/post/:postId/comment', [requireSignin, withAuthUser], getComments)
+router.get(
+    '/post/:postId/comment',
+    [loadCommentPostForRead, requireSignin, withAuthUser],
+    getComments
+)
 router.delete('/:commentId', [requireSignin, commentOwner], deleteComment)
 router.post('/:commentId/vote', [requireSignin, withAuthUser], voteOnComment)
 router.post('/:commentId/report', [requireSignin], reportComment)
