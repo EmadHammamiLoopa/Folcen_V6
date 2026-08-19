@@ -23,7 +23,7 @@ const Activity = require('../app/models/Activity');
 const AuditLog = require('../app/models/AuditLog');
 const MessageEvent = require('../app/models/MessageEvent');
 const peerStore = require('.././app/utils/peerStorage');
-const { notifyPeerNeeded, emitToUser } = require('../app/helpers');
+const { notifyPeerNeeded, emitToUser, normalizeId } = require('../app/helpers');
 const callSessions = require('../app/utils/callSessionStore');
 const { sendVideoCallLifecyclePush } = require('../app/services/videoCallPushService');
 
@@ -611,7 +611,13 @@ router.get('/users', [requireSignin, withAuthUser], getUsers);
 router.get('/profile/:profileUserId', [
   requireSignin,
   (req, res, next) => {
-    req.params.userId = req.params.profileUserId;
+    const userId = normalizeId(req.params.profileUserId);
+
+    if (!userId || !User.db.base.Types.ObjectId.isValid(userId)) {
+      return Response.sendError(res, 400, 'Invalid User ID format');
+    }
+
+    req.params.userId = userId;
     next();
   },
   withAuthUser
