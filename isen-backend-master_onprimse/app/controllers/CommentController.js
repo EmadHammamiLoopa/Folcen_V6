@@ -256,12 +256,30 @@ exports.storeComment = async (req, res) => {
                 const commenterId = req.auth._id.toString();
 
                 // Block checks
-                const isBlockedByAuthor = await User.findOne({ _id: authorId, blockedUsers: commenterId });
-                const isBlockedByMe = req.authUser.blockedUsers && req.authUser.blockedUsers.some(id => id.toString() === authorId);
-                if (isBlockedByAuthor || isBlockedByMe) return Response.sendError(res, 403, 'You cannot comment on this post');
+                const isOwner = authorId === commenterId;
+                const isBlockedByAuthor = isOwner
+                    ? null
+                    : await User.findOne({
+                        _id: authorId,
+                        blockedUsers: commenterId
+                    });
+
+                const isBlockedByMe =
+                    !isOwner &&
+                    req.authUser.blockedUsers &&
+                    req.authUser.blockedUsers.some(
+                        id => id.toString() === authorId
+                    );
+
+                if (isBlockedByAuthor || isBlockedByMe) {
+                    return Response.sendError(
+                        res,
+                        403,
+                        'You cannot comment on this post'
+                    );
+                }
 
                 // Visibility Check
-                const isOwner = authorId === commenterId;
                 const isFriend = req.authUser.friends && req.authUser.friends.some(id => id.toString() === authorId);
                 if (!isOwner) {
                     if (post.visibility === 'private') return Response.sendError(res, 403, 'This post is private');
