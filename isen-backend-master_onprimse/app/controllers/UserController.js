@@ -2184,6 +2184,25 @@ function findUserProfileDoc(userId) {
     }).exec();
 }
 
+function findSelfPendingCounts(userId) {
+  return Promise.all([
+    Follow.countDocuments({
+      followed: userId,
+      status: 'pending'
+    }),
+    Request.countDocuments({
+      to: userId,
+      accepted: false
+    })
+  ]).then(([
+    pendingFollowRequestsCount,
+    pendingFriendRequestsCount
+  ]) => ({
+    pendingFollowRequestsCount,
+    pendingFriendRequestsCount
+  }));
+}
+
 exports.prefetchUserProfile = (req, res, next) => {
   // Start the target-profile read now. withAuthUser runs next, so its
   // authenticated-user read can overlap this database round trip.
@@ -2193,6 +2212,24 @@ exports.prefetchUserProfile = (req, res, next) => {
     userDoc => ({ userDoc, error: null }),
     error => ({ userDoc: null, error })
   );
+
+  // For self-profile requests, the pending counters are also independent of
+  // withAuthUser and the profile read. Start them here so all Mongo reads can
+  // overlap instead of adding another database round trip afterward.
+  const authUserId = req.auth?._id
+    ? String(req.auth._id)
+    : null;
+
+  if (
+    authUserId &&
+    authUserId === String(req.params.userId)
+  ) {
+    req._profilePendingCountsPromise =
+      findSelfPendingCounts(authUserId).then(
+        counts => ({ counts, error: null }),
+        error => ({ counts: null, error })
+      );
+  }
 
   next();
 };
@@ -2252,19 +2289,27 @@ exports.getUserProfile = async (req, res) => {
       const user = normalizeLeanDoc(userDoc.toObject());
       const isMe = authUserId === userId;
 
-      // Add pending counts for self. These queries are independent, so do them
-      // concurrently instead of adding two serial database round trips.
+      // Add pending counts for self. The profile route starts these reads before
+      // withAuthUser so they overlap auth/profile Mongo latency. Keep a direct
+      // fallback for callers that invoke getUserProfile without the prefetch.
       if (isMe) {
-          const [
-            pendingFollowRequestsCount,
-            pendingFriendRequestsCount
-          ] = await Promise.all([
-            Follow.countDocuments({ followed: authUserId, status: 'pending' }),
-            Request.countDocuments({ to: authUserId, accepted: false })
-          ]);
+          const prefetchedPendingCounts =
+            req._profilePendingCountsPromise
+              ? await req._profilePendingCountsPromise
+              : {
+                  counts: await findSelfPendingCounts(authUserId),
+                  error: null
+                };
 
-          user.pendingFollowRequestsCount = pendingFollowRequestsCount;
-          user.pendingFriendRequestsCount = pendingFriendRequestsCount;
+          if (prefetchedPendingCounts.error) {
+            throw prefetchedPendingCounts.error;
+          }
+
+          user.pendingFollowRequestsCount =
+            prefetchedPendingCounts.counts.pendingFollowRequestsCount;
+
+          user.pendingFriendRequestsCount =
+            prefetchedPendingCounts.counts.pendingFriendRequestsCount;
       }
   
       // Default avatar if missing
