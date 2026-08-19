@@ -5,7 +5,6 @@
   <app-sandglass-loader [visible]="pageLoading" message="Loading profile..."></app-sandglass-loader>
   
   <div *ngIf="user && !pageLoading" class="immersive-profile">
-    <!-- Immersive Header -->
     <div class="profile-hero">
       <div class="hero-overlay"></div>
       <div class="hero-bg-pattern"></div>
@@ -34,7 +33,15 @@
 
       <div class="hero-main-content">
         <div class="avatar-wrapper">
-          <app-avatar [profile]="user" [size]="200" class="main-avatar-img" (click)="viewPhoto(mainAvatar)"></app-avatar>
+          <app-avatar
+            [profile]="user"
+            [size]="200"
+            [priority]="true"
+            [refreshKey]="mainAvatar"
+            class="main-avatar-img"
+            (click)="viewPhoto(mainAvatar)">
+          </app-avatar>
+
           <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
           
           <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end" data-tour="profile-avatar-tools">
@@ -53,7 +60,6 @@
           </p>
         </div>
 
-        <!-- Quick Stats -->
         <div class="stats-bar">
           <div class="stat-item clickable" (click)="openFollowModal('friends')">
             <span class="value">{{ user.friendsCount || 0 }}</span>
@@ -76,11 +82,8 @@
       </div>
     </div>
 
-    <!-- Main Content Area -->
     <div class="profile-body">
-      <!-- Action Bar for Visitors -->
       <div class="visitor-actions" *ngIf="!myProfile">
-        <!-- Add Friend / Unfriend — hidden on private profiles for non-friends (followers use Follow button only) -->
         <ion-button class="primary-action" (click)="request()" [color]="user.isFriend ? 'light' : 'primary'"
             *ngIf="!user.isPrivate || user.isFriend">
           <ion-icon [name]="user.isFriend ? 'person-remove-outline' : (user.request === 'requesting' ? 'checkmark-circle-outline' : (user.request === 'requested' ? 'paper-plane-outline' : 'person-add-outline'))" slot="start"></ion-icon>
@@ -104,7 +107,6 @@
         </ion-button>
       </div>
 
-      <!-- Private Profile Placeholder -->
       <div class="private-profile-placeholder animate__animated animate__fadeIn" *ngIf="isLocked">
         <div class="lock-icon-wrapper">
           <ion-icon name="lock-closed-outline"></ion-icon>
@@ -113,15 +115,12 @@
         <p>Follow this user to see their bio.</p>
       </div>
 
-      <!-- Unified Info Container -->
       <div class="info-glass-container" *ngIf="!isLocked">
-        <!-- About Section -->
         <section class="info-section" *ngIf="user.aboutMe">
           <h3 class="section-header">About</h3>
           <p class="about-bio">{{ user.aboutMe }}</p>
         </section>
 
-        <!-- Details Grid — friends of private profiles only -->
         <section class="info-section" *ngIf="myProfile || !user.isPrivate || user.isFriend || isFriend">
           <h3 class="section-header">Details</h3>
           <div class="details-grid">
@@ -163,7 +162,6 @@
           </div>
         </section>
 
-        <!-- Interests & Languages — hidden for friends of private profiles -->
         <section class="info-section" *ngIf="(myProfile || !user.isPrivate || user.isFriend || isFriend) && ((user.interests && isArray(user.interests) && user.interests.length) || (user.languages && isArray(user.languages) && user.languages.length))">
           <h3 class="section-header">Interests & Languages</h3>
           <div class="tags-container">
@@ -180,32 +178,54 @@
           </div>
         </section>
 
-        <!-- Photo Gallery — always for my profile; for others only if they have photos -->
-        <section class="info-section" *ngIf="myProfile || ((!user.isPrivate || user.isFriend || isFriend) && user?.avatars?.length > 0)">
+        <section class="info-section gallery-section" *ngIf="myProfile || ((!user.isPrivate || user.isFriend || isFriend) && user?.avatars?.length > 0)">
           <div class="section-header-row">
-            <h3 class="section-header">Gallery</h3>
+            <div>
+              <h3 class="section-header">Gallery</h3>
+              <p class="section-subtitle" *ngIf="myProfile">Keep your profile fresh with a few recent photos.</p>
+            </div>
             <span class="photo-count">{{ user?.avatars?.length || 0 }} photos</span>
           </div>
           
           <div class="modern-gallery-grid">
-            <!-- Add Photo Card (Only for My Profile) -->
-            <div class="gallery-item add-photo-card animate__animated animate__fadeIn" *ngIf="myProfile" (click)="!isUploading && openPhotoSourceOptions()">
+            <button
+              type="button"
+              class="gallery-item add-photo-card animate__animated animate__fadeIn"
+              *ngIf="myProfile"
+              [disabled]="isUploading"
+              (click)="!isUploading && openPhotoSourceOptions()"
+              aria-label="Add a photo to your gallery">
+
               <div class="add-content" *ngIf="!isUploading">
-                <ion-icon name="add-circle-outline"></ion-icon>
-                <span>Add Photo</span>
+                <span class="add-icon-shell">
+                  <ion-icon name="images-outline"></ion-icon>
+                  <ion-icon name="add-circle" class="add-badge-icon"></ion-icon>
+                </span>
+                <strong>Add photo</strong>
+                <small>Camera or gallery</small>
               </div>
+
               <div class="upload-loader" *ngIf="isUploading">
                 <ion-spinner name="crescent"></ion-spinner>
-                <span>Uploading...</span>
+                <strong>Uploading</strong>
+                <small>Adding your photo…</small>
               </div>
-            </div>
+            </button>
 
-            <!-- Gallery Items -->
-            <div *ngFor="let avatarObj of user?.avatars; let i = index; trackBy: trackByAvatar" 
-                 class="gallery-item animate__animated animate__fadeIn"
-                 [style.animation-delay]="(i * 0.05) + 's'"
-                 (click)="viewPhoto(i)">
-              <img [src]="avatarObj.url" alt="Gallery" />
+            <button
+              type="button"
+              *ngFor="let avatarObj of user?.avatars; let i = index; trackBy: trackByAvatar"
+              class="gallery-item gallery-photo animate__animated animate__fadeIn"
+              [class.is-main]="mainAvatar === avatarObj.path"
+              [style.animation-delay]="(i * 0.05) + 's'"
+              (click)="viewPhoto(i)"
+              [attr.aria-label]="mainAvatar === avatarObj.path ? 'View main profile photo' : 'View gallery photo'">
+
+              <img
+                [src]="avatarObj.url"
+                loading="lazy"
+                decoding="async"
+                alt="Profile gallery photo" />
               
               <div class="gallery-overlay">
                 <div class="view-hint">
@@ -213,14 +233,13 @@
                 </div>
               </div>
 
-              <!-- Main Badge -->
               <div class="main-badge" *ngIf="mainAvatar === avatarObj.path">
                 <ion-icon name="star"></ion-icon>
+                <span>Main</span>
               </div>
-            </div>
+            </button>
           </div>
 
-          <!-- Empty State for Visitors -->
           <div class="gallery-empty-state" *ngIf="!myProfile && (!user?.avatars || user?.avatars?.length === 0)">
             <ion-icon name="images-outline"></ion-icon>
             <p>No photos shared yet</p>
