@@ -284,6 +284,13 @@ selectedStudyCountry = '';
   }
   
 
+  private syncFormControl(controlName: string, value: any) {
+    const control = this.form && this.form.get(controlName);
+    if (!control) return;
+    control.setValue(value);
+    control.markAsDirty();
+  }
+
   async presentModal(data: any[], title: string, multiSelect: boolean = false) {
     let modalData = data;
 
@@ -305,17 +312,21 @@ selectedStudyCountry = '';
           this.selectedCity = result.data;
         } else if (title === 'Professions') {
           this.selectedProfession = result.data;
+          this.syncFormControl('profession', this.selectedProfession);
         } else if (title === 'Interests') {
           this.addInterests(result.data);
         } else if (title === 'Languages') {
           this.addLanguages(result.data);
         } else if (title === 'Educations') {
           this.selectedEducation = result.data;
+          this.syncFormControl('education', this.selectedEducation);
         } else if (title === 'Schools') {
           this.selectedSchool = result.data;
+          this.syncFormControl('school', this.selectedSchool);
         } else if (title === 'Study Countries') {
           // result.data can be either { name, values } or a simple string
           this.selectedStudyCountry = result.data.name || result.data;
+          this.syncFormControl('studyCountry', this.selectedStudyCountry);
           this.loadUniversities();
         }
       }
@@ -330,10 +341,12 @@ selectedStudyCountry = '';
         this.selectedInterests.push(interest);
       }
     });
+    this.syncFormControl('interests', [...this.selectedInterests]);
   }
 
   removeInterest(index: number) {
     this.selectedInterests.splice(index, 1);
+    this.syncFormControl('interests', [...this.selectedInterests]);
   }
 
   addLanguages(languages) {
@@ -342,10 +355,12 @@ selectedStudyCountry = '';
         this.selectedLanguages.push(lang);
       }
     });
+    this.syncFormControl('languages', [...this.selectedLanguages]);
   }
 
   removeLanguage(index: number) {
     this.selectedLanguages.splice(index, 1);
+    this.syncFormControl('languages', [...this.selectedLanguages]);
   }
 
   async presentCountriesModal() {
@@ -432,11 +447,19 @@ selectedStudyCountry = '';
   submit() {
     if (this.form.valid) {
       this.isUpdating = true;
-      const formData = this.form.getRawValue();
+      const formData = {
+        ...this.form.getRawValue(),
+        profession: this.selectedProfession || this.form.get('profession').value || '',
+        studyCountry: this.selectedStudyCountry || this.form.get('studyCountry').value || '',
+        school: this.selectedSchool || this.form.get('school').value || '',
+        interests: Array.isArray(this.selectedInterests) ? [...this.selectedInterests] : [],
+        languages: Array.isArray(this.selectedLanguages) ? [...this.selectedLanguages] : []
+      };
       console.log('Form Data:', formData);
 
       const userId = this.user.id;
       if (!userId) {
+        this.isUpdating = false;
         console.error('User ID is not defined');
         return;
       }
@@ -459,8 +482,13 @@ selectedStudyCountry = '';
       });
 
       // Always persist selected arrays explicitly
-      updatedUserData.interests = Array.isArray(this.selectedInterests) ? this.selectedInterests : (updatedUserData.interests || []);
-      updatedUserData.languages = Array.isArray(this.selectedLanguages) ? this.selectedLanguages : (updatedUserData.languages || []);
+      updatedUserData.interests = Array.isArray(this.selectedInterests) ? [...this.selectedInterests] : (updatedUserData.interests || []);
+      updatedUserData.languages = Array.isArray(this.selectedLanguages) ? [...this.selectedLanguages] : (updatedUserData.languages || []);
+
+      // Always prefer the current modal selections over stale values from the original user object.
+      if (this.selectedProfession) updatedUserData.profession = this.selectedProfession;
+      if (this.selectedStudyCountry) updatedUserData.studyCountry = this.selectedStudyCountry;
+      if (this.selectedSchool) updatedUserData.school = this.selectedSchool;
 
       console.log('Updating user with ID: ', userId, 'payload:', updatedUserData);
       // Prevent changing country/city from the profile form (preserve values from sign-up)
