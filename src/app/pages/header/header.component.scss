@@ -1,100 +1,180 @@
-ion-header {
+@use '../../../theme/design-system' as ds;
+
+@include ds.folcen-theme-tokens;
+
+.folcen-app-header {
   background: transparent;
-  
-  ion-toolbar {
-    --background: var(--folcen-toolbar-background);
-    --color: var(--folcen-toolbar-color);
-    --padding-start: 0;
-    --padding-end: 0;
-    --inner-padding-end: 0;
-    backdrop-filter: blur(16px) saturate(180%);
-    border-bottom: 1px solid var(--folcen-tabbar-border);
-    position: relative;
-    display: flex;
-    align-items: center;
+  padding-top: env(safe-area-inset-top, 0px);
+}
 
-    ion-buttons[slot="start"] {
-      padding-left: 8px;
-      z-index: 2;
-    }
+.folcen-toolbar {
+  --background: var(--f-toolbar);
+  --color: var(--f-text);
+  --min-height: clamp(56px, 8vw, 68px);
+  --padding-start: 0;
+  --padding-end: 0;
+  --inner-padding-end: 0;
 
-    ion-buttons[slot="end"] {
-      padding-right: 8px;
-      z-index: 2;
-    }
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--f-border);
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
 
-    ion-title {
-      font-weight: 800;
-      font-size: 1.1rem;
-      letter-spacing: -0.02em;
-      color: var(--folcen-toolbar-color);
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      pointer-events: none;
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      z-index: 1;
-
-      .title-content {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        pointer-events: auto;
-        gap: 8px;
-        width: fit-content;
-        margin: 0 auto;
-      }
-
-      .header-avatar {
-        height: 32px;
-        width: 32px;
-        border-radius: 10px;
-        border: 1.5px solid rgba(var(--ion-color-primary-rgb), 0.3);
-        overflow: hidden;
-      }
-    }
-
-    ion-button {
-      --color: var(--folcen-text-muted);
-      font-size: 1.1rem;
-    }
+  &::after {
+    content: '';
+    position: absolute;
+    inset: auto 12% 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(124,108,255,.55), transparent);
+    opacity: .45;
+    pointer-events: none;
   }
 }
 
-.avatar {
-  height: 40px;
+.header-actions {
+  position: relative;
+  z-index: 3;
+  min-width: 58px;
+
+  &-start { padding-left: clamp(8px, 2vw, 16px); }
+  &-end   { padding-right: clamp(8px, 2vw, 16px); justify-content: flex-end; }
+}
+
+.header-action,
+.folcen-toolbar ion-button,
+.folcen-toolbar ion-menu-button {
+  --color: var(--f-text-muted);
+  --background: var(--f-surface-muted);
+  --background-hover: var(--f-accent-soft);
+  --background-activated: var(--f-accent-soft);
+  --border-radius: 14px;
   width: 40px;
-  border-radius: 12px;
-  border: 2px solid rgba(99, 102, 241, 0.3);
-  overflow: hidden;
-  margin-right: 8px;
-}
+  height: 40px;
+  margin: 0 2px;
+  font-size: 1rem;
 
-ion-searchbar {
-  --background: var(--folcen-glass-bg);
-  --color: var(--ion-text-color);
-  --placeholder-color: var(--folcen-text-muted);
-  --icon-color: var(--folcen-text-muted);
-  --border-radius: 16px;
-  --box-shadow: none;
-  padding: 8px 16px;
-  margin-top: 8px;
-  
-  .searchbar-input {
-    background: rgba(255, 255, 255, 0.03) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+  @include ds.hover-capable {
+    &:hover { --color: var(--f-text-strong); }
   }
 }
 
-.sc-ion-searchbar-md-h {
-  --box-shadow: none !important;
-  font-size: 13px !important;
+.folcen-title {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+
+  .title-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    max-width: min(68vw, 520px);
+    padding: 6px 10px;
+    pointer-events: auto;
+    position: relative;
+  }
+
+  .title-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--f-text-strong);
+    font-size: clamp(.98rem, 2.8vw, 1.12rem);
+    font-weight: 820;
+    letter-spacing: -0.025em;
+  }
+
+  .title-accent {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, #8b5cf6, #38bdf8);
+    box-shadow: 0 0 0 4px rgba(124,108,255,.09), 0 0 14px rgba(124,108,255,.5);
+  }
+
+  .header-avatar {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--f-border-strong);
+    box-shadow: 0 6px 18px rgba(0,0,0,.16);
+  }
+}
+
+.header-search-shell {
+  position: relative;
+  z-index: 20;
+  padding: 8px var(--f-page-gutter) 4px;
+  background: linear-gradient(180deg, var(--f-toolbar), transparent);
+}
+
+.folcen-search {
+  max-width: var(--f-reading-max);
+  margin: 0 auto;
+  padding: 0;
+  --background: var(--f-surface);
+  --color: var(--f-text);
+  --placeholder-color: var(--f-text-faint);
+  --icon-color: var(--f-text-muted);
+  --clear-button-color: var(--f-text-muted);
+  --border-radius: 17px;
+  --box-shadow: var(--f-shadow-card);
+
+  &::part(container) {
+    border: 1px solid var(--f-border);
+    min-height: 46px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+@include ds.phone-xs {
+  .folcen-title {
+    padding-inline: 56px;
+    .title-content { max-width: 62vw; gap: 6px; }
+    .title-accent { display: none; }
+  }
+
+  .header-action,
+  .folcen-toolbar ion-button,
+  .folcen-toolbar ion-menu-button {
+    width: 36px;
+    height: 36px;
+    --border-radius: 12px;
+  }
+}
+
+@include ds.tablet-up {
+  .folcen-toolbar {
+    --min-height: 66px;
+  }
+
+  .folcen-title .title-text {
+    font-size: 1.08rem;
+  }
+
+  .header-actions {
+    min-width: 82px;
+  }
+}
+
+@include ds.reduced-motion {
+  .folcen-toolbar,
+  .folcen-toolbar * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
