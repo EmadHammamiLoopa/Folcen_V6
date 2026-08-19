@@ -1,24 +1,37 @@
-<div class="avatar-container" [style.width.px]="size" [style.height.px]="size" [class.premium-ring]="premium" [class.rounded]="shape === 'rounded'">
-  <img 
-    *ngIf="avatarUrl && !hasError" 
-    [src]="avatarUrl" 
+<div class="avatar-container"
+     [style.width.px]="size"
+     [style.height.px]="size"
+     [class.loading]="isLoading"
+     [class.premium-ring]="premium"
+     [class.rounded]="shape === 'rounded'">
+
+  <div class="avatar-skeleton" *ngIf="isLoading && avatarUrl && !hasError" aria-hidden="true"></div>
+
+  <img
+    *ngIf="avatarUrl && !hasError"
+    [src]="avatarUrl"
+    (load)="handleLoad()"
     (error)="handleError()"
-    [style.width.px]="size" 
+    [attr.loading]="priority ? 'eager' : 'lazy'"
+    [attr.fetchpriority]="priority ? 'high' : 'auto'"
+    decoding="async"
+    [style.width.px]="size"
     [style.height.px]="size"
+    [class.loaded]="!isLoading"
     alt="Avatar"
   />
-  <div 
-    *ngIf="!avatarUrl || hasError" 
+
+  <div
+    *ngIf="!avatarUrl || hasError"
     class="fallback"
-    [style.width.px]="size" 
+    [style.width.px]="size"
     [style.height.px]="size"
-    [style.font-size.px]="size * 0.4"
-  >
+    [style.font-size.px]="size * 0.4">
     <ng-container *ngIf="initials && initials !== '?'; else noInitials">
       {{ initials }}
     </ng-container>
     <ng-template #noInitials>
-      <i class="fas fa-user"></i>
+      <ion-icon name="person-outline"></ion-icon>
     </ng-template>
   </div>
 </div>
