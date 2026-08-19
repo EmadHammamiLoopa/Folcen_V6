@@ -32,7 +32,7 @@ function mockRes() {
 
 // Minimal request builder
 function mockReq(overrides) {
-  return { authUser: {}, auth: {}, query: {}, params: {}, body: {}, ...overrides };
+  return { authUser: {}, auth: {}, query: {}, params: {}, body: {}, get: () => undefined, ...overrides };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
