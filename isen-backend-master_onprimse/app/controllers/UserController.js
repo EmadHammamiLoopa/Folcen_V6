@@ -2288,11 +2288,11 @@ exports.getUserProfile = async (req, res) => {
           isFollower: false,
         };
       } else {
-        // Relationship status — bidirectional check:
-        // The viewed user may have the auth user in their friends, OR the auth user
-        // may have the viewed user in their friends.
-        const authUserFriends = await User.findById(authUserId).select('friends').lean();
-        const authFriendIds = (authUserFriends?.friends || []).map(id => String(id));
+        // Relationship status — bidirectional check.
+        // withAuthUser already loaded the authenticated user's friends, so reuse
+        // that request-local data instead of paying for another User.findById().
+        const authFriendIds =
+          (req.authUser?.friends || []).map(id => String(id));
 
         const inViewedSide =
           userDoc.friends &&
@@ -2309,16 +2309,37 @@ exports.getUserProfile = async (req, res) => {
           friend: isFriendResult,
         };
 
-        // Add follow status
-        const followRecord = await Follow.findOne({
-          follower: authUserId,
-          followed: userId
-        });
-
-        const isFollowerRecord = await Follow.findOne({
-          follower: userId,
-          followed: authUserId
-        });
+        // These relationship reads are independent. Run them concurrently so
+        // cross-region database latency is paid once rather than serially.
+        const [
+          followRecord,
+          isFollowerRecord,
+          outgoingRequest,
+          incomingRequest
+        ] = await Promise.all([
+          Follow.findOne({
+            follower: authUserId,
+            followed: userId
+          }),
+          Follow.findOne({
+            follower: userId,
+            followed: authUserId
+          }),
+          !isFriendResult
+            ? Request.findOne({
+                from: authUserId,
+                to: userId,
+                accepted: false
+              })
+            : Promise.resolve(null),
+          !isFriendResult
+            ? Request.findOne({
+                from: userId,
+                to: authUserId,
+                accepted: false
+              })
+            : Promise.resolve(null)
+        ]);
 
         relationshipStatus.followStatus =
           followRecord ? followRecord.status : null;
@@ -2333,18 +2354,6 @@ exports.getUserProfile = async (req, res) => {
         // requested = auth user sent it
         // requesting = profile owner sent it
         if (!isFriendResult) {
-          const outgoingRequest = await Request.findOne({
-            from: authUserId,
-            to: userId,
-            accepted: false
-          });
-
-          const incomingRequest = await Request.findOne({
-            from: userId,
-            to: authUserId,
-            accepted: false
-          });
-
           if (outgoingRequest) relationshipStatus.request = 'requested';
           else if (incomingRequest) relationshipStatus.request = 'requesting';
           else relationshipStatus.request = null;
