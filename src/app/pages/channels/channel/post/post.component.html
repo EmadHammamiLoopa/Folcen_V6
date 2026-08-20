@@ -1,4 +1,4 @@
-<ion-card class="jodel-card" [class.feed-card]="showCommentsBtn" [style]="{'--post-bg': post.backgroundColor, '--post-fg': post.color}">
+<ion-card class="jodel-card" [class.feed-card]="showCommentsBtn" [class.standard-feed-card]="showCommentsBtn && channel?.type === 'user'" [style]="{'--post-bg': post.backgroundColor, '--post-fg': post.color}">
   <header class="jdl-h">
     <div class="jdl-user" [style]="{'color':'var(--post-fg)'}" (click)="showUserProfile(post.user.id)" [style.cursor]="(post.anonyme || isAdminPost()) ? 'default' : 'pointer'">
       <div class="avatar-mini" [class.anonyme]="post.anonyme">
