@@ -1,168 +1,114 @@
 <ion-card class="jodel-card" [class.feed-card]="showCommentsBtn" [style]="{'--post-bg': post.backgroundColor, '--post-fg': post.color}">
-  <div class="jdl-reaction-rail" aria-label="Post reactions">
-    <button type="button" class="rail-btn love" [class.active]="post.voted === 1" (click)="$event.stopPropagation(); voteOnPost(1)">
-      <i class="fas fa-heart"></i>
-    </button>
-    <span class="rail-score">{{ post.votes }}</span>
-    <button type="button" class="rail-btn pass" [class.active]="post.voted === -1" (click)="$event.stopPropagation(); voteOnPost(-1)">
-      <i class="fas fa-arrow-down"></i>
-    </button>
-    <button type="button" *ngIf="showCommentsBtn" class="rail-btn comment" (click)="$event.stopPropagation(); showComments()">
-      <i class="far fa-comment-alt"></i>
-      <span>{{ getCommentCount() }}</span>
-    </button>
-  </div>
   <div class="jdl-top-rail" aria-label="Post options">
     <ng-container *ngIf="post.isOwner">
       <div class="rel">
-        <ion-button class="icon-btn" fill="clear" size="small" (click)="toggleVisibilityOptions($event)">
+        <ion-button class="icon-btn" fill="clear" size="small" (click)="toggleVisibilityOptions($event)" aria-label="Change post visibility">
           <ion-icon name="eye-outline"></ion-icon>
         </ion-button>
         <div class="custom-popover" [ngClass]="{'show': visibilityOptionsOpen}" #dropdown>
           <ion-list class="visibility-dropdown">
             <ion-item button (click)="changeVisibility('public')">
-              <ion-icon name="earth" slot="start"></ion-icon><ion-label>Public</ion-label>
+              <ion-icon name="earth-outline" slot="start"></ion-icon><ion-label>Public</ion-label>
             </ion-item>
             <ion-item button (click)="changeVisibility('friends-only')">
-              <ion-icon name="people" slot="start"></ion-icon><ion-label>Friends Only</ion-label>
+              <ion-icon name="people-outline" slot="start"></ion-icon><ion-label>Friends Only</ion-label>
             </ion-item>
             <ion-item button (click)="changeVisibility('private')">
-              <ion-icon name="lock-closed" slot="start"></ion-icon><ion-label>Private</ion-label>
+              <ion-icon name="lock-closed-outline" slot="start"></ion-icon><ion-label>Private</ion-label>
             </ion-item>
           </ion-list>
         </div>
       </div>
     </ng-container>
 
-    <ion-button class="icon-btn" fill="clear" size="small" (click)="presentPopover($event)">
-      <i class="fas fa-ellipsis-v"></i>
+    <ion-button class="icon-btn" fill="clear" size="small" (click)="presentPopover($event)" aria-label="Post options">
+      <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
     </ion-button>
   </div>
-  <!-- header -->
-  <div class="jdl-h">
+
+  <header class="jdl-h">
     <div class="jdl-user" [style]="{'color':'var(--post-fg)'}" (click)="showUserProfile(post.user.id)" [style.cursor]="(post.anonyme || isAdminPost()) ? 'default' : 'pointer'">
       <div class="avatar-mini" [class.anonyme]="post.anonyme">
-        <i *ngIf="post.anonyme" class="fas fa-user-secret"></i>
+        <ion-icon *ngIf="post.anonyme" name="person-circle-outline"></ion-icon>
         <app-avatar *ngIf="!post.anonyme" [profile]="post.user" [size]="40" shape="rounded"></app-avatar>
       </div>
       <div class="user-info">
         <span class="name">{{ postUserName(post) }}</span>
         <div class="meta-row">
+          <ion-icon name="time-outline" aria-hidden="true"></ion-icon>
           <span class="date">{{ post.createdAt | extractDiffTime }}</span>
         </div>
       </div>
     </div>
+  </header>
 
-  </div>
-
-  <!-- text -->
   <div class="jdl-text" [style]="{'color':'var(--post-fg)'}" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
       {{ post.text | slice:0:150 }}{{ post.text?.length > 150 ? '...' : '' }}
       <span *ngIf="post.text?.length > 150" class="see-more">See More</span>
     </ng-container>
-    <ng-container *ngIf="!showCommentsBtn">
-      {{ post.text }}
-    </ng-container>
+    <ng-container *ngIf="!showCommentsBtn">{{ post.text }}</ng-container>
   </div>
 
-  <!-- meta (events / dating) -->
   <div *ngIf="channel?.type === 'static_events'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
-      <div class="meta-chip">
-        <i class="far fa-calendar-alt"></i>
-        {{ post.eventDate | date:'dd MMM' }}
-      </div>
-      <div class="meta-chip">
-        <i class="fas fa-map-marker-alt"></i>
-        {{ post.eventLocation | slice:0:15 }}
-      </div>
-      <div class="meta-chip">
-        <i class="far fa-clock"></i>
-        {{ post.eventTime | date:'HH:mm' }}
-      </div>
+      <div class="meta-chip"><ion-icon name="calendar-outline"></ion-icon>{{ post.eventDate | date:'dd MMM' }}</div>
+      <div class="meta-chip"><ion-icon name="location-outline"></ion-icon>{{ post.eventLocation | slice:0:15 }}</div>
+      <div class="meta-chip"><ion-icon name="time-outline"></ion-icon>{{ post.eventTime | date:'HH:mm' }}</div>
     </ng-container>
 
     <ng-container *ngIf="!showCommentsBtn">
-      <div>
-        <strong><i class="far fa-calendar-alt"></i> Date</strong>
-        {{ post.eventDate | date:'dd MMM yyyy' }}
-      </div>
-      <div>
-        <strong><i class="fas fa-map-marker-alt"></i> Location</strong>
-        {{ post.eventLocation }}
-      </div>
-      <div>
-        <strong><i class="far fa-clock"></i> Time</strong>
-        {{ post.eventTime | date:'shortTime' }}
-      </div>
+      <div><strong><ion-icon name="calendar-outline"></ion-icon> Date</strong>{{ post.eventDate | date:'dd MMM yyyy' }}</div>
+      <div><strong><ion-icon name="location-outline"></ion-icon> Location</strong>{{ post.eventLocation }}</div>
+      <div><strong><ion-icon name="time-outline"></ion-icon> Time</strong>{{ post.eventTime | date:'shortTime' }}</div>
     </ng-container>
   </div>
 
   <div *ngIf="channel?.type === 'static_dating'" class="jdl-meta" [class.compact-meta]="showCommentsBtn" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
-      <div class="meta-chip" *ngIf="post.relationshipGoals?.length">
-        <i class="fas fa-heart"></i>
-        {{ post.relationshipGoals[0] }}
-      </div>
-      <div class="meta-chip">
-        <i class="fas fa-birthday-cake"></i>
-        {{ post.ageRange.min }}–{{ post.ageRange.max }}
-      </div>
-      <div class="meta-chip" *ngIf="post.interests?.length">
-        <i class="fas fa-star"></i>
-        {{ post.interests[0] }}
-      </div>
+      <div class="meta-chip" *ngIf="post.relationshipGoals?.length"><ion-icon name="heart-outline"></ion-icon>{{ post.relationshipGoals[0] }}</div>
+      <div class="meta-chip"><ion-icon name="calendar-number-outline"></ion-icon>{{ post.ageRange.min }}–{{ post.ageRange.max }}</div>
+      <div class="meta-chip" *ngIf="post.interests?.length"><ion-icon name="star-outline"></ion-icon>{{ post.interests[0] }}</div>
     </ng-container>
 
     <ng-container *ngIf="!showCommentsBtn">
-      <div><strong><i class="fas fa-heart"></i> Goals</strong> {{ post.relationshipGoals.join(', ') }}</div>
-      <div><strong><i class="fas fa-birthday-cake"></i> Age</strong> {{ post.ageRange.min }}–{{ post.ageRange.max }}</div>
-      <div class="full-width"><strong><i class="fas fa-star"></i> Interests</strong> {{ post.interests.join(', ') }}</div>
+      <div><strong><ion-icon name="heart-outline"></ion-icon> Goals</strong>{{ post.relationshipGoals.join(', ') }}</div>
+      <div><strong><ion-icon name="calendar-number-outline"></ion-icon> Age</strong>{{ post.ageRange.min }}–{{ post.ageRange.max }}</div>
+      <div class="full-width"><strong><ion-icon name="star-outline"></ion-icon> Interests</strong>{{ post.interests.join(', ') }}</div>
     </ng-container>
   </div>
 
-  <!-- hint (dating only) -->
   <ng-container *ngIf="channel?.type === 'static_dating' && post.hintAboutMe">
     <div *ngIf="showCommentsBtn" class="jdl-hint-teaser" (click)="showComments()">
-      <i class="fas fa-quote-left"></i>
+      <ion-icon name="chatbox-ellipses-outline"></ion-icon>
       <span>{{ post.hintAboutMe | slice:0:60 }}{{ post.hintAboutMe?.length > 60 ? '...' : '' }}</span>
     </div>
     <div *ngIf="!showCommentsBtn" class="hint-box full-width-hint">
-      <strong><i class="fas fa-quote-left"></i> Hint about me</strong>
+      <strong><ion-icon name="chatbox-ellipses-outline"></ion-icon> Hint about me</strong>
       <p>{{ post.hintAboutMe }}</p>
     </div>
   </ng-container>
 
-  <!-- media -->
   <div *ngIf="mediaUrl || (isMediaExpired && !showCommentsBtn)" class="jdl-media" (click)="handleMediaClick()">
     <div class="media-container" [class.enlarged-container]="isImageEnlarged && !showCommentsBtn">
       <ng-container *ngIf="!isMediaExpired">
-        <img *ngIf="isImageMedia(post.media?.url)"
-             [src]="mediaUrl" alt="media" [class.enlarged]="isImageEnlarged && !showCommentsBtn" />
-        
-        <video *ngIf="isVideoMedia(post.media?.url)"
-               [src]="mediaUrl" controls playsinline (click)="$event.stopPropagation()"></video>
-        
+        <img *ngIf="isImageMedia(post.media?.url)" [src]="mediaUrl" alt="Post media" [class.enlarged]="isImageEnlarged && !showCommentsBtn">
+        <video *ngIf="isVideoMedia(post.media?.url)" [src]="mediaUrl" controls playsinline (click)="$event.stopPropagation()"></video>
         <div class="media-overlay" *ngIf="showCommentsBtn">
-          <div class="expand-hint">
-            <ion-icon name="expand-outline"></ion-icon>
-            <span>Tap to view full</span>
-          </div>
+          <div class="expand-hint"><ion-icon name="expand-outline"></ion-icon><span>Tap to view</span></div>
         </div>
       </ng-container>
 
       <div *ngIf="isMediaExpired" class="expired-placeholder">
         <div class="expired-content">
-          <i class="fas fa-history"></i>
+          <ion-icon name="time-outline"></ion-icon>
           <span>Media Expired</span>
           <p>This temporary media is no longer available</p>
         </div>
       </div>
     </div>
 
-    <div *ngIf="post.media?.expiryDate && !isMediaExpired && getTimeRemaining(post.media.expiryDate) !== ''"
-         class="expiry-badge" [ngClass]="{'pulse-warning': getCircleColor(post.media.expiryDate) === 'red'}">
+    <div *ngIf="post.media?.expiryDate && !isMediaExpired && getTimeRemaining(post.media.expiryDate) !== ''" class="expiry-badge" [ngClass]="{'pulse-warning': getCircleColor(post.media.expiryDate) === 'red'}">
       <div class="progress-ring">
         <svg width="20" height="20">
           <circle class="bg" cx="10" cy="10" r="8"></circle>
@@ -173,28 +119,24 @@
     </div>
   </div>
 
-  <!-- actions: ↑ score ↓ • comments -->
-  <div class="jdl-actions">
-    <div class="vote-controls">
-      <ion-button class="icon-btn vote-up" fill="clear" size="small" (click)="voteOnPost(1)">
-        <i class="fas fa-arrow-up"></i>
-      </ion-button>
-      <span class="score">{{ post.votes }}</span>
-      <ion-button class="icon-btn vote-down" fill="clear" size="small" (click)="voteOnPost(-1)">
-        <i class="fas fa-arrow-down"></i>
-      </ion-button>
-    </div>
+  <footer class="jdl-actions">
+    <button type="button" class="post-action like" [class.active]="post.voted === 1" (click)="voteOnPost(1)" aria-label="Like post">
+      <ion-icon [name]="post.voted === 1 ? 'heart' : 'heart-outline'"></ion-icon>
+      <span>{{ post.votes }}</span>
+    </button>
 
-    <div class="spacer"></div>
+    <button type="button" class="post-action pass" [class.active]="post.voted === -1" (click)="voteOnPost(-1)" aria-label="Downvote post">
+      <ion-icon name="arrow-down-outline"></ion-icon>
+      <span>Pass</span>
+    </button>
 
-    <ion-button *ngIf="showCommentsBtn" class="icon-btn comment-btn" fill="clear" size="small" (click)="showComments()">
-      <i class="far fa-comment-alt"></i>
-      <span class="c-count">{{ getCommentCount() }}</span>
-    </ion-button>
-  </div>
+    <button *ngIf="showCommentsBtn" type="button" class="post-action comment" (click)="showComments()" aria-label="Open comments">
+      <ion-icon name="chatbubble-outline"></ion-icon>
+      <span>{{ getCommentCount() }} Comments</span>
+    </button>
+  </footer>
 </ion-card>
 
-<!-- Fullscreen overlay image -->
 <div class="img-fs" *ngIf="isImageEnlarged" (click)="toggleImageSize()">
-  <img [src]="mediaUrl" alt="media" class="img-fs-img" />
+  <img [src]="mediaUrl" alt="Post media fullscreen" class="img-fs-img">
 </div>
