@@ -148,7 +148,7 @@
   box-sizing: border-box;
   padding: 2px;
   border: 1px solid var(--f-border);
-  border-radius: 14px 14px 999px 999px;
+  border-radius: 999px;
   background: var(--f-surface-muted);
   box-shadow: inset 0 1px 0 var(--f-glass-highlight);
 }
@@ -165,7 +165,7 @@
   padding: 0;
   border: 0;
   border-bottom: 1px solid var(--f-divider);
-  border-radius: 11px 11px 5px 5px;
+  border-radius: 999px 999px 8px 8px;
   background: transparent;
   color: var(--f-text-muted);
   font: inherit;
