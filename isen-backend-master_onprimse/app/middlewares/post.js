@@ -174,7 +174,7 @@ exports.postById = async (req, res, next, id) => {
             .exec();
 
         if (!post) {
-            return Response.sendError(res, 400, 'Post not found');
+            return Response.sendError(res, 404, 'Post not found');
         }
 
         req.post = post;
