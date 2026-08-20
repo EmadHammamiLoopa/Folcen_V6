@@ -18,14 +18,19 @@
         <p>Your recent chats and call activity in one place.</p>
       </div>
 
-      <button class="missed-calls-btn" (click)="showMissedCalls()" aria-label="Open missed calls" title="Missed calls">
-        <ion-icon name="call-outline"></ion-icon>
-        <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
-          <span *ngIf="getMissedBellCount(missedCalls) > 0" class="fancy-badge">
+      <ng-container *ngIf="badges?.missedCalls$ | async as missedCalls">
+        <button
+          *ngIf="getMissedBellCount(missedCalls) > 0"
+          class="missed-calls-btn"
+          (click)="showMissedCalls()"
+          aria-label="Open missed calls"
+          title="Missed calls">
+          <ion-icon name="call-outline"></ion-icon>
+          <span class="fancy-badge">
             {{ getMissedBellCount(missedCalls) > 99 ? '99+' : getMissedBellCount(missedCalls) }}
           </span>
-        </ng-container>
-      </button>
+        </button>
+      </ng-container>
     </section>
 
     <app-loader *ngIf="pageLoading"></app-loader>
