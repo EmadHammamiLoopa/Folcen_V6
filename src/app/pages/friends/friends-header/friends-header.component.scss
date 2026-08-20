@@ -1,94 +1,252 @@
+@use '../../../../theme/design-system' as ds;
+
+@include ds.folcen-theme-tokens;
+
+:host {
+  display: block;
+}
+
+.social-hub-shell {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  box-sizing: border-box;
+  padding: calc(14px + env(safe-area-inset-top)) var(--f-page-gutter) 8px;
+  background: linear-gradient(180deg, var(--f-toolbar), rgba(0,0,0,0));
+}
+
+.social-hub-hero {
+  width: min(100%, 980px);
+  margin: 0 auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--f-border);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(124,108,255,.11), rgba(56,189,248,.035)),
+    var(--f-surface);
+  box-shadow: var(--f-shadow-card);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.social-hub-copy {
+  min-width: 0;
+  flex: 1;
+
+  .social-hub-kicker {
+    display: inline-block;
+    margin-bottom: 3px;
+    color: var(--f-accent);
+    font-size: 9px;
+    font-weight: 780;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0;
+    color: var(--f-text-strong);
+    font-size: clamp(1.45rem, 5vw, 2rem);
+    font-weight: 820;
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: var(--f-text-muted);
+    font-size: clamp(.76rem, 2.5vw, .9rem);
+    line-height: 1.4;
+  }
+}
+
 .header-action-wrapper {
   position: relative;
-  margin-right: 8px;
+  flex: 0 0 auto;
 
   .glass-action-btn {
-    --background: rgba(255, 255, 255, 0.1);
-    --color: white;
-    --border-radius: 12px;
-    backdrop-filter: blur(10px);
-    height: 40px;
-    width: 40px;
+    appearance: none;
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid rgba(124,108,255,.18);
+    border-radius: 15px;
+    color: var(--f-accent);
+    background: var(--f-surface-muted);
+    box-shadow: none;
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 21px;
+    }
   }
 
   .vibrant-badge {
     position: absolute;
     top: -5px;
-    right: -5px;
-    background: linear-gradient(135deg, #ef4444, #f43f5e);
-    color: white;
-    font-size: 0.7rem;
-    font-weight: 800;
-    min-width: 18px;
-    height: 18px;
-    border-radius: 9px;
+    right: -6px;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 4px;
-    border: 2px solid var(--ion-background-color);
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ef4444, #f43f5e);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    border: 2px solid var(--f-surface);
+    box-shadow: 0 5px 14px rgba(239,68,68,.30);
   }
 }
 
 .social-tabs-container {
-  padding: 8px clamp(12px, 4vw, 20px);
-  background: var(--ion-background-color);
-  width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
 
-  .glass-tabs {
-    display: flex;
-    background: var(--folcen-tabbar-background);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(var(--ion-text-color-rgb), 0.05);
-    border-radius: 16px;
-    padding: 6px;
+.glass-tabs {
+  display: flex;
+  width: 100%;
+  padding: 5px;
+  gap: 5px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: var(--f-surface);
+  border: 1px solid var(--f-border);
+  box-shadow: 0 10px 28px rgba(0,0,0,.10);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+.tab-item {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--f-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s ease, color .2s ease, transform .2s ease;
+
+  .tab-icon-shell {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+
+    ion-icon { font-size: 19px; }
+  }
+
+  .tab-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 680;
+    letter-spacing: -.01em;
+  }
+
+  .dot-badge {
+    position: absolute;
+    top: 1px;
+    right: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 1.5px solid var(--f-surface-solid);
+  }
+
+  .count-pill {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(239,68,68,.12);
+    color: #ef4444;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  &.active {
+    color: var(--f-text-strong);
+    background: linear-gradient(135deg, rgba(124,108,255,.18), rgba(56,189,248,.08));
+    box-shadow: inset 0 0 0 1px rgba(124,108,255,.17);
+
+    .tab-icon-shell { color: var(--f-accent); }
+  }
+
+  &:active { transform: scale(.98); }
+}
+
+@include ds.phone-xs {
+  .social-hub-shell {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .social-hub-hero {
+    padding: 14px;
+  }
+
+  .social-hub-copy p {
+    max-width: 230px;
+  }
+
+  .tab-item {
+    padding-inline: 8px;
     gap: 6px;
 
-    .tab-item {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px;
-      border-radius: 12px;
-      color: #94a3b8;
-      font-weight: 600;
-      font-size: 0.9rem;
-      transition: all 0.3s ease;
-      cursor: pointer;
-
-      i {
-        font-size: 1rem;
-      }
-
-      &.active {
-        background: rgba(99, 102, 241, 0.15);
-        color: #818cf8;
-        box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.2);
-      }
-
-      .request-icon-wrapper {
-        position: relative;
-        .dot-badge {
-          position: absolute;
-          top: -2px;
-          right: -2px;
-          width: 8px;
-          height: 8px;
-          background: #ef4444;
-          border-radius: 50%;
-          border: 1.5px solid var(--ion-background-color);
-        }
-      }
-
-      .count-text {
-        font-size: 0.8rem;
-        opacity: 0.8;
-      }
-    }
+    .tab-label { font-size: 13px; }
   }
+}
+
+@include ds.tablet-up {
+  .social-hub-shell {
+    padding-top: calc(20px + env(safe-area-inset-top));
+  }
+
+  .social-hub-hero {
+    padding: 18px 20px;
+  }
+
+  .glass-tabs {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .tab-item {
+    min-height: 48px;
+
+    .tab-label { font-size: 15px; }
+    .tab-icon-shell ion-icon { font-size: 20px; }
+  }
+}
+
+@include ds.reduced-motion {
+  .tab-item { transition: none !important; }
 }

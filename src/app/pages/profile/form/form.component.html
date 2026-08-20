@@ -1,213 +1,264 @@
-<app-header [back]="true" title="Edit Profile">
-  <div id="end-buttons">
-    <ion-button fill="clear" shape="round" (click)="submit()">
-      <i class="fas fa-save mr-2"></i> Save
-    </ion-button>
-  </div>
-</app-header>
-
 <app-loader *ngIf="pageLoading"></app-loader>
 
-<ion-content>
-  <div class="avatar-edit-section text-center p-3">
-    <app-avatar [profile]="user" [size]="140"></app-avatar>
-    <div class="mt-2">
-      <ion-button fill="outline" size="small" (click)="openAvatarCustomize()">
-        <ion-icon name="color-palette-outline" slot="start"></ion-icon>
-        Customize Avatar
-      </ion-button>
-    </div>
-  </div>
+<ion-content class="edit-profile-content" *ngIf="!pageLoading">
+  <div class="edit-profile-aurora" aria-hidden="true"></div>
 
-  <form class="p-2" *ngIf="form" [formGroup]="form">
-    <ion-text class="font-weight-bold" color="primary">
-      <i class="fas fa-info-circle mr-2"></i> Basic Information
-    </ion-text>
+  <main class="edit-profile-container" *ngIf="form && user" style="padding-top: calc(18px + env(safe-area-inset-top));">
+    <section class="profile-preview-card">
+      <ion-buttons class="profile-hero-back">
+        <ion-back-button
+          defaultHref="/tabs/profile"
+          text=""
+          icon="arrow-back-outline"
+          aria-label="Back to profile">
+        </ion-back-button>
+      </ion-buttons>
 
-    <ion-list class="styled-list">
-      <ion-item class="styled-item">
-        <ion-label position="floating">
-          <i class="far fa-user mr-2"></i>First Name
-        </ion-label>
-        <ion-input placeholder="Enter your first name" type="text" formControlName="firstName"></ion-input>
-      </ion-item>
-      <div class="mt-1" *ngIf="firstName.dirty && !firstName.valid">
-        <span class="text-danger pl-1">
-          <span *ngIf="firstName.hasError('required')">First name is required</span>
-        </span>
+      <div class="preview-avatar-wrap">
+        <app-avatar [profile]="user" [size]="118"></app-avatar>
+        <div class="preview-edit-badge" aria-hidden="true">
+          <ion-icon name="brush-outline"></ion-icon>
+        </div>
       </div>
 
-      <ion-item class="styled-item mt-2">
-        <ion-label position="floating">
-          <i class="far fa-user mr-2"></i>Last Name
-        </ion-label>
-        <ion-input placeholder="Enter your last name" type="text" formControlName="lastName"></ion-input>
-      </ion-item>
-      <div class="mt-1" *ngIf="(lastName.dirty && !lastName.valid) || validationErrors['lastName']">
-        <span *ngIf="!lastName.valid && validationErrors['lastName']" class="text-danger pl-1">
-          <span *ngIf="lastName.hasError('required')">Last name is required</span>
-          <span *ngIf="validationErrors['lastName']">{{ validationErrors['lastName'][0] }}</span>
-        </span>
+      <div class="preview-copy">
+        <span class="preview-kicker">Edit profile</span>
+        <h1>{{ user.fullName || 'Your profile' }}</h1>
+        <p>Keep your profile current so people can recognize and understand you.</p>
+
+        <ion-button fill="clear" class="customize-avatar-button" (click)="openAvatarCustomize()">
+          <ion-icon name="color-palette-outline" slot="start"></ion-icon>
+          Customize avatar
+        </ion-button>
       </div>
+    </section>
 
-      <ion-item class="styled-item mt-2">
-        <ion-label position="floating">
-          <i class="fas fa-birthday-cake mr-2"></i>Birth Date
-        </ion-label>
-        <ion-datetime 
-        displayFormat="MM/DD/YYYY" 
-        formControlName="birthDate"
-        [max]="getMaxBirthDate()">
-      </ion-datetime>
-         </ion-item>
-      <div class="mt-1" *ngIf="!birthDate.valid && validationErrors['birthDate']">
-        <span class="text-danger pl-1">
-          <span *ngIf="birthDate.hasError('required')">Birth date is required</span>
-          <span *ngIf="validationErrors['birthDate']">{{ validationErrors['birthDate'] }}</span>
-        </span>
+    <form [formGroup]="form" class="profile-form" novalidate>
+      <section class="form-section">
+        <div class="section-heading">
+          <div class="section-icon personal"><ion-icon name="person-outline"></ion-icon></div>
+          <div><span>Profile</span><h2>Personal information</h2></div>
+        </div>
+
+        <div class="form-card field-grid two-columns">
+          <div class="field-block">
+            <label for="firstName">First name</label>
+            <div class="field-shell" [class.invalid]="firstName.dirty && !firstName.valid">
+              <ion-icon name="person-outline" aria-hidden="true"></ion-icon>
+              <ion-input id="firstName" placeholder="Enter your first name" type="text" formControlName="firstName"></ion-input>
+            </div>
+            <div class="field-error" *ngIf="firstName.dirty && !firstName.valid">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <span *ngIf="firstName.hasError('required')">First name is required</span>
+            </div>
+          </div>
+
+          <div class="field-block">
+            <label for="lastName">Last name</label>
+            <div class="field-shell" [class.invalid]="(lastName.dirty && !lastName.valid) || validationErrors['lastName']">
+              <ion-icon name="person-outline" aria-hidden="true"></ion-icon>
+              <ion-input id="lastName" placeholder="Enter your last name" type="text" formControlName="lastName"></ion-input>
+            </div>
+            <div class="field-error" *ngIf="(lastName.dirty && !lastName.valid) || validationErrors['lastName']">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <span *ngIf="lastName.hasError('required')">Last name is required</span>
+              <span *ngIf="validationErrors['lastName']">{{ validationErrors['lastName'][0] }}</span>
+            </div>
+          </div>
+
+          <div class="field-block">
+            <label>Birth date</label>
+            <div class="field-shell datetime-shell" [class.invalid]="!birthDate.valid && validationErrors['birthDate']">
+              <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
+              <ion-datetime displayFormat="MM/DD/YYYY" formControlName="birthDate" [max]="getMaxBirthDate()"></ion-datetime>
+            </div>
+            <div class="field-error" *ngIf="!birthDate.valid && validationErrors['birthDate']">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <span *ngIf="birthDate.hasError('required')">Birth date is required</span>
+              <span *ngIf="validationErrors['birthDate']">{{ validationErrors['birthDate'] }}</span>
+            </div>
+          </div>
+
+          <div class="field-block">
+            <label>Gender</label>
+            <div class="field-shell select-shell" [class.invalid]="!gender.valid && validationErrors['gender']">
+              <ion-icon name="male-female-outline" aria-hidden="true"></ion-icon>
+              <ion-select interface="action-sheet" placeholder="Select your gender" formControlName="gender">
+                <ion-select-option value="female">Female</ion-select-option>
+                <ion-select-option value="male">Male</ion-select-option>
+                <ion-select-option value="other">Other</ion-select-option>
+                <ion-select-option value="prefer not to say">Prefer not to say</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="field-error" *ngIf="!gender.valid && validationErrors['gender']">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <span *ngIf="gender.hasError('required')">Gender is required</span>
+              <span *ngIf="validationErrors['gender']">{{ validationErrors['gender'] }}</span>
+            </div>
+          </div>
+
+          <div class="field-block full-width">
+            <label for="aboutMe">About me</label>
+            <div class="field-shell textarea-shell" [class.invalid]="aboutMe.dirty && !aboutMe.valid">
+              <ion-icon name="chatbubble-ellipses-outline" aria-hidden="true"></ion-icon>
+              <ion-textarea id="aboutMe" rows="3" autoGrow="true" placeholder="Tell people something about yourself" formControlName="aboutMe"></ion-textarea>
+            </div>
+            <div class="field-error" *ngIf="aboutMe.dirty && !aboutMe.valid">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <span *ngIf="aboutMe.hasError('required')">About me is required</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="section-heading">
+          <div class="section-icon location"><ion-icon name="location-outline"></ion-icon></div>
+          <div><span>Location</span><h2>Where you live</h2></div>
+        </div>
+
+        <div class="form-card field-grid two-columns">
+          <div class="field-block">
+            <label>Country</label>
+            <div class="field-shell readonly-shell">
+              <ion-icon name="globe-outline" aria-hidden="true"></ion-icon>
+              <ion-input placeholder="Country" type="text" formControlName="country" [value]="selectedCountry || ''" [disabled]="true"></ion-input>
+              <ion-icon name="lock-closed-outline" class="field-state-icon" aria-hidden="true"></ion-icon>
+            </div>
+          </div>
+
+          <div class="field-block">
+            <label>City</label>
+            <div class="field-shell readonly-shell">
+              <ion-icon name="business-outline" aria-hidden="true"></ion-icon>
+              <ion-input placeholder="City" type="text" formControlName="city" [value]="selectedCity || ''" [disabled]="true"></ion-input>
+              <ion-icon name="lock-closed-outline" class="field-state-icon" aria-hidden="true"></ion-icon>
+            </div>
+          </div>
+
+          <p class="section-helper full-width">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            Location fields are currently read-only on this profile.
+          </p>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="section-heading">
+          <div class="section-icon work"><ion-icon name="briefcase-outline"></ion-icon></div>
+          <div><span>Background</span><h2>Work & education</h2></div>
+        </div>
+
+        <div class="form-card field-grid two-columns">
+          <button type="button" class="picker-field field-block" (click)="presentProfessionsModal()">
+            <span class="picker-label">Profession</span>
+            <span class="picker-value-shell"><ion-icon name="briefcase-outline"></ion-icon><span [class.placeholder]="!selectedProfession">{{ selectedProfession || 'Select your profession' }}</span><ion-icon name="chevron-forward-outline" class="picker-chevron"></ion-icon></span>
+          </button>
+          <input type="hidden" formControlName="profession" />
+
+          <button type="button" class="picker-field field-block" (click)="presentStudyCountriesModal()">
+            <span class="picker-label">Study country</span>
+            <span class="picker-value-shell"><ion-icon name="globe-outline"></ion-icon><span [class.placeholder]="!selectedStudyCountry">{{ selectedStudyCountry || 'Select study country' }}</span><ion-icon name="chevron-forward-outline" class="picker-chevron"></ion-icon></span>
+          </button>
+          <input type="hidden" formControlName="studyCountry" />
+
+          <button type="button" class="picker-field field-block" [class.disabled]="!selectedStudyCountry" [disabled]="!selectedStudyCountry" (click)="selectedStudyCountry ? presentSchoolsModal() : null">
+            <span class="picker-label">School</span>
+            <span class="picker-value-shell"><ion-icon name="school-outline"></ion-icon><span [class.placeholder]="!selectedSchool">{{ selectedSchool || 'Select your school' }}</span><ion-icon [name]="selectedStudyCountry ? 'chevron-forward-outline' : 'lock-closed-outline'" class="picker-chevron"></ion-icon></span>
+          </button>
+          <input type="hidden" formControlName="school" />
+
+          <div class="field-block">
+            <label>Education</label>
+            <div class="field-shell select-shell" [class.invalid]="!education.valid && validationErrors['education']">
+              <ion-icon name="school-outline" aria-hidden="true"></ion-icon>
+              <ion-select interface="action-sheet" placeholder="Select your education degree" formControlName="education">
+                <ion-select-option [value]="degree" *ngFor="let degree of educations">{{ degree }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="field-error" *ngIf="!education.valid && validationErrors['education']">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <span *ngIf="education.hasError('max')">The education field must not contain more than 50 characters</span>
+              <span *ngIf="validationErrors['education']">{{ validationErrors['education'] }}</span>
+            </div>
+          </div>
+
+          <p class="section-helper full-width" *ngIf="!selectedStudyCountry"><ion-icon name="information-circle-outline"></ion-icon>Select a study country before choosing a school.</p>
+
+          <div class="field-error full-width" *ngIf="!school.valid && school.touched && validationErrors['school']">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span *ngIf="school.hasError('maxlength')">The school field must not contain more than 50 characters</span>
+            <span *ngIf="validationErrors['school']">{{ validationErrors['school'] }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="section-heading">
+          <div class="section-icon social"><ion-icon name="sparkles-outline"></ion-icon></div>
+          <div><span>About you</span><h2>Interests & languages</h2></div>
+        </div>
+
+        <div class="form-card selection-card">
+          <button type="button" class="selection-row" (click)="presentInterestsModal()">
+            <span class="selection-icon interests"><ion-icon name="heart-outline"></ion-icon></span>
+            <span class="selection-copy"><strong>Interests</strong><small>Choose up to 10 things you enjoy</small></span>
+            <span class="selection-count">{{ selectedInterests.length }}/10</span>
+            <ion-icon name="chevron-forward-outline" class="selection-chevron"></ion-icon>
+          </button>
+
+          <div class="chip-list" *ngIf="selectedInterests.length">
+            <button type="button" class="profile-chip" *ngFor="let interest of selectedInterests; let ind = index" (click)="removeInterest(ind)" [attr.aria-label]="'Remove ' + interest"><span>{{ interest }}</span><ion-icon name="close-outline"></ion-icon></button>
+          </div>
+
+          <div class="selection-divider"></div>
+
+          <button type="button" class="selection-row" (click)="presentLanguagesModal()">
+            <span class="selection-icon languages"><ion-icon name="language-outline"></ion-icon></span>
+            <span class="selection-copy"><strong>Languages</strong><small>Add up to 5 languages you speak</small></span>
+            <span class="selection-count">{{ selectedLanguages.length }}/5</span>
+            <ion-icon name="chevron-forward-outline" class="selection-chevron"></ion-icon>
+          </button>
+
+          <div class="chip-list" *ngIf="selectedLanguages.length">
+            <button type="button" class="profile-chip language-chip" *ngFor="let lang of selectedLanguages; let ind = index" (click)="removeLanguage(ind)" [attr.aria-label]="'Remove ' + lang"><span>{{ lang }}</span><ion-icon name="close-outline"></ion-icon></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section privacy-section">
+        <div class="section-heading">
+          <div class="section-icon privacy"><ion-icon name="shield-checkmark-outline"></ion-icon></div>
+          <div><span>Controls</span><h2>Privacy & visibility</h2></div>
+        </div>
+
+        <div class="form-card toggle-card">
+          <div class="profile-toggle-row">
+            <span class="toggle-icon age"><ion-icon name="calendar-outline"></ion-icon></span>
+            <span class="toggle-copy"><strong>Show age</strong><small>Display your age on your profile</small></span>
+            <ion-toggle [checked]="form.get('ageVisible').value" (ionChange)="onToggleChange('ageVisible', $event)"></ion-toggle>
+          </div>
+          <div class="selection-divider"></div>
+          <div class="profile-toggle-row">
+            <span class="toggle-icon gender"><ion-icon name="male-female-outline"></ion-icon></span>
+            <span class="toggle-copy"><strong>Show gender</strong><small>Display your gender on your profile</small></span>
+            <ion-toggle [checked]="form.get('genderVisible').value" (ionChange)="onToggleChange('genderVisible', $event)"></ion-toggle>
+          </div>
+          <div class="selection-divider"></div>
+          <div class="profile-toggle-row">
+            <span class="toggle-icon private"><ion-icon name="lock-closed-outline"></ion-icon></span>
+            <span class="toggle-copy"><strong>Private profile</strong><small>Limit profile content to approved followers</small></span>
+            <ion-toggle [checked]="form.get('isPrivate').value" (ionChange)="onToggleChange('isPrivate', $event)"></ion-toggle>
+          </div>
+        </div>
+      </section>
+
+      <div class="mobile-save-wrap">
+        <ion-button expand="block" class="mobile-save-button" (click)="submit()" [disabled]="isUpdating">
+          <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+          {{ isUpdating ? 'Saving…' : 'Save changes' }}
+        </ion-button>
       </div>
-      
-
-      <ion-item class="styled-item mt-3">
-        <ion-label position="floating">
-          <i class="fas fa-info-circle mr-2"></i>About Me
-        </ion-label>
-        <ion-input placeholder="Enter something about yourself" type="text" formControlName="aboutMe"></ion-input>
-      </ion-item>
-      <div class="mt-1" *ngIf="aboutMe.dirty && !aboutMe.valid">
-        <span class="text-danger pl-1">
-          <span *ngIf="aboutMe.hasError('required')">About me is required</span>
-        </span>
-      </div>
-
-      <ion-item class="styled-item mt-3">
-        <ion-label position="floating">
-          <i class="fas fa-venus-mars mr-1"></i>Gender
-        </ion-label>
-        <ion-select placeholder="Select your gender" formControlName="gender" class="w-100 ion-no-padding pl-2">
-          <ion-select-option value="female">Female</ion-select-option>
-          <ion-select-option value="male">Male</ion-select-option>
-          <ion-select-option value="other">Other</ion-select-option>
-          <ion-select-option value="prefer not to say">Prefer not to say</ion-select-option>
-        </ion-select>
-      </ion-item>
-      <div class="mt-1" *ngIf="!gender.valid && validationErrors['gender']">
-        <span class="text-danger pl-1">
-          <span *ngIf="gender.hasError('required')">Gender is required</span>
-          <span *ngIf="validationErrors['gender']">{{ validationErrors['gender'] }}</span>
-        </span>
-      </div>
-
-      <ion-item class="styled-item mt-3">
-        <ion-label position="floating">
-          <i class="fas fa-globe mr-2"></i>Country
-        </ion-label>
-        <ion-input placeholder="Select your country" type="text" formControlName="country" [value]="selectedCountry || ''" [disabled]="true"></ion-input>
-      </ion-item>
-
-      <ion-item class="styled-item mt-3">
-        <ion-label position="floating">
-          <i class="fas fa-city mr-2"></i>City
-        </ion-label>
-        <ion-input placeholder="Select your city" type="text" formControlName="city" [value]="selectedCity || ''" [disabled]="true"></ion-input>
-      </ion-item>
-
-      <ion-item class="styled-item mt-3" (click)="presentProfessionsModal()">
-        <ion-label position="floating">
-          <i class="fas fa-briefcase mr-2"></i>Profession
-        </ion-label>
-        <ion-input placeholder="Select your profession" type="text" formControlName="profession" [value]="selectedProfession" readonly></ion-input>
-      </ion-item>
-
-      <ion-item class="styled-item mt-3" (click)="presentStudyCountriesModal()">
-        <ion-label position="floating">
-          <i class="fas fa-globe mr-2"></i>Study Country
-        </ion-label>
-        <ion-input placeholder="Select study country" type="text" formControlName="studyCountry" [value]="selectedStudyCountry" readonly></ion-input>
-      </ion-item>
-
-      <ion-item class="styled-item mt-3" (click)="selectedStudyCountry ? presentSchoolsModal() : null">
-        <ion-label position="floating">
-          <i class="fas fa-school mr-2"></i>School
-        </ion-label>
-        <ion-input placeholder="Select your school" type="text" formControlName="school" [value]="selectedSchool || ''" readonly [disabled]="!selectedStudyCountry"></ion-input>
-      </ion-item>
-      <div class="mt-1" *ngIf="!school.valid && school.touched && validationErrors['school']">
-        <span class="text-danger pl-1">
-          <span *ngIf="school.hasError('maxlength')">The school field must not contain more than 50 characters</span>
-          <span *ngIf="validationErrors['school']">{{ validationErrors['school'] }}</span>
-        </span>
-      </div>
-      <div class="mt-1" *ngIf="!selectedStudyCountry" style="padding-left: 16px; color: #888; font-size: 0.9em;">
-        Select a Study Country to choose a School
-      </div>
-
-      <ion-item class="styled-item mt-3">
-        <ion-label position="floating">
-          <i class="fas fa-graduation-cap mr-2"></i>Education
-        </ion-label>
-        <ion-select placeholder="Select your education degree" class="w-100 pl-1" formControlName="education">
-          <ion-select-option [value]="degree" *ngFor="let degree of educations">{{ degree }}</ion-select-option>
-        </ion-select>
-      </ion-item>
-      <div class="mt-1" *ngIf="!education.valid && validationErrors['education']">
-        <span class="text-danger pl-1">
-          <span *ngIf="education.hasError('max')">The education field must not contain more than 50 characters</span>
-          <span *ngIf="validationErrors['education']">{{ validationErrors['education'] }}</span>
-        </span>
-      </div>
-
-      <ion-item class="styled-item mt-3" (click)="presentInterestsModal()">
-        <ion-label position="floating">
-          <i class="fas fa-heart mr-2"></i>Interests
-        </ion-label>
-        <ion-input placeholder="Select your interests" type="text" [value]="selectedInterests.join(', ')" readonly></ion-input>
-      </ion-item>
-      <ion-row *ngIf="selectedInterests.length" class="interest-list">
-        <ion-col class="text-center ion-no-padding p-0" size="auto" *ngFor="let interest of selectedInterests; let ind = index">
-          <ion-card class="text-center p-2 interest-card">
-            <span>{{ interest }}</span>
-            <span (click)="removeInterest(ind)" class="ml-2"><i class="fas fa-times"></i></span>
-          </ion-card>
-        </ion-col>
-      </ion-row>
-
-      <ion-item class="styled-item mt-3" (click)="presentLanguagesModal()">
-        <ion-label position="floating">
-          <i class="fas fa-language mr-2"></i>Languages
-        </ion-label>
-        <ion-input placeholder="Select languages you speak" type="text" [value]="selectedLanguages.join(', ')" readonly></ion-input>
-      </ion-item>
-      <ion-row *ngIf="selectedLanguages.length" class="interest-list">
-        <ion-col class="text-center ion-no-padding p-0" size="auto" *ngFor="let lang of selectedLanguages; let ind = index">
-          <ion-card class="text-center p-2 interest-card">
-            <span>{{ lang }}</span>
-            <span (click)="removeLanguage(ind)" class="ml-2"><i class="fas fa-times"></i></span>
-          </ion-card>
-        </ion-col>
-      </ion-row>
-
-      <ion-item class="styled-item mt-3">
-        <ion-label>
-          <i class="fas fa-birthday-cake mr-2"></i>Show Age
-        </ion-label>
-        <ion-toggle [checked]="form.get('ageVisible').value" (ionChange)="onToggleChange('ageVisible', $event)"></ion-toggle>
-      </ion-item>
-
-      <ion-item class="styled-item mt-3">
-        <ion-label>
-          <i class="fas fa-venus-mars mr-2"></i>Show Gender
-        </ion-label>
-        <ion-toggle [checked]="form.get('genderVisible').value" (ionChange)="onToggleChange('genderVisible', $event)"></ion-toggle>
-      </ion-item>
-
-      <ion-item class="styled-item mt-3">
-        <ion-label>
-          <i class="fas fa-lock mr-2"></i>Private Profile
-        </ion-label>
-        <ion-toggle [checked]="form.get('isPrivate').value" (ionChange)="onToggleChange('isPrivate', $event)"></ion-toggle>
-      </ion-item>
-    </ion-list>
-
-  </form>
+    </form>
+  </main>
 </ion-content>

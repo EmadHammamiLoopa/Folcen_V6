@@ -23,8 +23,6 @@
   --color: var(--ion-text-color);
   position: relative;
   min-height: 100%;
-  
-  /* Ensure content doesn't get hidden behind the floating tab bar */
   --padding-bottom: 110px;
 
   &::part(scroll) {
@@ -37,7 +35,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
+    background:
       radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%),
@@ -48,7 +46,6 @@
 }
 
 /* Header Styling */
-
 .highlight-comment {
   animation: highlight-pulse 2s ease-out;
   border-radius: 24px;
@@ -58,11 +55,12 @@
   0% { background-color: rgba(99, 102, 241, 0.3); box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
   100% { background-color: transparent; box-shadow: none; }
 }
+
 ion-header {
   --background: var(--folcen-toolbar-background);
   --color: var(--folcen-toolbar-color);
   backdrop-filter: blur(16px) saturate(180%);
-  
+
   ion-toolbar {
     --background: transparent;
     --color: var(--folcen-toolbar-color);
@@ -139,6 +137,270 @@ ion-header {
   }
 }
 
+/* ── Social Hub confirmation alerts ───────────────────────────── */
+.folcen-confirm-alert {
+  --backdrop-opacity: .58;
+
+  .alert-wrapper {
+    width: min(86vw, 344px);
+    border-radius: 22px;
+    overflow: hidden;
+    background:
+      linear-gradient(150deg, rgba(124,108,255,.10), rgba(56,189,248,.025)),
+      var(--ion-card-background, #111827);
+    border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10));
+    box-shadow: 0 24px 70px rgba(0,0,0,.38);
+    backdrop-filter: blur(24px) saturate(155%);
+    -webkit-backdrop-filter: blur(24px) saturate(155%);
+  }
+
+  .alert-head {
+    padding: 20px 20px 2px !important;
+  }
+
+  .alert-head .alert-title,
+  .alert-title {
+    margin: 0 !important;
+    color: var(--ion-text-color, #fff) !important;
+    font-size: 18px !important;
+    font-weight: 750 !important;
+    line-height: 1.18 !important;
+    letter-spacing: -.018em !important;
+    text-align: left !important;
+  }
+
+  .alert-message {
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 8px 20px 16px !important;
+    color: var(--folcen-text-muted, #94a3b8) !important;
+    font-size: 13px !important;
+    line-height: 1.42 !important;
+    text-align: left !important;
+    white-space: normal !important;
+  }
+
+  .alert-button-group {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 9px !important;
+    padding: 0 16px 16px !important;
+  }
+
+  .alert-button {
+    min-height: 44px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    border-radius: 13px !important;
+    font-size: 12.5px !important;
+    font-weight: 720 !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .alert-button .alert-button-inner {
+    justify-content: center !important;
+  }
+
+  .folcen-alert-cancel {
+    color: var(--ion-text-color, #fff) !important;
+    background: rgba(148,163,184,.10) !important;
+    border: 1px solid rgba(148,163,184,.14) !important;
+  }
+
+  .folcen-alert-danger {
+    color: #fff !important;
+    background: linear-gradient(135deg, #ef4444, #f43f5e) !important;
+    border: 1px solid rgba(244,63,94,.28) !important;
+    box-shadow: 0 8px 20px rgba(239,68,68,.18) !important;
+  }
+}
+
+/* ── Chat media and permission prompts ─────────────────────────── */
+.folcen-chat-alert,
+.folcen-media-source-alert {
+  --backdrop-opacity: .58;
+
+  .alert-wrapper {
+    width: min(88vw, 360px);
+    border-radius: 22px !important;
+    overflow: hidden;
+    background:
+      linear-gradient(150deg, rgba(124,108,255,.10), rgba(56,189,248,.025)),
+      var(--ion-card-background, #111827) !important;
+    border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10));
+    box-shadow: 0 24px 70px rgba(0,0,0,.38);
+    backdrop-filter: blur(24px) saturate(155%);
+    -webkit-backdrop-filter: blur(24px) saturate(155%);
+  }
+
+  .alert-head {
+    padding: 20px 20px 4px !important;
+  }
+
+  .alert-title {
+    color: var(--ion-text-color, #fff) !important;
+    font-size: 18px !important;
+    font-weight: 750 !important;
+    line-height: 1.2 !important;
+    letter-spacing: -.018em !important;
+  }
+
+  .alert-message {
+    margin: 0 !important;
+    padding: 7px 20px 14px !important;
+    color: var(--folcen-text-muted, #94a3b8) !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+  }
+
+  .alert-button-group {
+    gap: 8px !important;
+    padding: 6px 16px 16px !important;
+  }
+
+  .alert-button {
+    min-height: 44px !important;
+    margin: 0 !important;
+    border-radius: 13px !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .alert-button .alert-button-inner {
+    justify-content: center !important;
+  }
+}
+
+.folcen-chat-alert {
+  .alert-button-group {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .folcen-chat-cancel {
+    color: var(--ion-text-color, #fff) !important;
+    background: rgba(148,163,184,.10) !important;
+    border: 1px solid rgba(148,163,184,.14) !important;
+  }
+
+  .folcen-chat-primary {
+    color: #fff !important;
+    background: linear-gradient(135deg, #7c6cff, #6366f1) !important;
+    border: 1px solid rgba(124,108,255,.28) !important;
+  }
+
+  .folcen-chat-danger {
+    color: #fff !important;
+    background: linear-gradient(135deg, #ef4444, #f43f5e) !important;
+    border: 1px solid rgba(244,63,94,.28) !important;
+  }
+}
+
+.folcen-media-source-alert {
+  .alert-button-group {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .alert-button {
+    color: var(--ion-text-color, #fff) !important;
+    background: rgba(124,108,255,.08) !important;
+    border: 1px solid rgba(124,108,255,.14) !important;
+  }
+
+  .alert-button[role="cancel"],
+  .folcen-media-cancel {
+    color: var(--folcen-text-muted, #94a3b8) !important;
+    background: rgba(148,163,184,.07) !important;
+    border-color: rgba(148,163,184,.12) !important;
+  }
+}
+
+/* Chat attachment tray */
+app-chat .message-input-footer .media-options {
+  position: absolute !important;
+  left: 0 !important;
+  bottom: calc(100% + 12px) !important;
+  z-index: 10 !important;
+  width: min(310px, calc(100vw - 30px)) !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  padding: 9px !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
+  border-radius: 18px !important;
+  background: var(--ion-card-background, #111827) !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,.30) !important;
+  backdrop-filter: blur(22px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(150%) !important;
+}
+
+app-chat .message-input-footer .media-option-card {
+  appearance: none !important;
+  min-width: 0 !important;
+  min-height: 64px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  padding: 9px !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
+  border-radius: 14px !important;
+  color: var(--ion-text-color, #fff) !important;
+  background: rgba(124,108,255,.06) !important;
+  text-align: left !important;
+  font-family: inherit !important;
+}
+
+app-chat .message-input-footer .media-option-icon {
+  width: 38px !important;
+  height: 38px !important;
+  flex: 0 0 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 12px !important;
+  color: #8b7cff !important;
+  background: rgba(124,108,255,.12) !important;
+}
+
+app-chat .message-input-footer .media-option-icon.video {
+  color: #38bdf8 !important;
+  background: rgba(56,189,248,.10) !important;
+}
+
+app-chat .message-input-footer .media-option-icon ion-icon {
+  font-size: 19px !important;
+}
+
+app-chat .message-input-footer .media-option-copy {
+  min-width: 0 !important;
+}
+
+app-chat .message-input-footer .media-option-copy strong,
+app-chat .message-input-footer .media-option-copy small {
+  display: block !important;
+}
+
+app-chat .message-input-footer .media-option-copy strong {
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  color: var(--ion-text-color, #fff) !important;
+}
+
+app-chat .message-input-footer .media-option-copy small {
+  margin-top: 2px !important;
+  font-size: 9.5px !important;
+  line-height: 1.25 !important;
+  color: var(--folcen-text-muted, #94a3b8) !important;
+}
+
+app-chat .message-input-footer .attach-toggle {
+  --background: rgba(124,108,255,.08) !important;
+  --color: var(--ion-color-primary, #6366f1) !important;
+}
+
 /* ── Alerts ─────────────────────────────────────────────────────── */
 .empty-alert {
   font-size: 18px;
@@ -159,22 +421,22 @@ ion-header {
 
 /* Hide scrollbars globally */
 * {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   &::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
   }
 }
 
 ion-content {
   --scrollbar-width: 0px;
   --scrollbar-style: none;
-  
+
   &::part(scroll) {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     &::-webkit-scrollbar {
-      display: none; /* Chrome, Safari, Opera */
+      display: none;
     }
   }
 }
@@ -187,7 +449,7 @@ ion-content {
   --max-height: 100vh !important;
   --border-radius: 0 !important;
   --background: #000 !important;
-  
+
   ion-content {
     --background: #000 !important;
     --padding-top: 0;
@@ -284,8 +546,6 @@ app-header ion-title {
 }
 
 /* Animations */
-
-/* Fade-in animation */
 @keyframes fadeIn {
   0% { opacity: 0; }
   100% { opacity: 1; }
@@ -295,7 +555,6 @@ app-header ion-title {
   animation: fadeIn 0.5s ease-in-out;
 }
 
-/* Slide-in from bottom for elements like modals or cards */
 @keyframes slideInUp {
   0% {
     transform: translateY(100%);
@@ -311,33 +570,22 @@ app-header ion-title {
   animation: slideInUp 0.5s ease-out;
 }
 
-/* Pulse animation for call-to-action buttons */
-/* Pulse Animation */
 @keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1); /* Increase the scale slightly for a more noticeable effect */
-  }
-  100% {
-    transform: scale(1);
-  }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
 .pulse {
   animation: pulse 1.5s infinite;
-  transition: transform 0.2s; /* Ensures smooth scaling */
-  will-change: transform; /* Improves performance */
+  transition: transform 0.2s;
+  will-change: transform;
 }
 
-/* Example: Apply the pulse animation to primary buttons */
 ion-button.primary {
   animation: pulse 1.5s infinite;
 }
 
-
-/* Apply animations */
 app-header ion-title {
-  animation: fadeIn 0.5s ease-in-out; /* Title fades in */
+  animation: fadeIn 0.5s ease-in-out;
 }

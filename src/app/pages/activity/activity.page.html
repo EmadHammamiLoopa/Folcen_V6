@@ -1,137 +1,98 @@
-<ion-header class="ion-no-border">
+<ion-header class="archive-topbar ion-no-border" *ngIf="!actorId">
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/profile"></ion-back-button>
-    </ion-buttons>
-    <ion-title>{{ actorId ? 'My Archive' : 'Activity' }}</ion-title>
+    <ion-title>Activity</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="close()" *ngIf="!actorId">
-        <ion-icon name="close"></ion-icon>
+      <ion-button (click)="close()" fill="clear" aria-label="Close activity">
+        <ion-icon name="close-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <div class="archive-container">
-    <div class="archive-header" *ngIf="actorId">
-      <div class="header-content">
-        <ion-icon name="pulse-outline" class="archive-icon"></ion-icon>
-        <div class="header-text">
-          <h2>Personal Archive</h2>
-          <p>Posts, comments and votes</p>
-        </div>
+<ion-content class="archive-content">
+  <div class="archive-backdrop" aria-hidden="true"></div>
+
+  <main class="archive-container" [style.padding-top]="actorId ? 'calc(18px + env(safe-area-inset-top))' : null">
+    <section class="archive-header" *ngIf="actorId">
+      <ion-buttons class="archive-hero-back">
+        <ion-back-button
+          defaultHref="/tabs/profile"
+          text=""
+          icon="arrow-back-outline"
+          aria-label="Back to profile">
+        </ion-back-button>
+      </ion-buttons>
+
+      <div class="header-text">
+        <span class="archive-eyebrow">My Archive</span>
+        <h1>Personal Archive</h1>
+        <p>Revisit your posts, comments and votes in one place.</p>
       </div>
-    </div>
+    </section>
 
     <div class="filters-wrapper">
-      <ion-segment [value]="filter" (ionChange)="setFilter($event)" mode="ios">
-        <ion-segment-button value="all" *ngIf="!actorId">
-          <ion-label>All</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="my" *ngIf="actorId">
-          <ion-label>Everything</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="posts">
-          <ion-label>Posts</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="comments">
-          <ion-label>Comments</ion-label>
-        </ion-segment-button>
+      <ion-segment [value]="filter" (ionChange)="setFilter($event)" mode="ios" aria-label="Activity filter">
+        <ion-segment-button value="all" *ngIf="!actorId"><ion-label>All</ion-label></ion-segment-button>
+        <ion-segment-button value="my" *ngIf="actorId"><ion-label>Everything</ion-label></ion-segment-button>
+        <ion-segment-button value="posts"><ion-label>Posts</ion-label></ion-segment-button>
+        <ion-segment-button value="comments"><ion-label>Comments</ion-label></ion-segment-button>
       </ion-segment>
     </div>
 
-    <div class="activity-list">
-      <!-- Creative Sand Glass Loading -->
+    <section class="activity-list" aria-live="polite">
       <div class="loading-state" *ngIf="loading && activities.length === 0">
-        <div class="hourglass-wrapper">
-          <div class="hourglass">
-            <div class="sand-stream"></div>
-          
-            <div class="sand-stream"></div>
-          </div>
-        </div>
-        <p>Retrieving your archive...</p>
+        <div class="loading-icon-shell"><ion-spinner name="crescent"></ion-spinner></div>
+        <div><strong>Loading your archive</strong><p>Collecting your recent activity…</p></div>
       </div>
 
-      <!-- Skeleton Loading State -->
       <ng-container *ngIf="loading && activities.length === 0">
-        <div class="skeleton-item" *ngFor="let i of [1,2,3,4,5,6]">
+        <div class="skeleton-item" *ngFor="let i of [1,2,3]">
           <div class="skeleton-icon"></div>
-          <div class="skeleton-content">
-            <div class="skeleton-line short"></div>
-            <div class="skeleton-line long"></div>
-          </div>
+          <div class="skeleton-content"><div class="skeleton-line short"></div><div class="skeleton-line long"></div></div>
         </div>
       </ng-container>
 
       <div class="empty-archive" *ngIf="!loading && activities.length === 0">
-        <ion-icon name="document-text-outline"></ion-icon>
+        <div class="empty-icon-shell"><ion-icon name="archive-outline"></ion-icon></div>
         <h3>No activity found</h3>
-        <p>Your contributions will appear here.</p>
+        <p>Your posts, comments and votes will appear here.</p>
       </div>
 
-      <div *ngFor="let a of activities" (click)="openItem(a)" class="activity-item">
+      <article *ngFor="let a of activities" (click)="openItem(a)" class="activity-item" role="button" tabindex="0">
         <div class="item-icon-wrapper" [ngClass]="a.type">
-          <ion-icon [name]="a.type === 'post' ? 'paper-plane' : (a.type === 'comment' ? 'chatbubble' : 'heart')"></ion-icon>
+          <ion-icon [name]="a.type === 'post' ? 'document-text-outline' : (a.type === 'comment' ? 'chatbubble-ellipses-outline' : 'heart-outline')"></ion-icon>
         </div>
-        
+
         <div class="item-content">
           <div class="item-header">
-            <span class="item-type">{{ a.type === 'like' ? 'voted' : a.type }}</span>
+            <span class="item-type">{{ a.type === 'like' ? 'Voted' : a.type }}</span>
             <span class="item-time">{{ a.createdAt | extractDiffTime }}</span>
           </div>
 
           <div class="item-body">
-            <div class="item-channel" *ngIf="a.channelName">
-              in <strong>{{ a.channelName }}</strong>
-            </div>
-            <div class="item-text" [ngClass]="{'italic': !a.snippet}">
-              {{ a.snippet || a.summary }}
+            <div class="item-channel" *ngIf="a.channelName"><span>in</span><strong>{{ a.channelName }}</strong></div>
+            <div class="item-text" [ngClass]="{'italic': !a.snippet}">{{ a.snippet || a.summary }}</div>
+
+            <div class="post-extras event" *ngIf="a.postExtras && (a.postExtras.eventDate || a.postExtras.eventLocation || a.postExtras.eventTime)">
+              <span class="extra-chip" *ngIf="a.postExtras.eventDate"><ion-icon name="calendar-outline"></ion-icon>{{ a.postExtras.eventDate | date:'dd MMM y' }}</span>
+              <span class="extra-chip" *ngIf="a.postExtras.eventTime"><ion-icon name="time-outline"></ion-icon>{{ a.postExtras.eventTime | date:'HH:mm' }}</span>
+              <span class="extra-chip" *ngIf="a.postExtras.eventLocation"><ion-icon name="location-outline"></ion-icon>{{ a.postExtras.eventLocation }}</span>
             </div>
 
-            <div class="post-extras event"
-                 *ngIf="a.postExtras && (a.postExtras.eventDate || a.postExtras.eventLocation || a.postExtras.eventTime)">
-              <span class="extra-chip" *ngIf="a.postExtras.eventDate">
-                <ion-icon name="calendar-outline"></ion-icon>
-                {{ a.postExtras.eventDate | date:'dd MMM y' }}
-              </span>
-              <span class="extra-chip" *ngIf="a.postExtras.eventTime">
-                <ion-icon name="time-outline"></ion-icon>
-                {{ a.postExtras.eventTime | date:'HH:mm' }}
-              </span>
-              <span class="extra-chip" *ngIf="a.postExtras.eventLocation">
-                <ion-icon name="location-outline"></ion-icon>
-                {{ a.postExtras.eventLocation }}
-              </span>
-            </div>
-
-            <div class="post-extras dating"
-                 *ngIf="a.postExtras && (a.postExtras.relationshipGoals?.length || a.postExtras.ageRange || a.postExtras.interests?.length || a.postExtras.hintAboutMe)">
-              <span class="extra-chip" *ngIf="a.postExtras.relationshipGoals?.length">
-                <ion-icon name="heart-outline"></ion-icon>
-                {{ a.postExtras.relationshipGoals.join(', ') }}
-              </span>
-              <span class="extra-chip" *ngIf="a.postExtras.ageRange && (a.postExtras.ageRange.min || a.postExtras.ageRange.max)">
-                <ion-icon name="person-outline"></ion-icon>
-                {{ a.postExtras.ageRange.min }}–{{ a.postExtras.ageRange.max }} yrs
-              </span>
-              <span class="extra-chip" *ngIf="a.postExtras.interests?.length">
-                <ion-icon name="sparkles-outline"></ion-icon>
-                {{ a.postExtras.interests.slice(0,3).join(', ') }}
-              </span>
+            <div class="post-extras dating" *ngIf="a.postExtras && (a.postExtras.relationshipGoals?.length || a.postExtras.ageRange || a.postExtras.interests?.length || a.postExtras.hintAboutMe)">
+              <span class="extra-chip" *ngIf="a.postExtras.relationshipGoals?.length"><ion-icon name="heart-outline"></ion-icon>{{ a.postExtras.relationshipGoals.join(', ') }}</span>
+              <span class="extra-chip" *ngIf="a.postExtras.ageRange && (a.postExtras.ageRange.min || a.postExtras.ageRange.max)"><ion-icon name="person-outline"></ion-icon>{{ a.postExtras.ageRange.min }}–{{ a.postExtras.ageRange.max }} yrs</span>
+              <span class="extra-chip" *ngIf="a.postExtras.interests?.length"><ion-icon name="sparkles-outline"></ion-icon>{{ a.postExtras.interests.slice(0,3).join(', ') }}</span>
             </div>
           </div>
         </div>
-        
-        <div class="item-arrow">
-          <ion-icon name="chevron-forward-outline"></ion-icon>
-        </div>
-      </div>
-    </div>
+
+        <div class="item-arrow" aria-hidden="true"><ion-icon name="chevron-forward-outline"></ion-icon></div>
+      </article>
+    </section>
 
     <ion-infinite-scroll threshold="100px" (ionInfinite)="loadMore($event)">
       <ion-infinite-scroll-content loadingSpinner="crescent"></ion-infinite-scroll-content>
     </ion-infinite-scroll>
-  </div>
+  </main>
 </ion-content>

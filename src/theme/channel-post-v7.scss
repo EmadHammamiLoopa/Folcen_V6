@@ -1,0 +1,217 @@
+/* Channel post V7 — structural alignment for owner controls and privacy panel. */
+
+/* User-created channel cards should hug their content; structured static cards keep their existing height. */
+app-channel app-post .jodel-card.feed-card.standard-feed-card {
+  min-height: 0 !important;
+}
+
+/* Feed + Comments: author row owns the controls, so nothing floats over post text. */
+app-channel app-post .jdl-h,
+app-comments .post-focus app-post .jdl-h {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  padding-right: 0 !important;
+}
+
+app-channel app-post .jdl-user,
+app-comments .post-focus app-post .jdl-user {
+  min-width: 0 !important;
+}
+
+app-channel app-post .jdl-top-rail,
+app-comments .post-focus app-post .jdl-top-rail {
+  position: static !important;
+  inset: auto !important;
+  z-index: auto !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(148,163,184,.12) !important;
+  border-radius: 13px !important;
+  background: rgba(15,23,42,.68) !important;
+  box-shadow: 0 8px 20px rgba(2,6,23,.12) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+
+app-channel app-post .jdl-top-rail .icon-btn,
+app-comments .post-focus app-post .jdl-top-rail .icon-btn {
+  appearance: none !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  min-height: 28px !important;
+  flex: 0 0 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: inherit !important;
+}
+
+app-channel app-post .jdl-top-rail .icon-btn.active,
+app-comments .post-focus app-post .jdl-top-rail .icon-btn.active {
+  color: #fff !important;
+  background: rgba(124,108,255,.16) !important;
+}
+
+app-channel app-post .jdl-top-rail .icon-btn ion-icon,
+app-comments .post-focus app-post .jdl-top-rail .icon-btn ion-icon {
+  font-size: 16px !important;
+}
+
+/* Inline privacy panel: hidden by default, expands below header and never overlays text. */
+app-channel app-post .post-privacy-panel,
+app-comments .post-focus app-post .post-privacy-panel {
+  display: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+  margin: 8px 0 10px !important;
+  padding: 8px !important;
+  border: 1px solid rgba(148,163,184,.14) !important;
+  border-radius: 14px !important;
+  background: rgba(10,18,36,.80) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03) !important;
+  overflow: hidden !important;
+}
+
+app-channel app-post .post-privacy-panel.show,
+app-comments .post-focus app-post .post-privacy-panel.show {
+  display: grid !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-option,
+app-comments .post-focus app-post .post-privacy-panel .privacy-option {
+  appearance: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 62px !important;
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
+  padding: 8px !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+  border-radius: 11px !important;
+  color: #f8fafc !important;
+  background: rgba(148,163,184,.055) !important;
+  text-align: left !important;
+  font: inherit !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-option.selected,
+app-comments .post-focus app-post .post-privacy-panel .privacy-option.selected {
+  border-color: rgba(124,108,255,.44) !important;
+  background: rgba(124,108,255,.16) !important;
+  box-shadow: inset 0 0 0 1px rgba(196,181,253,.08) !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-option.selected .privacy-icon,
+app-comments .post-focus app-post .post-privacy-panel .privacy-option.selected .privacy-icon {
+  color: #fff !important;
+  background: rgba(124,108,255,.34) !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-icon,
+app-comments .post-focus app-post .post-privacy-panel .privacy-icon {
+  width: 30px !important;
+  height: 30px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 9px !important;
+  color: var(--post-bg,#7c6cff) !important;
+  background: rgba(124,108,255,.10) !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-icon ion-icon,
+app-comments .post-focus app-post .post-privacy-panel .privacy-icon ion-icon {
+  font-size: 15px !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-copy,
+app-comments .post-focus app-post .post-privacy-panel .privacy-copy {
+  min-width: 0 !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-copy strong,
+app-channel app-post .post-privacy-panel .privacy-copy small,
+app-comments .post-focus app-post .post-privacy-panel .privacy-copy strong,
+app-comments .post-focus app-post .post-privacy-panel .privacy-copy small {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-copy strong,
+app-comments .post-focus app-post .post-privacy-panel .privacy-copy strong {
+  color: #f8fafc !important;
+  font-size: 10.5px !important;
+  font-weight: 720 !important;
+  line-height: 1.2 !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-copy small,
+app-comments .post-focus app-post .post-privacy-panel .privacy-copy small {
+  margin-top: 2px !important;
+  color: #94a3b8 !important;
+  font-size: 8.8px !important;
+  line-height: 1.3 !important;
+}
+
+/* Kill all legacy floating-popover rules for this new inline panel. */
+app-channel app-post .custom-popover,
+app-comments .post-focus app-post .custom-popover {
+  display: none !important;
+}
+
+@media (max-width: 520px) {
+  app-channel app-post .post-privacy-panel,
+  app-comments .post-focus app-post .post-privacy-panel {
+    grid-template-columns: 1fr !important;
+    gap: 5px !important;
+  }
+
+  app-channel app-post .post-privacy-panel .privacy-option,
+  app-comments .post-focus app-post .post-privacy-panel .privacy-option {
+    min-height: 52px !important;
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    padding: 7px 9px !important;
+  }
+
+  app-channel app-post .post-privacy-panel .privacy-copy strong,
+  app-comments .post-focus app-post .post-privacy-panel .privacy-copy strong {
+    font-size: 11px !important;
+  }
+
+  app-channel app-post .post-privacy-panel .privacy-copy small,
+  app-comments .post-focus app-post .post-privacy-panel .privacy-copy small {
+    font-size: 9.5px !important;
+  }
+}

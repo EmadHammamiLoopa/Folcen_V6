@@ -1,0 +1,116 @@
+// Folcen UI design primitives
+// Shared by feature stylesheets during the v0.9.1 visual refresh.
+
+$phone-xs: 360px;
+$phone-wide: 480px;
+$tablet: 768px;
+$desktop: 1024px;
+$desktop-wide: 1280px;
+
+@mixin folcen-theme-tokens {
+  :host {
+    // Layout
+    --f-page-max: 1080px;
+    --f-reading-max: 760px;
+    --f-page-gutter: clamp(12px, 3.6vw, 28px);
+    --f-section-gap: clamp(14px, 2.4vw, 24px);
+
+    // Shape
+    --f-radius-xs: 10px;
+    --f-radius-sm: 14px;
+    --f-radius-md: 20px;
+    --f-radius-lg: 28px;
+    --f-radius-pill: 999px;
+
+    // Brand
+    --f-accent: #7c6cff;
+    --f-accent-strong: #6366f1;
+    --f-accent-soft: rgba(124, 108, 255, 0.14);
+    --f-accent-glow: rgba(124, 108, 255, 0.32);
+    --f-aurora-a: rgba(99, 102, 241, 0.24);
+    --f-aurora-b: rgba(168, 85, 247, 0.17);
+    --f-aurora-c: rgba(14, 165, 233, 0.11);
+
+    // Dark is the safe default. Explicit light theme overrides below.
+    --f-page-bg: #070b16;
+    --f-page-bg-soft: #0b1020;
+    --f-surface: rgba(19, 27, 48, 0.86);
+    --f-surface-solid: #131b30;
+    --f-surface-raised: rgba(27, 37, 63, 0.94);
+    --f-surface-muted: rgba(255, 255, 255, 0.055);
+    --f-text: #f8fafc;
+    --f-text-strong: #ffffff;
+    --f-text-muted: #9aa7bd;
+    --f-text-faint: #6f7d95;
+    --f-border: rgba(255, 255, 255, 0.085);
+    --f-border-strong: rgba(255, 255, 255, 0.14);
+    --f-divider: rgba(255, 255, 255, 0.075);
+    --f-toolbar: rgba(7, 11, 22, 0.76);
+    --f-shadow-card: 0 18px 55px rgba(0, 0, 0, 0.28);
+    --f-shadow-float: 0 14px 40px rgba(0, 0, 0, 0.30);
+    --f-glass-highlight: rgba(255, 255, 255, 0.08);
+    --f-image-overlay: linear-gradient(180deg, rgba(5, 9, 20, 0.02) 35%, rgba(5, 9, 20, 0.72) 100%);
+    --f-card-edge: linear-gradient(140deg, rgba(124, 108, 255, 0.40), rgba(255, 255, 255, 0.05) 38%, rgba(14, 165, 233, 0.16) 100%);
+  }
+
+  :host-context(body.light-theme) {
+    --f-page-bg: #f4f6fb;
+    --f-page-bg-soft: #eef2f8;
+    --f-surface: rgba(255, 255, 255, 0.86);
+    --f-surface-solid: #ffffff;
+    --f-surface-raised: rgba(255, 255, 255, 0.96);
+    --f-surface-muted: rgba(31, 41, 55, 0.045);
+    --f-text: #172033;
+    --f-text-strong: #0b1220;
+    --f-text-muted: #657188;
+    --f-text-faint: #8d97aa;
+    --f-border: rgba(27, 39, 66, 0.075);
+    --f-border-strong: rgba(27, 39, 66, 0.12);
+    --f-divider: rgba(27, 39, 66, 0.075);
+    --f-toolbar: rgba(247, 249, 253, 0.80);
+    --f-shadow-card: 0 18px 48px rgba(38, 51, 77, 0.095);
+    --f-shadow-float: 0 14px 36px rgba(38, 51, 77, 0.12);
+    --f-glass-highlight: rgba(255, 255, 255, 0.76);
+    --f-image-overlay: linear-gradient(180deg, rgba(10, 18, 36, 0.01) 42%, rgba(10, 18, 36, 0.52) 100%);
+    --f-card-edge: linear-gradient(140deg, rgba(99, 102, 241, 0.22), rgba(255, 255, 255, 0.72) 42%, rgba(14, 165, 233, 0.14) 100%);
+    --f-aurora-a: rgba(99, 102, 241, 0.12);
+    --f-aurora-b: rgba(168, 85, 247, 0.075);
+    --f-aurora-c: rgba(14, 165, 233, 0.07);
+  }
+}
+
+@mixin phone-xs {
+  @media (max-width: #{$phone-xs}) { @content; }
+}
+
+@mixin phone-wide {
+  @media (min-width: #{$phone-wide}) { @content; }
+}
+
+@mixin tablet-up {
+  @media (min-width: #{$tablet}) { @content; }
+}
+
+@mixin desktop-up {
+  @media (min-width: #{$desktop}) { @content; }
+}
+
+@mixin desktop-wide-up {
+  @media (min-width: #{$desktop-wide}) { @content; }
+}
+
+@mixin hover-capable {
+  @media (hover: hover) and (pointer: fine) { @content; }
+}
+
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) { @content; }
+}
+
+@mixin focus-ring {
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px var(--f-page-bg), 0 0 0 6px rgba(124, 108, 255, 0.58);
+  }
+}

@@ -1,55 +1,79 @@
 <app-channels-header *ngIf="!type || type != 'explore'"></app-channels-header>
-<app-header *ngIf="type && type == 'explore'" [back]="true" 
-  [title]="getExploreTitle()"></app-header>
 
-<ion-content class="vibrant-dark-theme">
-  <div class="mesh-gradient"></div>
+<ion-content class="channels-content">
+  <div class="channels-aurora" aria-hidden="true"></div>
 
-  <div class="channels-container" data-testid="channels-page">
-    <!-- Filters always at the top -->
-    <div class="explore-filters animate__animated animate__fadeIn" *ngIf="type === 'explore'">
+  <main class="channels-container" data-testid="channels-page">
+    <section class="explore-filters animate__animated animate__fadeIn" *ngIf="type === 'explore'">
+      <div class="explore-intro">
+        <button
+          type="button"
+          class="explore-back-btn"
+          (click)="router.navigate(['/tabs/channels/list/followed'])"
+          aria-label="Back to channels">
+          <ion-icon name="arrow-back-outline"></ion-icon>
+        </button>
+
+        <div class="explore-intro-icon" aria-hidden="true">
+          <ion-icon name="compass-outline"></ion-icon>
+        </div>
+
+        <div class="explore-intro-copy">
+          <span class="explore-kicker">Discover</span>
+          <div class="explore-title-row">
+            <h1>Explore channels</h1>
+            <span class="explore-location-pill">
+              <ion-icon name="location-outline"></ion-icon>
+              <span *ngIf="explorationLevel === 'city'">{{ user?.city || 'City' }}</span>
+              <span *ngIf="explorationLevel === 'country'">{{ user?.country || 'Country' }}</span>
+              <span *ngIf="explorationLevel === 'global'">Global</span>
+            </span>
+          </div>
+          <p>Find communities by topic and location.</p>
+        </div>
+      </div>
+
       <div class="search-wrapper">
-        <ion-searchbar 
-          placeholder="Search channels..." 
-          [(ngModel)]="searchWord" 
+        <ion-searchbar
+          placeholder="Search channels..."
+          [(ngModel)]="searchWord"
           (ionInput)="search()"
           class="custom-searchbar"
           mode="ios"
-          data-testid="channels-search"
-        ></ion-searchbar>
+          data-testid="channels-search">
+        </ion-searchbar>
       </div>
-      
-      <div class="category-scroll">
-        <div 
-          class="category-chip" 
-          [class.active]="selectedCategory === ''"
-          (click)="onCategoryChange('')"
-        >
-          All
-        </div>
-        <div 
-          *ngFor="let cat of categories"
-          class="category-chip" 
-          [class.active]="selectedCategory.toLowerCase() === cat.toLowerCase()"
-          (click)="onCategoryChange(cat)"
-        >
-          {{ cat }}
-        </div>
-      </div>
-    </div>
 
-    <!-- Search Results Bar UI -->
+      <div class="category-scroll" aria-label="Channel categories">
+        <button
+          type="button"
+          class="category-chip"
+          [class.active]="selectedCategory === ''"
+          (click)="onCategoryChange('')">
+          All
+        </button>
+        <button
+          type="button"
+          *ngFor="let cat of categories"
+          class="category-chip"
+          [class.active]="selectedCategory.toLowerCase() === cat.toLowerCase()"
+          (click)="onCategoryChange(cat)">
+          {{ cat }}
+        </button>
+      </div>
+    </section>
+
     <div class="search-status-bar animate__animated animate__fadeIn" *ngIf="searchWord && !pageLoading">
       <div class="status-content">
         <div class="query-box">
-          <ion-icon name="search-outline"></ion-icon>
-          <span class="search-label">Results for </span>
-          <span class="search-term">"{{ searchWord }}"</span>
+          <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+          <span class="search-label">Results for</span>
+          <span class="search-term">“{{ searchWord }}”</span>
         </div>
         <div class="meta-box">
-          <span class="results-count">{{ channels.length }} channels found</span>
-          <button class="clear-pill" (click)="searchWord = ''; search()">
-            <ion-icon name="close"></ion-icon>
+          <span class="results-count">{{ channels.length }} channels</span>
+          <button type="button" class="clear-pill" (click)="searchWord = ''; search()" aria-label="Clear channel search">
+            <ion-icon name="close-outline"></ion-icon>
           </button>
         </div>
       </div>
@@ -61,75 +85,72 @@
       <ion-refresher-content></ion-refresher-content>
     </ion-refresher>
 
-    <!-- Empty State below filters -->
-    <div class="empty-state-container empty-state animate__animated animate__fadeIn" *ngIf="!pageLoading && (!channels || channels.length === 0)" data-testid="channels-empty">
+    <section class="empty-state-container empty-state animate__animated animate__fadeIn" *ngIf="!pageLoading && (!channels || channels.length === 0)" data-testid="channels-empty">
       <div class="empty-icon-box">
-        <i class="fas fa-broadcast-tower"></i>
+        <ion-icon name="radio-outline"></ion-icon>
       </div>
       <div class="empty-text">
         <div class="empty-alert">
           <div *ngIf="type == 'mines'">
             <h2 class="glass-title">No Channels Yet</h2>
-            <p class="glass-subtitle">Click on <i class="fas fa-plus"></i> to add a new channel and share your thoughts.</p>
+            <p class="glass-subtitle">Create your first channel to start sharing with a community.</p>
           </div>
           <div *ngIf="type == 'followed'">
             <h2 class="glass-title">No Followed Channels</h2>
-            <p class="glass-subtitle">Click on <i class="fas fa-globe-americas"></i> to explore new channels around your city.</p>
+            <p class="glass-subtitle">Explore channels and follow the communities you want to keep up with.</p>
           </div>
           <div *ngIf="type == 'explore'">
             <h2 class="glass-title">No Results Found</h2>
-            <p class="glass-subtitle" *ngIf="searchWord">We couldn't find any channels matching "{{ searchWord }}" in this area.</p>
+            <p class="glass-subtitle" *ngIf="searchWord">We couldn't find any channels matching “{{ searchWord }}” in this area.</p>
             <p class="glass-subtitle" *ngIf="!searchWord && explorationLevel === 'city'">There are no channels in your city yet.</p>
             <p class="glass-subtitle" *ngIf="!searchWord && explorationLevel === 'country'">There are no channels in your country yet.</p>
             <p class="glass-subtitle" *ngIf="!searchWord && explorationLevel === 'global'">There are no channels available globally yet.</p>
-            
+
             <div class="empty-actions">
-              <ion-button fill="solid" color="primary" *ngIf="searchWord" (click)="searchWord = ''; search()">
+              <ion-button fill="solid" *ngIf="searchWord" (click)="searchWord = ''; search()">
                 Clear Search
               </ion-button>
-              <ion-button fill="outline" color="primary" *ngIf="explorationLevel === 'city' && !searchWord" (click)="explorationLevel = 'country'; page = 0; getChannels(null, true)">
+              <ion-button fill="outline" *ngIf="explorationLevel === 'city' && !searchWord" (click)="explorationLevel = 'country'; page = 0; getChannels(null, true)">
                 Search in Country
               </ion-button>
-              <ion-button fill="outline" color="primary" *ngIf="explorationLevel === 'country' && !searchWord" (click)="explorationLevel = 'global'; page = 0; getChannels(null, true)">
+              <ion-button fill="outline" *ngIf="explorationLevel === 'country' && !searchWord" (click)="explorationLevel = 'global'; page = 0; getChannels(null, true)">
                 Search Globally
               </ion-button>
-              <ion-button fill="solid" color="primary" *ngIf="!searchWord" (click)="router.navigate(['/tabs/channels/form'])">
+              <ion-button fill="solid" *ngIf="!searchWord" (click)="router.navigate(['/tabs/channels/form'])">
                 Create Channel
               </ion-button>
-              <div style="height: 20px;"></div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="channels-grid" *ngIf="channels && channels.length">
-      <div
+    <section class="channels-grid" *ngIf="channels && channels.length">
+      <article
         *ngFor="let channel of channels; let i = index"
         class="channel-card animate__animated animate__fadeInUp"
-        [style.animation-delay]="(i * 0.05) + 's'"
+        [style.animation-delay]="(i * 0.04) + 's'"
         (click)="showChannel(channel)"
-        data-testid="channel-card"
-      >
-        <!-- Banner cover area -->
+        data-testid="channel-card">
+
         <div class="card-cover"
              [style.background]="!channel.photo ? 'hsl(' + ((channel.name?.charCodeAt(0) || 65) * 137) % 360 + ', 46%, 28%)' : null">
-          <img *ngIf="channel.photo" [src]="channel.photo" class="cover-img"
-               (error)="onChannelImgError($event, channel)" />
-          <div class="cover-gradient"></div>
+          <img *ngIf="channel.photo" [src]="channel.photo" class="cover-img" [alt]="channel.name + ' channel cover'" (error)="onChannelImgError($event, channel)" />
+          <div class="cover-gradient" aria-hidden="true"></div>
 
-          <!-- Info button (static channels) -->
-          <button class="info-btn"
-            *ngIf="getTypechannel(channel) === 'static' || getTypechannel(channel) === 'static_events' || getTypechannel(channel) === 'static_dating'"
-            (click)="presentPopover($event, channel); $event.stopPropagation()">
+          <button
+            type="button"
+            class="info-btn"
+            *ngIf="channel.description"
+            (click)="presentPopover($event, channel); $event.stopPropagation()"
+            [attr.aria-label]="'About ' + channel.name">
             <ion-icon name="information-circle-outline"></ion-icon>
           </button>
 
-          <!-- Name + verified on the banner -->
           <div class="cover-meta">
             <div class="cover-title-row">
               <h3 class="cover-name">{{ channel.name }}</h3>
-              <ion-icon name="checkmark-circle" class="verified-icon" *ngIf="channel.approved"></ion-icon>
+              <ion-icon name="checkmark-circle" class="verified-icon" *ngIf="channel.approved" aria-label="Verified channel"></ion-icon>
             </div>
             <span class="cover-category" *ngIf="channel.category && channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">
               {{ channel.category }}
@@ -137,47 +158,47 @@
           </div>
         </div>
 
-        <!-- Card body -->
         <div class="card-body">
           <p class="channel-desc">{{ channel.description }}</p>
 
           <div class="card-footer">
-            <div class="stat-item">
-              <i class="fas fa-users"></i>
+            <div class="stat-item" aria-label="Followers">
+              <ion-icon name="people-outline"></ion-icon>
               <span>{{ channel.followers.length }}</span>
             </div>
 
-            <!-- Owner actions -->
             <div *ngIf="user && isOwner(channel)" class="owner-actions">
               <span class="status-tag" [class.approved]="channel.approved">
                 {{ channel.approved ? 'Live' : 'Pending' }}
               </span>
-              <button class="delete-btn"
+              <button
+                type="button"
+                class="delete-btn"
                 (click)="deleteChannel(channel, $event); $event.stopPropagation()"
-                *ngIf="channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'">
+                *ngIf="channel.type !== 'static' && channel.type !== 'static_events' && channel.type !== 'static_dating'"
+                aria-label="Delete channel">
                 <ion-icon name="trash-outline"></ion-icon>
               </button>
             </div>
 
-            <!-- Follow / Unfollow -->
             <button
               *ngIf="user && !isOwner(channel)"
+              type="button"
               class="follow-btn"
               [class.followed]="channel.followedBy(authUserId)"
               (click)="follow(channel); $event.stopPropagation()"
-              data-tour="channel-follow">
-              <i class="fas" [class.fa-heart]="!channel.followedBy(authUserId)" [class.fa-heart-broken]="channel.followedBy(authUserId)"></i>
-              {{ !channel.followedBy(authUserId) ? 'Follow' : 'Unfollow' }}
+              data-tour="channel-follow"
+              [attr.aria-label]="channel.followedBy(authUserId) ? 'Unfollow channel' : 'Follow channel'">
+              <ion-icon [name]="channel.followedBy(authUserId) ? 'heart-dislike-outline' : 'heart-outline'"></ion-icon>
+              <span>{{ !channel.followedBy(authUserId) ? 'Follow' : 'Unfollow' }}</span>
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </article>
+    </section>
 
-  <ion-infinite-scroll threshold="100px" (ionInfinite)="getChannels($event)">
-    <ion-infinite-scroll-content loadingSpinner="bubbles" loadingText="Loading more channels...">
-    </ion-infinite-scroll-content>
-  </ion-infinite-scroll>
-
-  </div>
+    <ion-infinite-scroll threshold="100px" (ionInfinite)="getChannels($event)">
+      <ion-infinite-scroll-content loadingSpinner="bubbles" loadingText="Loading more channels..."></ion-infinite-scroll-content>
+    </ion-infinite-scroll>
+  </main>
 </ion-content>

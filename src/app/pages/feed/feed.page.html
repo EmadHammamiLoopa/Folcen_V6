@@ -1,58 +1,78 @@
 <ion-content [fullscreen]="true" class="feed-content vibrant-dark-theme">
-  <div class="mesh-gradient"></div>
-  
+  <div class="mesh-gradient" aria-hidden="true"></div>
+
   <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)" pullFactor="0.5" pullMin="100" pullMax="200">
     <ion-refresher-content pullingIcon="chevron-down-outline" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="creative-feed-header">
+  <header class="creative-feed-header">
     <div class="header-container">
       <div class="header-top">
         <div class="brand-section">
-          <ion-buttons slot="start" style="margin-right: 10px;">
-            <ion-back-button defaultHref="/tabs/channels" text="" icon="chevron-back-outline" class="feed-back-btn"></ion-back-button>
-          </ion-buttons>
           <h1 class="main-title">Feed</h1>
-          <div class="status-dot"></div>
+          <div class="status-dot" aria-hidden="true"></div>
         </div>
+
         <div class="action-section">
-          <div class="budget-pill" *ngIf="budget > 0" routerLink="/tabs/messages">
-            <ion-icon name="call-outline"></ion-icon>
+          <button
+            type="button"
+            class="budget-pill"
+            *ngIf="budget > 0"
+            routerLink="/tabs/messages"
+            aria-label="Open messages"
+            style="font-family: inherit;">
+            <ion-icon name="call-outline" aria-hidden="true"></ion-icon>
             <span>{{ budget }}</span>
-          </div>
-          <ion-button fill="clear" class="icon-btn" routerLink="/tabs/channels">
-            <ion-icon name="add"></ion-icon>
+          </button>
+
+          <ion-button
+            fill="clear"
+            class="icon-btn feed-channels-btn"
+            routerLink="/tabs/channels"
+            aria-label="Open channels"
+            title="Channels">
+            <ion-icon name="radio-outline" slot="icon-only"></ion-icon>
           </ion-button>
         </div>
       </div>
-      <p class="header-desc">Discover what's happening around you</p>
+      <p class="header-desc" style="margin-left: 0;">Updates from people and channels you follow.</p>
     </div>
-  </div>
+  </header>
 
   <app-loader *ngIf="pageLoading"></app-loader>
 
-  <div class="empty-state-creative" *ngIf="!pageLoading && posts.length === 0">
+  <section
+    class="empty-state-creative"
+    *ngIf="!pageLoading && posts.length === 0"
+    style="padding-bottom: calc(138px + env(safe-area-inset-bottom));">
     <div class="empty-glass">
-      <div class="glow-orb"></div>
-      <ion-icon name="planet-outline" class="empty-icon"></ion-icon>
+      <div class="glow-orb" aria-hidden="true"></div>
+      <ion-icon name="planet-outline" class="empty-icon" aria-hidden="true"></ion-icon>
       <h2>Quiet in the orbit</h2>
-      <p>Follow some users to start seeing updates here.</p>
+      <p>Follow people or channels to start seeing their latest activity here.</p>
       <ion-button shape="round" class="explore-btn-creative" routerLink="/tabs/new-friends">
+        <ion-icon name="person-add-outline" slot="start"></ion-icon>
         Find People
       </ion-button>
     </div>
-  </div>
+  </section>
 
-  <div class="feed-scroll-area" *ngIf="posts.length > 0">
+  <div
+    class="feed-scroll-area"
+    *ngIf="posts.length > 0"
+    style="padding-bottom: calc(138px + env(safe-area-inset-bottom));">
     <div class="creative-grid compact-mode">
-      <div *ngFor="let activity of posts" (click)="goToActivity(activity)" class="creative-card">
+      <article
+        *ngFor="let activity of posts"
+        (click)="goToActivity(activity)"
+        class="creative-card">
         <div class="card-inner">
           <div class="card-header-minimal">
             <div class="user-block">
               <div class="avatar-ring">
                 <app-avatar *ngIf="!activity.anonyme" [profile]="activity.user" [size]="48" class="avatar-img"></app-avatar>
-                <div *ngIf="activity.anonyme" class="avatar-placeholder-creative anonym">
-                  <ion-icon name="eye-off"></ion-icon>
+                <div *ngIf="activity.anonyme" class="avatar-placeholder-creative anonym" aria-label="Anonymous activity">
+                  <ion-icon name="eye-off-outline"></ion-icon>
                 </div>
               </div>
               <div class="user-info-minimal">
@@ -60,15 +80,19 @@
                 <span class="time">{{ activity.createdAt | extractDiffTime }}</span>
               </div>
             </div>
+
             <div class="activity-badge" [ngClass]="activity.activityType">
-              <ion-icon [name]="getActivityIcon(activity.activityType)"></ion-icon>
+              <ion-icon [name]="getActivityIcon(activity.activityType)" aria-hidden="true"></ion-icon>
               <span>{{ activity.activityType | titlecase }}</span>
             </div>
           </div>
 
           <div class="card-visual" *ngIf="activity.displayImage">
-            <img [src]="activity.displayImage" class="visual-img" />
-            <div class="visual-overlay"></div>
+            <img
+              [src]="activity.displayImage"
+              class="visual-img"
+              [alt]="activity.summary || activity.text || 'Feed activity image'" />
+            <div class="visual-overlay" aria-hidden="true"></div>
             <div class="type-label">{{ activity.activityType }}</div>
           </div>
 
@@ -76,39 +100,38 @@
             <h3 class="activity-summary" *ngIf="activity.activityType !== 'post'">{{ activity.summary }}</h3>
             <p class="activity-text" [class.is-post]="activity.activityType === 'post'">{{ activity.text }}</p>
 
-            <!-- Event post extras -->
             <div class="post-extras event" *ngIf="activity.eventDate || activity.eventLocation || activity.eventTime">
               <div class="extra-chip" *ngIf="activity.eventDate">
-                <ion-icon name="calendar-outline"></ion-icon>
+                <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
                 <span>{{ activity.eventDate | date:'dd MMM y' }}</span>
               </div>
               <div class="extra-chip" *ngIf="activity.eventTime">
-                <ion-icon name="time-outline"></ion-icon>
+                <ion-icon name="time-outline" aria-hidden="true"></ion-icon>
                 <span>{{ activity.eventTime | date:'HH:mm' }}</span>
               </div>
               <div class="extra-chip" *ngIf="activity.eventLocation">
-                <ion-icon name="location-outline"></ion-icon>
+                <ion-icon name="location-outline" aria-hidden="true"></ion-icon>
                 <span>{{ activity.eventLocation }}</span>
               </div>
             </div>
 
-            <!-- Dating post extras -->
-            <div class="post-extras dating"
-                 *ngIf="activity.relationshipGoals?.length || activity.ageRange || activity.interests?.length || activity.hintAboutMe">
+            <div
+              class="post-extras dating"
+              *ngIf="activity.relationshipGoals?.length || activity.ageRange || activity.interests?.length || activity.hintAboutMe">
               <div class="extra-chip" *ngIf="activity.relationshipGoals?.length">
-                <ion-icon name="heart-outline"></ion-icon>
+                <ion-icon name="heart-outline" aria-hidden="true"></ion-icon>
                 <span>{{ activity.relationshipGoals.join(', ') }}</span>
               </div>
               <div class="extra-chip" *ngIf="activity.ageRange && (activity.ageRange.min || activity.ageRange.max)">
-                <ion-icon name="person-outline"></ion-icon>
+                <ion-icon name="person-outline" aria-hidden="true"></ion-icon>
                 <span>{{ activity.ageRange.min }}–{{ activity.ageRange.max }} yrs</span>
               </div>
               <div class="extra-chip" *ngIf="activity.interests?.length">
-                <ion-icon name="sparkles-outline"></ion-icon>
+                <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
                 <span>{{ activity.interests.slice(0,3).join(', ') }}</span>
               </div>
               <div class="extra-line" *ngIf="activity.hintAboutMe">
-                <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+                <ion-icon name="chatbubble-ellipses-outline" aria-hidden="true"></ion-icon>
                 <span>{{ activity.hintAboutMe }}</span>
               </div>
             </div>
@@ -117,17 +140,16 @@
           <div class="card-footer-minimal">
             <div class="footer-line"></div>
             <div class="footer-action">
-              <span>Explore</span>
-              <ion-icon name="chevron-forward"></ion-icon>
+              <span>View activity</span>
+              <ion-icon name="chevron-forward-outline" aria-hidden="true"></ion-icon>
             </div>
           </div>
         </div>
-      </div>
+      </article>
     </div>
   </div>
 
   <ion-infinite-scroll threshold="100px" (ionInfinite)="loadData($event)" #infinitScroll>
-    <ion-infinite-scroll-content loadingSpinner="crescent">
-    </ion-infinite-scroll-content>
+    <ion-infinite-scroll-content loadingSpinner="crescent"></ion-infinite-scroll-content>
   </ion-infinite-scroll>
 </ion-content>

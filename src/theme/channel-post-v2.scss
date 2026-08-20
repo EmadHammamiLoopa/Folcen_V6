@@ -1,0 +1,679 @@
+/* Channel posts V2 — neutral signal cards with user-selected accent identity. */
+
+app-channel .posts-container {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 14px !important;
+}
+
+app-post {
+  display: block !important;
+  min-width: 0 !important;
+}
+
+app-post .jodel-card {
+  --card-text: var(--ion-text-color, #f8fafc);
+  --card-muted: var(--folcen-text-muted, #94a3b8);
+  position: relative !important;
+  isolation: isolate !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 15px 15px 13px 18px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.09)) !important;
+  border-radius: 22px !important;
+  color: var(--card-text) !important;
+  background: var(--ion-card-background, #101827) !important;
+  box-shadow:
+    0 12px 34px rgba(0,0,0,.16),
+    inset 0 1px 0 rgba(255,255,255,.035) !important;
+}
+
+/* Signature accent: one bold rail + restrained glow, not a full saturated card. */
+app-post .jodel-card::before {
+  content: '' !important;
+  position: absolute !important;
+  z-index: -1 !important;
+  top: 12px !important;
+  bottom: 12px !important;
+  left: 0 !important;
+  width: 4px !important;
+  border-radius: 0 999px 999px 0 !important;
+  background: var(--post-bg, #6366f1) !important;
+  box-shadow: 7px 0 24px var(--post-bg, #6366f1) !important;
+  opacity: .92 !important;
+}
+
+app-post .jodel-card::after {
+  content: '' !important;
+  position: absolute !important;
+  z-index: -2 !important;
+  width: 150px !important;
+  height: 150px !important;
+  top: -82px !important;
+  left: -58px !important;
+  border-radius: 50% !important;
+  background: var(--post-bg, #6366f1) !important;
+  filter: blur(62px) !important;
+  opacity: .105 !important;
+  pointer-events: none !important;
+}
+
+app-post .jdl-h {
+  min-height: 42px !important;
+  padding: 0 74px 0 0 !important;
+}
+
+app-post .jdl-user {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  color: var(--card-text) !important;
+}
+
+app-post .avatar-mini {
+  width: 42px !important;
+  height: 42px !important;
+  flex: 0 0 42px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255,255,255,.11) !important;
+  border-radius: 14px !important;
+  background: rgba(255,255,255,.055) !important;
+  box-shadow: 0 7px 18px rgba(0,0,0,.13) !important;
+}
+
+app-post .avatar-mini.anonyme {
+  color: var(--post-bg, #8b7cff) !important;
+  background: rgba(124,108,255,.09) !important;
+}
+
+app-post .user-info {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+app-post .user-info .name {
+  display: block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  color: var(--card-text) !important;
+  font-size: 14px !important;
+  font-weight: 740 !important;
+  line-height: 1.18 !important;
+  letter-spacing: -.012em !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+app-post .meta-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-top: 3px !important;
+  color: var(--card-muted) !important;
+  font-size: 9.5px !important;
+  opacity: 1 !important;
+}
+
+app-post .meta-row ion-icon {
+  color: var(--post-bg, #8b7cff) !important;
+  font-size: 11px !important;
+}
+
+/* More/options become subtle circular utilities rather than dominant white blobs. */
+app-post .jdl-top-rail {
+  position: absolute !important;
+  z-index: 5 !important;
+  top: 11px !important;
+  right: 11px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+app-post .jdl-top-rail .icon-btn {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  margin: 0 !important;
+  --padding-start: 0 !important;
+  --padding-end: 0 !important;
+  --border-radius: 12px !important;
+  --background: rgba(148,163,184,.075) !important;
+  --background-hover: rgba(148,163,184,.12) !important;
+  --color: var(--card-muted) !important;
+  border: 1px solid rgba(148,163,184,.08) !important;
+}
+
+app-post .jdl-top-rail .icon-btn ion-icon {
+  font-size: 17px !important;
+}
+
+/* The body gets generous reading rhythm without becoming tall. */
+app-post .jdl-text {
+  margin: 13px 0 10px !important;
+  color: var(--card-text) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  letter-spacing: -.006em !important;
+  white-space: pre-wrap !important;
+}
+
+app-post .see-more {
+  color: var(--post-bg, #8b7cff) !important;
+  font-weight: 720 !important;
+}
+
+/* Event / dating metadata becomes a compact information ribbon. */
+app-post .jdl-meta.compact-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 8px 0 10px !important;
+}
+
+app-post .jdl-meta.compact-meta .meta-chip {
+  min-width: 0 !important;
+  min-height: 30px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  box-sizing: border-box !important;
+  padding: 5px 8px !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+  border-radius: 10px !important;
+  color: var(--card-text) !important;
+  background: rgba(148,163,184,.055) !important;
+  font-size: 10px !important;
+  font-weight: 620 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+}
+
+app-post .jdl-meta.compact-meta .meta-chip ion-icon {
+  flex: 0 0 auto !important;
+  color: var(--post-bg, #8b7cff) !important;
+  font-size: 13px !important;
+}
+
+app-post .jdl-meta:not(.compact-meta) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  gap: 8px !important;
+  margin: 10px 0 !important;
+}
+
+app-post .jdl-meta:not(.compact-meta) > div {
+  min-width: 0 !important;
+  padding: 9px 10px !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+  border-radius: 11px !important;
+  color: var(--card-muted) !important;
+  background: rgba(148,163,184,.05) !important;
+  font-size: 10.5px !important;
+}
+
+app-post .jdl-meta:not(.compact-meta) strong {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  margin-bottom: 4px !important;
+  color: var(--card-text) !important;
+  font-size: 10px !important;
+}
+
+app-post .jdl-meta:not(.compact-meta) ion-icon {
+  color: var(--post-bg, #8b7cff) !important;
+}
+
+app-post .jdl-hint-teaser,
+app-post .hint-box {
+  position: relative !important;
+  margin: 9px 0 10px !important;
+  padding: 10px 11px 10px 13px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(148,163,184,.09) !important;
+  border-radius: 12px !important;
+  color: var(--card-text) !important;
+  background: rgba(148,163,184,.045) !important;
+}
+
+app-post .jdl-hint-teaser::before,
+app-post .hint-box::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 8px !important;
+  bottom: 8px !important;
+  width: 2px !important;
+  border-radius: 999px !important;
+  background: var(--post-bg, #8b7cff) !important;
+}
+
+app-post .jdl-hint-teaser ion-icon,
+app-post .hint-box ion-icon {
+  color: var(--post-bg, #8b7cff) !important;
+}
+
+/* Media sits flush like a modern social card asset. */
+app-post .jdl-media {
+  position: relative !important;
+  margin: 10px -4px 2px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(148,163,184,.09) !important;
+  border-radius: 16px !important;
+  background: #050914 !important;
+}
+
+app-post .media-container,
+app-post .media-container img,
+app-post .media-container video {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 15px !important;
+}
+
+app-post .media-container img,
+app-post .media-container video {
+  display: block !important;
+  max-height: 460px !important;
+  object-fit: cover !important;
+}
+
+app-post .expand-hint {
+  min-height: 30px !important;
+  padding: 0 9px !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(5,9,20,.64) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+/* Signature action dock: one connected surface with independent hit targets. */
+app-post .jdl-actions {
+  display: grid !important;
+  grid-template-columns: .82fr .82fr 1.25fr !important;
+  gap: 4px !important;
+  margin: 12px 0 0 !important;
+  padding: 4px !important;
+  border: 1px solid rgba(148,163,184,.085) !important;
+  border-radius: 14px !important;
+  background: rgba(148,163,184,.045) !important;
+}
+
+app-post .jdl-actions .post-action,
+app-post .jdl-actions .post-action.comment {
+  appearance: none !important;
+  min-width: 0 !important;
+  min-height: 38px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  box-sizing: border-box !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  color: var(--card-muted) !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 10.5px !important;
+  font-weight: 660 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+app-post .jdl-actions .post-action ion-icon {
+  flex: 0 0 auto !important;
+  font-size: 15px !important;
+}
+
+app-post .jdl-actions .post-action.like.active {
+  color: #fb7185 !important;
+  background: rgba(251,113,133,.09) !important;
+}
+
+app-post .jdl-actions .post-action.pass.active {
+  color: #93c5fd !important;
+  background: rgba(147,197,253,.08) !important;
+}
+
+app-post .jdl-actions .post-action.comment {
+  color: var(--card-text) !important;
+}
+
+/* Owner visibility menu follows the same neutral/accent language. */
+app-post .custom-popover {
+  overflow: hidden !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
+  border-radius: 14px !important;
+  background: var(--ion-card-background, #111827) !important;
+  box-shadow: 0 16px 38px rgba(0,0,0,.30) !important;
+}
+
+app-post .visibility-dropdown,
+app-post .visibility-dropdown ion-item {
+  background: var(--ion-card-background, #111827) !important;
+  --background: var(--ion-card-background, #111827) !important;
+  --color: var(--card-text) !important;
+}
+
+app-post .visibility-dropdown ion-icon {
+  color: var(--post-bg, #8b7cff) !important;
+}
+
+/* Fullscreen media overlay remains above everything. */
+app-post .img-fs {
+  z-index: 10010 !important;
+  background: rgba(2,6,23,.94) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* CREATE POST: neutral canvas + inline accent palette. */
+app-post-form .create-post-content {
+  --background: var(--ion-background-color, #070d1a) !important;
+  --color: var(--ion-text-color, #f8fafc) !important;
+}
+
+app-post-form .create-post-shell {
+  width: min(100%, 720px) !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  padding: 16px 14px calc(42px + env(safe-area-inset-bottom)) !important;
+}
+
+app-post-form .post-style-panel {
+  position: relative !important;
+  margin-bottom: 12px !important;
+  padding: 15px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.09)) !important;
+  border-radius: 19px !important;
+  background: var(--ion-card-background, #111827) !important;
+}
+
+app-post-form .post-style-panel::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 12px !important;
+  bottom: 12px !important;
+  width: 3px !important;
+  border-radius: 0 999px 999px 0 !important;
+  background: var(--post-accent, #6366f1) !important;
+}
+
+app-post-form .post-style-heading {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  margin-bottom: 13px !important;
+}
+
+app-post-form .post-style-icon {
+  width: 38px !important;
+  height: 38px !important;
+  flex: 0 0 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 12px !important;
+  color: var(--post-accent, #8b7cff) !important;
+  background: rgba(124,108,255,.08) !important;
+}
+
+app-post-form .post-style-heading span,
+app-post-form .post-style-heading strong,
+app-post-form .post-style-heading small {
+  display: block !important;
+}
+
+app-post-form .post-style-heading span {
+  margin-bottom: 1px !important;
+  color: var(--folcen-text-muted, #94a3b8) !important;
+  font-size: 9px !important;
+  font-weight: 740 !important;
+  letter-spacing: .075em !important;
+  text-transform: uppercase !important;
+}
+
+app-post-form .post-style-heading strong {
+  color: var(--ion-text-color, #fff) !important;
+  font-size: 14px !important;
+}
+
+app-post-form .post-style-heading small {
+  margin-top: 3px !important;
+  color: var(--folcen-text-muted, #94a3b8) !important;
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+}
+
+app-post-form .post-accent-palette {
+  display: grid !important;
+  grid-template-columns: repeat(8, minmax(0,1fr)) !important;
+  gap: 7px !important;
+}
+
+app-post-form .accent-swatch {
+  appearance: none !important;
+  position: relative !important;
+  aspect-ratio: 1 / 1 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 2px solid transparent !important;
+  border-radius: 11px !important;
+  background: var(--ion-card-background, #111827) !important;
+}
+
+app-post-form .accent-swatch span {
+  position: absolute !important;
+  inset: 3px !important;
+  border-radius: 8px !important;
+}
+
+app-post-form .accent-swatch.active {
+  border-color: var(--ion-text-color, #fff) !important;
+  box-shadow: 0 0 0 2px rgba(124,108,255,.16) !important;
+}
+
+app-post-form .accent-swatch ion-icon {
+  position: absolute !important;
+  z-index: 2 !important;
+  inset: 50% auto auto 50% !important;
+  transform: translate(-50%,-50%) !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.35)) !important;
+}
+
+app-post-form .accent-swatch.aurora span { background: #6D5EF9 !important; }
+app-post-form .accent-swatch.ocean span { background: #2563EB !important; }
+app-post-form .accent-swatch.sky span { background: #0284C7 !important; }
+app-post-form .accent-swatch.teal span { background: #0F9F86 !important; }
+app-post-form .accent-swatch.emerald span { background: #16A34A !important; }
+app-post-form .accent-swatch.sunset span { background: #EA580C !important; }
+app-post-form .accent-swatch.rose span { background: #E11D48 !important; }
+app-post-form .accent-swatch.plum span { background: #A21CAF !important; }
+
+app-post-form .post-card,
+app-post-form .upload-zone {
+  margin: 0 0 12px !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.09)) !important;
+  border-radius: 18px !important;
+  color: var(--ion-text-color, #fff) !important;
+  background: var(--ion-card-background, #111827) !important;
+  box-shadow: none !important;
+}
+
+app-post-form .post-textarea-card {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+app-post-form .post-textarea-card::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 12px !important;
+  bottom: 12px !important;
+  width: 3px !important;
+  border-radius: 0 999px 999px 0 !important;
+  background: var(--post-accent, #6366f1) !important;
+}
+
+app-post-form .composer-kicker {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-bottom: 7px !important;
+  color: var(--folcen-text-muted, #94a3b8) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
+}
+
+app-post-form .composer-accent-dot {
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  background: var(--post-accent, #6366f1) !important;
+  box-shadow: 0 0 10px var(--post-accent, #6366f1) !important;
+}
+
+app-post-form .creative-textarea,
+app-post-form .custom-input,
+app-post-form .custom-select,
+app-post-form .custom-textarea,
+app-post-form ion-datetime {
+  --color: var(--ion-text-color, #fff) !important;
+  --placeholder-color: var(--folcen-text-muted, #94a3b8) !important;
+}
+
+app-post-form .char-counter,
+app-post-form .field-label,
+app-post-form .visibility-header,
+app-post-form .anonymous-toggle,
+app-post-form .upload-zone p {
+  color: var(--folcen-text-muted, #94a3b8) !important;
+}
+
+app-post-form .visibility-item.active {
+  border-color: var(--post-accent, #6366f1) !important;
+  color: var(--post-accent, #8b7cff) !important;
+  background: rgba(124,108,255,.07) !important;
+}
+
+app-post-form .upload-zone {
+  padding: 20px 16px !important;
+}
+
+app-post-form .upload-zone .icon-circle {
+  color: var(--post-accent, #8b7cff) !important;
+  background: rgba(124,108,255,.08) !important;
+}
+
+app-post-form .preview-container,
+app-post-form .preview-content {
+  border-radius: 16px !important;
+}
+
+/* Responsive behavior. */
+@media (max-width: 420px) {
+  app-channel .posts-container {
+    gap: 11px !important;
+  }
+
+  app-post .jodel-card {
+    padding: 13px 12px 11px 16px !important;
+    border-radius: 19px !important;
+  }
+
+  app-post .jdl-h {
+    padding-right: 68px !important;
+  }
+
+  app-post .avatar-mini {
+    width: 39px !important;
+    height: 39px !important;
+    flex-basis: 39px !important;
+  }
+
+  app-post .user-info .name {
+    font-size: 13px !important;
+  }
+
+  app-post .jdl-text {
+    font-size: 13.5px !important;
+  }
+
+  app-post .jdl-actions {
+    grid-template-columns: .78fr .78fr 1.34fr !important;
+  }
+
+  app-post .jdl-actions .post-action,
+  app-post .jdl-actions .post-action.comment {
+    min-height: 37px !important;
+    padding-inline: 5px !important;
+    font-size: 9.8px !important;
+  }
+
+  app-post .jdl-meta.compact-meta .meta-chip {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  app-post-form .create-post-shell {
+    padding-inline: 10px !important;
+  }
+
+  app-post-form .post-accent-palette {
+    grid-template-columns: repeat(4, minmax(0,1fr)) !important;
+  }
+
+  app-post-form .accent-swatch {
+    aspect-ratio: 2.25 / 1 !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-channel .posts-container {
+    width: min(100%, 760px) !important;
+    margin-inline: auto !important;
+    gap: 16px !important;
+  }
+
+  app-post .jodel-card {
+    padding: 17px 17px 14px 20px !important;
+  }
+
+  app-post .jdl-text {
+    font-size: 14.5px !important;
+  }
+
+  app-post-form .create-post-shell {
+    padding-top: 22px !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  app-channel .posts-container {
+    width: min(100%, 800px) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-post .jodel-card,
+  app-post-form .accent-swatch {
+    transition: none !important;
+  }
+}

@@ -3,18 +3,49 @@
    Mobile-first | 320px → tablet → desktop
 ───────────────────────────────────────────────────────────── */
 
-/* Submit button in header */
+/* Compact native action matching the shared premium header. */
 .post-submit-btn {
-  --background: linear-gradient(135deg, #6366f1, #a855f7);
-  --border-radius: 14px;
-  --box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
-  font-weight: 800;
-  text-transform: none;
-  letter-spacing: -0.2px;
-  height: 38px;
-  margin-right: 6px;
+  appearance: none;
+  min-width: 78px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-right: clamp(8px, 2vw, 14px);
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 13px;
+  color: #fff;
+  background: var(--f-accent-strong, linear-gradient(135deg, #6366f1, #8b5cf6));
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.24);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 720;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform 0.18s ease, filter 0.18s ease, opacity 0.18s ease;
 
-  ion-icon { font-size: 15px; margin-left: 4px; }
+  ion-icon {
+    flex: 0 0 auto;
+    font-size: 16px;
+  }
+
+  ion-spinner {
+    width: 15px;
+    height: 15px;
+    color: currentColor;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:disabled {
+    opacity: 0.56;
+    cursor: default;
+    box-shadow: none;
+  }
 }
 
 /* ── Content scroller ─────────────────────────────────────── */
@@ -172,8 +203,21 @@ ion-content {
 
     // Left-align placeholder so it is never clipped on narrow screens
     &::placeholder { color: inherit; opacity: 0.5; text-align: start; }
-    &::part(native) { text-align: start; }
-    &::part(placeholder) { text-align: start; white-space: normal; }
+    &::part(native) {
+      box-sizing: border-box;
+      min-height: clamp(112px, 26vw, 168px);
+      padding: clamp(16px, 5vw, 24px) clamp(14px, 4vw, 22px);
+      overflow-y: auto;
+      line-height: 1.5;
+      text-align: start;
+    }
+    &::part(native)::placeholder {
+      color: inherit;
+      opacity: 0.5;
+      line-height: 1.5;
+      text-align: start;
+      white-space: normal;
+    }
   }
 
   .char-counter {
@@ -367,14 +411,48 @@ ion-content {
 
     .custom-textarea {
       display: block;
-      min-height: 70px;
+      min-height: 96px;
       --padding-top: 14px;
       --padding-bottom: 14px;
       --placeholder-color: inherit;
       --placeholder-opacity: 0.75;
-      &::part(placeholder) {
+
+      &::part(native) {
+        box-sizing: border-box;
+        min-height: 68px;
+        padding: 14px;
+        overflow-y: auto;
+        line-height: 1.45;
+      }
+
+      &::part(native)::placeholder {
+        color: inherit;
+        opacity: 0.72;
+        line-height: 1.45;
         white-space: normal;
-        line-height: 1.35;
+      }
+    }
+
+    .field-meta {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 3px;
+      color: inherit;
+      font-size: 0.62rem;
+      font-weight: 600;
+      line-height: 1.35;
+      opacity: 0.58;
+
+      span:last-child {
+        flex: 0 0 auto;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .limit {
+        color: #f43f5e;
+        opacity: 1;
       }
     }
 

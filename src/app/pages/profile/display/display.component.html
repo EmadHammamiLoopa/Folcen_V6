@@ -1,33 +1,35 @@
 <ion-content class="profile-content" [fullscreen]="true" scroll-y="true">
+  <input id="avatar-source-toggle" class="profile-photo-source-toggle" type="checkbox" aria-hidden="true" />
+  <input id="gallery-source-toggle" class="profile-photo-source-toggle" type="checkbox" aria-hidden="true" />
+
   <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
     <ion-refresher-content pullingIcon="chevron-down-circle-outline" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
   <app-sandglass-loader [visible]="pageLoading" message="Loading profile..."></app-sandglass-loader>
   
   <div *ngIf="user && !pageLoading" class="immersive-profile">
-    <!-- Immersive Header -->
     <div class="profile-hero">
       <div class="hero-overlay"></div>
       <div class="hero-bg-pattern"></div>
       
       <div class="hero-top-actions">
-        <ion-button fill="clear" (click)="goBack()" class="back-btn">
-          <ion-icon name="chevron-back-outline"></ion-icon>
+        <ion-button fill="clear" (click)="goBack()" class="back-btn" aria-label="Back">
+          <ion-icon name="arrow-back-outline"></ion-icon>
         </ion-button>
         <div class="right-actions" *ngIf="myProfile">
-          <ion-button fill="clear" routerLink="/tabs/profile/form">
-            <ion-icon name="create-outline"></ion-icon>
+          <ion-button fill="clear" routerLink="/tabs/profile/form" aria-label="Edit profile" title="Edit profile">
+            <ion-icon name="pencil-outline"></ion-icon>
           </ion-button>
-          <ion-button fill="clear" [routerLink]="['/activity']" [queryParams]="{ actorId: 'me' }" title="My Archive">
-            <ion-icon name="pulse-outline"></ion-icon>
+          <ion-button fill="clear" [routerLink]="['/activity']" [queryParams]="{ actorId: 'me' }" aria-label="My archive" title="My Archive">
+            <ion-icon name="archive-outline"></ion-icon>
           </ion-button>
-          <ion-button fill="clear" routerLink="/tabs/profile/settings">
+          <ion-button fill="clear" routerLink="/settings" aria-label="Settings" title="Settings">
             <ion-icon name="settings-outline"></ion-icon>
           </ion-button>
         </div>
         <div class="right-actions" *ngIf="!myProfile">
-          <ion-button fill="clear" (click)="presentPopover($event)">
-            <ion-icon name="ellipsis-vertical-outline"></ion-icon>
+          <ion-button fill="clear" (click)="presentPopover($event)" aria-label="More profile actions" title="More">
+            <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
           </ion-button>
         </div>
       </div>
@@ -35,26 +37,34 @@
       <div class="hero-main-content">
         <div class="avatar-wrapper">
           <app-avatar [profile]="user" [size]="200" class="main-avatar-img" (click)="viewPhoto(mainAvatar)"></app-avatar>
-          <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
+          <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile && !isLocked"></div>
           
           <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end" data-tour="profile-avatar-tools">
-            <ion-fab-button size="small" (click)="openAvatarMediaOptions(); $event.stopPropagation()">
-              <ion-icon name="camera"></ion-icon>
-            </ion-fab-button>
+            <label
+              for="avatar-source-toggle"
+              class="profile-avatar-source-trigger"
+              (click)="$event.stopPropagation()"
+              aria-label="Change profile photo"
+              title="Change profile photo">
+              <ion-icon name="camera-outline"></ion-icon>
+            </label>
           </ion-fab>
         </div>
 
         <div class="user-identity">
-          <h1 class="name">{{ user.fullName }}<span class="age" *ngIf="user.getAge(myProfile)">, {{ user.getAge(myProfile) }}</span></h1>
-          <p class="location">
-            <ion-icon name="location-sharp"></ion-icon> 
+          <h1 class="name">{{ user.fullName }}<span class="age" *ngIf="!isLocked && user.getAge(myProfile)">, {{ user.getAge(myProfile) }}</span></h1>
+          <p class="location" *ngIf="!isLocked">
+            <ion-icon name="location-outline"></ion-icon> 
             {{ (user.city && user.city !== 'Unknown') ? user.city : '' }}{{ (user.city && user.city !== 'Unknown' && user.country && user.country !== 'Unknown') ? ', ' : '' }}{{ (user.country && user.country !== 'Unknown') ? user.country : '' }}
             <span *ngIf="(!user.city || user.city === 'Unknown') && (!user.country || user.country === 'Unknown')">Location not specified</span>
           </p>
+          <p class="private-identity-label" *ngIf="isLocked">
+            <ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon>
+            <span>Private profile</span>
+          </p>
         </div>
 
-        <!-- Quick Stats -->
-        <div class="stats-bar">
+        <div class="stats-bar" *ngIf="myProfile || !user.isPrivate">
           <div class="stat-item clickable" (click)="openFollowModal('friends')">
             <span class="value">{{ user.friendsCount || 0 }}</span>
             <span class="label">Friends</span>
@@ -76,52 +86,46 @@
       </div>
     </div>
 
-    <!-- Main Content Area -->
     <div class="profile-body">
-      <!-- Action Bar for Visitors -->
-      <div class="visitor-actions" *ngIf="!myProfile">
-        <!-- Add Friend / Unfriend — hidden on private profiles for non-friends (followers use Follow button only) -->
+      <div class="visitor-actions" [class.private-actions]="isLocked" *ngIf="!myProfile">
         <ion-button class="primary-action" (click)="request()" [color]="user.isFriend ? 'light' : 'primary'"
             *ngIf="!user.isPrivate || user.isFriend">
-          <ion-icon [name]="user.isFriend ? 'person-remove' : (user.request === 'requesting' ? 'checkmark-circle' : (user.request === 'requested' ? 'paper-plane' : 'person-add'))" slot="start"></ion-icon>
+          <ion-icon [name]="user.isFriend ? 'person-remove-outline' : (user.request === 'requesting' ? 'checkmark-circle-outline' : (user.request === 'requested' ? 'paper-plane-outline' : 'person-add-outline'))" slot="start"></ion-icon>
           {{ user.isFriend ? 'Unfriend' : (user.request === 'requesting' ? 'Accept' : (user.request === 'requested' ? 'Cancel Request' : 'Add Friend')) }}
         </ion-button>
 
         <ion-button class="primary-action" (click)="toggleFollow()" [color]="user.isFollowing ? 'light' : 'secondary'"
             *ngIf="!user.isFriend && !isFriend">
-          <ion-icon [name]="user.isFollowing ? 'eye-off-outline' : 'eye-outline'" slot="start"></ion-icon>
+          <ion-icon [name]="user.isFollowing ? 'eye-off-outline' : (user.followStatus === 'pending' ? 'time-outline' : 'eye-outline')" slot="start"></ion-icon>
           {{ user.isFollowing ? 'Unfollow' : (user.followStatus === 'pending' ? 'Requested' : 'Follow') }}
         </ion-button>
         
         <ion-button class="secondary-action" [routerLink]="['/messages/chat/', user.id]" color="secondary" *ngIf="user.isFriend || isFriend || !user.isPrivate">
-          <ion-icon name="chatbubble-ellipses" slot="start"></ion-icon>
+          <ion-icon name="chatbubble-ellipses-outline" slot="start"></ion-icon>
           Chat
         </ion-button>
 
         <ion-button class="secondary-action" *ngIf="user.isFriend && features.friendVideoCall" (click)="videoCall()" color="tertiary">
-          <ion-icon name="videocam" slot="start"></ion-icon>
+          <ion-icon name="videocam-outline" slot="start"></ion-icon>
           Call
         </ion-button>
       </div>
 
-      <!-- Private Profile Placeholder -->
       <div class="private-profile-placeholder animate__animated animate__fadeIn" *ngIf="isLocked">
         <div class="lock-icon-wrapper">
           <ion-icon name="lock-closed-outline"></ion-icon>
         </div>
-        <h3>This Profile is Private</h3>
-        <p>Follow this user to see their bio.</p>
+        <h3>Private profile</h3>
+        <p *ngIf="user.followStatus !== 'pending'">Only friends and approved followers can view this profile.</p>
+        <p *ngIf="user.followStatus === 'pending'">Your follow request is waiting for approval.</p>
       </div>
 
-      <!-- Unified Info Container -->
       <div class="info-glass-container" *ngIf="!isLocked">
-        <!-- About Section -->
         <section class="info-section" *ngIf="user.aboutMe">
           <h3 class="section-header">About</h3>
           <p class="about-bio">{{ user.aboutMe }}</p>
         </section>
 
-        <!-- Details Grid — friends of private profiles only -->
         <section class="info-section" *ngIf="myProfile || !user.isPrivate || user.isFriend || isFriend">
           <h3 class="section-header">Details</h3>
           <div class="details-grid">
@@ -146,13 +150,6 @@
                 <span class="grid-value">{{ user.profession }}</span>
               </div>
             </div>
-            <div class="grid-item" *ngIf="user.school">
-              <ion-icon name="school-outline"></ion-icon>
-              <div class="grid-text">
-                <span class="grid-label">School</span>
-                <span class="grid-value">{{ user.school }}</span>
-              </div>
-            </div>
             <div class="grid-item" *ngIf="user.education">
               <ion-icon name="book-outline"></ion-icon>
               <div class="grid-text">
@@ -160,27 +157,32 @@
                 <span class="grid-value">{{ user.education }}</span>
               </div>
             </div>
+            <div class="grid-item school-item" *ngIf="user.school">
+              <ion-icon name="school-outline"></ion-icon>
+              <div class="grid-text">
+                <span class="grid-label">School</span>
+                <span class="grid-value">{{ user.school }}</span>
+              </div>
+            </div>
           </div>
         </section>
 
-        <!-- Interests & Languages — hidden for friends of private profiles -->
         <section class="info-section" *ngIf="(myProfile || !user.isPrivate || user.isFriend || isFriend) && ((user.interests && isArray(user.interests) && user.interests.length) || (user.languages && isArray(user.languages) && user.languages.length))">
           <h3 class="section-header">Interests & Languages</h3>
           <div class="tags-container">
             <ng-container *ngIf="user.interests && isArray(user.interests)">
               <span *ngFor="let interest of user.interests" class="tag interest-tag">
-                <ion-icon name="heart"></ion-icon> {{ interest }}
+                <ion-icon name="heart-outline"></ion-icon> {{ interest }}
               </span>
             </ng-container>
             <ng-container *ngIf="user.languages && isArray(user.languages)">
               <span *ngFor="let lang of user.languages" class="tag language-tag">
-                <ion-icon name="language"></ion-icon> {{ lang }}
+                <ion-icon name="language-outline"></ion-icon> {{ lang }}
               </span>
             </ng-container>
           </div>
         </section>
 
-        <!-- Photo Gallery — always for my profile; for others only if they have photos -->
         <section class="info-section" *ngIf="myProfile || ((!user.isPrivate || user.isFriend || isFriend) && user?.avatars?.length > 0)">
           <div class="section-header-row">
             <h3 class="section-header">Gallery</h3>
@@ -188,19 +190,22 @@
           </div>
           
           <div class="modern-gallery-grid">
-            <!-- Add Photo Card (Only for My Profile) -->
-            <div class="gallery-item add-photo-card animate__animated animate__fadeIn" *ngIf="myProfile" (click)="!isUploading && openPhotoSourceOptions()">
+            <label
+              for="gallery-source-toggle"
+              class="gallery-item add-photo-card animate__animated animate__fadeIn"
+              *ngIf="myProfile"
+              [class.uploading]="isUploading"
+              aria-label="Add photo">
               <div class="add-content" *ngIf="!isUploading">
-                <ion-icon name="add-outline"></ion-icon>
+                <ion-icon name="add-circle-outline"></ion-icon>
                 <span>Add Photo</span>
               </div>
               <div class="upload-loader" *ngIf="isUploading">
                 <ion-spinner name="crescent"></ion-spinner>
                 <span>Uploading...</span>
               </div>
-            </div>
+            </label>
 
-            <!-- Gallery Items -->
             <div *ngFor="let avatarObj of user?.avatars; let i = index; trackBy: trackByAvatar" 
                  class="gallery-item animate__animated animate__fadeIn"
                  [style.animation-delay]="(i * 0.05) + 's'"
@@ -213,14 +218,12 @@
                 </div>
               </div>
 
-              <!-- Main Badge -->
               <div class="main-badge" *ngIf="mainAvatar === avatarObj.path">
                 <ion-icon name="star"></ion-icon>
               </div>
             </div>
           </div>
 
-          <!-- Empty State for Visitors -->
           <div class="gallery-empty-state" *ngIf="!myProfile && (!user?.avatars || user?.avatars?.length === 0)">
             <ion-icon name="images-outline"></ion-icon>
             <p>No photos shared yet</p>
@@ -231,6 +234,68 @@
   </div>
 
   <input type="file" accept="image/*" id="webImageInput" (change)="onFileSelected($event)" style="display: none" />
+
+  <div class="profile-photo-source-sheet avatar-source-sheet" *ngIf="myProfile">
+    <label for="avatar-source-toggle" class="profile-photo-source-backdrop" aria-label="Close photo options"></label>
+    <div class="profile-photo-source-panel" role="dialog" aria-modal="true" aria-label="Update avatar">
+      <div class="profile-photo-source-handle"></div>
+      <div class="profile-photo-source-heading">
+        <span class="profile-photo-source-kicker">Profile photo</span>
+        <h3>Update avatar</h3>
+        <p>Choose how you want to update your profile photo.</p>
+      </div>
+
+      <div class="profile-photo-source-options">
+        <label for="avatar-source-toggle" class="profile-photo-source-option" (click)="openCameraPicker()">
+          <span class="profile-photo-source-icon camera"><ion-icon name="camera-outline"></ion-icon></span>
+          <span class="profile-photo-source-copy"><strong>Camera</strong><small>Take a new photo</small></span>
+          <ion-icon name="chevron-forward-outline" class="profile-photo-source-chevron"></ion-icon>
+        </label>
+
+        <label for="avatar-source-toggle" class="profile-photo-source-option" (click)="openImagePicker()">
+          <span class="profile-photo-source-icon library"><ion-icon name="images-outline"></ion-icon></span>
+          <span class="profile-photo-source-copy"><strong>Photo library</strong><small>Choose an existing photo</small></span>
+          <ion-icon name="chevron-forward-outline" class="profile-photo-source-chevron"></ion-icon>
+        </label>
+
+        <label for="avatar-source-toggle" class="profile-photo-source-option" (click)="openAvatarCustomize()">
+          <span class="profile-photo-source-icon customize"><ion-icon name="color-palette-outline"></ion-icon></span>
+          <span class="profile-photo-source-copy"><strong>Customize avatar</strong><small>Create or edit your illustrated avatar</small></span>
+          <ion-icon name="chevron-forward-outline" class="profile-photo-source-chevron"></ion-icon>
+        </label>
+      </div>
+
+      <label for="avatar-source-toggle" class="profile-photo-source-cancel">Cancel</label>
+    </div>
+  </div>
+
+  <div class="profile-photo-source-sheet gallery-source-sheet" *ngIf="myProfile">
+    <label for="gallery-source-toggle" class="profile-photo-source-backdrop" aria-label="Close photo options"></label>
+    <div class="profile-photo-source-panel" role="dialog" aria-modal="true" aria-label="Add photo">
+      <div class="profile-photo-source-handle"></div>
+      <div class="profile-photo-source-heading">
+        <span class="profile-photo-source-kicker">Gallery</span>
+        <h3>Add a photo</h3>
+        <p>Capture something new or pick a photo you already have.</p>
+      </div>
+
+      <div class="profile-photo-source-options">
+        <label for="gallery-source-toggle" class="profile-photo-source-option" (click)="openCameraPicker()">
+          <span class="profile-photo-source-icon camera"><ion-icon name="camera-outline"></ion-icon></span>
+          <span class="profile-photo-source-copy"><strong>Take photo</strong><small>Open the camera</small></span>
+          <ion-icon name="chevron-forward-outline" class="profile-photo-source-chevron"></ion-icon>
+        </label>
+
+        <label for="gallery-source-toggle" class="profile-photo-source-option" (click)="openImagePicker()">
+          <span class="profile-photo-source-icon library"><ion-icon name="images-outline"></ion-icon></span>
+          <span class="profile-photo-source-copy"><strong>Choose from library</strong><small>Select an existing photo</small></span>
+          <ion-icon name="chevron-forward-outline" class="profile-photo-source-chevron"></ion-icon>
+        </label>
+      </div>
+
+      <label for="gallery-source-toggle" class="profile-photo-source-cancel">Cancel</label>
+    </div>
+  </div>
 
   <div class="no-profile" *ngIf="!user && !pageLoading">
     <div class="creative-empty-state">
@@ -253,4 +318,204 @@
       </div>
     </div>
   </div>
+
+  <style>
+    .profile-photo-source-toggle {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .profile-avatar-source-trigger {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid var(--f-page-bg-soft);
+      border-radius: 15px;
+      color: #fff;
+      background: var(--f-accent-strong);
+      box-shadow: 0 9px 24px rgba(99, 102, 241, .34);
+      cursor: pointer;
+    }
+
+    .profile-avatar-source-trigger ion-icon { font-size: 18px; }
+
+    .profile-photo-source-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 10050;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity .2s ease, visibility .2s ease;
+    }
+
+    #avatar-source-toggle:checked ~ .avatar-source-sheet,
+    #gallery-source-toggle:checked ~ .gallery-source-sheet {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .profile-photo-source-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(3, 7, 18, .58);
+      backdrop-filter: blur(9px);
+      -webkit-backdrop-filter: blur(9px);
+    }
+
+    .profile-photo-source-panel {
+      position: relative;
+      width: min(calc(100% - 20px), 520px);
+      margin: 0 10px calc(10px + env(safe-area-inset-bottom));
+      padding: 10px 12px 12px;
+      border: 1px solid var(--f-border-strong);
+      border-radius: 28px;
+      color: var(--f-text);
+      background: var(--f-surface-raised);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, .42);
+      backdrop-filter: blur(28px) saturate(160%);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
+      transform: translateY(24px) scale(.985);
+      transition: transform .24s cubic-bezier(.2,.8,.2,1);
+      overflow: hidden;
+    }
+
+    #avatar-source-toggle:checked ~ .avatar-source-sheet .profile-photo-source-panel,
+    #gallery-source-toggle:checked ~ .gallery-source-sheet .profile-photo-source-panel {
+      transform: translateY(0) scale(1);
+    }
+
+    .profile-photo-source-handle {
+      width: 38px;
+      height: 4px;
+      margin: 2px auto 13px;
+      border-radius: 999px;
+      background: var(--f-border-strong);
+    }
+
+    .profile-photo-source-heading { padding: 0 8px 13px; }
+    .profile-photo-source-kicker {
+      display: inline-block;
+      margin-bottom: 5px;
+      color: var(--f-accent);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .profile-photo-source-heading h3 {
+      margin: 0;
+      color: var(--f-text-strong);
+      font-size: 20px;
+      font-weight: 720;
+      line-height: 1.15;
+      letter-spacing: -.025em;
+    }
+    .profile-photo-source-heading p {
+      margin: 6px 0 0;
+      color: var(--f-text-muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .profile-photo-source-options {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .profile-photo-source-option {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 11px;
+      box-sizing: border-box;
+      border: 1px solid var(--f-border);
+      border-radius: 18px;
+      color: var(--f-text);
+      background: var(--f-surface-muted);
+      cursor: pointer;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+    }
+
+    .profile-photo-source-option:active {
+      transform: scale(.985);
+      background: var(--f-accent-soft);
+      border-color: rgba(124, 108, 255, .26);
+    }
+
+    .profile-photo-source-icon {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      background: var(--f-accent-soft);
+      color: var(--f-accent);
+    }
+    .profile-photo-source-icon.library { color: #38bdf8; background: rgba(56,189,248,.11); }
+    .profile-photo-source-icon.customize { color: #a855f7; background: rgba(168,85,247,.11); }
+    .profile-photo-source-icon ion-icon { font-size: 21px; }
+
+    .profile-photo-source-copy {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      text-align: left;
+    }
+    .profile-photo-source-copy strong {
+      color: var(--f-text-strong);
+      font-size: 14px;
+      font-weight: 680;
+      letter-spacing: -.01em;
+    }
+    .profile-photo-source-copy small {
+      color: var(--f-text-muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .profile-photo-source-chevron {
+      flex: 0 0 auto;
+      color: var(--f-text-faint);
+      font-size: 16px;
+    }
+
+    .profile-photo-source-cancel {
+      min-height: 48px;
+      margin-top: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      color: var(--f-text-muted);
+      background: transparent;
+      font-size: 14px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    @media (min-width: 768px) {
+      .profile-photo-source-panel { margin-bottom: 24px; padding: 12px 14px 14px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .profile-photo-source-sheet,
+      .profile-photo-source-panel,
+      .profile-photo-source-option { transition: none !important; }
+    }
+  </style>
 </ion-content>

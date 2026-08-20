@@ -16,7 +16,7 @@
 >
   <div class="card-accent-line"></div>
   
-  <div class="card-header">
+  <div class="comment-card-header">
     <div class="user-info" (click)="showUserProfile(commentUserId)" [style.cursor]="(comment.anonyme || isAdminComment() || !commentUserId) ? 'default' : 'pointer'">
       <div class="avatar-ring" [class.anonyme]="comment.anonyme">
         <div class="avatar-inner" [class.is-anonyme]="comment.anonyme">
@@ -29,11 +29,23 @@
         <span class="timestamp">{{ comment.createdAt | extractDiffTime }}</span>
       </div>
     </div>
-    
-    <button class="btn-more" (click)="presentPopover($event)">
-      <i class="fas fa-ellipsis-h"></i>
-    </button>
   </div>
+
+  <aside class="comment-controls" aria-label="Comment actions">
+    <button type="button" class="btn-more" (click)="presentPopover($event)" aria-label="More comment options">
+      <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+    </button>
+
+    <div class="vote-widget" aria-label="Comment voting">
+      <button type="button" class="vote-btn up" [class.active]="comment.voted === 1" [disabled]="isVoting" (click)="$event.stopPropagation(); voteOnComment(1)" aria-label="Like comment">
+        <i class="fas fa-chevron-up" aria-hidden="true"></i>
+      </button>
+      <span class="vote-val">{{ comment.votes }}</span>
+      <button type="button" class="vote-btn down" [class.active]="comment.voted === -1" [disabled]="isVoting" (click)="$event.stopPropagation(); voteOnComment(-1)" aria-label="Dislike comment">
+        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+      </button>
+    </div>
+  </aside>
 
   <div class="card-body" *ngIf="hasRenderableContent()">
     <p class="comment-text" *ngIf="comment.text && comment.text.trim()">{{ comment.text }}</p>
@@ -66,17 +78,4 @@
     </div>
   </div>
 
-  <div class="card-footer">
-    <div class="interaction-group">
-      <div class="vote-widget">
-        <button type="button" class="vote-btn up" [class.active]="comment.voted === 1" [disabled]="isVoting" (click)="$event.stopPropagation(); voteOnComment(1)">
-          <i class="fas fa-chevron-up"></i>
-        </button>
-        <span class="vote-val">{{ comment.votes }}</span>
-        <button type="button" class="vote-btn down" [class.active]="comment.voted === -1" [disabled]="isVoting" (click)="$event.stopPropagation(); voteOnComment(-1)">
-          <i class="fas fa-chevron-down"></i>
-        </button>
-      </div>
-    </div>
-  </div>
 </div>

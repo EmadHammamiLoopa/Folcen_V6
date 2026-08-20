@@ -15,10 +15,14 @@ const routes: Routes = [
         pathMatch: 'full'
       },
       {
+        path: 'profile/settings',
+        loadChildren: () => import('./../settings/settings.module').then( m => m.SettingsPageModule),
+        canActivate: [AuthGuard]
+      },
+      {
         path: 'profile',
         loadChildren: () => import('./../profile/profile.module').then( m => m.ProfilePageModule),
         canActivate: [AuthGuard]
-
       },
       {
         path: 'friends',
@@ -49,10 +53,6 @@ const routes: Routes = [
         path: 'buy-and-sell',
         loadChildren: () => import('./../buy-and-sell/buy-and-sell.module').then( m => m.BuyAndSellPageModule),
         canActivate: [AuthGuard]
-      },
-      {
-        path: 'profile/settings',
-        loadChildren: () => import('./../settings/settings.module').then( m => m.SettingsPageModule),
       },
       {
         path: 'subscription',

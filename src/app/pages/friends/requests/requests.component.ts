@@ -41,13 +41,11 @@ export class RequestsComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit() {
-    // Subscribe to friend request count changes
     this.badgeSubscription = this.appEvents.badge$('friends').subscribe(count => {
       this.friendRequestCount = count;
       this.updatePageTitle();
     });
 
-    // Merge all friend-request-related socket events into one stream (reconnect-safe)
     merge(
       SocketService.newFriendRequest$,
       SocketService.friendRequestsUpdated$
@@ -65,11 +63,10 @@ export class RequestsComponent implements OnInit, OnDestroy {
   ionViewWillEnter() {
     this.page = 0;
     this.loadRequests();
-    this.updatePageTitle(); // Update title when entering page
+    this.updatePageTitle();
   }
 
   ionViewWillLeave() {
-    // Reset title when leaving the page
     this.resetPageTitle();
   }
 
@@ -89,8 +86,7 @@ export class RequestsComponent implements OnInit, OnDestroy {
   }
 
   private resetPageTitle() {
-    // Reset to your app's default title
-    document.title = 'Your App Name'; // Replace with your actual app name
+    document.title = 'Your App Name';
   }
 
   loadRequests(event?: any) {
@@ -101,34 +97,33 @@ export class RequestsComponent implements OnInit, OnDestroy {
   getRequests(page: number = this.page, event?: any) {
     this.requestService.requests(page).then(
       (resp: any) => {
-          const dataArray = Array.isArray(resp?.data) ? resp.data : [];
-          if (!event) {
-            this.requests = [];
-          }
+        const dataArray = Array.isArray(resp?.data) ? resp.data : [];
+        if (!event) {
+          this.requests = [];
+        }
 
-          this.requests = [
-            ...this.requests,
-            ...dataArray.map((requestData: any) => {
-              const request = new Request().initialize(requestData);
-              request.from = new User().initialize({
-                ...requestData.from,
-                mainAvatar: requestData.from?.mainAvatar || requestData.from?.avatar?.[0],
-              });
-              return request;
-            }),
-          ];
+        this.requests = [
+          ...this.requests,
+          ...dataArray.map((requestData: any) => {
+            const request = new Request().initialize(requestData);
+            request.from = new User().initialize({
+              ...requestData.from,
+              mainAvatar: requestData.from?.mainAvatar || requestData.from?.avatar?.[0],
+            });
+            return request;
+          }),
+        ];
 
-          // Update the badge when we load page 0
-          if (page === 0) {
-            const count = dataArray.length;
-            this.appEvents.set('friends', count);
-            this.friendRequestCount = count;
-            this.updatePageTitle();
-          }
+        if (page === 0) {
+          const count = dataArray.length;
+          this.appEvents.set('friends', count);
+          this.friendRequestCount = count;
+          this.updatePageTitle();
+        }
 
-          if (event?.target) event.target.complete();
-          this.pageLoading = false;
-        },
+        if (event?.target) event.target.complete();
+        this.pageLoading = false;
+      },
       (err) => {
         this.pageLoading = false;
         console.error('Error loading requests:', err);
@@ -143,22 +138,13 @@ export class RequestsComponent implements OnInit, OnDestroy {
     this.showSandglass = true;
     try {
       const resp: any = await this.requestService.acceptRequest(requestId);
-
-      // Remove from list immediately
       this.requests = this.requests.filter((r) => r._id !== requestId);
       this.toastService.presentSuccessToastr(resp.message);
-
-      // Instant badge change (optimistic)
       this.appEvents.inc('friends', -1);
-      this.friendRequestCount = Math.max(0, this.friendRequestCount - 1); // Update local count
-      this.updatePageTitle(); // Update page title
-
-      // Refresh friends list and current user
+      this.friendRequestCount = Math.max(0, this.friendRequestCount - 1);
+      this.updatePageTitle();
       this.userService.triggerFriendsRefresh();
-      
-      // Emit socket event to notify other clients
       SocketService.emit('friend-request-accepted', { requestId });
-      
     } catch (err) {
       console.error('Error accepting request:', err);
       this.toastService.presentErrorToastr('Failed to accept request.');
@@ -168,12 +154,14 @@ export class RequestsComponent implements OnInit, OnDestroy {
   }
 
   async rejectRequestConf(request: Request) {
+    const displayName = request?.from?.fullName || 'this user';
     const alert = await this.alertCtrl.create({
-      header: 'Reject request',
-      message: 'Do you really want to reject this request?',
+      header: 'Decline request?',
+      message: `${displayName}'s friend request will be removed.`,
+      cssClass: 'folcen-confirm-alert',
       buttons: [
-        { text: 'CANCEL', role: 'cancel' },
-        { text: 'REJECT', cssClass: 'text-danger', handler: () => this.rejectRequest(request) },
+        { text: 'Cancel', role: 'cancel', cssClass: 'folcen-alert-cancel' },
+        { text: 'Decline', cssClass: 'folcen-alert-danger', handler: () => this.rejectRequest(request) },
       ],
     });
     await alert.present();
@@ -184,19 +172,12 @@ export class RequestsComponent implements OnInit, OnDestroy {
     this.showSandglass = true;
     try {
       const resp: any = await this.requestService.rejectRequest(requestId);
-
-      // Remove from list immediately
       this.requests = this.requests.filter((r) => r._id !== requestId);
       this.toastService.presentSuccessToastr(resp.message);
-
-      // Instant badge change (optimistic)
       this.appEvents.inc('friends', -1);
-      this.friendRequestCount = Math.max(0, this.friendRequestCount - 1); // Update local count
-      this.updatePageTitle(); // Update page title
-
-      // Emit socket event to notify other clients
+      this.friendRequestCount = Math.max(0, this.friendRequestCount - 1);
+      this.updatePageTitle();
       SocketService.emit('friend-request-declined', { requestId });
-      
     } catch (err) {
       console.error('Error rejecting request:', err);
       this.toastService.presentErrorToastr('Failed to reject request.');

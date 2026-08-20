@@ -675,10 +675,26 @@ exports.showPost = async (req, res) => {
         const author = post.user;
         const requesterId = req.auth._id.toString();
         const isAdmin = req.auth && (req.auth.role === 'ADMIN' || req.auth.role === 'SUPER ADMIN');
-        const isSelf = author && author._id.toString() === requesterId;
+
+        if (!author) {
+            return Response.sendError(res, 404, 'Post not found');
+        }
+
+        // A direct/stale link must not bypass the same lifecycle checks used by
+        // the channel timeline. Only admins retain access for moderation;
+        // everyone else sees the temporary unavailable state.
+        if (
+            !isAdmin &&
+            (
+                post.deletedAt ||
+                post.moderationStatus !== 'approved'
+            )
+        ) {
+            return Response.sendError(res, 404, 'Post not found');
+        }
 
         if (author && (author.enabled === false || author.isDeleted || author.banned || author.deletedAt)) {
-            if (!isAdmin && !isSelf) {
+            if (!isAdmin) {
                 return Response.sendError(res, 404, 'Post not found');
             }
         }
@@ -699,42 +715,16 @@ exports.showPost = async (req, res) => {
             }
         }
 
-        // Relationship / profile privacy check.
-        //
-        // Friends are implicit followers and need no Follow record.
-        // For a private profile, a non-friend must have an ACTIVE Follow.
-        // Pending requests never grant access.
+        // Profile privacy controls access to the author's profile and bio.
+        // It must not override an explicit post visibility choice: a public
+        // channel post remains public even when its author has a private
+        // profile. Post visibility is enforced independently below.
         const isOwner = authorId === requesterId;
         const isFriend =
             req.authUser.friends &&
             req.authUser.friends.some(
                 id => id.toString() === authorId
             );
-
-        let isAcceptedFollower = false;
-
-        if (
-            !isOwner &&
-            !isFriend &&
-            author &&
-            author.isPrivate
-        ) {
-            isAcceptedFollower = !!(
-                await Follow.exists({
-                    follower: req.auth._id,
-                    followed: authorId,
-                    status: 'active'
-                })
-            );
-
-            if (!isAcceptedFollower) {
-                return Response.sendError(
-                    res,
-                    403,
-                    'This profile is private'
-                );
-            }
-        }
 
         // Post visibility is a separate permission layer.
         if (!isOwner) {
@@ -1158,7 +1148,8 @@ exports.getPosts = async (req, res) => {
                 { _id: { $in: req.authUser.blockedUsers || [] } }, // People I blocked
                 { enabled: false },
                 { isDeleted: true },
-                { banned: true }
+                { banned: true },
+                { deletedAt: { $ne: null } }
             ]
         }).select('_id').lean();
         
@@ -1206,10 +1197,10 @@ exports.getPosts = async (req, res) => {
                 limit
             );
 
-        // Filter out posts with missing users (due to deleted/invalid user references)
-        // This prevents frontend errors when posts reference non-existent users
+        // Posts whose author record no longer exists must not remain as stale
+        // cards in the channel, including formerly anonymous posts.
         const validPosts = posts.filter(post => {
-            if (!post.user && !post.anonyme) {
+            if (!post.user) {
                 logger.warn('Filtering out post with missing user:', {
                     postId: post._id,
                     text: post.text?.substring(0, 50)

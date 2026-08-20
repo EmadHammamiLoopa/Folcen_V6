@@ -1,0 +1,183 @@
+/* Channel post V6 — align owner controls everywhere and prevent comment composer overlap. */
+
+/* Keep the same owner-control order in Comments as in the channel feed: options first, eye underneath. */
+app-comments .post-focus app-post .jdl-top-rail {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 40 !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(148,163,184,.12) !important;
+  border-radius: 13px !important;
+  background: rgba(15,23,42,.68) !important;
+  box-shadow: 0 8px 20px rgba(2,6,23,.14) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+
+app-comments .post-focus app-post .jdl-top-rail > .icon-btn {
+  order: 1 !important;
+}
+
+app-comments .post-focus app-post .jdl-top-rail > .rel {
+  order: 2 !important;
+}
+
+app-comments .post-focus app-post .jdl-top-rail .rel,
+app-comments .post-focus app-post .jdl-top-rail .icon-btn {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  min-height: 28px !important;
+  flex: 0 0 28px !important;
+}
+
+app-comments .post-focus app-post .jdl-top-rail .icon-btn {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+app-comments .post-focus app-post .jdl-top-rail .icon-btn ion-icon {
+  font-size: 16px !important;
+}
+
+/* Privacy menu in Comments: same full readable design as channel feed, anchored inward. */
+app-comments .post-focus app-post .jdl-top-rail .custom-popover {
+  position: absolute !important;
+  top: 34px !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(244px, calc(100vw - 74px)) !important;
+  min-width: min(220px, calc(100vw - 74px)) !important;
+  max-width: calc(100vw - 74px) !important;
+  box-sizing: border-box !important;
+  padding: 5px !important;
+  border: 1px solid rgba(148,163,184,.16) !important;
+  border-radius: 15px !important;
+  overflow: visible !important;
+  color: #f8fafc !important;
+  background: rgba(10,18,36,.97) !important;
+  box-shadow: 0 20px 50px rgba(2,6,23,.42) !important;
+  backdrop-filter: blur(22px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(150%) !important;
+  transform-origin: top right !important;
+}
+
+app-comments .post-focus app-post .visibility-dropdown {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+app-comments .post-focus app-post .privacy-option {
+  appearance: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  box-sizing: border-box !important;
+  padding: 8px 10px !important;
+  border: 0 !important;
+  border-radius: 11px !important;
+  color: #f8fafc !important;
+  background: transparent !important;
+  text-align: left !important;
+  font: inherit !important;
+}
+
+app-comments .post-focus app-post .privacy-icon {
+  width: 34px !important;
+  height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  color: var(--post-bg,#7c6cff) !important;
+  background: rgba(124,108,255,.10) !important;
+}
+
+app-comments .post-focus app-post .privacy-copy {
+  min-width: 0 !important;
+  display: block !important;
+}
+
+app-comments .post-focus app-post .privacy-copy strong,
+app-comments .post-focus app-post .privacy-copy small {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+}
+
+app-comments .post-focus app-post .privacy-copy strong {
+  color: #f8fafc !important;
+  font-size: 12px !important;
+  font-weight: 720 !important;
+  line-height: 1.2 !important;
+}
+
+app-comments .post-focus app-post .privacy-copy small {
+  margin-top: 3px !important;
+  color: #94a3b8 !important;
+  font-size: 10px !important;
+  line-height: 1.32 !important;
+}
+
+/* Reserve the full height of the fixed comment composer so content can scroll completely above it. */
+app-comments .comments-page-container {
+  padding-bottom: calc(188px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+app-comments ion-content::part(scroll) {
+  padding-bottom: calc(188px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+app-comments .post-focus app-post .jodel-card {
+  overflow: hidden !important;
+}
+
+@media (max-width: 420px) {
+  app-comments .comments-page-container,
+  app-comments ion-content::part(scroll) {
+    padding-bottom: calc(196px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  app-comments .post-focus app-post .jdl-top-rail .custom-popover {
+    width: min(232px, calc(100vw - 66px)) !important;
+    max-width: calc(100vw - 66px) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-comments .comments-page-container,
+  app-comments ion-content::part(scroll) {
+    padding-bottom: calc(176px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

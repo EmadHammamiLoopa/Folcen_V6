@@ -1,0 +1,418 @@
+/* Cross-component responsive refinements. */
+
+/* Profile gallery: keep Add Photo compact on Android tablets. */
+@media (min-width: 560px) and (max-width: 1199px) {
+  app-display .modern-gallery-grid .add-photo-card {
+    width: 132px !important;
+    max-width: 132px !important;
+    aspect-ratio: 1 / 1 !important;
+    justify-self: start !important;
+  }
+}
+
+/* Settings: remove redundant branding footer and clear system navigation. */
+app-settings .branding-footer {
+  display: none !important;
+}
+
+app-settings .settings-container {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+}
+
+app-settings .account-actions-section {
+  margin-bottom: 0 !important;
+}
+
+@media (min-width: 768px) {
+  app-settings .settings-container {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* My Archive: keep only the rounded segment visible, without a dark rectangular strip behind it. */
+app-activity .filters-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-top: 0 !important;
+}
+
+/* New Friends: one compact clearance is enough to lift the final card above the floating dock. */
+app-new-friends .discovery-content {
+  --padding-bottom: 0 !important;
+}
+
+app-new-friends .discovery-container {
+  padding-top: calc(18px + env(safe-area-inset-top)) !important;
+  padding-bottom: calc(138px + env(safe-area-inset-bottom)) !important;
+}
+
+@media (max-width: 420px) {
+  app-new-friends .discovery-container {
+    padding-bottom: calc(145px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-new-friends .discovery-container {
+    padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Discovery Filters: keep final rows and action buttons above Android navigation. */
+app-search-options .filter-modal-content {
+  --padding-bottom: 0 !important;
+}
+
+app-search-options .filter-modal-shell {
+  padding-bottom: calc(44px + env(safe-area-inset-bottom)) !important;
+}
+
+app-search-options .custom-list .toggle-item {
+  min-height: 54px !important;
+  padding: 6px 0 !important;
+  overflow: visible !important;
+}
+
+app-search-options .custom-list .toggle-item ion-toggle {
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  max-width: 44px !important;
+  margin-inline-start: 12px !important;
+}
+
+app-search-options .filter-actions-panel {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-top: 14px !important;
+  padding: 10px 0 calc(20px + env(safe-area-inset-bottom)) !important;
+  border-top: 1px solid var(--f-border) !important;
+}
+
+app-search-options .filter-actions-panel .footer-actions {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+@media (max-width: 420px) {
+  app-search-options .filter-modal-shell {
+    padding-bottom: calc(52px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Create Channel: one hero only, with back action and app-styled category picker. */
+app-channel-form .channel-create-container {
+  padding-top: calc(18px + env(safe-area-inset-top)) !important;
+}
+
+app-channel-form .create-intro {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+}
+
+app-channel-form .create-back-btn {
+  appearance: none !important;
+  width: 46px !important;
+  height: 46px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  border: 1px solid rgba(124, 108, 255, 0.18) !important;
+  border-radius: 15px !important;
+  color: var(--f-text-strong) !important;
+  background: var(--f-surface-muted) !important;
+  box-shadow: none !important;
+}
+
+app-channel-form .create-back-btn ion-icon {
+  font-size: 21px !important;
+}
+
+app-channel-form .category-picker-btn {
+  appearance: none !important;
+  width: 100% !important;
+  min-height: 58px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 10px 13px !important;
+  border: 1px solid var(--f-border) !important;
+  border-radius: 14px !important;
+  color: var(--f-text-strong) !important;
+  background: var(--f-surface-muted) !important;
+  text-align: left !important;
+  font-family: inherit !important;
+}
+
+app-channel-form .category-picker-btn.has-value {
+  border-color: rgba(124, 108, 255, 0.24) !important;
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.08), transparent 72%), var(--f-surface-muted) !important;
+}
+
+app-channel-form .category-picker-copy {
+  min-width: 0 !important;
+}
+
+app-channel-form .category-picker-copy strong,
+app-channel-form .category-picker-copy small {
+  display: block !important;
+}
+
+app-channel-form .category-picker-copy strong {
+  overflow: hidden !important;
+  color: var(--f-text-strong) !important;
+  font-size: 12px !important;
+  font-weight: 680 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+app-channel-form .category-picker-copy small {
+  margin-top: 3px !important;
+  color: var(--f-text-muted) !important;
+  font-size: 9.5px !important;
+  line-height: 1.3 !important;
+}
+
+app-channel-form .category-picker-btn > ion-icon {
+  flex: 0 0 auto !important;
+  color: var(--f-accent) !important;
+  font-size: 18px !important;
+}
+
+/* Category modal: overlays live outside page components, so use globally available theme vars. */
+ion-modal.channel-category-modal {
+  --width: 100% !important;
+  --height: 100% !important;
+  --border-radius: 0 !important;
+  --background: var(--ion-background-color, #070d1a) !important;
+  --backdrop-opacity: 0.56 !important;
+  color: var(--ion-text-color, #fff) !important;
+}
+
+ion-modal.channel-category-modal::part(content) {
+  background: var(--ion-background-color, #070d1a) !important;
+  color: var(--ion-text-color, #fff) !important;
+}
+
+ion-modal.channel-category-modal::part(backdrop) {
+  background: #000 !important;
+  opacity: 0.56 !important;
+}
+
+ion-modal.channel-category-modal app-list-search {
+  display: block !important;
+  min-height: 100% !important;
+  background: var(--ion-background-color, #070d1a) !important;
+  color: var(--ion-text-color, #fff) !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-header,
+ion-modal.channel-category-modal app-list-search ion-toolbar {
+  background: var(--folcen-toolbar-background, var(--ion-background-color, #070d1a)) !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-toolbar {
+  --background: var(--folcen-toolbar-background, var(--ion-background-color, #070d1a)) !important;
+  --color: var(--ion-text-color, #fff) !important;
+  --border-width: 0 !important;
+  border-bottom: 1px solid var(--folcen-tabbar-border, rgba(255,255,255,0.08)) !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-title {
+  color: var(--ion-text-color, #fff) !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-content {
+  --background: var(--ion-background-color, #070d1a) !important;
+  --color: var(--ion-text-color, #fff) !important;
+  --padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  background: var(--ion-background-color, #070d1a) !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-searchbar {
+  margin: 12px 12px 8px !important;
+  width: calc(100% - 24px) !important;
+  padding: 0 !important;
+  --background: var(--folcen-tabbar-background, rgba(255,255,255,0.07)) !important;
+  --color: var(--ion-text-color, #fff) !important;
+  --placeholder-color: var(--folcen-text-muted, rgba(255,255,255,0.55)) !important;
+  --icon-color: var(--ion-color-primary, #6366f1) !important;
+  --clear-button-color: var(--folcen-text-muted, rgba(255,255,255,0.55)) !important;
+  --border-radius: 14px !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-list {
+  padding: 0 12px 18px !important;
+  background: var(--ion-background-color, #070d1a) !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-item {
+  --background: var(--ion-item-background, var(--folcen-toolbar-background, #111827)) !important;
+  --color: var(--ion-text-color, #fff) !important;
+  --border-color: var(--folcen-tabbar-border, rgba(255,255,255,0.08)) !important;
+  --padding-start: 14px !important;
+  --padding-end: 10px !important;
+  min-height: 52px !important;
+  margin-bottom: 7px !important;
+  border: 1px solid var(--folcen-tabbar-border, rgba(255,255,255,0.08)) !important;
+  border-radius: 14px !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-item.selected-item {
+  --background: rgba(var(--ion-color-primary-rgb, 99,102,241), 0.14) !important;
+  border-color: rgba(var(--ion-color-primary-rgb, 99,102,241), 0.28) !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-label {
+  color: var(--ion-text-color, #fff) !important;
+  font-size: 12px !important;
+  font-weight: 620 !important;
+}
+
+ion-modal.channel-category-modal app-list-search ion-header ion-button {
+  --color: var(--ion-color-primary, #6366f1) !important;
+  font-weight: 650 !important;
+}
+
+@media (min-width: 768px) {
+  ion-modal.channel-category-modal {
+    --width: min(620px, 88vw) !important;
+    --height: min(760px, 84vh) !important;
+    --border-radius: 22px !important;
+  }
+
+  ion-modal.channel-category-modal::part(content) {
+    border-radius: 22px !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Integrated hero navigation: Settings, Edit Profile, and My Archive. */
+app-settings .settings-intro > ion-buttons,
+app-form .profile-hero-back,
+app-activity .archive-hero-back {
+  flex: 0 0 auto !important;
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+app-settings .settings-intro > ion-buttons ion-back-button,
+app-form .profile-hero-back ion-back-button,
+app-activity .archive-hero-back ion-back-button {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  margin: 0 !important;
+  --padding-start: 0 !important;
+  --padding-end: 0 !important;
+  --color: var(--f-text-strong) !important;
+  --background: var(--f-surface-muted) !important;
+  --background-hover: var(--f-accent-soft) !important;
+  --background-activated: var(--f-accent-soft) !important;
+  --border-radius: 15px !important;
+  --icon-font-size: 21px !important;
+}
+
+app-settings .settings-intro,
+app-activity .archive-header {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+}
+
+app-settings .settings-intro {
+  display: grid !important;
+}
+
+app-form .profile-preview-card {
+  display: grid !important;
+  grid-template-columns: auto auto minmax(0, 1fr) !important;
+}
+
+@media (max-width: 420px) {
+  app-form .profile-preview-card {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    align-items: start !important;
+  }
+
+  app-form .profile-preview-card .preview-avatar-wrap {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+    order: 3 !important;
+  }
+}
+
+/* Edit Profile: use only the bottom Save action. */
+app-form .save-profile-button {
+  display: none !important;
+}
+
+app-form .mobile-save-wrap {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 10px 0 18px !important;
+}
+
+app-form .mobile-save-button {
+  width: 100% !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  --border-radius: 16px !important;
+}
+
+/* The floating tab dock can be ~70px high and overlays the page. */
+app-form .edit-profile-container {
+  padding-bottom: calc(140px + env(safe-area-inset-bottom)) !important;
+}
+
+/* Avatar customization action. */
+app-form .customize-avatar-button {
+  --background: var(--f-accent-soft) !important;
+  --background-hover: rgba(124, 108, 255, 0.16) !important;
+  --background-activated: rgba(124, 108, 255, 0.20) !important;
+  --color: var(--f-accent) !important;
+  --border-radius: 999px !important;
+  --padding-start: 12px !important;
+  --padding-end: 14px !important;
+  min-height: 36px !important;
+  margin: 2px 0 0 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+app-form .customize-avatar-button::part(native) {
+  border: 1px solid rgba(124, 108, 255, 0.22) !important;
+  box-shadow: none !important;
+}
+
+app-form .customize-avatar-button ion-icon {
+  font-size: 16px !important;
+}
+
+@media (max-width: 420px) {
+  app-form .customize-avatar-button {
+    margin-inline: auto !important;
+  }
+
+  app-form .edit-profile-container {
+    padding-bottom: calc(152px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-form .mobile-save-wrap {
+    max-width: 520px !important;
+    margin-inline: auto !important;
+  }
+
+  app-form .edit-profile-container {
+    padding-bottom: calc(150px + env(safe-area-inset-bottom)) !important;
+  }
+}

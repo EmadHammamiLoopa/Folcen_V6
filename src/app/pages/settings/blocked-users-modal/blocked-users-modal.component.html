@@ -1,40 +1,96 @@
-<ion-header class="ion-no-border">
-  <ion-toolbar>
+<ion-header class="ion-no-border blocked-header">
+  <ion-toolbar class="blocked-toolbar">
+    <ion-title>Blocked accounts</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="close()">
-        <ion-icon name="close-outline" slot="icon-only"></ion-icon>
-      </ion-button>
+      <button type="button" class="modal-close" (click)="close()" aria-label="Close">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <div class="blocked-container">
-    <div class="grid" *ngIf="!loading && users.length">
-      <div class="user-card" *ngFor="let u of users">
-        <div class="avatar-wrapper" (click)="goToProfile(u)">
-          <app-avatar [profile]="u" [size]="56"></app-avatar>
-        </div>
-        <div class="info" (click)="goToProfile(u)">
-          <div class="name">{{ u.fullName || (u.firstName + ' ' + u.lastName) }}</div>
-          <div class="handle" *ngIf="u.email">@{{ u.email.split('@')[0] }}</div>
-        </div>
-        <div class="actions">
-          <ion-button size="small" color="danger" fill="clear" (click)="unblock(u)">
-            Unblock
-          </ion-button>
-        </div>
+<ion-content class="blocked-content" [fullscreen]="true">
+  <div class="blocked-aurora" aria-hidden="true"></div>
+
+  <main class="blocked-shell">
+    <section class="blocked-intro">
+      <div class="shield-mark">
+        <ion-icon name="shield-checkmark-outline"></ion-icon>
       </div>
+      <div class="intro-copy">
+        <span>Privacy controls</span>
+        <h1>Blocked accounts</h1>
+        <p>Blocked people cannot contact you or view your profile activity.</p>
+      </div>
+      <div class="blocked-count" [attr.aria-label]="users.length + ' blocked accounts'">
+        <strong>{{ users.length }}</strong>
+        <small>blocked</small>
+      </div>
+    </section>
+
+    <div class="blocked-search" *ngIf="!loading && users.length > 0">
+      <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+      <input
+        type="search"
+        [(ngModel)]="searchTerm"
+        placeholder="Search blocked accounts"
+        aria-label="Search blocked accounts"
+      />
+      <button *ngIf="searchTerm" type="button" (click)="searchTerm = ''" aria-label="Clear search">
+        <ion-icon name="close-circle"></ion-icon>
+      </button>
     </div>
 
-    <div *ngIf="loading" class="status-msg">
-      <ion-spinner name="crescent"></ion-spinner>
-      <p>Loading...</p>
-    </div>
-    
-    <div *ngIf="!loading && users.length === 0" class="status-msg">
-      <ion-icon name="people-outline"></ion-icon>
-      <p>No blocked users</p>
-    </div>
-  </div>
+    <section *ngIf="loading" class="blocked-state" aria-live="polite">
+      <span class="state-icon"><ion-spinner name="crescent"></ion-spinner></span>
+      <strong>Loading blocked accounts</strong>
+      <p>Checking your privacy list…</p>
+    </section>
+
+    <section *ngIf="!loading && users.length === 0" class="blocked-state empty-state animate__animated animate__fadeIn">
+      <span class="state-icon safe"><ion-icon name="shield-checkmark-outline"></ion-icon></span>
+      <strong>No blocked accounts</strong>
+      <p>Accounts you block will be collected here.</p>
+    </section>
+
+    <section *ngIf="!loading && users.length > 0 && visibleUsers.length === 0" class="blocked-state empty-state animate__animated animate__fadeIn">
+      <span class="state-icon"><ion-icon name="search-outline"></ion-icon></span>
+      <strong>No matches</strong>
+      <p>Try searching with another name or location.</p>
+    </section>
+
+    <section class="blocked-list" *ngIf="!loading && visibleUsers.length > 0">
+      <article class="blocked-row" *ngFor="let u of visibleUsers">
+        <button type="button" class="blocked-person" (click)="goToProfile(u)">
+          <span class="avatar-shell">
+            <app-avatar [profile]="u" [size]="48"></app-avatar>
+            <span class="blocked-badge" aria-hidden="true">
+              <ion-icon name="ban-outline"></ion-icon>
+            </span>
+          </span>
+          <span class="person-copy">
+            <strong>{{ u.fullName || (u.firstName + ' ' + u.lastName) }}</strong>
+            <small>
+              {{ (u.city && u.city !== '-') ? u.city : '' }}{{ (u.city && u.city !== '-' && u.country && u.country !== '-') ? ', ' : '' }}{{ (u.country && u.country !== '-') ? u.country : '' }}{{ (!u.city || u.city === '-') && (!u.country || u.country === '-') ? 'Blocked account' : '' }}
+            </small>
+          </span>
+          <ion-icon class="profile-chevron" name="chevron-forward-outline" aria-hidden="true"></ion-icon>
+        </button>
+
+        <button
+          type="button"
+          class="unblock-action"
+          (click)="unblock(u)"
+          [attr.aria-label]="'Unblock ' + (u.fullName || u.firstName || 'account')">
+          <ion-icon name="lock-open-outline"></ion-icon>
+          <span>Unblock</span>
+        </button>
+      </article>
+    </section>
+
+    <p class="privacy-note" *ngIf="!loading && users.length > 0">
+      <ion-icon name="information-circle-outline" aria-hidden="true"></ion-icon>
+      <span>Unblocking restores profile visibility, but it does not automatically make you friends or followers.</span>
+    </p>
+  </main>
 </ion-content>

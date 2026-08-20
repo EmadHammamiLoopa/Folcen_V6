@@ -1,107 +1,137 @@
-<ion-header class="ion-no-border">
-  <ion-toolbar class="glass-toolbar">
+<ion-header class="ion-no-border connections-header">
+  <ion-toolbar class="connections-toolbar">
     <ion-title>{{ type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Friends' }}</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="dismiss()" class="close-btn">
+      <button type="button" class="modal-close" (click)="dismiss()" aria-label="Close">
         <ion-icon name="close-outline"></ion-icon>
-      </ion-button>
+      </button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="custom-content">
-  <div class="mesh-gradient"></div>
-  
-  <div class="content-wrapper ion-padding">
-    <!-- Follow Requests Section (Only for My Profile) -->
-    <div *ngIf="isMyProfile && type === 'followers' && requests.length > 0" class="section-container animate__animated animate__fadeIn">
-      <h3 class="section-title">Follow Requests</h3>
-      <div class="user-card-list">
-        <div *ngFor="let req of requests" class="user-card glassy-card follow-request-card">
-          <div class="user-info" (click)="goToProfile(req.follower)">
-            <div class="avatar-container">
-              <app-avatar [profile]="req.follower" [size]="52"></app-avatar>
-              <div class="status-dot online"></div>
-            </div>
-            <div class="user-details">
-              <span class="user-name">{{ req.follower?.firstName }} {{ req.follower?.lastName }}</span>
-              <span class="user-handle">wants to follow you</span>
-            </div>
-          </div>
+<ion-content class="connections-content" [fullscreen]="true">
+  <div class="connections-aurora" aria-hidden="true"></div>
+
+  <main class="connections-shell">
+    <section class="connections-intro">
+      <div class="intro-icon" [ngClass]="type">
+        <ion-icon [name]="type === 'following' ? 'person-add-outline' : type === 'followers' ? 'people-outline' : 'people-circle-outline'"></ion-icon>
+      </div>
+      <div class="intro-copy">
+        <span class="intro-kicker">Profile network</span>
+        <h1>{{ type === 'followers' ? 'Your followers' : type === 'following' ? 'People you follow' : (isMyProfile ? 'Your friends' : 'Friends') }}</h1>
+        <p>
+          {{ type === 'followers'
+            ? 'People who keep up with your public activity.'
+            : type === 'following'
+              ? 'Profiles whose updates you chose to follow.'
+              : 'People connected with this profile.' }}
+        </p>
+      </div>
+      <div class="network-count" [attr.aria-label]="users.length + ' people'">
+        <strong>{{ users.length }}</strong>
+        <span>{{ users.length === 1 ? 'person' : 'people' }}</span>
+      </div>
+    </section>
+
+    <section *ngIf="isMyProfile && type === 'followers' && requests.length > 0" class="requests-section animate__animated animate__fadeIn">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Waiting for you</span>
+          <h2>Follow requests</h2>
+        </div>
+        <span class="section-count">{{ requests.length }}</span>
+      </div>
+
+      <div class="people-list requests-list">
+        <article *ngFor="let req of requests" class="person-row request-row">
+          <button type="button" class="person-main" (click)="goToProfile(req.follower)">
+            <span class="avatar-shell request-avatar">
+              <app-avatar [profile]="req.follower" [size]="48"></app-avatar>
+              <span class="request-dot" aria-hidden="true"></span>
+            </span>
+            <span class="person-copy">
+              <strong>{{ req.follower?.firstName }} {{ req.follower?.lastName }}</strong>
+              <small>Wants to follow you</small>
+            </span>
+          </button>
+
           <div class="request-actions">
-            <button class="action-btn accept" (click)="acceptRequest(req.follower?._id || req.follower?.id)">
-              <ion-icon name="checkmark"></ion-icon>
+            <button type="button" class="request-action accept" (click)="acceptRequest(req.follower?._id || req.follower?.id)" aria-label="Accept follow request">
+              <ion-icon name="checkmark-outline"></ion-icon>
               <span>Accept</span>
             </button>
-            <button class="action-btn reject" (click)="rejectRequest(req.follower?._id || req.follower?.id)">
-              <ion-icon name="close"></ion-icon>
+            <button type="button" class="request-action decline" (click)="rejectRequest(req.follower?._id || req.follower?.id)" aria-label="Decline follow request">
+              <ion-icon name="close-outline"></ion-icon>
             </button>
           </div>
-        </div>
+        </article>
       </div>
-    </div>
+    </section>
 
-    <!-- Main List Section -->
-    <div class="section-container">
-      <div class="list-header-row">
-        <div class="search-wrapper glassy-card">
-          <ion-icon name="search-outline"></ion-icon>
-          <input type="text" [(ngModel)]="searchTerm" (input)="filterUsers()" placeholder="Search..." />
-        </div>
-      </div>
-      
-      <div *ngIf="loading && !loadingRequests" class="loading-container">
-        <ion-spinner name="crescent"></ion-spinner>
-      </div>
-
-      <div *ngIf="!loading && filteredUsers.length === 0" class="empty-state animate__animated animate__zoomIn">
-        <div class="empty-icon-wrapper">
-          <ion-icon name="people-outline"></ion-icon>
-        </div>
-        <p>{{ searchTerm ? 'No matches found' : 'No ' + (type === 'friends' ? 'friends' : type) + ' found yet' }}</p>
+    <section class="network-section">
+      <div class="search-field">
+        <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+        <input
+          type="search"
+          [(ngModel)]="searchTerm"
+          (input)="filterUsers()"
+          [placeholder]="'Search ' + (type === 'friends' ? 'friends' : type)"
+          [attr.aria-label]="'Search ' + (type === 'friends' ? 'friends' : type)"
+        />
+        <button *ngIf="searchTerm" type="button" class="clear-search" (click)="searchTerm = ''; filterUsers()" aria-label="Clear search">
+          <ion-icon name="close-circle"></ion-icon>
+        </button>
       </div>
 
-      <div class="user-card-list" *ngIf="!loading && filteredUsers.length > 0">
-        <div *ngFor="let user of filteredUsers; let i = index" 
-             class="user-card glassy-card animate__animated animate__fadeInUp"
-             [style.animation-delay]="(i * 0.05) + 's'">
-          <div class="user-info" (click)="goToProfile(user)">
-            <div class="avatar-container">
-              <app-avatar [profile]="user" [size]="52"></app-avatar>
-            </div>
-            <div class="user-details">
-              <span class="user-name">{{ user.firstName }} {{ user.lastName }}</span>
-              <span class="user-handle">
+      <div *ngIf="loading && !loadingRequests" class="network-state loading-state" aria-live="polite">
+        <span class="state-icon"><ion-spinner name="crescent"></ion-spinner></span>
+        <strong>Loading connections</strong>
+        <p>Bringing your network together…</p>
+      </div>
+
+      <div *ngIf="!loading && filteredUsers.length === 0" class="network-state empty-state animate__animated animate__fadeIn">
+        <span class="state-icon">
+          <ion-icon [name]="searchTerm ? 'search-outline' : 'people-outline'"></ion-icon>
+        </span>
+        <strong>{{ searchTerm ? 'No matches' : 'Nothing here yet' }}</strong>
+        <p>{{ searchTerm ? 'Try another name or location.' : 'New connections will appear here.' }}</p>
+      </div>
+
+      <div class="people-list" *ngIf="!loading && filteredUsers.length > 0">
+        <article
+          *ngFor="let user of filteredUsers; let i = index"
+          class="person-row animate__animated animate__fadeInUp"
+          [style.animation-delay]="(i * 0.035) + 's'">
+          <button type="button" class="person-main" (click)="goToProfile(user)">
+            <span class="avatar-shell">
+              <app-avatar [profile]="user" [size]="48"></app-avatar>
+            </span>
+            <span class="person-copy">
+              <strong>{{ user.firstName }} {{ user.lastName }}</strong>
+              <small>
                 {{ (user.city && user.city !== '-') ? user.city : '' }}{{ (user.city && user.city !== '-' && user.country && user.country !== '-') ? ', ' : '' }}{{ (user.country && user.country !== '-') ? user.country : '' }}{{ (!user.city || user.city === '-') && (!user.country || user.country === '-') ? 'Location not specified' : '' }}
-              </span>
-            </div>
+              </small>
+            </span>
+            <ion-icon class="profile-chevron" name="chevron-forward-outline" aria-hidden="true"></ion-icon>
+          </button>
+
+          <div class="relationship-actions" *ngIf="isMyProfile">
+            <button *ngIf="type === 'following'" type="button" class="relationship-action" (click)="unfollow(user._id)">
+              <ion-icon name="person-remove-outline"></ion-icon>
+              <span>Unfollow</span>
+            </button>
+            <button *ngIf="type === 'followers'" type="button" class="relationship-action" (click)="removeFollower(user._id)">
+              <ion-icon name="close-circle-outline"></ion-icon>
+              <span>Remove</span>
+            </button>
+            <button *ngIf="type === 'friends'" type="button" class="relationship-action" (click)="removeFriend(user._id || user.id)">
+              <ion-icon name="person-remove-outline"></ion-icon>
+              <span>Unfriend</span>
+            </button>
           </div>
-          
-          <div class="action-buttons">
-            <ng-container *ngIf="isMyProfile">
-              <ion-button *ngIf="type === 'following'" 
-                          fill="solid" 
-                          class="unfollow-btn" 
-                          (click)="unfollow(user._id)">
-                Unfollow
-              </ion-button>
-              <ion-button *ngIf="type === 'followers'" 
-                          fill="outline" 
-                          class="remove-btn" 
-                          (click)="removeFollower(user._id)">
-                Remove
-              </ion-button>
-              <ion-button *ngIf="type === 'friends'" 
-                          fill="outline" 
-                          color="medium"
-                          class="remove-btn unfriend-btn" 
-                          (click)="removeFriend(user._id || user.id)">
-                Unfriend
-              </ion-button>
-            </ng-container>
-          </div>
-        </div>
+        </article>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 </ion-content>

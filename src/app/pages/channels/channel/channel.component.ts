@@ -15,6 +15,7 @@ import { AuthService } from 'src/app/services/auth.service';
 import { SocketService } from 'src/app/services/socket.service';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { ChannelPopoverComponent } from '../list/ChannelPopoverComponent';
 
 @Component({
   selector: 'app-channel',
@@ -93,6 +94,17 @@ export class ChannelComponent implements OnInit {
     if (!channel) return false;
     const uid = this.user?.id || this.user?._id || '';
     return channel.isOwner(uid);
+  }
+
+  async showChannelInfo(event?: Event) {
+    event?.stopPropagation();
+    const modal = await this.modalCtrl.create({
+      component: ChannelPopoverComponent,
+      componentProps: { channel: this.channel },
+      cssClass: 'full-screen-modal',
+      mode: 'ios'
+    });
+    await modal.present();
   }
 
   ionViewWillEnter() {

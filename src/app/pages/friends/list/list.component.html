@@ -12,19 +12,20 @@
       <ion-refresher-content></ion-refresher-content>
     </ion-refresher>
 
-    <!-- Empty State -->
     <div class="empty-state" *ngIf="(!friends || !friends.length) && !pageLoading">
       <div class="empty-icon">
-        <i class="fas fa-user-friends"></i>
+        <ion-icon name="people-outline"></ion-icon>
       </div>
       <h3>No Friends Yet</h3>
       <p>Start connecting with people to see them here.</p>
-      <button class="find-btn" routerLink="/tabs/new-friends">Find People</button>
+      <button class="find-btn" routerLink="/tabs/new-friends">
+        <ion-icon name="search-outline"></ion-icon>
+        <span>Find People</span>
+      </button>
     </div>
 
-    <!-- Friends List -->
     <div class="friends-list" *ngIf="!pageLoading && friends.length > 0">
-      <div class="friend-card glass-card" *ngFor="let friend of friends">
+      <article class="friend-card glass-card" *ngFor="let friend of friends">
         <div class="friend-info" (click)="navigateToProfile(friend)" [style.cursor]="isAdmin(friend) ? 'default' : 'pointer'">
           <div class="avatar-wrapper">
             <app-avatar [profile]="friend" [size]="50"></app-avatar>
@@ -38,7 +39,7 @@
               </ng-container>
             </span>
             <span class="friend-location" *ngIf="!isAdmin(friend) && ((friend.city && friend.city !== '-') || (friend.country && friend.country !== '-')) else noLocation">
-              <ion-icon name="location-outline" size="small"></ion-icon>
+              <ion-icon name="location-outline"></ion-icon>
               {{ (friend.city && friend.city !== '-') ? friend.city : '' }}{{ (friend.city && friend.city !== '-' && friend.country && friend.country !== '-') ? ', ' : '' }}{{ (friend.country && friend.country !== '-') ? friend.country : '' }}
             </span>
             <ng-template #noLocation>
@@ -48,26 +49,24 @@
         </div>
         
         <div class="friend-actions">
-          <!-- Missed Messages Indicator -->
           <ng-container *ngIf="missedMap$ | async as missedMap">
             <div class="vibrant-missed-badge" *ngIf="missedMap[friend._id || friend.id]">
               {{ missedMap[friend._id || friend.id] > 99 ? '99+' : missedMap[friend._id || friend.id] }}
             </div>
           </ng-container>
 
-          <button class="action-btn remove" (click)="removeFriend(friend); $event.stopPropagation()">
-            <i class="fas fa-user-minus"></i>
+          <button class="action-btn remove" (click)="removeFriend(friend); $event.stopPropagation()" aria-label="Remove friend" title="Remove friend">
+            <ion-icon name="person-remove-outline"></ion-icon>
           </button>
-          <button class="action-btn block" (click)="blockUser(friend); $event.stopPropagation()">
-            <i class="fas fa-ban"></i>
+          <button class="action-btn block" (click)="blockUser(friend); $event.stopPropagation()" aria-label="Block user" title="Block user">
+            <ion-icon name="ban-outline"></ion-icon>
           </button>
         </div>
-      </div>
+      </article>
     </div>
 
     <ion-infinite-scroll #infinitScroll threshold="100px" (ionInfinite)="getFriends($event)">
-      <ion-infinite-scroll-content loadingSpinner="crescent">
-      </ion-infinite-scroll-content>
+      <ion-infinite-scroll-content loadingSpinner="crescent"></ion-infinite-scroll-content>
     </ion-infinite-scroll>
   </div>
 </ion-content>

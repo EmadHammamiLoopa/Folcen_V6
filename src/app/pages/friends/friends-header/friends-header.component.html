@@ -1,34 +1,55 @@
-<app-header title="Social Hub" [menu]="true">
-  <div id="end-buttons">
-    <div class="header-action-wrapper">
-      <ion-button fill="clear" shape="round" routerLink="/tabs/messages" class="glass-action-btn">
-        <i class="far fa-comments"></i>
-      </ion-button>
-      <ng-container *ngIf="(messagesCount$ | async) as m">
-        <div class="vibrant-badge" *ngIf="m > 0">{{ m }}</div>
-      </ng-container>
+<section class="social-hub-shell">
+  <header class="social-hub-hero">
+    <div class="social-hub-copy">
+      <span class="social-hub-kicker">Connections</span>
+      <h1>Social Hub</h1>
+      <p>Keep up with friends, requests and conversations.</p>
     </div>
-  </div>
-</app-header>
 
-<div class="social-tabs-container">
-  <div class="glass-tabs">
-    <div class="tab-item" routerLink="/tabs/friends/list" routerLinkActive="active">
-      <i class="fas fa-user-friends"></i>
-      <span>Friends</span>
-    </div>
-    
-    <div class="tab-item" routerLink="/tabs/friends/requests" routerLinkActive="active">
-      <div class="request-icon-wrapper">
-        <i class="fas fa-user-plus"></i>
-        <ng-container *ngIf="(friendRequestsCount$ | async) as fr2">
-          <div class="dot-badge" *ngIf="fr2 > 0"></div>
-        </ng-container>
-      </div>
-      <span>Requests</span>
-      <ng-container *ngIf="(friendRequestsCount$ | async) as fr2">
-        <span class="count-text" *ngIf="fr2 > 0">({{ fr2 }})</span>
+    <div class="header-action-wrapper">
+      <button
+        type="button"
+        routerLink="/tabs/messages"
+        class="glass-action-btn"
+        aria-label="Open messages"
+        title="Messages">
+        <ion-icon name="chatbubbles-outline"></ion-icon>
+      </button>
+      <ng-container *ngIf="(messagesCount$ | async) as m">
+        <span class="vibrant-badge" *ngIf="m > 0">{{ m > 99 ? '99+' : m }}</span>
       </ng-container>
     </div>
-  </div>
-</div>
+  </header>
+
+  <nav class="social-tabs-container" aria-label="Friends navigation">
+    <div class="glass-tabs">
+      <a
+        class="tab-item"
+        routerLink="/tabs/friends/list"
+        routerLinkActive="active"
+        aria-label="Friends list">
+        <span class="tab-icon-shell">
+          <ion-icon name="people-outline"></ion-icon>
+        </span>
+        <span class="tab-label">Friends</span>
+      </a>
+
+      <a
+        class="tab-item"
+        routerLink="/tabs/friends/requests"
+        routerLinkActive="active"
+        aria-label="Friend requests">
+        <span class="tab-icon-shell request-icon-wrapper">
+          <ion-icon name="person-add-outline"></ion-icon>
+          <ng-container *ngIf="(friendRequestsCount$ | async) as fr2">
+            <span class="dot-badge" *ngIf="fr2 > 0"></span>
+          </ng-container>
+        </span>
+        <span class="tab-label">Requests</span>
+        <ng-container *ngIf="(friendRequestsCount$ | async) as fr2">
+          <span class="count-pill" *ngIf="fr2 > 0">{{ fr2 > 99 ? '99+' : fr2 }}</span>
+        </ng-container>
+      </a>
+    </div>
+  </nav>
+</section>

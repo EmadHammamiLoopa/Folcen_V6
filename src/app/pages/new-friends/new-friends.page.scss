@@ -1,376 +1,541 @@
-// ─── Page theme shell ───────────────────────────────────────────
-.vibrant-dark-theme {
-  --background: var(--ion-background-color);
-  background: var(--ion-background-color);
-  position: relative;
-  overflow: hidden;
+@use '../../../theme/design-system' as ds;
 
-  .mesh-gradient {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background:
-      radial-gradient(at 0% 0%,   rgba(99,102,241,var(--folcen-mesh-opacity)) 0px, transparent 55%),
-      radial-gradient(at 100% 0%,  rgba(168,85,247,var(--folcen-mesh-opacity)) 0px, transparent 55%),
-      radial-gradient(at 100% 100%,rgba(236,72,153,var(--folcen-mesh-opacity)) 0px, transparent 55%),
-      radial-gradient(at 0% 100%,  rgba(59,130,246,var(--folcen-mesh-opacity)) 0px, transparent 55%);
-    z-index: 0;
-    pointer-events: none;
-  }
+@include ds.folcen-theme-tokens;
+
+$ui-font: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+:host {
+  display: block;
+  min-height: 100%;
+  font-family: $ui-font;
+  color: var(--f-text);
 }
 
-// ─── Container ──────────────────────────────────────────────────
+.discovery-content {
+  --background: var(--f-page-bg);
+  --color: var(--f-text);
+}
+
+.discovery-aurora {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 8% 4%, var(--f-aurora-a), transparent 34%),
+    radial-gradient(circle at 92% 20%, var(--f-aurora-b), transparent 36%),
+    radial-gradient(circle at 50% 94%, var(--f-aurora-c), transparent 38%);
+  opacity: .7;
+}
+
 .discovery-container {
   position: relative;
   z-index: 1;
-  padding: clamp(10px, 3vw, 18px);
+  width: min(100%, 1060px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 16px var(--f-page-gutter) calc(118px + env(safe-area-inset-bottom));
 }
 
-// ─── Mode toggle pill ────────────────────────────────────────────
-// Hidden in v1 — random feature disabled; do not delete, re-enable in v2
+.discovery-header-action {
+  --color: var(--f-text);
+  --background-hover: var(--f-accent-soft);
+  --background-activated: var(--f-accent-soft);
+  --border-radius: 14px;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+
+  ion-icon { font-size: 20px; }
+}
+
 .mode-pill {
   display: none !important;
+}
+
+.discovery-lead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  background: var(--folcen-tabbar-background);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--folcen-tabbar-border);
-  border-radius: 20px;
-  padding: 12px 16px;
-  margin-bottom: clamp(12px, 3vw, 20px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--f-border-strong);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(124, 108, 255, .11), rgba(56, 189, 248, .035)),
+    var(--f-surface);
+  box-shadow: var(--f-shadow-card);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
 
-  .pill-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--ion-text-color);
-    font-weight: 700;
-    font-size: clamp(0.88rem, 3.5vw, 1rem);
+.lead-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  color: var(--f-accent);
+  background: var(--f-accent-soft);
+  border: 1px solid rgba(124, 108, 255, .18);
 
-    .pill-icon {
-      color: #6366f1;
-      font-size: 1rem;
-    }
+  ion-icon { font-size: 22px; }
+}
+
+.lead-copy {
+  min-width: 0;
+
+  .lead-kicker {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--f-accent);
+    font-size: 9px;
+    font-weight: 760;
+    letter-spacing: .09em;
+    text-transform: uppercase;
   }
 
-  ion-toggle {
-    --handle-background: white;
-    --handle-background-checked: white;
-    --background: rgba(148,163,184,0.3);
-    --background-checked: #6366f1;
-    --handle-width: 22px;
-    --handle-height: 22px;
+  h1 {
+    margin: 0;
+    color: var(--f-text-strong);
+    font-size: clamp(18px, 4.8vw, 24px);
+    font-weight: 720;
+    line-height: 1.12;
+    letter-spacing: -.03em;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: var(--f-text-muted);
+    font-size: 11.5px;
+    line-height: 1.4;
   }
 }
 
-// ─── Responsive 2-column grid ────────────────────────────────────
+.lead-filter-button,
+.adjust-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(124, 108, 255, .18);
+  color: var(--f-accent);
+  background: var(--f-accent-soft);
+  font-family: inherit;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.lead-filter-button {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 13px;
+  font-size: 11px;
+
+  ion-icon { font-size: 16px; }
+}
+
 .user-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: clamp(8px, 2.5vw, 14px);
-
-  @media (min-width: 600px) {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  @media (min-width: 960px) {
-    grid-template-columns: repeat(4, 1fr);
-  }
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
-// ─── User card – full-photo with overlay ────────────────────────
-.user-card {
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
-  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), box-shadow 0.25s ease;
-  cursor: pointer;
+.user-card-wrapper {
+  min-width: 0;
+}
 
-  &:active {
-    transform: scale(0.95);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-  }
+.user-card {
+  overflow: hidden;
+  border: 1px solid var(--f-border);
+  border-radius: 20px;
+  background: var(--f-surface);
+  box-shadow: var(--f-shadow-card);
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
 
   .photo-wrap {
     position: relative;
     width: 100%;
-    aspect-ratio: 3 / 4;          // portrait card, adapts to any screen
-    background: linear-gradient(135deg, #1e293b, #0f172a);
+    aspect-ratio: 4 / 5;
     overflow: hidden;
+    background: var(--f-surface-muted);
 
-    // avatar fills the entire card
     .card-avatar {
       position: absolute;
       inset: 0;
       width: 100% !important;
       height: 100% !important;
       display: block;
-      object-fit: cover;
       --avatar-border-radius: 0;
     }
 
-    // override avatar component inline px sizes
     ::ng-deep app-avatar.card-avatar {
       position: absolute !important;
       inset: 0 !important;
       width: 100% !important;
       height: 100% !important;
 
-      .avatar-container {
+      .avatar-container,
+      img,
+      .fallback {
         width: 100% !important;
         height: 100% !important;
+      }
+
+      .avatar-container {
         border-radius: 0 !important;
       }
 
       img,
       .fallback {
-        width: 100% !important;
-        height: 100% !important;
         object-fit: cover;
       }
     }
+  }
 
-    // online pulse dot
-    .online-badge {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 13px;
-      height: 13px;
-      background: #22c55e;
-      border-radius: 50%;
-      border: 2.5px solid rgba(255,255,255,0.9);
-      box-shadow: 0 0 0 3px rgba(34,197,94,0.35);
-      animation: pulse-online 2.2s infinite ease-in-out;
-      z-index: 6;
-    }
-
-    // gradient that fades in from bottom
-    .card-overlay {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        to top,
-        rgba(0,0,0,0.78) 0%,
-        rgba(0,0,0,0.28) 45%,
-        transparent 100%
-      );
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      padding: clamp(10px, 3vw, 16px);
-      z-index: 5;
-
-      .card-info {
-        flex: 1;
-        min-width: 0;
-
-        .card-name {
-          color: #fff;
-          font-weight: 800;
-          font-size: clamp(0.85rem, 3.8vw, 1.05rem);
-          margin: 0 0 2px;
-          text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .card-meta {
-          color: rgba(255,255,255,0.82);
-          font-size: clamp(0.72rem, 2.8vw, 0.84rem);
-          font-weight: 500;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-
-          i { font-size: 0.7rem; }
-
-          &.official i { color: #60a5fa; }
-
-          &.private-tag {
-            color: rgba(255,255,255,0.7);
-            i { color: #fbbf24; }
-          }
-        }
-      }
-
-      .connect-btn {
-        flex-shrink: 0;
-        width: clamp(30px, 8vw, 38px);
-        height: clamp(30px, 8vw, 38px);
-        border-radius: 50%;
-        border: none;
-        background: linear-gradient(135deg, #6366f1, #a855f7);
-        color: #fff;
-        font-size: clamp(0.68rem, 2.4vw, 0.82rem);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(99,102,241,0.45);
-        margin-left: 8px;
-        cursor: pointer;
-        transition: transform 0.2s ease, background 0.2s ease;
-
-        // Private profile → warm amber/red gradient
-        &.is-private {
-          background: linear-gradient(135deg, #f59e0b, #ef4444);
-          box-shadow: 0 4px 12px rgba(239,68,68,0.4);
-        }
-
-        // Already actioned → muted green confirm state
-        &.sent {
-          background: linear-gradient(135deg, #22c55e, #16a34a);
-          box-shadow: 0 4px 12px rgba(34,197,94,0.35);
-          opacity: 0.85;
-          pointer-events: none;
-        }
-
-        &:active { transform: scale(0.88); }
-      }
-    }
+  &:active {
+    transform: scale(.975);
   }
 }
 
-@keyframes pulse-online {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(34,197,94,0.35); }
-  50%       { box-shadow: 0 0 0 6px rgba(34,197,94,0.15); }
+.online-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(255, 255, 255, .92);
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .22);
 }
 
-// ─── Discovery divider message ───────────────────────────────────
-.discovery-message-wrapper {
-  grid-column: span 2;
-  margin: 8px 0;
+.card-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(to top, rgba(5, 10, 22, .90) 0%, rgba(5, 10, 22, .36) 44%, transparent 74%);
+}
 
-  @media (min-width: 600px) { grid-column: span 3; }
-  @media (min-width: 960px) { grid-column: span 4; }
+.card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.card-name {
+  min-width: 0;
+  margin: 0 0 3px;
+  overflow: hidden;
+  color: #fff;
+  font-size: clamp(13px, 3.7vw, 16px);
+  font-weight: 750;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .45);
+}
+
+.verified-icon {
+  flex: 0 0 auto;
+  color: #60a5fa;
+  font-size: 14px;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 0;
+  color: rgba(255, 255, 255, .78);
+  font-size: 10px;
+  font-weight: 540;
+  line-height: 1.2;
+
+  ion-icon {
+    flex: 0 0 auto;
+    font-size: 12px;
+  }
+
+  &.official ion-icon { color: #60a5fa; }
+  &.private-tag ion-icon { color: #fbbf24; }
+}
+
+.connect-btn {
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(145deg, #7568ff, #8b5cf6);
+  box-shadow: 0 8px 18px rgba(99, 102, 241, .28);
+  cursor: pointer;
+  transition: transform .18s ease, filter .18s ease, background .18s ease;
+
+  ion-icon { font-size: 17px; }
+
+  &.is-private {
+    color: #fff7ed;
+    background: linear-gradient(145deg, #f59e0b, #ea580c);
+    box-shadow: 0 8px 18px rgba(234, 88, 12, .22);
+  }
+
+  &.sent {
+    color: #dcfce7;
+    background: rgba(22, 163, 74, .86);
+    box-shadow: 0 8px 18px rgba(22, 163, 74, .20);
+  }
+
+  &:active { transform: scale(.91); }
+}
+
+.discovery-message-wrapper {
+  grid-column: 1 / -1;
+  margin: 3px 0;
 }
 
 .discovery-message {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12));
-  border: 1px solid rgba(99,102,241,0.22);
-  border-radius: 18px;
-  backdrop-filter: blur(10px);
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(124, 108, 255, .17);
+  border-radius: 17px;
+  background:
+    linear-gradient(135deg, rgba(124, 108, 255, .09), rgba(56, 189, 248, .035)),
+    var(--f-surface);
+}
 
-  .disc-icon-ring {
-    flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-    background: linear-gradient(135deg, #6366f1, #a855f7);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 6px 16px rgba(99,102,241,0.35);
-    i { font-size: 1.1rem; color: #fff; }
+.disc-icon-ring {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  color: var(--f-accent);
+  background: var(--f-accent-soft);
+
+  ion-icon { font-size: 18px; }
+}
+
+.disc-text {
+  min-width: 0;
+
+  h2 {
+    margin: 0 0 2px;
+    color: var(--f-text-strong);
+    font-size: 12.5px;
+    font-weight: 680;
   }
 
-  .disc-text {
-    h2 {
-      color: var(--ion-text-color);
-      font-size: clamp(0.88rem, 3.5vw, 1rem);
-      font-weight: 700;
-      margin: 0 0 2px;
-    }
-    p {
-      color: var(--folcen-text-muted);
-      font-size: 0.78rem;
-      margin: 0;
-    }
+  p {
+    margin: 0;
+    color: var(--f-text-muted);
+    font-size: 10.5px;
+    line-height: 1.35;
   }
 }
 
-// ─── Empty state ─────────────────────────────────────────────────
 .empty-state {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px clamp(16px, 6vw, 40px);
+  min-height: 320px;
+  padding: 38px 22px;
+  border: 1px solid var(--f-border);
+  border-radius: 24px;
+  background: var(--f-surface);
+  box-shadow: var(--f-shadow-card);
   text-align: center;
+}
+
+.empty-glow {
+  position: absolute;
+  top: 10px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--f-accent-glow), transparent 70%);
+  pointer-events: none;
+}
+
+.empty-icon-ring {
   position: relative;
+  z-index: 1;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border: 1px solid rgba(124, 108, 255, .20);
+  border-radius: 22px;
+  color: var(--f-accent);
+  background: var(--f-accent-soft);
 
-  .empty-glow {
-    position: absolute;
-    width: 200px;
-    height: 200px;
-    background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%);
-    border-radius: 50%;
-    top: 20px;
-    pointer-events: none;
-  }
-
-  .empty-icon-ring {
-    width: 90px;
-    height: 90px;
-    background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15));
-    border: 2px solid rgba(99,102,241,0.3);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 20px;
-    i { font-size: 2.4rem; color: #818cf8; }
-  }
-
-  h2 {
-    color: var(--ion-text-color);
-    font-size: clamp(1.2rem, 5vw, 1.5rem);
-    font-weight: 800;
-    margin: 0 0 10px;
-  }
-
-  p {
-    color: var(--folcen-text-muted);
-    font-size: 0.95rem;
-    margin: 0 0 28px;
-    max-width: 260px;
-  }
-
-  .adjust-btn {
-    background: linear-gradient(135deg, #6366f1, #a855f7);
-    color: white;
-    border: none;
-    padding: 14px 32px;
-    border-radius: 16px;
-    font-weight: 700;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 10px 24px rgba(99,102,241,0.35);
-    cursor: pointer;
-    transition: transform 0.2s ease;
-
-    &:active { transform: scale(0.96); }
-  }
+  ion-icon { font-size: 31px; }
 }
 
-// ─── FAB ─────────────────────────────────────────────────────────
+.empty-state h2 {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 7px;
+  color: var(--f-text-strong);
+  font-size: 20px;
+  font-weight: 720;
+  letter-spacing: -.025em;
+}
+
+.empty-state p {
+  position: relative;
+  z-index: 1;
+  max-width: 300px;
+  margin: 0 0 20px;
+  color: var(--f-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.adjust-btn {
+  position: relative;
+  z-index: 1;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 14px;
+  font-size: 12px;
+
+  ion-icon { font-size: 17px; }
+}
+
 .glass-fab {
-  --background: var(--folcen-tabbar-background);
-  --background-activated: var(--folcen-tabbar-background);
-  --background-focused: var(--folcen-tabbar-background);
-  --color: var(--ion-text-color);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--folcen-tabbar-border);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.37);
+  --background: var(--f-toolbar);
+  --background-activated: var(--f-accent-soft);
+  --color: var(--f-text-strong);
+  border: 1px solid var(--f-border-strong);
+  box-shadow: var(--f-shadow-float);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
-// ─── Glass card (shared utility) ─────────────────────────────────
-.glass-card {
-  background: var(--folcen-tabbar-background);
-  border-radius: 16px;
-  padding: 16px;
-  border: 1px solid var(--folcen-tabbar-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+@include ds.phone-xs {
+  .discovery-container {
+    padding-inline: 9px;
+  }
+
+  .discovery-lead {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 11px;
+    padding: 13px;
+  }
+
+  .lead-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+
+  .lead-copy p { font-size: 10.5px; }
+
+  .lead-filter-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .user-grid { gap: 8px; }
+
+  .card-overlay { padding: 9px; }
+
+  .connect-btn {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+    border-radius: 11px;
+
+    ion-icon { font-size: 15px; }
+  }
+}
+
+@media (min-width: 600px) {
+  .user-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .user-card .photo-wrap {
+    aspect-ratio: 4 / 5.3;
+  }
+}
+
+@include ds.tablet-up {
+  .discovery-container {
+    padding-top: 24px;
+    padding-inline: clamp(28px, 5vw, 56px);
+    padding-bottom: calc(132px + env(safe-area-inset-bottom));
+  }
+
+  .discovery-lead {
+    padding: 18px 20px;
+  }
+
+  .lead-icon {
+    width: 52px;
+    height: 52px;
+  }
+
+  .lead-copy p { font-size: 12px; }
+}
+
+@media (min-width: 1024px) {
+  .user-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+@include ds.hover-capable {
+  .user-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--f-border-strong);
+    box-shadow: var(--f-shadow-float);
+  }
+
+  .lead-filter-button:hover,
+  .adjust-btn:hover,
+  .connect-btn:hover {
+    filter: brightness(1.06);
+  }
+}
+
+@include ds.reduced-motion {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -1,30 +1,47 @@
-<app-header title="Channels" [menu]="true" class="glass-header-wrapper">
+<app-header title="Channels" [menu]="true" class="channels-app-header">
   <div id="end-buttons">
-    <button class="header-action-btn create-btn" 
-            routerLink="/tabs/channels/form" 
-            *ngIf="isMines()"
-            data-tour="channels-create">
-      <ion-icon name="add-circle"></ion-icon>
+    <button
+      type="button"
+      class="header-action-btn create-btn"
+      routerLink="/tabs/channels/form"
+      *ngIf="isMines()"
+      data-tour="channels-create"
+      aria-label="Create channel">
+      <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
+      <span>Create</span>
     </button>
-    
-    <button class="header-action-btn explore-btn" 
-            (click)="router.navigate(['/tabs/channels/list/explore'])" 
-            *ngIf="isFollowed()"
-            data-tour="channels-explore">
-      <ion-icon name="globe-outline"></ion-icon>
+
+    <button
+      type="button"
+      class="header-action-btn explore-btn"
+      (click)="router.navigate(['/tabs/channels/list/explore'])"
+      *ngIf="isFollowed()"
+      data-tour="channels-explore"
+      aria-label="Explore channels">
+      <ion-icon name="compass-outline" aria-hidden="true"></ion-icon>
+      <span>Explore</span>
     </button>
   </div>
 </app-header>
 
-<div class="glass-tabs-container">
-  <div class="glass-tabs-inner">
-    <div class="tab-item" routerLink="/tabs/channels/list/mines" routerLinkActive="active" data-testid="channels-tab-managed">
-      <i class="fas fa-user-circle"></i>
+<nav class="channels-tabs" aria-label="Channel sections">
+  <div class="channels-tabs-inner">
+    <a
+      class="channel-tab"
+      routerLink="/tabs/channels/list/mines"
+      routerLinkActive="active"
+      data-testid="channels-tab-managed">
+      <ion-icon name="albums-outline" aria-hidden="true"></ion-icon>
       <span>My Channels</span>
-    </div>
-    <div class="tab-item" routerLink="/tabs/channels/list/followed" routerLinkActive="active" data-testid="channels-tab-followed">
-      <i class="fas fa-heart"></i>
+    </a>
+
+    <a
+      class="channel-tab"
+      routerLink="/tabs/channels/list/followed"
+      routerLinkActive="active"
+      data-testid="channels-tab-followed">
+      <ion-icon name="heart-outline" aria-hidden="true"></ion-icon>
       <span>Followed</span>
-    </div>
+    </a>
   </div>
-</div>
+</nav>

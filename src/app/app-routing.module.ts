@@ -22,17 +22,21 @@ const routes: Routes = [
     path: 'error/:type',
     component: ErrorComponent
   },
-  { path: 'profile', loadChildren: () => import('./pages/profile/profile.module').then(m => m.ProfilePageModule), 
-    canActivate: [AuthGuard] 
-
+  {
+    path: 'settings',
+    loadChildren: () => import('./pages/settings/settings.module').then(m => m.SettingsPageModule),
+    canActivate: [AuthGuard]
   },
-
+  {
+    path: 'profile',
+    loadChildren: () => import('./pages/profile/profile.module').then(m => m.ProfilePageModule),
+    canActivate: [AuthGuard]
+  },
   {
     path: 'activity',
     loadChildren: () => import('./pages/activity/activity.module').then(m => m.ActivityPageModule),
     canActivate: [AuthGuard]
   },
-
   {
     path: 'auth',
     loadChildren: () => import('./pages/auth/auth.module').then(m => m.AuthPageModule),
@@ -61,18 +65,17 @@ const routes: Routes = [
     canActivate: [AuthGuard],
     resolve: { session: SessionInitResolver }
   },
-  // Legacy/duplicate chat path kept as alias, redirect to guarded product chat
   {
     path: 'messages/chat/:productId',
     redirectTo: 'chat/:productId',
     pathMatch: 'full'
   },
-  { path: 'edit-product/:id', component: ProductFormComponent, canActivate: [AuthGuard]},
+  { path: 'edit-product/:id', component: ProductFormComponent, canActivate: [AuthGuard] },
   { path: 'product/:id', component: ProductComponent, canActivate: [AuthGuard] },
   {
     path: 'add-product',
     component: ProductFormComponent,
-    canActivate: [AuthGuard] 
+    canActivate: [AuthGuard]
   },
   {
     path: 'admin/events',
@@ -84,8 +87,6 @@ const routes: Routes = [
     component: AcceptancesComponent,
     canActivate: [AuthGuard]
   },
-
-  
 ];
 
 @NgModule({

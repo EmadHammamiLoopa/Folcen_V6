@@ -349,7 +349,13 @@ export class TabsPage implements OnInit, OnDestroy {
   }
 
   shouldShowTabs(): boolean {
-    return this.showTabs && !this.isTablessRoute(this.currentUrl || this.router.url || '');
+    const url = this.currentUrl || this.router.url || '';
+
+    // Feed is a primary destination. Always restore its dock even if a
+    // tabless detail screen previously left the shared visibility state off.
+    if (/\/tabs\/feed(?:[/?#]|$)/.test(url)) return true;
+
+    return this.showTabs && !this.isTablessRoute(url);
   }
 
   private isTablessRoute(url: string): boolean {

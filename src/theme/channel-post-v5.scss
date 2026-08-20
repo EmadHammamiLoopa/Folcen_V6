@@ -1,0 +1,429 @@
+/* Channel post V5 — final containment + Comments detail repair. */
+
+/* Hero actions: make the whole visible control the button surface. */
+app-channel .channel-hero .ch-actions {
+  width: 100% !important;
+  max-width: 430px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+app-channel .channel-hero .ch-btn {
+  appearance: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  border-radius: 15px !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  color: #fff !important;
+  background: rgba(15,23,42,.80) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  font: inherit !important;
+  font-size: 13px !important;
+  font-weight: 720 !important;
+  line-height: 1 !important;
+}
+
+app-channel .channel-hero .ch-btn ion-icon {
+  flex: 0 0 auto !important;
+  font-size: 18px !important;
+}
+
+app-channel .channel-hero .ch-btn.follow-btn.followed {
+  color: #dcfce7 !important;
+  background: rgba(22, 101, 52, .78) !important;
+  border-color: rgba(134,239,172,.28) !important;
+}
+
+app-channel .channel-hero .ch-btn.post-btn {
+  background: linear-gradient(135deg,#7c6cff,#6366f1) !important;
+  border-color: rgba(196,181,253,.28) !important;
+}
+
+/* Feed owner controls: one narrow vertical utility stack, fully inside the card. */
+app-channel app-post .jdl-h {
+  padding-right: 54px !important;
+}
+
+app-channel app-post .jdl-top-rail {
+  position: absolute !important;
+  top: 10px !important;
+  right: 12px !important;
+  z-index: 30 !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(148,163,184,.12) !important;
+  border-radius: 13px !important;
+  background: rgba(15,23,42,.68) !important;
+  box-shadow: 0 8px 20px rgba(2,6,23,.14) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+
+/* Put the direct options button first, eye button underneath. */
+app-channel app-post .jdl-top-rail > .icon-btn {
+  order: 1 !important;
+}
+
+app-channel app-post .jdl-top-rail > .rel {
+  order: 2 !important;
+}
+
+app-channel app-post .jdl-top-rail .rel {
+  position: relative !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  flex: 0 0 28px !important;
+}
+
+app-channel app-post .jdl-top-rail .icon-btn {
+  appearance: none !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  min-height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 28px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: inherit !important;
+}
+
+app-channel app-post .jdl-top-rail .icon-btn:active,
+app-channel app-post .jdl-top-rail .icon-btn:hover {
+  background: rgba(148,163,184,.12) !important;
+}
+
+app-channel app-post .jdl-top-rail .icon-btn ion-icon {
+  font-size: 16px !important;
+}
+
+/* Privacy picker: opens inward from the eye, with complete readable copy. */
+app-channel app-post .jdl-top-rail .custom-popover {
+  position: absolute !important;
+  top: 34px !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(244px, calc(100vw - 74px)) !important;
+  min-width: min(220px, calc(100vw - 74px)) !important;
+  max-width: calc(100vw - 74px) !important;
+  box-sizing: border-box !important;
+  padding: 5px !important;
+  border: 1px solid rgba(148,163,184,.16) !important;
+  border-radius: 15px !important;
+  overflow: visible !important;
+  color: #f8fafc !important;
+  background: rgba(10,18,36,.97) !important;
+  box-shadow: 0 20px 50px rgba(2,6,23,.42) !important;
+  backdrop-filter: blur(22px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(150%) !important;
+  transform-origin: top right !important;
+}
+
+app-channel app-post .visibility-dropdown {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+app-channel app-post .privacy-option {
+  appearance: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  box-sizing: border-box !important;
+  padding: 8px 10px !important;
+  border: 0 !important;
+  border-radius: 11px !important;
+  color: #f8fafc !important;
+  background: transparent !important;
+  text-align: left !important;
+  font: inherit !important;
+}
+
+app-channel app-post .privacy-option:active,
+app-channel app-post .privacy-option:hover {
+  background: rgba(124,108,255,.10) !important;
+}
+
+app-channel app-post .privacy-icon {
+  width: 34px !important;
+  height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  color: var(--post-bg,#7c6cff) !important;
+  background: rgba(124,108,255,.10) !important;
+}
+
+app-channel app-post .privacy-icon ion-icon {
+  font-size: 17px !important;
+}
+
+app-channel app-post .privacy-copy {
+  min-width: 0 !important;
+  display: block !important;
+}
+
+app-channel app-post .privacy-copy strong,
+app-channel app-post .privacy-copy small {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+
+app-channel app-post .privacy-copy strong {
+  margin: 0 !important;
+  color: #f8fafc !important;
+  font-size: 12px !important;
+  font-weight: 720 !important;
+  line-height: 1.2 !important;
+}
+
+app-channel app-post .privacy-copy small {
+  margin-top: 3px !important;
+  color: #94a3b8 !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  line-height: 1.32 !important;
+}
+
+/* Comments detail: full post should be rich but compact and readable. */
+app-comments .post-focus app-post {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+app-comments .post-focus app-post .jodel-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 14px !important;
+  overflow: hidden !important;
+  border-radius: 20px !important;
+  box-sizing: border-box !important;
+}
+
+app-comments .post-focus app-post .jdl-h {
+  min-height: 42px !important;
+  margin-bottom: 10px !important;
+  padding-right: 54px !important;
+}
+
+app-comments .post-focus app-post .jdl-top-rail {
+  top: 10px !important;
+  right: 10px !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  padding: 4px !important;
+}
+
+app-comments .post-focus app-post .jdl-text {
+  margin: 10px 0 14px !important;
+  font-size: clamp(14px, 3.5vw, 16px) !important;
+  line-height: 1.52 !important;
+  font-weight: 560 !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/* Dating/event full-detail cards. */
+app-comments .post-focus app-post .jdl-meta:not(.compact-meta) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 10px !important;
+}
+
+app-comments .post-focus app-post .jdl-meta:not(.compact-meta) > div {
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 10px !important;
+  border-radius: 13px !important;
+  overflow: hidden !important;
+  background: rgba(148,163,184,.07) !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+  font-size: 11px !important;
+  line-height: 1.38 !important;
+  overflow-wrap: anywhere !important;
+}
+
+app-comments .post-focus app-post .jdl-meta:not(.compact-meta) > div.full-width {
+  grid-column: 1 / -1 !important;
+}
+
+app-comments .post-focus app-post .jdl-meta:not(.compact-meta) strong {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 0 0 5px !important;
+  color: var(--card-muted, #94a3b8) !important;
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+  letter-spacing: .05em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+
+app-comments .post-focus app-post .jdl-meta:not(.compact-meta) strong ion-icon {
+  flex: 0 0 auto !important;
+  font-size: 13px !important;
+}
+
+/* Repair the broken vertical HINT ABOUT ME layout. */
+app-comments .post-focus app-post .hint-box.full-width-hint {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 0 10px !important;
+  padding: 11px 12px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+  border-left: 3px solid var(--post-bg,#7c6cff) !important;
+  border-radius: 13px !important;
+  background: rgba(148,163,184,.055) !important;
+}
+
+app-comments .post-focus app-post .hint-box.full-width-hint > strong {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 0 0 7px !important;
+  padding: 0 !important;
+  color: var(--post-bg,#7c6cff) !important;
+  font-size: 9.5px !important;
+  line-height: 1.2 !important;
+  letter-spacing: .045em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  writing-mode: horizontal-tb !important;
+  word-break: normal !important;
+}
+
+app-comments .post-focus app-post .hint-box.full-width-hint > strong ion-icon {
+  flex: 0 0 auto !important;
+  font-size: 14px !important;
+}
+
+app-comments .post-focus app-post .hint-box.full-width-hint > p {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: var(--card-text, var(--ion-text-color,#fff)) !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  font-style: normal !important;
+  font-weight: 500 !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+app-comments .post-focus app-post .jdl-media {
+  margin: 10px 0 6px !important;
+  border-radius: 14px !important;
+}
+
+app-comments .post-focus app-post .jdl-media .media-container {
+  min-height: 0 !important;
+  max-height: min(46vh, 360px) !important;
+}
+
+app-comments .post-focus app-post .jdl-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  max-width: 100% !important;
+  margin-top: 10px !important;
+}
+
+@media (max-width: 420px) {
+  app-channel app-post .jdl-h {
+    padding-right: 52px !important;
+  }
+
+  app-channel app-post .jdl-top-rail {
+    right: 9px !important;
+  }
+
+  app-channel app-post .jdl-top-rail .custom-popover {
+    width: min(232px, calc(100vw - 66px)) !important;
+    max-width: calc(100vw - 66px) !important;
+  }
+
+  app-comments .post-focus app-post .jodel-card {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+
+  app-comments .post-focus app-post .jdl-meta:not(.compact-meta) {
+    gap: 7px !important;
+  }
+
+  app-comments .post-focus app-post .jdl-meta:not(.compact-meta) > div {
+    padding: 9px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-comments .post-focus app-post .jodel-card {
+    padding: 18px !important;
+  }
+
+  app-comments .post-focus app-post .jdl-text {
+    font-size: 16px !important;
+  }
+}

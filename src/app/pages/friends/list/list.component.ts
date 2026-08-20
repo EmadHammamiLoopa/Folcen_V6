@@ -25,7 +25,7 @@ export class ListComponent implements OnInit {
   friends: User[] = [];
   showSandglass: boolean = false;
   page: number = 0;
-  myProfile: User; // Ensure myProfile is defined
+  myProfile: User;
   private missedSub: Subscription;
   public missedMap: { [userId: string]: number } = {};
   public missedMap$: Observable<{ [userId: string]: number }>;
@@ -36,16 +36,16 @@ export class ListComponent implements OnInit {
     private platform: Platform,
     private toastService: ToastService,
     private userService: UserService,
-    private alertCtrl: AlertController
-    , private webRTC: WebrtcService
-    , private zone: NgZone
-    , private cdr: ChangeDetectorRef
-    , private appEvents: AppEventsService, private router: Router
+    private alertCtrl: AlertController,
+    private webRTC: WebrtcService,
+    private zone: NgZone,
+    private cdr: ChangeDetectorRef,
+    private appEvents: AppEventsService,
+    private router: Router
   ) {}
 
   ngOnInit() {
-    this.loadUserProfile(); // Load user profile on component initialization
-    // Use async pipe via missedMap$ to avoid manual subscriptions and OnPush churn
+    this.loadUserProfile();
     const source$ = this.appEvents && this.appEvents.missedCalls$ ? this.appEvents.missedCalls$ : this.webRTC.missedCalls$;
     this.missedMap$ = source$.pipe(
       map((calls: any[]) => {
@@ -55,17 +55,14 @@ export class ListComponent implements OnInit {
           if (!id) return;
           map[id] = (map[id] || 0) + 1;
         });
-        // keep snapshot for template fallback
         this.missedMap = map;
         this.cdr.markForCheck();
         return map;
       })
     );
 
-    // immediate refresh in case stream hasn't emitted
     try { this.refreshMissedFromService(); } catch(e) {}
 
-    // Listen for real-time friends list updates
     this.friendsSub = this.userService.friendsUpdated$.subscribe(() => {
       this.zone.run(() => {
         console.log('👥 Friends list update received, refreshing...');
@@ -98,7 +95,7 @@ export class ListComponent implements OnInit {
   ionViewWillEnter() {
     this.platform.ready().then(() => {
       this.page = 0;
-      this.friends = []; // Clear out any old friends data
+      this.friends = [];
       this.getFriends();
     });
   }
@@ -120,7 +117,7 @@ export class ListComponent implements OnInit {
         this.router.navigate(['/tabs/profile/display', friend._id]);
         return;
       }
-    } catch (e) { /* ignore cache check failure */ }
+    } catch (e) {}
 
     this.showSandglass = true;
     this.cdr.markForCheck();
@@ -130,18 +127,17 @@ export class ListComponent implements OnInit {
     });
   }
 
-  
   loadUserProfile() {
-    const currentUserId = this.userService.getCurrentUserId(); // Dynamically get the current user ID
+    const currentUserId = this.userService.getCurrentUserId();
     if (!currentUserId) {
       console.error('Current user ID not found');
       this.toastService.presentErrorToastr('Failed to load profile.');
       return;
     }
-  
+
     this.userService.getUserProfile(currentUserId).subscribe(
       (profile: User) => {
-        this.myProfile = profile; // Set the current user profile
+        this.myProfile = profile;
       },
       (error) => {
         console.error('Error loading user profile:', error);
@@ -171,7 +167,6 @@ export class ListComponent implements OnInit {
       avatar: profileAvatars.length ? profileAvatars.slice() : fallbackAvatars.slice()
     };
   }
-  
 
   getFriends(event?: any, refresh: boolean = false) {
     if (!event) this.pageLoading = true;
@@ -180,7 +175,7 @@ export class ListComponent implements OnInit {
     this.userService.getFriends(this.page).subscribe(
       (resp: any) => {
         const newFriendsRaw = resp.friends || [];
-        
+
         if (newFriendsRaw.length === 0) {
           if (!event || refresh) this.friends = [];
           this.pageLoading = false;
@@ -189,8 +184,7 @@ export class ListComponent implements OnInit {
           return;
         }
 
-        // Fetch all profiles in parallel for better performance and consistent UI update
-        const profileRequests = newFriendsRaw.map((usr: any) => 
+        const profileRequests = newFriendsRaw.map((usr: any) =>
           this.userService.getUserProfile(usr._id).pipe(
             map(userProfile => {
               const stableAvatar = this.mergeStableAvatars(userProfile, usr);
@@ -203,7 +197,7 @@ export class ListComponent implements OnInit {
                 fullName: (userProfile.firstName || usr.firstName) + ' ' + (userProfile.lastName || usr.lastName),
                 country: userProfile.country || usr.country || '-',
                 city: userProfile.city || usr.city || '-',
-                online: userProfile.online // preserve online status if available
+                online: userProfile.online
               };
               const friend = new User().initialize(safeProfile);
               friend.friend = true;
@@ -211,14 +205,14 @@ export class ListComponent implements OnInit {
             }),
             catchError(() => {
               const stableAvatar = this.mergeStableAvatars(null, usr);
-              const friend = new User().initialize({ 
-                _id: usr._id, 
-                firstName: usr.firstName, 
-                lastName: usr.lastName, 
-                mainAvatar: stableAvatar.mainAvatar, 
-                avatar: stableAvatar.avatar, 
-                country: usr.country || '-', 
-                city: usr.city || '-' 
+              const friend = new User().initialize({
+                _id: usr._id,
+                firstName: usr.firstName,
+                lastName: usr.lastName,
+                mainAvatar: stableAvatar.mainAvatar,
+                avatar: stableAvatar.avatar,
+                country: usr.country || '-',
+                city: usr.city || '-'
               });
               friend.friend = true;
               return of(friend);
@@ -263,16 +257,18 @@ export class ListComponent implements OnInit {
 
   async removeFriend(friend: User) {
     const alert = await this.alertCtrl.create({
-      header: 'Remove Friend',
-      message: `Are you sure you want to remove ${friend.fullName} from your friends?`,
+      header: 'Remove friend?',
+      message: `${friend.fullName} will be removed from your friends list.`,
+      cssClass: 'folcen-confirm-alert',
       buttons: [
         {
           text: 'Cancel',
           role: 'cancel',
+          cssClass: 'folcen-alert-cancel',
         },
         {
           text: 'Remove',
-          cssClass: 'text-danger',
+          cssClass: 'folcen-alert-danger',
           handler: () => {
             this.userService.removeFriendship(friend._id).subscribe(
               (resp: any) => {
@@ -295,16 +291,18 @@ export class ListComponent implements OnInit {
 
   async blockUser(friend: User) {
     const alert = await this.alertCtrl.create({
-      header: 'Block User',
-      message: `Are you sure you want to block ${friend.fullName}?`,
+      header: 'Block user?',
+      message: `${friend.fullName} will no longer be able to interact with you as a friend.`,
+      cssClass: 'folcen-confirm-alert',
       buttons: [
         {
           text: 'Cancel',
           role: 'cancel',
+          cssClass: 'folcen-alert-cancel',
         },
         {
           text: 'Block',
-          cssClass: 'text-danger',
+          cssClass: 'folcen-alert-danger',
           handler: () => {
             this.userService.block(friend._id).subscribe(
               (resp: any) => {
