@@ -1,0 +1,216 @@
+/* Channel post V4 — targeted fixes for owner controls, visibility menu and hero actions. */
+
+/* Hero action buttons: fill the complete control, not an inner pill. */
+app-channel .channel-hero .ch-actions {
+  width: 100% !important;
+  max-width: 430px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+app-channel .channel-hero .ch-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 15px !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+
+app-channel .channel-hero .ch-btn::part(native) {
+  width: 100% !important;
+  min-height: 44px !important;
+  padding: 0 14px !important;
+  border-radius: 15px !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  justify-content: center !important;
+}
+
+app-channel .channel-hero .follow-btn::part(native) {
+  color: #f8fafc !important;
+  background: rgba(15,23,42,.76) !important;
+  border-color: rgba(255,255,255,.16) !important;
+}
+
+app-channel .channel-hero .follow-btn.followed::part(native) {
+  color: #dcfce7 !important;
+  background: rgba(22,101,52,.70) !important;
+  border-color: rgba(134,239,172,.30) !important;
+}
+
+app-channel .channel-hero .post-btn::part(native) {
+  color: #fff !important;
+  background: linear-gradient(135deg,#7c6cff 0%,#6366f1 100%) !important;
+  border-color: rgba(196,181,253,.30) !important;
+}
+
+/* Owner utility rail: one tidy capsule fully inside the card. */
+app-post .jdl-top-rail {
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 20 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  max-width: none !important;
+  padding: 3px !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+  border-radius: 13px !important;
+  background: rgba(15,23,42,.72) !important;
+  box-shadow: 0 8px 18px rgba(0,0,0,.18) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+app-post .jdl-top-rail .rel {
+  position: relative !important;
+  display: flex !important;
+}
+
+app-post .jdl-top-rail .icon-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  --padding-start: 0 !important;
+  --padding-end: 0 !important;
+  --background: transparent !important;
+  --background-hover: rgba(148,163,184,.10) !important;
+  --background-activated: rgba(148,163,184,.14) !important;
+  --color: #cbd5e1 !important;
+  box-shadow: none !important;
+}
+
+app-post .jdl-top-rail .icon-btn::part(native) {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+app-post .jdl-top-rail .icon-btn ion-icon {
+  font-size: 16px !important;
+}
+
+/* Compact visibility popup. It stays anchored to the eye button and never covers the whole post. */
+app-post .custom-popover {
+  position: absolute !important;
+  top: 36px !important;
+  right: 0 !important;
+  left: auto !important;
+  z-index: 60 !important;
+  width: 154px !important;
+  min-width: 154px !important;
+  max-width: calc(100vw - 36px) !important;
+  padding: 5px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(148,163,184,.14) !important;
+  border-radius: 14px !important;
+  background: rgba(10,17,32,.98) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.38) !important;
+  backdrop-filter: blur(18px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+}
+
+app-post .custom-popover:not(.show) {
+  display: none !important;
+}
+
+app-post .custom-popover.show {
+  display: block !important;
+}
+
+app-post .visibility-dropdown {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+app-post .visibility-dropdown ion-item {
+  --min-height: 40px !important;
+  --padding-start: 10px !important;
+  --inner-padding-end: 8px !important;
+  --background: transparent !important;
+  --background-hover: rgba(124,108,255,.10) !important;
+  --background-activated: rgba(124,108,255,.14) !important;
+  --color: #f8fafc !important;
+  margin: 0 0 2px !important;
+  border-radius: 9px !important;
+  font-size: 12px !important;
+}
+
+app-post .visibility-dropdown ion-item:last-child {
+  margin-bottom: 0 !important;
+}
+
+app-post .visibility-dropdown ion-icon {
+  margin-right: 8px !important;
+  color: var(--post-bg,#7c6cff) !important;
+  font-size: 17px !important;
+}
+
+app-post .visibility-dropdown ion-label {
+  margin: 0 !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  white-space: nowrap !important;
+}
+
+/* Let only the owner popup escape the card while keeping the card geometry constrained. */
+app-post .jodel-card {
+  overflow: visible !important;
+}
+
+app-post .jodel-card::before,
+app-post .jodel-card::after,
+app-post .jdl-media,
+app-post .jdl-actions,
+app-post .jdl-hint-teaser {
+  pointer-events: auto;
+}
+
+app-post .jodel-card,
+app-post .jdl-text,
+app-post .jdl-meta,
+app-post .jdl-hint-teaser,
+app-post .jdl-actions {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 420px) {
+  app-channel .channel-hero .ch-actions {
+    gap: 7px !important;
+  }
+
+  app-channel .channel-hero .ch-btn::part(native) {
+    min-height: 42px !important;
+    padding-inline: 10px !important;
+    font-size: 11px !important;
+  }
+
+  app-post .jdl-top-rail {
+    top: 9px !important;
+    right: 9px !important;
+  }
+
+  app-post .custom-popover {
+    width: 146px !important;
+    min-width: 146px !important;
+  }
+}
