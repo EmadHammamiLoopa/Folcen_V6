@@ -52,9 +52,7 @@
     border: 1px solid var(--f-border);
     box-shadow: var(--f-shadow-card);
 
-    ion-icon {
-      font-size: 32px;
-    }
+    ion-icon { font-size: 32px; }
   }
 
   h3 {
@@ -120,9 +118,7 @@
   min-width: 0;
   cursor: pointer;
 
-  &:active {
-    opacity: .75;
-  }
+  &:active { opacity: .75; }
 
   .avatar-wrapper {
     width: 52px;
@@ -133,11 +129,13 @@
 
 .request-details {
   min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
 
   .user-name {
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -156,12 +154,14 @@
   }
 
   .request-time {
+    flex: 0 0 auto;
     color: var(--f-text-faint);
     font-size: 12px;
   }
 
   .location {
     min-width: 0;
+    max-width: 100%;
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -196,13 +196,8 @@
     cursor: pointer;
     transition: transform .18s ease, background .18s ease, color .18s ease;
 
-    ion-icon {
-      font-size: 18px;
-    }
-
-    &:active {
-      transform: scale(.95);
-    }
+    ion-icon { font-size: 18px; }
+    &:active { transform: scale(.95); }
 
     &.accept {
       min-width: 92px;
@@ -237,35 +232,59 @@
   }
 
   .request-card {
-    padding: 10px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 11px;
   }
 
   .request-info {
-    gap: 9px;
+    width: 100%;
+    gap: 10px;
 
     .avatar-wrapper {
-      width: 46px;
-      height: 46px;
-      flex-basis: 46px;
+      width: 48px;
+      height: 48px;
+      flex-basis: 48px;
+    }
+  }
+
+  .request-details {
+    .user-name {
+      font-size: 14.5px;
+    }
+
+    .meta-info {
+      gap: 5px 8px;
+    }
+
+    .location {
+      flex-basis: 100%;
+      font-size: 11.5px;
     }
   }
 
   .request-actions {
-    margin-left: 6px;
-    gap: 4px;
+    width: 100%;
+    margin-left: 0;
+    gap: 7px;
+    justify-content: flex-end;
 
     .action-btn {
-      min-height: 36px;
+      min-height: 38px;
       border-radius: 12px;
 
       &.accept {
-        min-width: 76px;
-        padding-inline: 10px;
-        font-size: 12px;
+        flex: 1;
+        min-width: 0;
+        max-width: 180px;
+        padding-inline: 14px;
+        font-size: 12.5px;
       }
 
       &.reject {
-        width: 36px;
+        width: 40px;
+        flex: 0 0 40px;
       }
     }
   }
