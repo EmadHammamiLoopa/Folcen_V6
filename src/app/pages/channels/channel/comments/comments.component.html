@@ -23,10 +23,10 @@
         </div>
         <h3>Content is Hidden</h3>
         <p>You no longer have permission to view this post or it has been removed.</p>
-        <ion-button fill="outline" color="light" (click)="getPost()">
-          <ion-icon name="refresh-outline" slot="start"></ion-icon>
-          Try Again
-        </ion-button>
+        <button type="button" class="retry-content-btn" (click)="getPost()">
+          <ion-icon name="refresh-outline" aria-hidden="true"></ion-icon>
+          <span>Try Again</span>
+        </button>
       </div>
     </div>
 
