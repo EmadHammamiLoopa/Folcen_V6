@@ -150,18 +150,18 @@
                 <span class="grid-value">{{ user.profession }}</span>
               </div>
             </div>
-            <div class="grid-item" *ngIf="user.school">
-              <ion-icon name="school-outline"></ion-icon>
-              <div class="grid-text">
-                <span class="grid-label">School</span>
-                <span class="grid-value">{{ user.school }}</span>
-              </div>
-            </div>
             <div class="grid-item" *ngIf="user.education">
               <ion-icon name="book-outline"></ion-icon>
               <div class="grid-text">
                 <span class="grid-label">Education</span>
                 <span class="grid-value">{{ user.education }}</span>
+              </div>
+            </div>
+            <div class="grid-item school-item" *ngIf="user.school">
+              <ion-icon name="school-outline"></ion-icon>
+              <div class="grid-text">
+                <span class="grid-label">School</span>
+                <span class="grid-value">{{ user.school }}</span>
               </div>
             </div>
           </div>
