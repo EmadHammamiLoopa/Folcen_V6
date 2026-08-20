@@ -23,7 +23,7 @@ import { ModalController } from '@ionic/angular';
             </div>
           </div>
 
-          <span class="info-kicker">Official local channel</span>
+          <span class="info-kicker">{{ isStaticChannel() ? 'Official local channel' : 'Community channel' }}</span>
           <h2 class="title" id="channel-info-title">{{ channel.name }}</h2>
           <div class="category-badge" *ngIf="channel.category">
             <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
@@ -361,6 +361,10 @@ export class ChannelPopoverComponent {
 
   close() {
     this.modalCtrl.dismiss();
+  }
+
+  isStaticChannel(): boolean {
+    return ['static', 'static_events', 'static_dating'].includes(this.channel?.type);
   }
 
   getEnhancedDescription(name: string): string {
