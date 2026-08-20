@@ -7,8 +7,7 @@
 <app-loader *ngIf="pageLoading"></app-loader>
 
 <ion-content
-  class="d-flex flex-column"
-  [style]="{'--background': '#f7f8ff'}"
+  class="d-flex flex-column comments-content"
 >
 
   <ion-refresher slot="fixed" pullFactor="0.5" pullMin="100" pullMax="200"  (ionRefresh)="getComments($event, true)">
@@ -62,15 +61,8 @@
           <app-comment
             class="comment-theme-host"
             [id]="'comment-' + comment.id"
-            [style.background]="getCommentTheme(ind).bg"
             (removeComment)="onRemoveComment(ind)"
             [backgroundColor]="post.backgroundColor"
-            [color]="'#111827'"
-            [cardBackground]="getCommentTheme(ind).bg"
-            [cardTextColor]="getCommentTheme(ind).text"
-            [cardMutedColor]="getCommentTheme(ind).muted"
-            [cardControlBackground]="getCommentTheme(ind).control"
-            [cardThemeIndex]="ind"
             [comment]="comment"
             [user]="user"
             (hiddenComment)="onHiddenComment($event)"
