@@ -11,6 +11,13 @@
   position: relative;
   width: 100%;
   min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  grid-template-areas:
+    'header controls'
+    'body controls';
+  align-items: start;
+  column-gap: 10px;
   box-sizing: border-box;
   overflow: hidden;
   padding: 12px;
@@ -34,9 +41,9 @@
 }
 
 .card-header {
+  grid-area: header;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   min-width: 0;
 }
@@ -125,6 +132,15 @@
   line-height: 1.2;
 }
 
+.comment-controls {
+  grid-area: controls;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
 .btn-more {
   @include ds.focus-ring;
   appearance: none;
@@ -153,6 +169,7 @@
 }
 
 .card-body {
+  grid-area: body;
   min-width: 0;
   margin-top: 8px;
   padding-inline-start: 50px;
@@ -268,24 +285,12 @@
   font-weight: 680;
 }
 
-.card-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
-  padding-inline-start: 50px;
-}
-
-.interaction-group {
-  display: flex;
-  align-items: center;
-}
-
 .vote-widget {
-  display: inline-grid;
-  grid-template-columns: 30px minmax(24px, auto) 30px;
-  align-items: center;
-  min-height: 32px;
-  padding: 2px;
+  width: 34px;
+  display: grid;
+  grid-template-rows: 28px minmax(22px, auto) 28px;
+  place-items: center;
+  padding: 2px 0;
   border: 1px solid var(--f-border);
   border-radius: 999px;
   background: var(--f-surface-muted);
@@ -294,8 +299,8 @@
 .vote-btn {
   @include ds.focus-ring;
   appearance: none;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -330,7 +335,7 @@
 }
 
 .vote-val {
-  min-width: 24px;
+  min-width: 0;
   color: var(--f-text-strong);
   text-align: center;
   font-size: 0.78rem;
@@ -349,8 +354,7 @@
     border-radius: 16px;
   }
 
-  .card-body,
-  .card-footer {
+  .card-body {
     padding-inline-start: 0;
   }
 
@@ -368,10 +372,19 @@
     font-size: 0.86rem;
   }
 
+  .comment-card {
+    grid-template-columns: minmax(0, 1fr) 34px;
+    column-gap: 8px;
+  }
+
   .btn-more {
     width: 32px;
     height: 32px;
     min-width: 32px;
+  }
+
+  .vote-widget {
+    width: 32px;
   }
 }
 
