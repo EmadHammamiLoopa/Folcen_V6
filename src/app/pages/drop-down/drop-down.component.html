@@ -1,13 +1,23 @@
 <div class="dropdown-container">
-  <div class="dropdown-item" *ngFor="let item of items; let last = last" (click)="dismiss(item.event)" [class.last]="last">
-    <div class="item-content">
-      <div class="icon-box">
-        <i [class]="item.icon"></i>
-      </div>
+  <button
+    type="button"
+    class="dropdown-item"
+    *ngFor="let item of items; let last = last"
+    (click)="dismiss(item.event)"
+    [class.last]="last"
+    [class.danger]="item.event === 'delete' || item.event === 'report' || (item.event === 'follow' && item.text === 'Unfollow')">
+
+    <span class="item-content">
+      <span class="icon-box">
+        <ion-icon *ngIf="item.event === 'report'" name="flag-outline"></ion-icon>
+        <ion-icon *ngIf="item.event === 'delete'" name="trash-outline"></ion-icon>
+        <ion-icon *ngIf="item.event === 'follow' && item.text === 'Unfollow'" name="person-remove-outline"></ion-icon>
+        <ion-icon *ngIf="item.event === 'follow' && item.text !== 'Unfollow'" name="person-add-outline"></ion-icon>
+        <i *ngIf="item.event !== 'report' && item.event !== 'delete' && item.event !== 'follow'" [class]="item.icon"></i>
+      </span>
       <span class="item-text">{{ item.text }}</span>
-    </div>
-    <div class="chevron">
-      <i class="fas fa-chevron-right"></i>
-    </div>
-  </div>
+    </span>
+
+    <ion-icon name="chevron-forward-outline" class="chevron" aria-hidden="true"></ion-icon>
+  </button>
 </div>
