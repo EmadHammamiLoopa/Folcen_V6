@@ -1,130 +1,138 @@
-/* Channel post V4 — targeted fixes for owner controls, visibility menu and hero actions. */
+/* Channel post V4 — targeted corrections for owner controls, long previews, and hero buttons. */
 
-/* Hero action buttons: fill the complete control, not an inner pill. */
+/* Hero actions: eliminate the old outer translucent shell completely. */
 app-channel .channel-hero .ch-actions {
   width: 100% !important;
   max-width: 430px !important;
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   gap: 8px !important;
+  margin-top: 12px !important;
   padding: 0 !important;
   background: transparent !important;
   border: 0 !important;
+  box-shadow: none !important;
 }
 
 app-channel .channel-hero .ch-btn {
   width: 100% !important;
   min-width: 0 !important;
+  min-height: 44px !important;
   margin: 0 !important;
+  padding: 0 !important;
   border: 0 !important;
   border-radius: 15px !important;
-  overflow: hidden !important;
+  background: transparent !important;
   box-shadow: none !important;
+  overflow: hidden !important;
 }
 
 app-channel .channel-hero .ch-btn::part(native) {
   width: 100% !important;
   min-height: 44px !important;
-  padding: 0 14px !important;
+  box-sizing: border-box !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 13px !important;
   border-radius: 15px !important;
   border: 1px solid transparent !important;
   box-shadow: none !important;
-  justify-content: center !important;
-}
-
-app-channel .channel-hero .follow-btn::part(native) {
-  color: #f8fafc !important;
-  background: rgba(15,23,42,.76) !important;
-  border-color: rgba(255,255,255,.16) !important;
 }
 
 app-channel .channel-hero .follow-btn.followed::part(native) {
-  color: #dcfce7 !important;
-  background: rgba(22,101,52,.70) !important;
-  border-color: rgba(134,239,172,.30) !important;
+  color: #d1fae5 !important;
+  background: rgba(22, 101, 52, .78) !important;
+  border-color: rgba(134,239,172,.26) !important;
+}
+
+app-channel .channel-hero .follow-btn:not(.followed)::part(native) {
+  color: #fff !important;
+  background: rgba(15,23,42,.78) !important;
+  border-color: rgba(255,255,255,.14) !important;
 }
 
 app-channel .channel-hero .post-btn::part(native) {
   color: #fff !important;
-  background: linear-gradient(135deg,#7c6cff 0%,#6366f1 100%) !important;
-  border-color: rgba(196,181,253,.30) !important;
+  background: linear-gradient(135deg,#7c6cff,#6366f1) !important;
+  border-color: rgba(196,181,253,.26) !important;
 }
 
-/* Owner utility rail: one tidy capsule fully inside the card. */
+/* Reserve enough room for both owner utilities. */
+app-post .jdl-h {
+  padding-right: 78px !important;
+}
+
 app-post .jdl-top-rail {
+  position: absolute !important;
   top: 10px !important;
   right: 10px !important;
   z-index: 20 !important;
-  display: flex !important;
+  width: auto !important;
+  max-width: none !important;
+  display: inline-flex !important;
   align-items: center !important;
   gap: 3px !important;
-  max-width: none !important;
+  box-sizing: border-box !important;
   padding: 3px !important;
   border: 1px solid rgba(148,163,184,.10) !important;
   border-radius: 13px !important;
-  background: rgba(15,23,42,.72) !important;
-  box-shadow: 0 8px 18px rgba(0,0,0,.18) !important;
+  background: rgba(15,23,42,.46) !important;
+  box-shadow: none !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
 }
 
 app-post .jdl-top-rail .rel {
-  position: relative !important;
-  display: flex !important;
+  position: static !important;
+  width: 29px !important;
+  height: 29px !important;
+  flex: 0 0 29px !important;
 }
 
-app-post .jdl-top-rail .icon-btn {
-  width: 30px !important;
-  height: 30px !important;
-  min-width: 30px !important;
-  min-height: 30px !important;
-  margin: 0 !important;
-  border: 0 !important;
-  border-radius: 10px !important;
-  overflow: hidden !important;
-  --padding-start: 0 !important;
-  --padding-end: 0 !important;
-  --background: transparent !important;
-  --background-hover: rgba(148,163,184,.10) !important;
-  --background-activated: rgba(148,163,184,.14) !important;
-  --color: #cbd5e1 !important;
-  box-shadow: none !important;
-}
-
+app-post .jdl-top-rail .icon-btn,
 app-post .jdl-top-rail .icon-btn::part(native) {
-  width: 30px !important;
-  height: 30px !important;
-  min-width: 30px !important;
-  min-height: 30px !important;
+  width: 29px !important;
+  height: 29px !important;
+  min-width: 29px !important;
+  min-height: 29px !important;
+  margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  border-radius: 10px !important;
+  border-radius: 9px !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
-app-post .jdl-top-rail .icon-btn ion-icon {
-  font-size: 16px !important;
+app-post .jdl-top-rail .icon-btn {
+  --padding-start: 0 !important;
+  --padding-end: 0 !important;
+  --background: transparent !important;
+  --background-hover: rgba(148,163,184,.08) !important;
+  --background-activated: rgba(148,163,184,.12) !important;
+  --color: var(--card-muted) !important;
 }
 
-/* Compact visibility popup. It stays anchored to the eye button and never covers the whole post. */
-app-post .custom-popover {
+app-post .jdl-top-rail .icon-btn ion-icon {
+  font-size: 15px !important;
+}
+
+/* Small anchored visibility menu; never covers the action row. */
+app-post .jdl-top-rail .custom-popover {
   position: absolute !important;
-  top: 36px !important;
+  z-index: 40 !important;
+  top: 37px !important;
   right: 0 !important;
   left: auto !important;
-  z-index: 60 !important;
   width: 154px !important;
   min-width: 154px !important;
-  max-width: calc(100vw - 36px) !important;
-  padding: 5px !important;
+  max-width: calc(100vw - 48px) !important;
+  margin: 0 !important;
+  padding: 4px !important;
   overflow: hidden !important;
-  border: 1px solid rgba(148,163,184,.14) !important;
-  border-radius: 14px !important;
-  background: rgba(10,17,32,.98) !important;
-  box-shadow: 0 14px 34px rgba(0,0,0,.38) !important;
-  backdrop-filter: blur(18px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+  border: 1px solid rgba(148,163,184,.12) !important;
+  border-radius: 13px !important;
+  background: var(--ion-card-background, #111827) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.34) !important;
 }
 
 app-post .custom-popover:not(.show) {
@@ -143,45 +151,87 @@ app-post .visibility-dropdown {
 
 app-post .visibility-dropdown ion-item {
   --min-height: 40px !important;
-  --padding-start: 10px !important;
-  --inner-padding-end: 8px !important;
+  --padding-start: 9px !important;
+  --inner-padding-end: 7px !important;
   --background: transparent !important;
   --background-hover: rgba(124,108,255,.10) !important;
   --background-activated: rgba(124,108,255,.14) !important;
-  --color: #f8fafc !important;
-  margin: 0 0 2px !important;
+  --color: var(--ion-text-color,#fff) !important;
+  margin: 0 !important;
   border-radius: 9px !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
 }
 
-app-post .visibility-dropdown ion-item:last-child {
-  margin-bottom: 0 !important;
+app-post .visibility-dropdown ion-item + ion-item {
+  margin-top: 2px !important;
 }
 
 app-post .visibility-dropdown ion-icon {
-  margin-right: 8px !important;
+  margin-inline-end: 8px !important;
   color: var(--post-bg,#7c6cff) !important;
-  font-size: 17px !important;
+  font-size: 15px !important;
 }
 
 app-post .visibility-dropdown ion-label {
   margin: 0 !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-weight: 650 !important;
   white-space: nowrap !important;
 }
 
-/* Let only the owner popup escape the card while keeping the card geometry constrained. */
-app-post .jodel-card {
-  overflow: visible !important;
+/* Long feed text: clamp naturally by lines; Read more sits below. */
+app-post .jdl-text .post-preview-text {
+  display: -webkit-box !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  line-clamp: 3 !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 
-app-post .jodel-card::before,
-app-post .jodel-card::after,
-app-post .jdl-media,
-app-post .jdl-actions,
-app-post .jdl-hint-teaser {
-  pointer-events: auto;
+app-post .jdl-text .see-more {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin: 5px 0 0 !important;
+  padding: 0 !important;
+  color: var(--post-bg,#7c6cff) !important;
+  font-size: 10.5px !important;
+  font-weight: 740 !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+}
+
+/* Metadata must never widen the card. */
+app-post .jdl-meta.compact-meta {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+app-post .jdl-meta.compact-meta .meta-chip {
+  max-width: min(100%, 180px) !important;
+}
+
+app-post .jdl-meta.compact-meta .meta-chip span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+app-post .jdl-hint-teaser span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Keep card geometry contained, but allow the small owner menu to layer above. */
+app-post .jodel-card {
+  overflow: visible !important;
 }
 
 app-post .jodel-card,
@@ -195,22 +245,26 @@ app-post .jdl-actions {
 
 @media (max-width: 420px) {
   app-channel .channel-hero .ch-actions {
-    gap: 7px !important;
+    width: 100% !important;
+    max-width: none !important;
   }
 
+  app-channel .channel-hero .ch-btn,
   app-channel .channel-hero .ch-btn::part(native) {
     min-height: 42px !important;
-    padding-inline: 10px !important;
-    font-size: 11px !important;
+  }
+
+  app-post .jdl-h {
+    padding-right: 74px !important;
   }
 
   app-post .jdl-top-rail {
-    top: 9px !important;
-    right: 9px !important;
+    right: 8px !important;
   }
 
-  app-post .custom-popover {
-    width: 146px !important;
-    min-width: 146px !important;
+  app-post .jdl-top-rail .custom-popover {
+    width: 148px !important;
+    min-width: 148px !important;
+    max-width: calc(100vw - 40px) !important;
   }
 }
