@@ -1,0 +1,573 @@
+/* Channel detail / posts final presentation layer.
+   Loaded after component styles so business logic and large legacy SCSS stay untouched. */
+
+app-channel {
+  .channel-detail-content {
+    --background: var(--ion-background-color, #070d1a) !important;
+    --padding-bottom: 0 !important;
+  }
+
+  .channel-detail-aurora {
+    position: fixed !important;
+    inset: 0 !important;
+    pointer-events: none !important;
+    background:
+      radial-gradient(circle at 8% 5%, rgba(124,108,255,.12), transparent 34%),
+      radial-gradient(circle at 94% 26%, rgba(56,189,248,.08), transparent 36%) !important;
+  }
+
+  .channel-detail-shell {
+    position: relative !important;
+    z-index: 1 !important;
+    width: min(100%, 920px) !important;
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
+    padding: calc(16px + env(safe-area-inset-top)) 14px calc(150px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .channel-hero {
+    position: relative !important;
+    min-height: 250px !important;
+    margin: 0 0 22px !important;
+    overflow: hidden !important;
+    border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.09)) !important;
+    border-radius: 26px !important;
+    background: var(--ion-card-background, #111827) !important;
+    box-shadow: 0 18px 44px rgba(0,0,0,.22) !important;
+  }
+
+  .channel-hero .hero-bg {
+    position: absolute !important;
+    inset: 0 !important;
+    background-position: center !important;
+    background-size: cover !important;
+    filter: saturate(.9) brightness(.68) !important;
+    transform: scale(1.02) !important;
+  }
+
+  .channel-hero .hero-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    background:
+      linear-gradient(180deg, rgba(6,10,24,.28) 0%, rgba(7,13,26,.72) 56%, rgba(7,13,26,.94) 100%) !important;
+  }
+
+  .channel-hero .top-bar {
+    position: relative !important;
+    z-index: 2 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 14px !important;
+  }
+
+  .channel-hero .top-bar ion-buttons,
+  .channel-hero .top-bar ion-back-button,
+  .channel-hero .hero-menu-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  .channel-hero .top-bar ion-back-button {
+    --color: #fff !important;
+    --background: rgba(15,23,42,.64) !important;
+    --border-radius: 14px !important;
+    --padding-start: 0 !important;
+    --padding-end: 0 !important;
+  }
+
+  .channel-hero .hero-menu-btn {
+    appearance: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    border: 1px solid rgba(255,255,255,.10) !important;
+    border-radius: 14px !important;
+    color: #fff !important;
+    background: rgba(15,23,42,.64) !important;
+  }
+
+  .channel-hero .hero-menu-btn ion-icon {
+    font-size: 20px !important;
+  }
+
+  .channel-hero .hero-row {
+    position: relative !important;
+    z-index: 2 !important;
+    display: grid !important;
+    grid-template-columns: 74px minmax(0,1fr) !important;
+    align-items: end !important;
+    gap: 16px !important;
+    padding: 44px 18px 20px !important;
+  }
+
+  .channel-hero .ch-avatar,
+  .channel-hero .ch-avatar-img,
+  .channel-hero .ch-avatar-initials {
+    width: 74px !important;
+    height: 74px !important;
+    border-radius: 20px !important;
+  }
+
+  .channel-hero .ch-avatar {
+    position: relative !important;
+    flex: 0 0 74px !important;
+  }
+
+  .channel-hero .ch-avatar-img {
+    display: block !important;
+    object-fit: cover !important;
+    border: 2px solid rgba(255,255,255,.18) !important;
+    box-shadow: 0 12px 26px rgba(0,0,0,.30) !important;
+  }
+
+  .channel-hero .ch-avatar-initials {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #fff !important;
+    font-size: 27px !important;
+    font-weight: 760 !important;
+    border: 2px solid rgba(255,255,255,.18) !important;
+  }
+
+  .channel-hero .verified-dot {
+    position: absolute !important;
+    right: -5px !important;
+    bottom: -5px !important;
+    color: #8b7cff !important;
+    background: #07101f !important;
+    border-radius: 50% !important;
+    line-height: 0 !important;
+  }
+
+  .channel-hero .verified-dot ion-icon { font-size: 24px !important; }
+
+  .channel-hero .ch-info { min-width: 0 !important; }
+
+  .channel-hero .channel-kicker {
+    display: block !important;
+    margin-bottom: 5px !important;
+    color: #9b8cff !important;
+    font-size: 9.5px !important;
+    font-weight: 760 !important;
+    letter-spacing: .085em !important;
+    text-transform: uppercase !important;
+  }
+
+  .channel-hero .ch-top-line {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .channel-hero .ch-name {
+    min-width: 0 !important;
+    margin: 0 !important;
+    color: #fff !important;
+    font-size: clamp(22px, 5vw, 30px) !important;
+    font-weight: 760 !important;
+    line-height: 1.08 !important;
+    letter-spacing: -.025em !important;
+  }
+
+  .channel-hero .ch-badge {
+    padding: 5px 8px !important;
+    border: 1px solid rgba(139,124,255,.24) !important;
+    border-radius: 999px !important;
+    color: #b9afff !important;
+    background: rgba(124,108,255,.12) !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+  }
+
+  .channel-hero .ch-desc {
+    max-width: 620px !important;
+    margin: 7px 0 10px !important;
+    color: rgba(226,232,240,.76) !important;
+    font-size: 12.5px !important;
+    line-height: 1.46 !important;
+  }
+
+  .channel-hero .ch-stats {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 7px !important;
+  }
+
+  .channel-hero .ch-stat {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    color: rgba(226,232,240,.70) !important;
+    font-size: 10.5px !important;
+  }
+
+  .channel-hero .ch-stat ion-icon {
+    color: #9b8cff !important;
+    font-size: 13px !important;
+  }
+
+  .channel-hero .ch-stat strong {
+    color: #fff !important;
+    font-weight: 700 !important;
+  }
+
+  .channel-hero .ch-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 13px !important;
+  }
+
+  .channel-hero .ch-btn {
+    min-height: 40px !important;
+    margin: 0 !important;
+    --border-radius: 13px !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+  }
+
+  .channel-hero .follow-btn {
+    --background: rgba(255,255,255,.10) !important;
+    --color: #fff !important;
+  }
+
+  .channel-hero .follow-btn.followed {
+    --background: rgba(34,197,94,.12) !important;
+    --color: #86efac !important;
+  }
+
+  .channel-hero .post-btn {
+    --background: linear-gradient(135deg,#7c6cff,#6366f1) !important;
+    --color: #fff !important;
+  }
+
+  .posts-section { margin-top: 8px !important; }
+
+  .posts-heading {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin: 0 2px 12px !important;
+  }
+
+  .posts-heading span {
+    display: block !important;
+    margin-bottom: 2px !important;
+    color: var(--folcen-text-muted, #94a3b8) !important;
+    font-size: 9px !important;
+    font-weight: 720 !important;
+    letter-spacing: .08em !important;
+    text-transform: uppercase !important;
+  }
+
+  .posts-heading h2 {
+    margin: 0 !important;
+    color: var(--ion-text-color, #fff) !important;
+    font-size: 17px !important;
+    font-weight: 720 !important;
+  }
+
+  .posts-heading > ion-icon {
+    color: #8b7cff !important;
+    font-size: 20px !important;
+  }
+
+  .posts-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .empty-state,
+  .verification-alert {
+    display: flex !important;
+    justify-content: center !important;
+    padding: 30px 0 !important;
+  }
+
+  .empty-content,
+  .alert-card {
+    width: min(100%, 540px) !important;
+    box-sizing: border-box !important;
+    padding: 28px 22px !important;
+    border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.09)) !important;
+    border-radius: 22px !important;
+    text-align: center !important;
+    background: var(--ion-card-background, #111827) !important;
+  }
+
+  .state-icon {
+    width: 54px !important;
+    height: 54px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto 12px !important;
+    border-radius: 17px !important;
+    color: #8b7cff !important;
+    background: rgba(124,108,255,.12) !important;
+  }
+
+  .state-icon ion-icon { font-size: 24px !important; }
+
+  .state-kicker {
+    color: #8b7cff !important;
+    font-size: 9px !important;
+    font-weight: 760 !important;
+    letter-spacing: .08em !important;
+    text-transform: uppercase !important;
+  }
+}
+
+app-post {
+  display: block !important;
+}
+
+app-post .jodel-card {
+  position: relative !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  overflow: visible !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.09)) !important;
+  border-radius: 22px !important;
+  color: var(--post-fg, var(--ion-text-color, #fff)) !important;
+  background:
+    linear-gradient(145deg, rgba(124,108,255,.035), transparent 58%),
+    var(--post-bg, var(--ion-card-background, #111827)) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,.16) !important;
+}
+
+app-post .jdl-top-rail {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  display: flex !important;
+  gap: 2px !important;
+  z-index: 4 !important;
+}
+
+app-post .jdl-top-rail .icon-btn {
+  width: 34px !important;
+  height: 34px !important;
+  margin: 0 !important;
+  --padding-start: 0 !important;
+  --padding-end: 0 !important;
+  --border-radius: 11px !important;
+  --background: rgba(148,163,184,.08) !important;
+  --color: var(--post-fg, var(--ion-text-color,#fff)) !important;
+}
+
+app-post .jdl-h { padding-right: 78px !important; }
+
+app-post .jdl-user {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+app-post .avatar-mini {
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 13px !important;
+  background: rgba(124,108,255,.10) !important;
+}
+
+app-post .avatar-mini > ion-icon { font-size: 23px !important; color: #8b7cff !important; }
+
+app-post .user-info { min-width: 0 !important; }
+app-post .user-info .name {
+  display: block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+}
+
+app-post .meta-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-top: 2px !important;
+  opacity: .64 !important;
+  font-size: 9.5px !important;
+}
+
+app-post .meta-row ion-icon { font-size: 11px !important; }
+
+app-post .jdl-text {
+  margin: 14px 0 12px !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  white-space: pre-wrap !important;
+}
+
+app-post .see-more {
+  margin-left: 4px !important;
+  color: #9b8cff !important;
+  font-weight: 700 !important;
+}
+
+app-post .jdl-media {
+  position: relative !important;
+  margin: 12px -4px 2px !important;
+  overflow: hidden !important;
+  border-radius: 17px !important;
+}
+
+app-post .media-container,
+app-post .media-container img,
+app-post .media-container video {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 17px !important;
+}
+
+app-post .media-container img,
+app-post .media-container video {
+  display: block !important;
+  max-height: 520px !important;
+  object-fit: cover !important;
+}
+
+app-post .jdl-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 7px !important;
+  margin: 10px 0 !important;
+}
+
+app-post .meta-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 6px 9px !important;
+  border-radius: 999px !important;
+  background: rgba(124,108,255,.09) !important;
+  font-size: 9.5px !important;
+}
+
+app-post .meta-chip ion-icon { color: #9b8cff !important; font-size: 12px !important; }
+
+app-post .jdl-hint-teaser,
+app-post .hint-box {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 7px !important;
+  margin: 10px 0 !important;
+  padding: 10px 11px !important;
+  border-radius: 13px !important;
+  background: rgba(124,108,255,.07) !important;
+}
+
+app-post .jdl-actions {
+  display: grid !important;
+  grid-template-columns: auto auto 1fr !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 13px -2px -2px !important;
+  padding-top: 11px !important;
+  border-top: 1px solid rgba(148,163,184,.10) !important;
+}
+
+app-post .post-action {
+  appearance: none !important;
+  min-height: 38px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 11px !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+  border-radius: 12px !important;
+  color: var(--post-fg, var(--ion-text-color,#fff)) !important;
+  background: rgba(148,163,184,.06) !important;
+  font-family: inherit !important;
+  font-size: 10.5px !important;
+  font-weight: 650 !important;
+}
+
+app-post .post-action ion-icon { font-size: 16px !important; }
+app-post .post-action.like.active { color: #fb7185 !important; background: rgba(251,113,133,.09) !important; }
+app-post .post-action.pass.active { color: #60a5fa !important; background: rgba(96,165,250,.09) !important; }
+app-post .post-action.comment { justify-self: end !important; }
+
+app-post .visibility-dropdown {
+  min-width: 180px !important;
+  padding: 6px !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.09)) !important;
+  border-radius: 14px !important;
+  background: var(--ion-card-background, #111827) !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,.28) !important;
+}
+
+@media (max-width: 520px) {
+  app-channel .channel-detail-shell {
+    padding-inline: 10px !important;
+  }
+
+  app-channel .channel-hero {
+    min-height: 285px !important;
+    border-radius: 22px !important;
+  }
+
+  app-channel .channel-hero .hero-row {
+    grid-template-columns: 58px minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 50px 14px 16px !important;
+  }
+
+  app-channel .channel-hero .ch-avatar,
+  app-channel .channel-hero .ch-avatar-img,
+  app-channel .channel-hero .ch-avatar-initials {
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 17px !important;
+  }
+
+  app-channel .channel-hero .ch-name { font-size: 21px !important; }
+  app-channel .channel-hero .ch-desc { font-size: 11.5px !important; }
+
+  app-channel .channel-hero .ch-actions {
+    grid-column: 1 / -1 !important;
+  }
+
+  app-post .jodel-card {
+    padding: 14px !important;
+    border-radius: 19px !important;
+  }
+
+  app-post .jdl-actions {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  app-post .post-action.comment {
+    grid-column: 1 / -1 !important;
+    justify-self: stretch !important;
+  }
+}
+
+@media (min-width: 768px) {
+  app-channel .channel-detail-shell {
+    padding-inline: 24px !important;
+    padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+  }
+
+  app-channel .channel-hero .hero-row {
+    padding: 70px 26px 24px !important;
+  }
+}
