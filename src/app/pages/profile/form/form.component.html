@@ -1,24 +1,19 @@
-<app-header [back]="true" title="Edit Profile" class="edit-profile-header">
-  <div id="end-buttons">
-    <ion-button
-      fill="clear"
-      class="save-profile-button"
-      (click)="submit()"
-      [disabled]="!form || isUpdating"
-      aria-label="Save profile changes">
-      <ion-icon name="checkmark-outline" slot="start"></ion-icon>
-      <span>Save</span>
-    </ion-button>
-  </div>
-</app-header>
-
 <app-loader *ngIf="pageLoading"></app-loader>
 
 <ion-content class="edit-profile-content" *ngIf="!pageLoading">
   <div class="edit-profile-aurora" aria-hidden="true"></div>
 
-  <main class="edit-profile-container" *ngIf="form && user">
+  <main class="edit-profile-container" *ngIf="form && user" style="padding-top: calc(18px + env(safe-area-inset-top));">
     <section class="profile-preview-card">
+      <ion-buttons class="profile-hero-back">
+        <ion-back-button
+          defaultHref="/tabs/profile"
+          text=""
+          icon="arrow-back-outline"
+          aria-label="Back to profile">
+        </ion-back-button>
+      </ion-buttons>
+
       <div class="preview-avatar-wrap">
         <app-avatar [profile]="user" [size]="118"></app-avatar>
         <div class="preview-edit-badge" aria-hidden="true">
@@ -27,7 +22,7 @@
       </div>
 
       <div class="preview-copy">
-        <span class="preview-kicker">Profile appearance</span>
+        <span class="preview-kicker">Edit profile</span>
         <h1>{{ user.fullName || 'Your profile' }}</h1>
         <p>Keep your profile current so people can recognize and understand you.</p>
 
@@ -41,13 +36,8 @@
     <form [formGroup]="form" class="profile-form" novalidate>
       <section class="form-section">
         <div class="section-heading">
-          <div class="section-icon personal">
-            <ion-icon name="person-outline"></ion-icon>
-          </div>
-          <div>
-            <span>Profile</span>
-            <h2>Personal information</h2>
-          </div>
+          <div class="section-icon personal"><ion-icon name="person-outline"></ion-icon></div>
+          <div><span>Profile</span><h2>Personal information</h2></div>
         </div>
 
         <div class="form-card field-grid two-columns">
@@ -123,13 +113,8 @@
 
       <section class="form-section">
         <div class="section-heading">
-          <div class="section-icon location">
-            <ion-icon name="location-outline"></ion-icon>
-          </div>
-          <div>
-            <span>Location</span>
-            <h2>Where you live</h2>
-          </div>
+          <div class="section-icon location"><ion-icon name="location-outline"></ion-icon></div>
+          <div><span>Location</span><h2>Where you live</h2></div>
         </div>
 
         <div class="form-card field-grid two-columns">
@@ -160,48 +145,26 @@
 
       <section class="form-section">
         <div class="section-heading">
-          <div class="section-icon work">
-            <ion-icon name="briefcase-outline"></ion-icon>
-          </div>
-          <div>
-            <span>Background</span>
-            <h2>Work & education</h2>
-          </div>
+          <div class="section-icon work"><ion-icon name="briefcase-outline"></ion-icon></div>
+          <div><span>Background</span><h2>Work & education</h2></div>
         </div>
 
         <div class="form-card field-grid two-columns">
           <button type="button" class="picker-field field-block" (click)="presentProfessionsModal()">
             <span class="picker-label">Profession</span>
-            <span class="picker-value-shell">
-              <ion-icon name="briefcase-outline"></ion-icon>
-              <span [class.placeholder]="!selectedProfession">{{ selectedProfession || 'Select your profession' }}</span>
-              <ion-icon name="chevron-forward-outline" class="picker-chevron"></ion-icon>
-            </span>
+            <span class="picker-value-shell"><ion-icon name="briefcase-outline"></ion-icon><span [class.placeholder]="!selectedProfession">{{ selectedProfession || 'Select your profession' }}</span><ion-icon name="chevron-forward-outline" class="picker-chevron"></ion-icon></span>
           </button>
           <input type="hidden" formControlName="profession" />
 
           <button type="button" class="picker-field field-block" (click)="presentStudyCountriesModal()">
             <span class="picker-label">Study country</span>
-            <span class="picker-value-shell">
-              <ion-icon name="globe-outline"></ion-icon>
-              <span [class.placeholder]="!selectedStudyCountry">{{ selectedStudyCountry || 'Select study country' }}</span>
-              <ion-icon name="chevron-forward-outline" class="picker-chevron"></ion-icon>
-            </span>
+            <span class="picker-value-shell"><ion-icon name="globe-outline"></ion-icon><span [class.placeholder]="!selectedStudyCountry">{{ selectedStudyCountry || 'Select study country' }}</span><ion-icon name="chevron-forward-outline" class="picker-chevron"></ion-icon></span>
           </button>
           <input type="hidden" formControlName="studyCountry" />
 
-          <button
-            type="button"
-            class="picker-field field-block"
-            [class.disabled]="!selectedStudyCountry"
-            [disabled]="!selectedStudyCountry"
-            (click)="selectedStudyCountry ? presentSchoolsModal() : null">
+          <button type="button" class="picker-field field-block" [class.disabled]="!selectedStudyCountry" [disabled]="!selectedStudyCountry" (click)="selectedStudyCountry ? presentSchoolsModal() : null">
             <span class="picker-label">School</span>
-            <span class="picker-value-shell">
-              <ion-icon name="school-outline"></ion-icon>
-              <span [class.placeholder]="!selectedSchool">{{ selectedSchool || 'Select your school' }}</span>
-              <ion-icon [name]="selectedStudyCountry ? 'chevron-forward-outline' : 'lock-closed-outline'" class="picker-chevron"></ion-icon>
-            </span>
+            <span class="picker-value-shell"><ion-icon name="school-outline"></ion-icon><span [class.placeholder]="!selectedSchool">{{ selectedSchool || 'Select your school' }}</span><ion-icon [name]="selectedStudyCountry ? 'chevron-forward-outline' : 'lock-closed-outline'" class="picker-chevron"></ion-icon></span>
           </button>
           <input type="hidden" formControlName="school" />
 
@@ -220,10 +183,7 @@
             </div>
           </div>
 
-          <p class="section-helper full-width" *ngIf="!selectedStudyCountry">
-            <ion-icon name="information-circle-outline"></ion-icon>
-            Select a study country before choosing a school.
-          </p>
+          <p class="section-helper full-width" *ngIf="!selectedStudyCountry"><ion-icon name="information-circle-outline"></ion-icon>Select a study country before choosing a school.</p>
 
           <div class="field-error full-width" *ngIf="!school.valid && school.touched && validationErrors['school']">
             <ion-icon name="alert-circle-outline"></ion-icon>
@@ -235,94 +195,59 @@
 
       <section class="form-section">
         <div class="section-heading">
-          <div class="section-icon social">
-            <ion-icon name="sparkles-outline"></ion-icon>
-          </div>
-          <div>
-            <span>About you</span>
-            <h2>Interests & languages</h2>
-          </div>
+          <div class="section-icon social"><ion-icon name="sparkles-outline"></ion-icon></div>
+          <div><span>About you</span><h2>Interests & languages</h2></div>
         </div>
 
         <div class="form-card selection-card">
           <button type="button" class="selection-row" (click)="presentInterestsModal()">
             <span class="selection-icon interests"><ion-icon name="heart-outline"></ion-icon></span>
-            <span class="selection-copy">
-              <strong>Interests</strong>
-              <small>Choose up to 10 things you enjoy</small>
-            </span>
+            <span class="selection-copy"><strong>Interests</strong><small>Choose up to 10 things you enjoy</small></span>
             <span class="selection-count">{{ selectedInterests.length }}/10</span>
             <ion-icon name="chevron-forward-outline" class="selection-chevron"></ion-icon>
           </button>
 
           <div class="chip-list" *ngIf="selectedInterests.length">
-            <button type="button" class="profile-chip" *ngFor="let interest of selectedInterests; let ind = index" (click)="removeInterest(ind)" [attr.aria-label]="'Remove ' + interest">
-              <span>{{ interest }}</span>
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
+            <button type="button" class="profile-chip" *ngFor="let interest of selectedInterests; let ind = index" (click)="removeInterest(ind)" [attr.aria-label]="'Remove ' + interest"><span>{{ interest }}</span><ion-icon name="close-outline"></ion-icon></button>
           </div>
 
           <div class="selection-divider"></div>
 
           <button type="button" class="selection-row" (click)="presentLanguagesModal()">
             <span class="selection-icon languages"><ion-icon name="language-outline"></ion-icon></span>
-            <span class="selection-copy">
-              <strong>Languages</strong>
-              <small>Add up to 5 languages you speak</small>
-            </span>
+            <span class="selection-copy"><strong>Languages</strong><small>Add up to 5 languages you speak</small></span>
             <span class="selection-count">{{ selectedLanguages.length }}/5</span>
             <ion-icon name="chevron-forward-outline" class="selection-chevron"></ion-icon>
           </button>
 
           <div class="chip-list" *ngIf="selectedLanguages.length">
-            <button type="button" class="profile-chip language-chip" *ngFor="let lang of selectedLanguages; let ind = index" (click)="removeLanguage(ind)" [attr.aria-label]="'Remove ' + lang">
-              <span>{{ lang }}</span>
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
+            <button type="button" class="profile-chip language-chip" *ngFor="let lang of selectedLanguages; let ind = index" (click)="removeLanguage(ind)" [attr.aria-label]="'Remove ' + lang"><span>{{ lang }}</span><ion-icon name="close-outline"></ion-icon></button>
           </div>
         </div>
       </section>
 
       <section class="form-section privacy-section">
         <div class="section-heading">
-          <div class="section-icon privacy">
-            <ion-icon name="shield-checkmark-outline"></ion-icon>
-          </div>
-          <div>
-            <span>Controls</span>
-            <h2>Privacy & visibility</h2>
-          </div>
+          <div class="section-icon privacy"><ion-icon name="shield-checkmark-outline"></ion-icon></div>
+          <div><span>Controls</span><h2>Privacy & visibility</h2></div>
         </div>
 
         <div class="form-card toggle-card">
           <div class="profile-toggle-row">
             <span class="toggle-icon age"><ion-icon name="calendar-outline"></ion-icon></span>
-            <span class="toggle-copy">
-              <strong>Show age</strong>
-              <small>Display your age on your profile</small>
-            </span>
+            <span class="toggle-copy"><strong>Show age</strong><small>Display your age on your profile</small></span>
             <ion-toggle [checked]="form.get('ageVisible').value" (ionChange)="onToggleChange('ageVisible', $event)"></ion-toggle>
           </div>
-
           <div class="selection-divider"></div>
-
           <div class="profile-toggle-row">
             <span class="toggle-icon gender"><ion-icon name="male-female-outline"></ion-icon></span>
-            <span class="toggle-copy">
-              <strong>Show gender</strong>
-              <small>Display your gender on your profile</small>
-            </span>
+            <span class="toggle-copy"><strong>Show gender</strong><small>Display your gender on your profile</small></span>
             <ion-toggle [checked]="form.get('genderVisible').value" (ionChange)="onToggleChange('genderVisible', $event)"></ion-toggle>
           </div>
-
           <div class="selection-divider"></div>
-
           <div class="profile-toggle-row">
             <span class="toggle-icon private"><ion-icon name="lock-closed-outline"></ion-icon></span>
-            <span class="toggle-copy">
-              <strong>Private profile</strong>
-              <small>Limit profile content to approved followers</small>
-            </span>
+            <span class="toggle-copy"><strong>Private profile</strong><small>Limit profile content to approved followers</small></span>
             <ion-toggle [checked]="form.get('isPrivate').value" (ionChange)="onToggleChange('isPrivate', $event)"></ion-toggle>
           </div>
         </div>
