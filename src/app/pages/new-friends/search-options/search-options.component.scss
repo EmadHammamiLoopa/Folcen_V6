@@ -11,6 +11,7 @@ $ui-font: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI Variabl
   color: var(--f-text);
 }
 
+.filter-modal-header,
 ion-header {
   background: transparent;
 }
@@ -49,13 +50,9 @@ ion-header {
   ion-icon { font-size: 20px; }
 }
 
-ion-content {
+.filter-modal-content {
   --background: var(--f-page-bg);
   --color: var(--f-text);
-  --padding-start: var(--f-page-gutter);
-  --padding-end: var(--f-page-gutter);
-  --padding-top: 16px;
-  --padding-bottom: 24px;
 }
 
 .mesh-gradient {
@@ -66,44 +63,137 @@ ion-content {
     radial-gradient(circle at 8% 4%, var(--f-aurora-a), transparent 34%),
     radial-gradient(circle at 94% 18%, var(--f-aurora-b), transparent 36%),
     radial-gradient(circle at 50% 96%, var(--f-aurora-c), transparent 40%);
-  opacity: .65;
+  opacity: .62;
+}
+
+.filter-modal-shell {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 760px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 16px var(--f-page-gutter) 24px;
+}
+
+.filter-intro {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 14px;
+  padding: 15px 16px;
+  border: 1px solid var(--f-border-strong);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(124, 108, 255, .11), rgba(56, 189, 248, .035)),
+    var(--f-surface);
+  box-shadow: var(--f-shadow-card);
+}
+
+.filter-intro-icon,
+.toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--f-accent);
+  background: var(--f-accent-soft);
+  border: 1px solid rgba(124, 108, 255, .16);
+}
+
+.filter-intro-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+
+  ion-icon { font-size: 21px; }
+}
+
+.filter-intro-copy {
+  min-width: 0;
+
+  .filter-intro-kicker {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--f-accent);
+    font-size: 9px;
+    font-weight: 760;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0;
+    color: var(--f-text-strong);
+    font-size: clamp(17px, 4.6vw, 22px);
+    font-weight: 720;
+    line-height: 1.14;
+    letter-spacing: -.03em;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: var(--f-text-muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
 }
 
 .filter-group {
   position: relative;
-  z-index: 1;
-  margin: 0 auto 14px;
-  padding: 16px;
+  margin: 0 0 12px;
+  padding: 15px;
   border: 1px solid var(--f-border);
-  border-radius: 20px;
+  border-radius: 19px;
   background: var(--f-surface);
   box-shadow: var(--f-shadow-card);
   backdrop-filter: blur(20px) saturate(145%);
   -webkit-backdrop-filter: blur(20px) saturate(145%);
 }
 
+.compact-filter-group {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
 .group-header {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-bottom: 13px;
+  gap: 10px;
+  margin-bottom: 12px;
 
-  ion-icon {
+  > ion-icon {
     width: 34px;
     height: 34px;
-    padding: 8px;
+    flex: 0 0 34px;
     box-sizing: border-box;
+    padding: 8px;
     border-radius: 11px;
     color: var(--f-accent);
     background: var(--f-accent-soft);
     border: 1px solid rgba(124, 108, 255, .14);
   }
+}
+
+.group-heading-copy {
+  min-width: 0;
+
+  ion-label,
+  span {
+    display: block;
+  }
 
   ion-label {
     color: var(--f-text-strong);
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 680;
     letter-spacing: -.01em;
+  }
+
+  span {
+    margin-top: 2px;
+    color: var(--f-text-muted);
+    font-size: 9.5px;
+    line-height: 1.35;
   }
 }
 
@@ -195,13 +285,15 @@ ion-content {
 
   ion-icon {
     color: var(--f-accent);
-    font-size: 15px;
+    font-size: 14px;
   }
 }
 
 .add-list-btn {
   --color: var(--f-accent);
   --background: var(--f-accent-soft);
+  --background-hover: rgba(124, 108, 255, .14);
+  --background-activated: rgba(124, 108, 255, .18);
   --border-radius: 999px;
   --padding-start: 10px;
   --padding-end: 12px;
@@ -225,11 +317,21 @@ ion-content {
   display: flex;
   align-items: center;
   gap: 10px;
+}
 
-  > ion-icon {
-    flex: 0 0 auto;
-    font-size: 19px;
-  }
+.toggle-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 11px;
+
+  ion-icon { font-size: 17px; }
+}
+
+.online-toggle-icon {
+  color: #22c55e;
+  background: rgba(34, 197, 94, .10);
+  border-color: rgba(34, 197, 94, .16);
 }
 
 .toggle-text {
@@ -249,7 +351,7 @@ ion-content {
   .subtitle {
     margin-top: 2px;
     color: var(--f-text-muted);
-    font-size: 10px;
+    font-size: 9.5px;
     line-height: 1.35;
   }
 }
@@ -273,11 +375,16 @@ ion-content {
   flex-direction: column;
   gap: 2px;
 
+  .toggle-item {
+    padding: 3px 0;
+  }
+
   .toggle-item + .toggle-item {
     border-top: 1px solid var(--f-divider);
   }
 }
 
+.filter-modal-footer,
 ion-footer {
   background: var(--f-page-bg);
   border-top: 1px solid var(--f-border);
@@ -288,14 +395,14 @@ ion-footer {
   width: min(100%, 720px);
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, .65fr) minmax(0, 1.35fr);
+  grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
   gap: 10px;
   margin: 0 auto;
-  padding: 12px var(--f-page-gutter) calc(14px + env(safe-area-inset-bottom));
+  padding: 12px var(--f-page-gutter) calc(16px + env(safe-area-inset-bottom));
 }
 
 .vibrant-btn {
-  min-height: 48px;
+  min-height: 50px;
   margin: 0;
   --border-radius: 15px;
   font-family: $ui-font;
@@ -319,9 +426,18 @@ ion-footer {
 }
 
 @include ds.phone-xs {
-  ion-content {
-    --padding-start: 10px;
-    --padding-end: 10px;
+  .filter-modal-shell {
+    padding-inline: 10px;
+  }
+
+  .filter-intro {
+    padding: 13px;
+  }
+
+  .filter-intro-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
   }
 
   .filter-group {
@@ -339,15 +455,24 @@ ion-footer {
 }
 
 @include ds.tablet-up {
-  ion-content {
-    --padding-start: clamp(28px, 6vw, 72px);
-    --padding-end: clamp(28px, 6vw, 72px);
-    --padding-top: 24px;
+  .filter-modal-shell {
+    padding-top: 24px;
+    padding-inline: clamp(28px, 6vw, 72px);
+  }
+
+  .filter-intro,
+  .filter-group {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .filter-intro {
+    padding: 17px 18px;
   }
 
   .filter-group {
-    max-width: 720px;
-    padding: 19px 20px;
+    padding: 18px 19px;
   }
 
   .footer-actions {
