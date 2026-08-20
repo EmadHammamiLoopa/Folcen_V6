@@ -37,7 +37,7 @@
       <div class="hero-main-content">
         <div class="avatar-wrapper">
           <app-avatar [profile]="user" [size]="200" class="main-avatar-img" (click)="viewPhoto(mainAvatar)"></app-avatar>
-          <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile"></div>
+          <div class="status-dot" [class.online]="user.online" *ngIf="!myProfile && !isLocked"></div>
           
           <ion-fab *ngIf="myProfile" class="edit-avatar-fab" vertical="bottom" horizontal="end" data-tour="profile-avatar-tools">
             <label
@@ -52,15 +52,19 @@
         </div>
 
         <div class="user-identity">
-          <h1 class="name">{{ user.fullName }}<span class="age" *ngIf="user.getAge(myProfile)">, {{ user.getAge(myProfile) }}</span></h1>
-          <p class="location">
+          <h1 class="name">{{ user.fullName }}<span class="age" *ngIf="!isLocked && user.getAge(myProfile)">, {{ user.getAge(myProfile) }}</span></h1>
+          <p class="location" *ngIf="!isLocked">
             <ion-icon name="location-outline"></ion-icon> 
             {{ (user.city && user.city !== 'Unknown') ? user.city : '' }}{{ (user.city && user.city !== 'Unknown' && user.country && user.country !== 'Unknown') ? ', ' : '' }}{{ (user.country && user.country !== 'Unknown') ? user.country : '' }}
             <span *ngIf="(!user.city || user.city === 'Unknown') && (!user.country || user.country === 'Unknown')">Location not specified</span>
           </p>
+          <p class="private-identity-label" *ngIf="isLocked">
+            <ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon>
+            <span>Private profile</span>
+          </p>
         </div>
 
-        <div class="stats-bar">
+        <div class="stats-bar" *ngIf="myProfile || !user.isPrivate">
           <div class="stat-item clickable" (click)="openFollowModal('friends')">
             <span class="value">{{ user.friendsCount || 0 }}</span>
             <span class="label">Friends</span>
@@ -83,7 +87,7 @@
     </div>
 
     <div class="profile-body">
-      <div class="visitor-actions" *ngIf="!myProfile">
+      <div class="visitor-actions" [class.private-actions]="isLocked" *ngIf="!myProfile">
         <ion-button class="primary-action" (click)="request()" [color]="user.isFriend ? 'light' : 'primary'"
             *ngIf="!user.isPrivate || user.isFriend">
           <ion-icon [name]="user.isFriend ? 'person-remove-outline' : (user.request === 'requesting' ? 'checkmark-circle-outline' : (user.request === 'requested' ? 'paper-plane-outline' : 'person-add-outline'))" slot="start"></ion-icon>
@@ -92,7 +96,7 @@
 
         <ion-button class="primary-action" (click)="toggleFollow()" [color]="user.isFollowing ? 'light' : 'secondary'"
             *ngIf="!user.isFriend && !isFriend">
-          <ion-icon [name]="user.isFollowing ? 'eye-off-outline' : 'eye-outline'" slot="start"></ion-icon>
+          <ion-icon [name]="user.isFollowing ? 'eye-off-outline' : (user.followStatus === 'pending' ? 'time-outline' : 'eye-outline')" slot="start"></ion-icon>
           {{ user.isFollowing ? 'Unfollow' : (user.followStatus === 'pending' ? 'Requested' : 'Follow') }}
         </ion-button>
         
@@ -111,8 +115,9 @@
         <div class="lock-icon-wrapper">
           <ion-icon name="lock-closed-outline"></ion-icon>
         </div>
-        <h3>This Profile is Private</h3>
-        <p>Follow this user to see their bio.</p>
+        <h3>Private profile</h3>
+        <p *ngIf="user.followStatus !== 'pending'">Only friends and approved followers can view this profile.</p>
+        <p *ngIf="user.followStatus === 'pending'">Your follow request is waiting for approval.</p>
       </div>
 
       <div class="info-glass-container" *ngIf="!isLocked">
