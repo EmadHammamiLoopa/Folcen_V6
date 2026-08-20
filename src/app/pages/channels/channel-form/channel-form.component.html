@@ -1,14 +1,17 @@
-<app-header title="Create Channel" [back]="true" class="channel-create-header"></app-header>
-
 <ion-content class="channel-create-content">
   <div class="channel-create-aurora" aria-hidden="true"></div>
   <app-loader *ngIf="pageLoading"></app-loader>
 
   <main *ngIf="!pageLoading" class="channel-create-container">
     <section class="create-intro">
-      <div class="create-intro-icon" aria-hidden="true">
-        <ion-icon name="megaphone-outline"></ion-icon>
-      </div>
+      <button
+        type="button"
+        class="create-back-btn"
+        routerLink="/tabs/channels/list/mines"
+        aria-label="Back to My Channels">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </button>
+
       <div class="create-intro-copy">
         <span class="create-kicker">Your community space</span>
         <h1>Launch your channel</h1>
@@ -66,9 +69,18 @@
 
         <div class="field-box select-field">
           <label class="field-label">Category</label>
-          <ion-select formControlName="category" (ionChange)="onCategoryChange($event)" interface="action-sheet" placeholder="Choose a category" class="custom-select" aria-label="Channel category">
-            <ion-select-option *ngFor="let cat of categories" [value]="cat">{{ cat }}</ion-select-option>
-          </ion-select>
+          <button
+            type="button"
+            class="category-picker-btn"
+            [class.has-value]="category.value"
+            (click)="openCategoryPicker()"
+            aria-label="Choose channel category">
+            <span class="category-picker-copy">
+              <strong>{{ category.value || 'Choose a category' }}</strong>
+              <small>{{ category.value ? 'Tap to change category' : 'Search or browse channel categories' }}</small>
+            </span>
+            <ion-icon name="chevron-down-outline" aria-hidden="true"></ion-icon>
+          </button>
           <div class="error-msg" *ngIf="validatorErrors['category'] || (category.dirty && category.errors)">
             <span *ngIf="category.hasError('required')">Choose a category.</span>
           </div>
@@ -106,11 +118,11 @@
     <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;" accept="image/*">
 
     <div class="create-action-wrap">
-      <button type="button" class="create-channel-btn" (click)="submit()" [disabled]="!form.valid || !termsAccepted || !channelImage.file">
+      <button type="button" class="create-channel-btn" (click)="submit()" [disabled]="!canCreateChannel">
         <ion-icon name="rocket-outline" aria-hidden="true"></ion-icon>
         <span>Create Channel</span>
       </button>
-      <p class="create-requirement" *ngIf="!form.valid || !termsAccepted || !channelImage.file">
+      <p class="create-requirement" *ngIf="!canCreateChannel">
         Add a cover, complete the required details, and accept the terms to continue.
       </p>
     </div>
