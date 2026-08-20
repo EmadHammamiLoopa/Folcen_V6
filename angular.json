@@ -46,7 +46,8 @@
               "src/theme/variables.scss",
               "src/global.scss",
               "src/theme/page-overrides.scss",
-              "src/theme/chat-overlays.scss"
+              "src/theme/chat-overlays.scss",
+              "src/theme/channel-detail-overrides.scss"
             ],
             "scripts": [
               "./node_modules/@fortawesome/fontawesome-free/js/all.min.js",
@@ -190,12 +191,12 @@
         "ionic-cordova-serve": {
           "builder": "@ionic/angular-toolkit:cordova-serve",
           "options": {
-            "cordovaBuildTarget": "folcen:ionic-cordova-build",
+            "browserTarget": "folcen:ionic-cordova-build",
             "devServerTarget": "folcen:serve"
           },
           "configurations": {
             "production": {
-              "cordovaBuildTarget": "folcen:ionic-cordova-build:production",
+              "browserTarget": "folcen:ionic-cordova-build:production",
               "devServerTarget": "folcen:serve:production"
             }
           }
