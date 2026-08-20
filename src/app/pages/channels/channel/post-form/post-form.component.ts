@@ -32,8 +32,12 @@ export class PostFormComponent implements OnInit, OnChanges {
 
   relationshipGoals: string = '';
   ageRange = { lower: 18, upper: 99 };  // Adjusted to use `lower` and `upper` for ion-range
-  interests: string[] = [];
+  interests: string = '';
   hintAboutMe: string = '';
+
+  readonly interestsMaxLength = 120;
+  readonly hintMaxLength = 160;
+  readonly postMaxLength = 1000;
   
 
   colors = [
@@ -445,6 +449,22 @@ removeMedia() {
 
 addPost() {
   const text = (this.postText || '').trim();
+  const interests = String(this.interests || '').trim();
+  const hintAboutMe = (this.hintAboutMe || '').trim();
+
+  if (text.length > this.postMaxLength) {
+    this.toastService.presentErrorToastr(`Keep your post under ${this.postMaxLength} characters.`);
+    return;
+  }
+
+  if (
+    this.channel?.type === 'static_dating' &&
+    (interests.length > this.interestsMaxLength || hintAboutMe.length > this.hintMaxLength)
+  ) {
+    this.toastService.presentErrorToastr('Shorten the dating details before posting.');
+    return;
+  }
+
   if (!text && !this.mediaFile) {
     this.toastService.presentErrorToastr('Please add text or media before submitting.');
     return;
@@ -486,8 +506,8 @@ addPost() {
     formData.append('relationshipGoals', this.relationshipGoals);
     formData.append('ageRangeMin', this.ageRange.lower.toString());
     formData.append('ageRangeMax', this.ageRange.upper.toString());
-    formData.append('interests', this.interests.toString());
-    formData.append('hintAboutMe', this.hintAboutMe);
+    formData.append('interests', interests);
+    formData.append('hintAboutMe', hintAboutMe);
   }
 
 
