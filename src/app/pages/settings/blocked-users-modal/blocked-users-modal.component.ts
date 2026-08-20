@@ -13,6 +13,27 @@ export class BlockedUsersModalComponent implements OnInit {
   blockedIds: string[] = [];
   users: any[] = [];
   loading = true;
+  searchTerm = '';
+
+  get visibleUsers(): any[] {
+    const query = this.searchTerm.trim().toLowerCase();
+    if (!query) return this.users;
+
+    return this.users.filter((user: any) => {
+      const searchable = [
+        user?.fullName,
+        user?.firstName,
+        user?.lastName,
+        user?.city,
+        user?.country
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }
 
   constructor(
     private modalCtrl: ModalController,
