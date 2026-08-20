@@ -61,7 +61,16 @@
             </span>
           </div>
 
-          <p class="ch-desc" *ngIf="channel.description">{{ channel.description }}</p>
+          <div class="ch-description-row" *ngIf="channel.description">
+            <p class="ch-desc">{{ channel.description }}</p>
+            <button
+              type="button"
+              class="ch-description-info"
+              (click)="showChannelInfo($event)"
+              aria-label="Read full channel description">
+              <ion-icon name="information-circle-outline"></ion-icon>
+            </button>
+          </div>
 
           <div class="ch-stats">
             <span class="ch-stat">
