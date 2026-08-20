@@ -83,25 +83,26 @@
           </div>
 
           <div class="ch-actions">
-            <ion-button
+            <button
+              type="button"
               class="ch-btn follow-btn"
               *ngIf="!isOwner(channel)"
               [class.followed]="channel.followedBy(user.id || user._id)"
               (click)="handlePopoverEvent('follow')">
               <ion-icon
-                [name]="channel.followedBy(user.id || user._id) ? 'checkmark-outline' : 'person-add-outline'"
-                slot="start">
+                [name]="channel.followedBy(user.id || user._id) ? 'checkmark-outline' : 'person-add-outline'">
               </ion-icon>
-              {{ channel.followedBy(user.id || user._id) ? 'Following' : 'Follow' }}
-            </ion-button>
+              <span>{{ channel.followedBy(user.id || user._id) ? 'Following' : 'Follow' }}</span>
+            </button>
 
-            <ion-button
+            <button
+              type="button"
               class="ch-btn post-btn"
               (click)="showPostForm()"
               *ngIf="channel && user && (channel.followedBy(user.id || user._id) || isOwner(channel))">
-              <ion-icon name="create-outline" slot="start"></ion-icon>
-              New Post
-            </ion-button>
+              <ion-icon name="create-outline"></ion-icon>
+              <span>New Post</span>
+            </button>
           </div>
         </div>
       </div>
