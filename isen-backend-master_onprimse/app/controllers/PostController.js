@@ -675,18 +675,16 @@ exports.showPost = async (req, res) => {
         const author = post.user;
         const requesterId = req.auth._id.toString();
         const isAdmin = req.auth && (req.auth.role === 'ADMIN' || req.auth.role === 'SUPER ADMIN');
-        const isSelf = author && author._id.toString() === requesterId;
 
         if (!author) {
             return Response.sendError(res, 404, 'Post not found');
         }
 
         // A direct/stale link must not bypass the same lifecycle checks used by
-        // the channel timeline. Owners/admins retain access for moderation and
-        // recovery flows; everyone else sees the temporary unavailable state.
+        // the channel timeline. Only admins retain access for moderation;
+        // everyone else sees the temporary unavailable state.
         if (
             !isAdmin &&
-            !isSelf &&
             (
                 post.deletedAt ||
                 post.moderationStatus !== 'approved'
@@ -696,7 +694,7 @@ exports.showPost = async (req, res) => {
         }
 
         if (author && (author.enabled === false || author.isDeleted || author.banned || author.deletedAt)) {
-            if (!isAdmin && !isSelf) {
+            if (!isAdmin) {
                 return Response.sendError(res, 404, 'Post not found');
             }
         }
