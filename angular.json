@@ -47,7 +47,8 @@
               "src/global.scss",
               "src/theme/page-overrides.scss",
               "src/theme/chat-overlays.scss",
-              "src/theme/channel-detail-overrides.scss"
+              "src/theme/channel-detail-overrides.scss",
+              "src/theme/channel-feed-fixes.scss"
             ],
             "scripts": [
               "./node_modules/@fortawesome/fontawesome-free/js/all.min.js",
