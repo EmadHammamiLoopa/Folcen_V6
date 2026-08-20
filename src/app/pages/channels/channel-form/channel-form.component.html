@@ -1,90 +1,118 @@
-<app-header title="Launch Your Channel" [back]="true"></app-header>
+<app-header title="Create Channel" [back]="true" class="channel-create-header"></app-header>
 
-<ion-content class="pro-form-content">
+<ion-content class="channel-create-content">
+  <div class="channel-create-aurora" aria-hidden="true"></div>
   <app-loader *ngIf="pageLoading"></app-loader>
-  
-  <div *ngIf="!pageLoading" class="pro-container">
-    <div class="form-header-creative">
-    </div>
 
-    <!-- Professional Image Header -->
-    <div (click)="pickImage()" class="image-header" [class.has-img]="channelImage.url">
-      <div *ngIf="!channelImage.url" class="upload-state">
-        <div class="upload-icon">
-          <i class="fas" [class.fa-plus]="!imageLoading" [class.fa-circle-notch]="imageLoading" [class.fa-spin]="imageLoading"></i>
+  <main *ngIf="!pageLoading" class="channel-create-container">
+    <section class="create-intro">
+      <div class="create-intro-icon" aria-hidden="true">
+        <ion-icon name="megaphone-outline"></ion-icon>
+      </div>
+      <div class="create-intro-copy">
+        <span class="create-kicker">Your community space</span>
+        <h1>Launch your channel</h1>
+        <p>Choose a clear identity, add a cover, and tell people what your channel is about.</p>
+      </div>
+    </section>
+
+    <section
+      class="cover-picker"
+      [class.has-image]="channelImage.url"
+      [class.is-loading]="imageLoading"
+      (click)="pickImage()"
+      role="button"
+      tabindex="0"
+      aria-label="Choose channel cover image">
+      <div *ngIf="!channelImage.url" class="cover-empty-state">
+        <div class="cover-upload-icon">
+          <ion-spinner *ngIf="imageLoading" name="crescent"></ion-spinner>
+          <ion-icon *ngIf="!imageLoading" name="image-outline"></ion-icon>
         </div>
-        <span class="label">{{ imageLoading ? 'Processing...' : 'Add Channel Cover' }}</span>
+        <strong>{{ imageLoading ? 'Processing cover...' : 'Add Channel Cover' }}</strong>
+        <span>{{ imageLoading ? 'Please wait a moment' : 'Choose an image that represents your channel' }}</span>
       </div>
-      <img *ngIf="channelImage.url" [src]="channelImage.url" class="header-img" alt="">
-      <div class="img-overlay" *ngIf="channelImage.url">
-        <button class="edit-btn"><i class="fas fa-camera"></i></button>
-      </div>
-    </div>
 
-    <form [formGroup]="form" class="pro-form">
-      <div class="form-section">
+      <img *ngIf="channelImage.url" [src]="channelImage.url" class="cover-preview" alt="Channel cover preview">
+
+      <div class="cover-image-overlay" *ngIf="channelImage.url">
+        <button type="button" class="change-cover-btn" aria-label="Change channel cover">
+          <ion-icon name="camera-outline"></ion-icon>
+          <span>Change cover</span>
+        </button>
+      </div>
+    </section>
+
+    <form [formGroup]="form" class="channel-create-form">
+      <section class="form-panel">
+        <div class="panel-heading">
+          <div class="panel-heading-icon" aria-hidden="true">
+            <ion-icon name="create-outline"></ion-icon>
+          </div>
+          <div>
+            <h2>Channel details</h2>
+            <p>These details help people understand and discover your channel.</p>
+          </div>
+        </div>
+
         <div class="field-box">
-          <span class="field-label">Channel Name</span>
-          <ion-input formControlName="name" placeholder="Enter name..."></ion-input>
+          <label class="field-label" for="channel-name">Channel Name</label>
+          <ion-input id="channel-name" formControlName="name" placeholder="Give your channel a name" maxlength="50"></ion-input>
           <div class="error-msg" *ngIf="validatorErrors['name'] || (name.dirty && name.errors)">
-            <span *ngIf="name.hasError('required')">Required</span>
-            <span *ngIf="name.hasError('maxlength')">Too long</span>
+            <span *ngIf="name.hasError('required')">Channel name is required.</span>
+            <span *ngIf="name.hasError('maxlength')">Keep the name under 50 characters.</span>
           </div>
         </div>
 
         <div class="field-box select-field">
-          <div class="field-header">
-            <span class="field-label">Category</span>
-          </div>
-          <ion-select formControlName="category" (ionChange)="onCategoryChange($event)" interface="action-sheet" placeholder="Choose a category" class="custom-select">
-            <ion-select-option *ngFor="let cat of categories" [value]="cat">{{cat}}</ion-select-option>
+          <label class="field-label">Category</label>
+          <ion-select formControlName="category" (ionChange)="onCategoryChange($event)" interface="action-sheet" placeholder="Choose a category" class="custom-select" aria-label="Channel category">
+            <ion-select-option *ngFor="let cat of categories" [value]="cat">{{ cat }}</ion-select-option>
           </ion-select>
           <div class="error-msg" *ngIf="validatorErrors['category'] || (category.dirty && category.errors)">
-            <span *ngIf="category.hasError('required')">Required</span>
+            <span *ngIf="category.hasError('required')">Choose a category.</span>
           </div>
         </div>
 
         <div class="field-box animate__animated animate__fadeIn" *ngIf="showOtherCategory">
-          <span class="field-label">Specify Category</span>
-          <ion-input formControlName="otherCategory" placeholder="Enter your category"></ion-input>
+          <label class="field-label" for="channel-other-category">Specify Category</label>
+          <ion-input id="channel-other-category" formControlName="otherCategory" placeholder="Enter your category"></ion-input>
         </div>
 
-        <div class="field-box">
-          <span class="field-label">Description</span>
-          <ion-textarea 
-            maxlength="255" 
-            formControlName="description" 
-            rows="3" 
-            placeholder="Tell us about this channel...">
-          </ion-textarea>
+        <div class="field-box description-field">
+          <div class="field-label-row">
+            <label class="field-label" for="channel-description">Description</label>
+            <span class="field-hint">Up to 255 characters</span>
+          </div>
+          <ion-textarea id="channel-description" maxlength="255" formControlName="description" rows="4" placeholder="What will people find in this channel?"></ion-textarea>
           <div class="error-msg" *ngIf="validatorErrors['description'] || (description.dirty && description.errors)">
-            <span *ngIf="description.hasError('required')">Required</span>
+            <span *ngIf="description.hasError('required')">Add a short description.</span>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Terms & Conditions -->
-      <div class="terms-wrapper" (click)="presentTermsModal()">
-        <div class="terms-check" [class.checked]="termsAccepted">
-          <i class="fas fa-check" *ngIf="termsAccepted"></i>
+      <button type="button" class="terms-card" (click)="presentTermsModal()" [class.accepted]="termsAccepted">
+        <div class="terms-check" [class.checked]="termsAccepted" aria-hidden="true">
+          <ion-icon [name]="termsAccepted ? 'checkmark-outline' : 'document-text-outline'"></ion-icon>
         </div>
-        <div class="terms-text">
-          I agree to the <span>Terms & Conditions</span>
+        <div class="terms-copy">
+          <strong>{{ termsAccepted ? 'Terms accepted' : 'Review Terms & Conditions' }}</strong>
+          <span>{{ termsAccepted ? 'You are ready to publish when the form is complete.' : 'Read and accept the channel rules before creating your channel.' }}</span>
         </div>
-      </div>
+        <ion-icon name="chevron-forward-outline" class="terms-chevron" aria-hidden="true"></ion-icon>
+      </button>
     </form>
 
-    <!-- Hidden File Input for Browser Fallback -->
     <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;" accept="image/*">
 
-    <div class="pro-footer-inline">
-      <button 
-        class="pro-submit-btn"
-        (click)="submit()"
-        [disabled]="!form.valid || !termsAccepted || !channelImage.file"
-      >
-        Create Channel
+    <div class="create-action-wrap">
+      <button type="button" class="create-channel-btn" (click)="submit()" [disabled]="!form.valid || !termsAccepted || !channelImage.file">
+        <ion-icon name="rocket-outline" aria-hidden="true"></ion-icon>
+        <span>Create Channel</span>
       </button>
+      <p class="create-requirement" *ngIf="!form.valid || !termsAccepted || !channelImage.file">
+        Add a cover, complete the required details, and accept the terms to continue.
+      </p>
     </div>
-  </div>
+  </main>
 </ion-content>
