@@ -1,5 +1,10 @@
 /* Channel post V7 — structural alignment for owner controls and privacy panel. */
 
+/* User-created channel cards should hug their content; structured static cards keep their existing height. */
+app-channel app-post .jodel-card.feed-card.standard-feed-card {
+  min-height: 0 !important;
+}
+
 /* Feed + Comments: author row owns the controls, so nothing floats over post text. */
 app-channel app-post .jdl-h,
 app-comments .post-focus app-post .jdl-h {
