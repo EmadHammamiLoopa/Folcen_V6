@@ -19,7 +19,7 @@
       </div>
       <div class="intro-copy">
         <span class="intro-kicker">Profile network</span>
-        <h1>{{ type === 'followers' ? 'Your followers' : type === 'following' ? 'People you follow' : 'Your friends' }}</h1>
+        <h1>{{ type === 'followers' ? 'Your followers' : type === 'following' ? 'People you follow' : (isMyProfile ? 'Your friends' : 'Friends') }}</h1>
         <p>
           {{ type === 'followers'
             ? 'People who keep up with your public activity.'
