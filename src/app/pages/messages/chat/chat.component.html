@@ -1,7 +1,7 @@
 <ion-header class="chat-header glass-header">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-button fill="clear" (click)="goBack()" class="back-button" aria-label="Back">
+      <ion-button fill="clear" (click)="goBack()" class="back-button" aria-label="Back to messages">
         <ion-icon name="arrow-back-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
@@ -9,16 +9,14 @@
     <div class="user-info" (click)="!isAdminChat() && showUserProfile()" [style.cursor]="isAdminChat() ? 'default' : 'pointer'">
       <div class="avatar-wrapper">
         <app-avatar [profile]="user" [size]="40"></app-avatar>
-        <div *ngIf="user?.online && !isAdminChat()" class="online-dot"></div>
+        <div *ngIf="user?.online && !isAdminChat()" class="online-dot" aria-label="Online"></div>
       </div>
 
       <div class="user-text">
         <h2 class="user-name">{{ isAdminChat() ? 'System' : user?.fullName }}</h2>
         <p class="user-status">
           <span *ngIf="user?.online && !isAdminChat()" class="online">Online</span>
-          <span *ngIf="!user?.online && !isAdminChat()" class="offline">
-            Last seen {{ user?.lastSeenText }}
-          </span>
+          <span *ngIf="!user?.online && !isAdminChat()" class="offline">Last seen {{ user?.lastSeenText }}</span>
           <span *ngIf="isAdminChat()" class="online">Official Account</span>
         </p>
       </div>
@@ -54,7 +52,7 @@
 
 <ion-content #content class="vibrant-dark-theme chat-content">
   <div class="mesh-gradient"></div>
-  
+
   <app-loader *ngIf="pageLoading"></app-loader>
 
   <div *ngIf="product" (click)="showUproduct()" class="product-glass-card animate__animated animate__fadeInDown">
@@ -77,22 +75,21 @@
 
   <div class="messages-container">
     <ng-container *ngFor="let group of groupedMessages">
-      <div class="date-separator">
-        <span>{{ group.date }}</span>
-      </div>
-      
+      <div class="date-separator"><span>{{ group.date }}</span></div>
+
       <div *ngFor="let message of group.messages" class="message-wrapper">
-        <div class="message-bubble" 
+        <div class="message-bubble"
              [class.my-message]="message?.isMine(authUser?.id)"
              [class.their-message]="!message?.isMine(authUser?.id)"
              [class.failed]="message?.state === 'failed'">
-          
+
           <img
             *ngIf="message?.image && !isVideoMessage(message)"
             [src]="message?.image"
             class="message-image"
             (click)="openImage(message?.image)"
-            style="cursor:pointer">
+            alt="Shared photo — tap to view fullscreen"
+            role="button">
 
           <video
             *ngIf="message?.image && isVideoMessage(message)"
@@ -100,14 +97,13 @@
             class="message-image message-video"
             controls
             playsinline
-            preload="metadata">
+            preload="metadata"
+            aria-label="Shared video">
           </video>
-          
-          <div class="message-text" *ngIf="message?.text && message?.type !== 'video-call-request'">
-            {{ message?.text }}
-          </div>
-          
-          <div *ngIf="message?.type === 'video-call-request'" 
+
+          <div class="message-text" *ngIf="message?.text && message?.type !== 'video-call-request'">{{ message?.text }}</div>
+
+          <div *ngIf="message?.type === 'video-call-request'"
                class="video-call-request"
                [ngClass]="{ 'improved-request': message?.from === authUser?.id,
                             'fancy-request': message?.from !== authUser?.id }">
@@ -123,9 +119,7 @@
               <ng-container *ngIf="message?.from === authUser?.id; else incomingRequestCopy">
                 You asked {{ user?.fullName }} for permission to video call.
               </ng-container>
-              <ng-template #incomingRequestCopy>
-                {{ message?.text }}
-              </ng-template>
+              <ng-template #incomingRequestCopy>{{ message?.text }}</ng-template>
 
               <div class="action-buttons" *ngIf="isActionableCall(message)">
                 <ion-button *ngIf="message?.from !== authUser?.id"
@@ -144,76 +138,43 @@
                 </ion-button>
               </div>
 
-              <div *ngIf="message?.status === 'pending' && message?.from === authUser?.id" class="resolved-text">
-                Video request pending
-              </div>
-
-              <div *ngIf="message?.status === 'pending' && message?.from !== authUser?.id && !isActionableCall(message)" class="resolved-text">
-                Video request pending
-              </div>
+              <div *ngIf="message?.status === 'pending' && message?.from === authUser?.id" class="resolved-text">Video request pending</div>
+              <div *ngIf="message?.status === 'pending' && message?.from !== authUser?.id && !isActionableCall(message)" class="resolved-text">Video request pending</div>
 
               <div *ngIf="message?.status === 'accepted'" class="resolved-text">
-                <ng-container *ngIf="message?.from === authUser?.id">
-                  ✅ {{ user?.fullName }} granted you video-call access
-                </ng-container>
-                <ng-container *ngIf="message?.from !== authUser?.id">
-                  ✅ You granted {{ user?.fullName }} video-call access
-                </ng-container>
+                <ng-container *ngIf="message?.from === authUser?.id">✅ {{ user?.fullName }} granted you video-call access</ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">✅ You granted {{ user?.fullName }} video-call access</ng-container>
               </div>
 
               <div *ngIf="message?.status === 'cancelled'" class="resolved-text">
-                <ng-container *ngIf="message?.from === authUser?.id">
-                  You cancelled the request
-                </ng-container>
-                <ng-container *ngIf="message?.from !== authUser?.id">
-                  {{ user?.fullName }} cancelled the request
-                </ng-container>
+                <ng-container *ngIf="message?.from === authUser?.id">You cancelled the request</ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">{{ user?.fullName }} cancelled the request</ng-container>
               </div>
 
               <div *ngIf="message?.status === 'rejected'" class="resolved-text">
-                <ng-container *ngIf="message?.from === authUser?.id">
-                  Request rejected
-                </ng-container>
-                <ng-container *ngIf="message?.from !== authUser?.id">
-                  You rejected the request
-                </ng-container>
+                <ng-container *ngIf="message?.from === authUser?.id">Request rejected</ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">You rejected the request</ng-container>
               </div>
 
               <div *ngIf="message?.status === 'revoked'" class="resolved-text">
-                <ng-container *ngIf="message?.from === authUser?.id">
-                  Video-call access was revoked
-                </ng-container>
-                <ng-container *ngIf="message?.from !== authUser?.id">
-                  You revoked video-call access
-                </ng-container>
+                <ng-container *ngIf="message?.from === authUser?.id">Video-call access was revoked</ng-container>
+                <ng-container *ngIf="message?.from !== authUser?.id">You revoked video-call access</ng-container>
               </div>
 
-              <div *ngIf="message?.status === 'expired'" class="resolved-text">
-                Video request expired
-              </div>
+              <div *ngIf="message?.status === 'expired'" class="resolved-text">Video request expired</div>
             </div>
           </div>
 
           <div class="message-meta">
             <span class="message-time">{{ formatMessageTime(message.createdAt) }}</span>
-            <span *ngIf="message?.state === 'sending'" class="message-status">
-              <ion-spinner name="dots"></ion-spinner>
-            </span>
-            <span *ngIf="message?.state === 'queued'" class="message-status">
-              <ion-icon name="time-outline"></ion-icon>
-            </span>
-            <span *ngIf="message?.state === 'sent'" class="message-status">
-              <ion-icon name="checkmark-done-outline"></ion-icon>
-            </span>
-            <span *ngIf="message?.state === 'seen'" class="message-status">
-              <ion-icon name="checkmark-done-circle-outline"></ion-icon>
-            </span>
+            <span *ngIf="message?.state === 'sending'" class="message-status"><ion-spinner name="dots"></ion-spinner></span>
+            <span *ngIf="message?.state === 'queued'" class="message-status"><ion-icon name="time-outline"></ion-icon></span>
+            <span *ngIf="message?.state === 'sent'" class="message-status"><ion-icon name="checkmark-done-outline"></ion-icon></span>
+            <span *ngIf="message?.state === 'seen'" class="message-status"><ion-icon name="checkmark-done-circle-outline"></ion-icon></span>
           </div>
-          
-          <ion-button *ngIf="message?.state === 'failed'" 
-                      fill="clear" 
-                      size="small" 
-                      class="resend-button"
+
+          <ion-button *ngIf="message?.state === 'failed'"
+                      fill="clear" size="small" class="resend-button"
                       (click)="resendMessage(message)"
                       aria-label="Resend message">
             <ion-icon name="refresh-outline"></ion-icon>
@@ -239,18 +200,26 @@
 <ion-footer class="message-input-footer" *ngIf="!isAdminChat()">
   <ion-toolbar>
     <ion-item lines="none" class="input-container">
-      <ion-button slot="start" fill="clear" (click)="toggleMediaOptions()" class="camera-button" aria-label="Add media">
-        <ion-icon name="add-circle-outline"></ion-icon>
+      <ion-button slot="start" fill="clear" (click)="toggleMediaOptions()" class="camera-button attach-toggle" aria-label="Add photo or video">
+        <ion-icon [name]="showMediaOptions ? 'close-outline' : 'add-outline'"></ion-icon>
       </ion-button>
 
-      <div *ngIf="showMediaOptions" class="media-options">
-        <ion-button fill="clear" (click)="pickMedia('image')" class="camera-button" aria-label="Add image">
-          <ion-icon name="camera-outline"></ion-icon>
-        </ion-button>
+      <div *ngIf="showMediaOptions" class="media-options" role="menu" aria-label="Add media">
+        <button type="button" class="media-option-card" (click)="pickMedia('image')" aria-label="Add photo">
+          <span class="media-option-icon photo"><ion-icon name="image-outline"></ion-icon></span>
+          <span class="media-option-copy">
+            <strong>Photo</strong>
+            <small>Camera or gallery</small>
+          </span>
+        </button>
 
-        <ion-button fill="clear" (click)="pickMedia('video')" class="camera-button" aria-label="Add video">
-          <ion-icon name="videocam-outline"></ion-icon>
-        </ion-button>
+        <button type="button" class="media-option-card" (click)="pickMedia('video')" aria-label="Add video">
+          <span class="media-option-icon video"><ion-icon name="videocam-outline"></ion-icon></span>
+          <span class="media-option-copy">
+            <strong>Video</strong>
+            <small>Record or choose</small>
+          </span>
+        </button>
       </div>
 
       <ion-input
@@ -262,11 +231,7 @@
       </ion-input>
 
       <div *ngIf="image" class="image-preview">
-        <img
-          *ngIf="selectedMediaType !== 'video'"
-          [src]="image"
-          alt="Preview"
-          style="max-height: 150px;">
+        <img *ngIf="selectedMediaType !== 'video'" [src]="image" alt="Selected photo preview">
 
         <video
           *ngIf="selectedMediaType === 'video'"
@@ -274,26 +239,19 @@
           controls
           playsinline
           preload="metadata"
-          style="max-height: 180px; max-width: 220px;">
+          aria-label="Selected video preview">
         </video>
 
-        <ion-button
-          fill="clear"
-          size="small"
-          color="danger"
-          (click)="removeImage()"
-          aria-label="Remove attachment">
+        <ion-button fill="clear" size="small" color="danger" (click)="removeImage()" aria-label="Remove attachment">
           <ion-icon name="close-circle-outline"></ion-icon>
         </ion-button>
       </div>
 
       <ion-button slot="end" fill="clear" (click)="addMessage()"
         [disabled]="(!messageText && !image) || !conversationStarted()"
-        class="send-button"
-        aria-label="Send message">
+        class="send-button" aria-label="Send message">
         <ion-icon name="send-outline"></ion-icon>
       </ion-button>
-
     </ion-item>
   </ion-toolbar>
 </ion-footer>
