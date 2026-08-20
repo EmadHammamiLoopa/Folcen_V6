@@ -10,258 +10,327 @@
       class="post-submit-btn"
       fill="solid"
     >
-      <span *ngIf="postLoading"><i class="fas fa-spinner fa-spin mr-2"></i></span>
-      <ion-icon name="send" slot="end" *ngIf="!postLoading"></ion-icon>
+      <span *ngIf="postLoading"><ion-spinner name="crescent"></ion-spinner></span>
+      <ion-icon name="send-outline" slot="end" *ngIf="!postLoading"></ion-icon>
       Post
     </ion-button>
   </div>
 </app-header>
 
 <ion-content
-  [style]="{'--background': postBackColor, '--color': postTextColor}"
+  class="create-post-content"
+  [style]="{'--post-accent': postBackColor, '--post-accent-ink': postTextColor}"
 >
   <app-sandglass-loader [visible]="postLoading" message="Posting"></app-sandglass-loader>
-  <ion-card class="post-card">
-    <ion-card-content>
-      <div class="visibility-header" [style]="{'color': postTextColor}">
-        <ion-icon name="eye-outline"></ion-icon>
-        <ion-label>Who can see this?</ion-label>
-      </div>
-      
-      <div class="visibility-grid" data-tour="post-visibility">
-        <div class="visibility-item" 
-             [class.active]="visibility === 'public'" 
-             (click)="setPostVisibility('public')"
-             [style]="{'--active-color': postTextColor}">
-          <div class="icon-wrapper">
-            <ion-icon name="earth"></ion-icon>
-          </div>
-          <span>Public</span>
-        </div>
 
-        <div class="visibility-item" 
-             [class.active]="visibility === 'friends-only'" 
-             (click)="setPostVisibility('friends-only')"
-             [style]="{'--active-color': postTextColor}">
-          <div class="icon-wrapper">
-            <ion-icon name="people"></ion-icon>
-          </div>
-          <span>Friends</span>
+  <div class="create-post-shell">
+    <section class="post-style-panel">
+      <div class="post-style-heading">
+        <div class="post-style-icon" aria-hidden="true">
+          <ion-icon name="color-palette-outline"></ion-icon>
         </div>
-
-        <div class="visibility-item" 
-             [class.active]="visibility === 'private'" 
-             (click)="setPostVisibility('private')"
-             [style]="{'--active-color': postTextColor}">
-          <div class="icon-wrapper">
-            <ion-icon name="lock-closed"></ion-icon>
-          </div>
-          <span>Private</span>
+        <div>
+          <span>Post style</span>
+          <strong>Choose your accent</strong>
+          <small>Your color becomes a signature accent, keeping every post readable.</small>
         </div>
       </div>
 
-      <div class="divider" [style]="{'background': postTextColor, 'opacity': 0.1}"></div>
-
-      <ion-item class="ion-item-clear anonymous-toggle" [style]="{'--color': postTextColor}" data-tour="post-anonymous">
-        <ion-icon name="person-circle-outline" slot="start" class="mr-2"></ion-icon>
-        <ion-label>Post Anonymously</ion-label>
-        <ion-toggle
-          [(ngModel)]="anonyme"
-          slot="end"
-          (ionChange)="onPostMentionPolicyChanged()"
-        ></ion-toggle>
-      </ion-item>
-    </ion-card-content>
-  </ion-card>
-
-  <!-- Show event fields if it's a static_events channel -->
-  <div *ngIf="showEventFields">
-    <ion-card class="post-card">
-      <ion-card-content>
-        <div class="field-container">
-          <ion-label class="field-label">Date</ion-label>
-          <ion-datetime
-            [(ngModel)]="eventDate"
-            presentation="date"
-            [min]="minDate"
-            [max]="maxDate"
-            display-format="DD MMM YYYY"
-            placeholder="Select date"
-            class="custom-input"
-          ></ion-datetime>
-        </div>
-
-        <div class="field-container">
-          <ion-label class="field-label">Location</ion-label>
-          <ion-input
-            [(ngModel)]="eventLocation"
-            placeholder="Enter location"
-            class="custom-input"
-          ></ion-input>
-        </div>
-
-        <div class="field-container">
-          <ion-label class="field-label">Time</ion-label>
-          <ion-datetime
-            [(ngModel)]="eventTime"
-            presentation="time"
-            [min]="minDate"
-            [max]="maxDate"
-            display-format="HH:mm"
-            picker-format="HH:mm"
-            placeholder="Select time"
-            class="custom-input"
-          ></ion-datetime>
-        </div>
-      </ion-card-content>
-    </ion-card>
-  </div>
-
-  <!-- Other static_dating fields -->
-  <div *ngIf="showDatingFields">
-    <ion-card class="post-card">
-      <ion-card-content>
-        <div class="field-container">
-          <ion-label class="field-label">Relationship Goals</ion-label>
-          <ion-select [(ngModel)]="relationshipGoals" placeholder="Select goal" interface="alert" class="custom-select">
-            <ion-select-option value="casual">Casual</ion-select-option>
-            <ion-select-option value="long-term">Long-term</ion-select-option>
-            <ion-select-option value="friendship">Friendship</ion-select-option>
-          </ion-select>
-        </div>
-
-        <div class="field-container">
-          <ion-label class="field-label">Age Range</ion-label>
-          <div class="range-wrapper">
-            <div class="range-values">
-              <span>{{ ageRange.lower }} yrs</span>
-              <span>{{ ageRange.upper }} yrs</span>
-            </div>
-            <ion-range dualKnobs="true" min="18" max="99" step="1" [(ngModel)]="ageRange" class="custom-range">
-            </ion-range>
-          </div>
-        </div>
-
-        <div class="field-container">
-          <ion-label class="field-label">Interests or Hobbies</ion-label>
-          <ion-input
-            [(ngModel)]="interests"
-            placeholder="Enter interests or hobbies"
-            class="custom-input"
-          ></ion-input>
-        </div>
-
-        <div class="field-container">
-          <ion-label class="field-label">Hint about me</ion-label>
-          <ion-textarea
-            [(ngModel)]="hintAboutMe"
-            placeholder="Write a hint about yourself"
-            autoGrow="true"
-            class="custom-textarea"
-          ></ion-textarea>
-        </div>
-      </ion-card-content>
-    </ion-card>
-  </div>
-
-  <!-- Post Textarea Section -->
-  <ion-card class="post-card post-textarea-card" [style]="{'--background': postBackColor, '--color': postTextColor}">
-    <ion-card-content>
-      <div
-        class="post-mention-dropdown"
-        *ngIf="tagging && filteredTaggableUsers?.length"
-      >
+      <div class="post-accent-palette" role="group" aria-label="Post accent color">
         <button
           type="button"
-          class="post-mention-option"
-          *ngFor="let u of filteredTaggableUsers"
-          (mousedown)="$event.preventDefault()"
-          (click)="selectPostMention(u)"
-        >
-          <ion-icon name="at-circle-outline"></ion-icon>
-          <span>{{ u.name }}</span>
+          class="accent-swatch aurora"
+          [class.active]="postBackColor === '#6D5EF9'"
+          (click)="selectColor({ background: '#6D5EF9', text: '#ffffff' })"
+          aria-label="Aurora violet"
+          title="Aurora violet">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#6D5EF9'" name="checkmark-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="accent-swatch ocean"
+          [class.active]="postBackColor === '#2563EB'"
+          (click)="selectColor({ background: '#2563EB', text: '#ffffff' })"
+          aria-label="Ocean blue"
+          title="Ocean blue">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#2563EB'" name="checkmark-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="accent-swatch sky"
+          [class.active]="postBackColor === '#0284C7'"
+          (click)="selectColor({ background: '#0284C7', text: '#ffffff' })"
+          aria-label="Sky blue"
+          title="Sky blue">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#0284C7'" name="checkmark-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="accent-swatch teal"
+          [class.active]="postBackColor === '#0F9F86'"
+          (click)="selectColor({ background: '#0F9F86', text: '#ffffff' })"
+          aria-label="Teal"
+          title="Teal">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#0F9F86'" name="checkmark-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="accent-swatch emerald"
+          [class.active]="postBackColor === '#16A34A'"
+          (click)="selectColor({ background: '#16A34A', text: '#ffffff' })"
+          aria-label="Emerald"
+          title="Emerald">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#16A34A'" name="checkmark-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="accent-swatch sunset"
+          [class.active]="postBackColor === '#EA580C'"
+          (click)="selectColor({ background: '#EA580C', text: '#ffffff' })"
+          aria-label="Sunset orange"
+          title="Sunset orange">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#EA580C'" name="checkmark-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="accent-swatch rose"
+          [class.active]="postBackColor === '#E11D48'"
+          (click)="selectColor({ background: '#E11D48', text: '#ffffff' })"
+          aria-label="Rose"
+          title="Rose">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#E11D48'" name="checkmark-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="accent-swatch plum"
+          [class.active]="postBackColor === '#A21CAF'"
+          (click)="selectColor({ background: '#A21CAF', text: '#ffffff' })"
+          aria-label="Plum"
+          title="Plum">
+          <span></span>
+          <ion-icon *ngIf="postBackColor === '#A21CAF'" name="checkmark-outline"></ion-icon>
         </button>
       </div>
+    </section>
 
-      <ion-textarea
-        #postTextarea
-        [(ngModel)]="postText"
-        placeholder="What's on your mind?"
-        (ionInput)="onPostInput($event)"
-        (keydown)="onPostMentionKeyDown($event)"
-        class="creative-textarea"
-        [maxlength]="255"
-        autoGrow="true"
-        (ionFocus)="forceTextareaResize()"
-        [style]="{'--color': postTextColor}"
-      ></ion-textarea>
-      
-      <div class="char-counter" [class.limit]="postText?.length >= 255" [style]="{'color': postTextColor}">
-        {{ postText?.length || 0 }}/255
-      </div>
-    </ion-card-content>
-  </ion-card>
-
-  <!-- Media Section -->
-  <div class="media-section">
-    <!-- Upload Zone (Visible when no media) -->
-    <div *ngIf="!mediaPreview" 
-         class="upload-zone" 
-         (click)="triggerFileInput()"
-         [style]="{'--color': postTextColor}">
-      <div class="upload-content">
-        <div class="icon-circle">
-          <ion-icon name="cloud-upload-outline"></ion-icon>
+    <ion-card class="post-card audience-card">
+      <ion-card-content>
+        <div class="visibility-header">
+          <ion-icon name="eye-outline"></ion-icon>
+          <ion-label>Who can see this?</ion-label>
         </div>
-        <h3>Add Photos or Video</h3>
-        <p>Share your moments with the community</p>
-      </div>
-    </div>
 
-    <!-- Creative Media Preview (Visible when media selected) -->
-    <div *ngIf="mediaPreview" class="creative-media-preview">
-      <div class="preview-container">
-        <img *ngIf="mediaFile?.type.startsWith('image')" [src]="mediaPreview" alt="media preview" class="preview-content">
-        <video *ngIf="mediaFile?.type.startsWith('video')" controls class="preview-content">
-          <source [src]="mediaPreview" type="video/mp4">
-        </video>
-        
-        <div class="preview-overlay">
-          <div class="lifespan-badge">
-            <ion-icon name="time-outline"></ion-icon>
-            <span>24h</span>
+        <div class="visibility-grid" data-tour="post-visibility">
+          <div class="visibility-item"
+               [class.active]="visibility === 'public'"
+               (click)="setPostVisibility('public')">
+            <div class="icon-wrapper">
+              <ion-icon name="earth-outline"></ion-icon>
+            </div>
+            <span>Public</span>
           </div>
-          <ion-button (click)="removeMedia()" class="remove-btn" fill="clear">
-            <ion-icon name="close-circle"></ion-icon>
-          </ion-button>
+
+          <div class="visibility-item"
+               [class.active]="visibility === 'friends-only'"
+               (click)="setPostVisibility('friends-only')">
+            <div class="icon-wrapper">
+              <ion-icon name="people-outline"></ion-icon>
+            </div>
+            <span>Friends</span>
+          </div>
+
+          <div class="visibility-item"
+               [class.active]="visibility === 'private'"
+               (click)="setPostVisibility('private')">
+            <div class="icon-wrapper">
+              <ion-icon name="lock-closed-outline"></ion-icon>
+            </div>
+            <span>Private</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <ion-item class="ion-item-clear anonymous-toggle" data-tour="post-anonymous">
+          <ion-icon name="person-circle-outline" slot="start" class="mr-2"></ion-icon>
+          <ion-label>Post Anonymously</ion-label>
+          <ion-toggle
+            [(ngModel)]="anonyme"
+            slot="end"
+            (ionChange)="onPostMentionPolicyChanged()">
+          </ion-toggle>
+        </ion-item>
+      </ion-card-content>
+    </ion-card>
+
+    <div *ngIf="showEventFields">
+      <ion-card class="post-card">
+        <ion-card-content>
+          <div class="field-container">
+            <ion-label class="field-label">Date</ion-label>
+            <ion-datetime
+              [(ngModel)]="eventDate"
+              presentation="date"
+              [min]="minDate"
+              [max]="maxDate"
+              display-format="DD MMM YYYY"
+              placeholder="Select date"
+              class="custom-input">
+            </ion-datetime>
+          </div>
+
+          <div class="field-container">
+            <ion-label class="field-label">Location</ion-label>
+            <ion-input
+              [(ngModel)]="eventLocation"
+              placeholder="Enter location"
+              class="custom-input">
+            </ion-input>
+          </div>
+
+          <div class="field-container">
+            <ion-label class="field-label">Time</ion-label>
+            <ion-datetime
+              [(ngModel)]="eventTime"
+              presentation="time"
+              [min]="minDate"
+              [max]="maxDate"
+              display-format="HH:mm"
+              picker-format="HH:mm"
+              placeholder="Select time"
+              class="custom-input">
+            </ion-datetime>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <div *ngIf="showDatingFields">
+      <ion-card class="post-card">
+        <ion-card-content>
+          <div class="field-container">
+            <ion-label class="field-label">Relationship Goals</ion-label>
+            <ion-select [(ngModel)]="relationshipGoals" placeholder="Select goal" interface="alert" class="custom-select">
+              <ion-select-option value="casual">Casual</ion-select-option>
+              <ion-select-option value="long-term">Long-term</ion-select-option>
+              <ion-select-option value="friendship">Friendship</ion-select-option>
+            </ion-select>
+          </div>
+
+          <div class="field-container">
+            <ion-label class="field-label">Age Range</ion-label>
+            <div class="range-wrapper">
+              <div class="range-values">
+                <span>{{ ageRange.lower }} yrs</span>
+                <span>{{ ageRange.upper }} yrs</span>
+              </div>
+              <ion-range dualKnobs="true" min="18" max="99" step="1" [(ngModel)]="ageRange" class="custom-range"></ion-range>
+            </div>
+          </div>
+
+          <div class="field-container">
+            <ion-label class="field-label">Interests or Hobbies</ion-label>
+            <ion-input
+              [(ngModel)]="interests"
+              placeholder="Enter interests or hobbies"
+              class="custom-input">
+            </ion-input>
+          </div>
+
+          <div class="field-container">
+            <ion-label class="field-label">Hint about me</ion-label>
+            <ion-textarea
+              [(ngModel)]="hintAboutMe"
+              placeholder="Write a hint about yourself"
+              autoGrow="true"
+              class="custom-textarea">
+            </ion-textarea>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <ion-card
+      class="post-card post-textarea-card"
+      [style]="{'--post-accent': postBackColor, '--post-accent-ink': postTextColor}">
+      <ion-card-content>
+        <div class="composer-kicker">
+          <span class="composer-accent-dot"></span>
+          <span>Write your post</span>
+        </div>
+
+        <div
+          class="post-mention-dropdown"
+          *ngIf="tagging && filteredTaggableUsers?.length">
+          <button
+            type="button"
+            class="post-mention-option"
+            *ngFor="let u of filteredTaggableUsers"
+            (mousedown)="$event.preventDefault()"
+            (click)="selectPostMention(u)">
+            <ion-icon name="at-circle-outline"></ion-icon>
+            <span>{{ u.name }}</span>
+          </button>
+        </div>
+
+        <ion-textarea
+          #postTextarea
+          [(ngModel)]="postText"
+          placeholder="What's on your mind?"
+          (ionInput)="onPostInput($event)"
+          (keydown)="onPostMentionKeyDown($event)"
+          class="creative-textarea"
+          [maxlength]="255"
+          autoGrow="true"
+          (ionFocus)="forceTextareaResize()">
+        </ion-textarea>
+
+        <div class="char-counter" [class.limit]="postText?.length >= 255">
+          {{ postText?.length || 0 }}/255
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <div class="media-section">
+      <div *ngIf="!mediaPreview"
+           class="upload-zone"
+           (click)="triggerFileInput()">
+        <div class="upload-content">
+          <div class="icon-circle">
+            <ion-icon name="images-outline"></ion-icon>
+          </div>
+          <h3>Add photo or video</h3>
+          <p>Bring the post to life with visual media.</p>
+        </div>
+      </div>
+
+      <div *ngIf="mediaPreview" class="creative-media-preview">
+        <div class="preview-container">
+          <img *ngIf="mediaFile?.type.startsWith('image')" [src]="mediaPreview" alt="Media preview" class="preview-content">
+          <video *ngIf="mediaFile?.type.startsWith('video')" controls class="preview-content">
+            <source [src]="mediaPreview" type="video/mp4">
+          </video>
+
+          <div class="preview-overlay">
+            <div class="lifespan-badge">
+              <ion-icon name="time-outline"></ion-icon>
+              <span>24h</span>
+            </div>
+            <ion-button (click)="removeMedia()" class="remove-btn" fill="clear" aria-label="Remove media">
+              <ion-icon name="close-circle-outline"></ion-icon>
+            </ion-button>
+          </div>
         </div>
       </div>
     </div>
+
+    <input type="file" #fileInput (change)="onMediaSelected($event)" hidden accept="image/*,video/*">
   </div>
-
-  <!-- FAB for Palette -->
-  <ion-fab
-    slot="fixed"
-    vertical="bottom"
-    horizontal="end"
-    class="fab-palette"
-  >
-    <ion-fab-button
-      class="main-fab"
-      [style]="{'--background': postBackColor, '--color': postTextColor}"
-    >
-      <ion-icon name="color-palette-outline"></ion-icon>
-    </ion-fab-button>
-    <ion-fab-list side="top">
-      <ion-fab-button
-        *ngFor="let color of colors"
-        [style]="{'--background': color.background}"
-        (click)="selectColor(color)"
-        class="color-option"
-      ></ion-fab-button>
-    </ion-fab-list>
-  </ion-fab>
-
-  <!-- Hidden input for media selection -->
-  <input type="file" #fileInput (change)="onMediaSelected($event)" hidden accept="image/*,video/*">
 </ion-content>
