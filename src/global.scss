@@ -23,8 +23,6 @@
   --color: var(--ion-text-color);
   position: relative;
   min-height: 100%;
-  
-  /* Ensure content doesn't get hidden behind the floating tab bar */
   --padding-bottom: 110px;
 
   &::part(scroll) {
@@ -37,7 +35,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
+    background:
       radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%),
@@ -48,7 +46,6 @@
 }
 
 /* Header Styling */
-
 .highlight-comment {
   animation: highlight-pulse 2s ease-out;
   border-radius: 24px;
@@ -58,11 +55,12 @@
   0% { background-color: rgba(99, 102, 241, 0.3); box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
   100% { background-color: transparent; box-shadow: none; }
 }
+
 ion-header {
   --background: var(--folcen-toolbar-background);
   --color: var(--folcen-toolbar-color);
   backdrop-filter: blur(16px) saturate(180%);
-  
+
   ion-toolbar {
     --background: transparent;
     --color: var(--folcen-toolbar-color);
@@ -139,6 +137,72 @@ ion-header {
   }
 }
 
+/* ── Social Hub confirmation alerts ───────────────────────────── */
+.folcen-confirm-alert {
+  --backdrop-opacity: .58;
+
+  .alert-wrapper {
+    width: min(88vw, 360px);
+    border-radius: 24px;
+    overflow: hidden;
+    background:
+      linear-gradient(150deg, rgba(124,108,255,.10), rgba(56,189,248,.025)),
+      var(--ion-card-background, #111827);
+    border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10));
+    box-shadow: 0 24px 70px rgba(0,0,0,.38);
+    backdrop-filter: blur(24px) saturate(155%);
+    -webkit-backdrop-filter: blur(24px) saturate(155%);
+  }
+
+  .alert-head {
+    padding: 24px 22px 8px;
+  }
+
+  .alert-title {
+    color: var(--ion-text-color, #fff) !important;
+    font-size: 20px;
+    font-weight: 760;
+    line-height: 1.2;
+    letter-spacing: -.02em;
+  }
+
+  .alert-message {
+    padding: 8px 22px 22px;
+    color: var(--folcen-text-muted, #94a3b8) !important;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .alert-button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 18px 18px;
+  }
+
+  .alert-button {
+    min-height: 46px;
+    margin: 0 !important;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 720;
+    letter-spacing: 0;
+  }
+
+  .folcen-alert-cancel {
+    color: var(--ion-text-color, #fff) !important;
+    background: rgba(148,163,184,.10) !important;
+    border: 1px solid rgba(148,163,184,.14) !important;
+  }
+
+  .folcen-alert-danger {
+    color: #fff !important;
+    background: linear-gradient(135deg, #ef4444, #f43f5e) !important;
+    border: 1px solid rgba(244,63,94,.28) !important;
+    box-shadow: 0 10px 24px rgba(239,68,68,.20);
+  }
+}
+
 /* ── Alerts ─────────────────────────────────────────────────────── */
 .empty-alert {
   font-size: 18px;
@@ -159,22 +223,22 @@ ion-header {
 
 /* Hide scrollbars globally */
 * {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   &::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
   }
 }
 
 ion-content {
   --scrollbar-width: 0px;
   --scrollbar-style: none;
-  
+
   &::part(scroll) {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     &::-webkit-scrollbar {
-      display: none; /* Chrome, Safari, Opera */
+      display: none;
     }
   }
 }
@@ -187,7 +251,7 @@ ion-content {
   --max-height: 100vh !important;
   --border-radius: 0 !important;
   --background: #000 !important;
-  
+
   ion-content {
     --background: #000 !important;
     --padding-top: 0;
@@ -284,8 +348,6 @@ app-header ion-title {
 }
 
 /* Animations */
-
-/* Fade-in animation */
 @keyframes fadeIn {
   0% { opacity: 0; }
   100% { opacity: 1; }
@@ -295,7 +357,6 @@ app-header ion-title {
   animation: fadeIn 0.5s ease-in-out;
 }
 
-/* Slide-in from bottom for elements like modals or cards */
 @keyframes slideInUp {
   0% {
     transform: translateY(100%);
@@ -311,33 +372,22 @@ app-header ion-title {
   animation: slideInUp 0.5s ease-out;
 }
 
-/* Pulse animation for call-to-action buttons */
-/* Pulse Animation */
 @keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1); /* Increase the scale slightly for a more noticeable effect */
-  }
-  100% {
-    transform: scale(1);
-  }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
 .pulse {
   animation: pulse 1.5s infinite;
-  transition: transform 0.2s; /* Ensures smooth scaling */
-  will-change: transform; /* Improves performance */
+  transition: transform 0.2s;
+  will-change: transform;
 }
 
-/* Example: Apply the pulse animation to primary buttons */
 ion-button.primary {
   animation: pulse 1.5s infinite;
 }
 
-
-/* Apply animations */
 app-header ion-title {
-  animation: fadeIn 0.5s ease-in-out; /* Title fades in */
+  animation: fadeIn 0.5s ease-in-out;
 }
