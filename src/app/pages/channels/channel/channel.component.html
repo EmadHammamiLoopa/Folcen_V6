@@ -147,14 +147,6 @@
     </section>
 
     <section *ngIf="posts && posts.length" class="posts-section" aria-label="Channel posts">
-      <div class="posts-heading">
-        <div>
-          <span>Conversation</span>
-          <h2>Latest posts</h2>
-        </div>
-        <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
-      </div>
-
       <div class="posts-container">
         <app-post
           [user]="user"
