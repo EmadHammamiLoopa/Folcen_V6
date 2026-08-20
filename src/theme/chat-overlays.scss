@@ -1,0 +1,103 @@
+/* Chat overlay fallbacks. Kept separate from page styles because Ionic overlays
+   render outside app-chat. Existing explicitly styled alerts remain untouched. */
+
+ion-alert:not(.folcen-confirm-alert):not(.forgot-password-alert):not(.folcen-chat-alert):not(.folcen-media-source-alert) {
+  --backdrop-opacity: .58;
+
+  .alert-wrapper {
+    width: min(88vw, 360px) !important;
+    border-radius: 22px !important;
+    overflow: hidden !important;
+    background:
+      linear-gradient(150deg, rgba(124,108,255,.10), rgba(56,189,248,.025)),
+      var(--ion-card-background, #111827) !important;
+    border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
+    box-shadow: 0 24px 70px rgba(0,0,0,.38) !important;
+    backdrop-filter: blur(24px) saturate(155%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(155%) !important;
+  }
+
+  .alert-head {
+    padding: 20px 20px 3px !important;
+  }
+
+  .alert-title {
+    margin: 0 !important;
+    color: var(--ion-text-color, #fff) !important;
+    font-size: 18px !important;
+    font-weight: 750 !important;
+    line-height: 1.2 !important;
+    letter-spacing: -.018em !important;
+    text-align: left !important;
+  }
+
+  .alert-message {
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 8px 20px 15px !important;
+    color: var(--folcen-text-muted, #94a3b8) !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+    text-align: left !important;
+    white-space: normal !important;
+  }
+
+  .alert-button-group {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 4px 16px 16px !important;
+  }
+
+  .alert-button {
+    min-height: 44px !important;
+    margin: 0 !important;
+    padding: 0 12px !important;
+    border: 1px solid rgba(124,108,255,.16) !important;
+    border-radius: 13px !important;
+    color: #fff !important;
+    background: rgba(124,108,255,.10) !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .alert-button .alert-button-inner {
+    justify-content: center !important;
+  }
+
+  .alert-button[role="cancel"] {
+    color: var(--ion-text-color, #fff) !important;
+    background: rgba(148,163,184,.09) !important;
+    border-color: rgba(148,163,184,.14) !important;
+  }
+
+  .alert-button.text-danger {
+    color: #fff !important;
+    background: linear-gradient(135deg, #ef4444, #f43f5e) !important;
+    border-color: rgba(244,63,94,.28) !important;
+    box-shadow: 0 8px 20px rgba(239,68,68,.18) !important;
+  }
+}
+
+/* Media source alerts have three actions; stack them so labels never squeeze. */
+ion-alert:not(.folcen-confirm-alert):not(.forgot-password-alert):has(.alert-button:nth-child(3)) {
+  .alert-button-group {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Fullscreen chat image viewer. */
+ion-modal.image-fullscreen-modal {
+  --width: 100vw !important;
+  --height: 100vh !important;
+  --max-width: 100vw !important;
+  --max-height: 100vh !important;
+  --border-radius: 0 !important;
+  --background: #030712 !important;
+}
+
+ion-modal.image-fullscreen-modal::part(content) {
+  background: #030712 !important;
+}
