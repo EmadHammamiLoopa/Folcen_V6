@@ -33,18 +33,10 @@
         </div>
       </div>
       <ion-segment [(ngModel)]="gender" mode="ios" class="custom-segment" aria-label="Gender filter">
-        <ion-segment-button value="both">
-          <ion-label>Any</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="male">
-          <ion-label>Male</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="female">
-          <ion-label>Female</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="other">
-          <ion-label>Other</ion-label>
-        </ion-segment-button>
+        <ion-segment-button value="both"><ion-label>Any</ion-label></ion-segment-button>
+        <ion-segment-button value="male"><ion-label>Male</ion-label></ion-segment-button>
+        <ion-segment-button value="female"><ion-label>Female</ion-label></ion-segment-button>
+        <ion-segment-button value="other"><ion-label>Other</ion-label></ion-segment-button>
       </ion-segment>
     </section>
 
@@ -59,26 +51,12 @@
       <div class="age-container">
         <label class="age-input-wrapper">
           <span>Min</span>
-          <ion-input
-            type="number"
-            inputmode="numeric"
-            placeholder="18"
-            [(ngModel)]="minAge"
-            class="custom-input"
-            aria-label="Minimum age">
-          </ion-input>
+          <ion-input type="number" inputmode="numeric" placeholder="18" [(ngModel)]="minAge" class="custom-input" aria-label="Minimum age"></ion-input>
         </label>
         <div class="age-divider" aria-hidden="true"></div>
         <label class="age-input-wrapper">
           <span>Max</span>
-          <ion-input
-            type="number"
-            inputmode="numeric"
-            placeholder="99"
-            [(ngModel)]="maxAge"
-            class="custom-input"
-            aria-label="Maximum age">
-          </ion-input>
+          <ion-input type="number" inputmode="numeric" placeholder="99" [(ngModel)]="maxAge" class="custom-input" aria-label="Maximum age"></ion-input>
         </label>
       </div>
     </section>
@@ -92,11 +70,7 @@
         </div>
       </div>
       <div class="chip-container">
-        <ion-chip
-          *ngFor="let t of interestsChips; let i = index"
-          (click)="removeInterest(i)"
-          class="custom-chip"
-          [attr.aria-label]="'Remove interest ' + t">
+        <ion-chip *ngFor="let t of interestsChips; let i = index" (click)="removeInterest(i)" class="custom-chip" [attr.aria-label]="'Remove interest ' + t">
           <ion-label>{{ t }}</ion-label>
           <ion-icon name="close-outline" aria-hidden="true"></ion-icon>
         </ion-chip>
@@ -116,11 +90,7 @@
         </div>
       </div>
       <div class="chip-container">
-        <ion-chip
-          *ngFor="let t of languagesChips; let i = index"
-          (click)="removeLanguage(i)"
-          class="custom-chip"
-          [attr.aria-label]="'Remove language ' + t">
+        <ion-chip *ngFor="let t of languagesChips; let i = index" (click)="removeLanguage(i)" class="custom-chip" [attr.aria-label]="'Remove language ' + t">
           <ion-label>{{ t }}</ion-label>
           <ion-icon name="close-outline" aria-hidden="true"></ion-icon>
         </ion-chip>
@@ -165,18 +135,18 @@
         </div>
       </div>
     </section>
+
+    <div class="filter-actions-panel">
+      <div class="footer-actions">
+        <ion-button (click)="reset()" class="vibrant-btn reset-btn">
+          <ion-icon name="refresh-outline" slot="start"></ion-icon>
+          Reset
+        </ion-button>
+        <ion-button (click)="submit()" class="vibrant-btn apply-btn">
+          <ion-icon name="checkmark-outline" slot="start"></ion-icon>
+          Apply Filters
+        </ion-button>
+      </div>
+    </div>
   </main>
 </ion-content>
-
-<ion-footer class="ion-no-border filter-modal-footer">
-  <div class="footer-actions">
-    <ion-button (click)="reset()" class="vibrant-btn reset-btn">
-      <ion-icon name="refresh-outline" slot="start"></ion-icon>
-      Reset
-    </ion-button>
-    <ion-button (click)="submit()" class="vibrant-btn apply-btn">
-      <ion-icon name="checkmark-outline" slot="start"></ion-icon>
-      Apply Filters
-    </ion-button>
-  </div>
-</ion-footer>
