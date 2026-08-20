@@ -26,7 +26,7 @@
   width: 100%;
   max-width: 980px;
   margin: 0 auto;
-  padding: 14px var(--f-page-gutter) calc(108px + env(safe-area-inset-bottom));
+  padding: 14px var(--f-page-gutter) calc(118px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -75,18 +75,19 @@
 .requests-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
 .request-card {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
+  gap: 14px;
   min-width: 0;
-  padding: 12px;
-  border-radius: 18px;
+  padding: 14px;
+  border-radius: 20px;
   background: var(--f-surface);
   border: 1px solid var(--f-border);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
@@ -114,7 +115,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
   min-width: 0;
   cursor: pointer;
 
@@ -132,161 +132,150 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.request-name-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--f-text-strong);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.request-time {
+  flex: 0 0 auto;
+  color: var(--f-text-faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.location {
+  min-width: 0;
+  display: flex;
+  align-items: center;
   gap: 4px;
+  color: var(--f-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
 
-  .user-name {
-    max-width: 100%;
+  > span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--f-text-strong);
-    font-size: 15px;
-    font-weight: 690;
-    letter-spacing: -0.015em;
   }
 
-  .meta-info {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    min-width: 0;
-    flex-wrap: wrap;
-  }
-
-  .request-time {
+  ion-icon {
     flex: 0 0 auto;
+    font-size: 13px;
     color: var(--f-text-faint);
-    font-size: 12px;
-  }
-
-  .location {
-    min-width: 0;
-    max-width: 100%;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    color: var(--f-text-muted);
-    font-size: 12px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    ion-icon {
-      flex: 0 0 auto;
-      font-size: 13px;
-      color: var(--f-text-faint);
-    }
   }
 }
 
 .request-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 0 0 auto;
-  margin-left: 10px;
+}
 
-  .action-btn {
-    min-height: 40px;
-    border-radius: 13px;
-    border: 1px solid var(--f-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: transform .18s ease, background .18s ease, color .18s ease;
+.action-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 13px;
+  border: 1px solid var(--f-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform .18s ease, background .18s ease, color .18s ease;
 
-    ion-icon { font-size: 18px; }
-    &:active { transform: scale(.95); }
+  ion-icon { font-size: 18px; }
+  &:active { transform: scale(.97); }
 
-    &.accept {
-      min-width: 92px;
-      padding: 0 14px;
-      gap: 6px;
-      background: linear-gradient(135deg, #7467f2, #6366f1);
-      color: #fff;
-      border-color: rgba(124, 108, 255, .30);
-      font-size: 13px;
-      font-weight: 700;
-      box-shadow: 0 8px 20px rgba(99, 102, 241, .20);
-    }
+  &.accept {
+    background: linear-gradient(135deg, #7467f2, #6366f1);
+    color: #fff;
+    border-color: rgba(124, 108, 255, .30);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, .20);
+  }
 
-    &.reject {
-      width: 40px;
-      padding: 0;
-      background: var(--f-surface-muted);
-      color: var(--f-text-muted);
+  &.reject {
+    background: var(--f-surface-muted);
+    color: var(--f-text-muted);
 
-      &:active {
-        background: rgba(239, 68, 68, .10);
-        color: #ef4444;
-        border-color: rgba(239, 68, 68, .18);
-      }
+    &:active {
+      background: rgba(239, 68, 68, .10);
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, .18);
     }
   }
 }
 
-@include ds.phone-xs {
+@media (max-width: 767px) {
   .requests-container {
     padding-inline: 10px;
   }
 
   .request-card {
-    display: grid;
     grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 11px;
+    align-items: stretch;
+    gap: 12px;
+    padding: 13px;
   }
 
   .request-info {
     width: 100%;
-    gap: 10px;
+    gap: 11px;
 
     .avatar-wrapper {
-      width: 48px;
-      height: 48px;
-      flex-basis: 48px;
+      width: 50px;
+      height: 50px;
+      flex-basis: 50px;
     }
   }
 
-  .request-details {
-    .user-name {
-      font-size: 14.5px;
-    }
+  .request-name-row {
+    gap: 8px;
+  }
 
-    .meta-info {
-      gap: 5px 8px;
-    }
+  .user-name {
+    font-size: 15px;
+  }
 
-    .location {
-      flex-basis: 100%;
-      font-size: 11.5px;
-    }
+  .location {
+    font-size: 11.75px;
   }
 
   .request-actions {
     width: 100%;
-    margin-left: 0;
-    gap: 7px;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 8px;
+  }
 
-    .action-btn {
-      min-height: 38px;
-      border-radius: 12px;
-
-      &.accept {
-        flex: 1;
-        min-width: 0;
-        max-width: 180px;
-        padding-inline: 14px;
-        font-size: 12.5px;
-      }
-
-      &.reject {
-        width: 40px;
-        flex: 0 0 40px;
-      }
-    }
+  .action-btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding-inline: 12px;
+    border-radius: 13px;
   }
 }
 
@@ -301,8 +290,13 @@
   }
 
   .request-card {
-    min-height: 78px;
-    padding: 13px 14px;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .request-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 
@@ -319,7 +313,7 @@
     background: var(--f-surface-raised);
   }
 
-  .request-actions .reject:hover {
+  .action-btn.reject:hover {
     color: #ef4444;
     background: rgba(239, 68, 68, .08);
   }
@@ -327,7 +321,7 @@
 
 @include ds.reduced-motion {
   .request-card,
-  .request-actions .action-btn {
+  .action-btn {
     transition: none !important;
   }
 }
