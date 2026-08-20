@@ -16,7 +16,7 @@
 >
   <div class="card-accent-line"></div>
   
-  <div class="card-header">
+  <div class="comment-card-header">
     <div class="user-info" (click)="showUserProfile(commentUserId)" [style.cursor]="(comment.anonyme || isAdminComment() || !commentUserId) ? 'default' : 'pointer'">
       <div class="avatar-ring" [class.anonyme]="comment.anonyme">
         <div class="avatar-inner" [class.is-anonyme]="comment.anonyme">
