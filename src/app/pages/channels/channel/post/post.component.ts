@@ -256,6 +256,37 @@ const channelData = typeof params.channel === 'string' ? JSON.parse(params.chann
     );
   }
 
+  private normalizedVisibility(): string {
+    const visibility = String(this.post?.visibility || 'public').toLowerCase();
+    return visibility === 'friends' ? 'friends-only' : visibility;
+  }
+
+  visibilityLabel(): string {
+    switch (this.normalizedVisibility()) {
+      case 'friends-only':
+        return 'Friends';
+      case 'private':
+        return 'Private';
+      default:
+        return 'Public';
+    }
+  }
+
+  visibilityIcon(): string {
+    switch (this.normalizedVisibility()) {
+      case 'friends-only':
+        return 'people-outline';
+      case 'private':
+        return 'lock-closed-outline';
+      default:
+        return 'earth-outline';
+    }
+  }
+
+  isCurrentVisibility(option: string): boolean {
+    return this.normalizedVisibility() === option;
+  }
+
   toggleVisibilityOptions(event: Event) {
     event.stopPropagation();
     this.visibilityOptionsOpen = !this.visibilityOptionsOpen;
