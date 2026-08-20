@@ -52,7 +52,8 @@
               "src/theme/channel-post-v2.scss",
               "src/theme/channel-post-v3.scss",
               "src/theme/channel-post-v4.scss",
-              "src/theme/channel-post-v5.scss"
+              "src/theme/channel-post-v5.scss",
+              "src/theme/channel-post-v6.scss"
             ],
             "scripts": [
               "./node_modules/@fortawesome/fontawesome-free/js/all.min.js",
