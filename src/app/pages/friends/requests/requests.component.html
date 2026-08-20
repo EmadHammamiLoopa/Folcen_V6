@@ -20,23 +20,28 @@
     </div>
 
     <div class="requests-list" *ngIf="requests && requests.length > 0">
-      <article class="request-card animate__animated animate__fadeInUp" 
-           *ngFor="let request of requests; let i = index"
-           [style.animation-delay]="(i * 0.06) + 's'">
-        
+      <article
+        class="request-card animate__animated animate__fadeInUp"
+        *ngFor="let request of requests; let i = index"
+        [style.animation-delay]="(i * 0.06) + 's'">
+
         <div class="request-info" (click)="goToProfile(request.from?._id || request.from?.id)">
           <div class="avatar-wrapper">
             <app-avatar [profile]="request.from" [size]="50"></app-avatar>
           </div>
+
           <div class="request-details">
-            <span class="user-name">{{ request.from.fullName }}</span>
-            <div class="meta-info">
+            <div class="request-name-row">
+              <span class="user-name">{{ request.from.fullName }}</span>
               <span class="request-time">{{ request.createdAt | extractDiffTime }}</span>
-              <span class="location" *ngIf="(request.from.city && request.from.city !== '-') || (request.from.country && request.from.country !== '-')">
-                <ion-icon name="location-outline"></ion-icon>
-                {{ (request.from.city && request.from.city !== '-') ? request.from.city : '' }}{{ (request.from.city && request.from.city !== '-' && request.from.country && request.from.country !== '-') ? ', ' : '' }}{{ (request.from.country && request.from.country !== '-') ? request.from.country : '' }}
-              </span>
             </div>
+
+            <span
+              class="location"
+              *ngIf="(request.from.city && request.from.city !== '-') || (request.from.country && request.from.country !== '-')">
+              <ion-icon name="location-outline"></ion-icon>
+              <span>{{ (request.from.city && request.from.city !== '-') ? request.from.city : '' }}{{ (request.from.city && request.from.city !== '-' && request.from.country && request.from.country !== '-') ? ', ' : '' }}{{ (request.from.country && request.from.country !== '-') ? request.from.country : '' }}</span>
+            </span>
           </div>
         </div>
 
@@ -45,8 +50,10 @@
             <ion-icon name="checkmark-outline"></ion-icon>
             <span>Accept</span>
           </button>
-          <button class="action-btn reject" (click)="rejectRequestConf(request)" aria-label="Reject friend request" title="Reject">
+
+          <button class="action-btn reject" (click)="rejectRequestConf(request)" aria-label="Decline friend request">
             <ion-icon name="close-outline"></ion-icon>
+            <span>Decline</span>
           </button>
         </div>
       </article>
