@@ -44,8 +44,8 @@
 
   <div class="jdl-text" [style]="{'color':'var(--post-fg)'}" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
-      {{ post.text | slice:0:150 }}{{ post.text?.length > 150 ? '...' : '' }}
-      <span *ngIf="post.text?.length > 150" class="see-more">See More</span>
+      <span class="post-preview-text">{{ post.text }}</span>
+      <span *ngIf="post.text?.length > 150" class="see-more">Read more</span>
     </ng-container>
     <ng-container *ngIf="!showCommentsBtn">{{ post.text }}</ng-container>
   </div>
@@ -68,7 +68,10 @@
     <ng-container *ngIf="showCommentsBtn">
       <div class="meta-chip" *ngIf="post.relationshipGoals?.length"><ion-icon name="heart-outline"></ion-icon>{{ post.relationshipGoals[0] }}</div>
       <div class="meta-chip"><ion-icon name="calendar-number-outline"></ion-icon>{{ post.ageRange.min }}–{{ post.ageRange.max }}</div>
-      <div class="meta-chip" *ngIf="post.interests?.length"><ion-icon name="star-outline"></ion-icon>{{ post.interests[0] }}</div>
+      <div class="meta-chip" *ngIf="post.interests?.length">
+        <ion-icon name="star-outline"></ion-icon>
+        <span>{{ post.interests[0] | slice:0:24 }}{{ post.interests[0]?.length > 24 ? '…' : '' }}</span>
+      </div>
     </ng-container>
 
     <ng-container *ngIf="!showCommentsBtn">
@@ -81,7 +84,7 @@
   <ng-container *ngIf="channel?.type === 'static_dating' && post.hintAboutMe">
     <div *ngIf="showCommentsBtn" class="jdl-hint-teaser" (click)="showComments()">
       <ion-icon name="chatbox-ellipses-outline"></ion-icon>
-      <span>{{ post.hintAboutMe | slice:0:60 }}{{ post.hintAboutMe?.length > 60 ? '...' : '' }}</span>
+      <span>{{ post.hintAboutMe | slice:0:48 }}{{ post.hintAboutMe?.length > 48 ? '…' : '' }}</span>
     </div>
     <div *ngIf="!showCommentsBtn" class="hint-box full-width-hint">
       <strong><ion-icon name="chatbox-ellipses-outline"></ion-icon> Hint about me</strong>
