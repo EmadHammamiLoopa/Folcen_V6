@@ -94,11 +94,12 @@
         <div class="field-box description-field">
           <div class="field-label-row">
             <label class="field-label" for="channel-description">Description</label>
-            <span class="field-hint">Up to 255 characters</span>
+            <span class="field-hint">{{ description.value?.length || 0 }}/255</span>
           </div>
           <ion-textarea id="channel-description" maxlength="255" formControlName="description" rows="4" placeholder="What will people find in this channel?"></ion-textarea>
           <div class="error-msg" *ngIf="validatorErrors['description'] || (description.dirty && description.errors)">
             <span *ngIf="description.hasError('required')">Add a short description.</span>
+            <span *ngIf="description.hasError('maxlength')">Keep the description under 255 characters.</span>
           </div>
         </div>
       </section>
