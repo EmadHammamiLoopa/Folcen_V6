@@ -184,12 +184,40 @@ app-channel {
     font-weight: 700 !important;
   }
 
+  .channel-hero .ch-description-row {
+    width: min(100%, 650px) !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 30px !important;
+    align-items: start !important;
+    gap: 7px !important;
+    margin: 7px 0 10px !important;
+  }
+
   .channel-hero .ch-desc {
     max-width: 620px !important;
-    margin: 7px 0 10px !important;
+    margin: 0 !important;
     color: rgba(226,232,240,.76) !important;
     font-size: 12.5px !important;
     line-height: 1.46 !important;
+    cursor: default !important;
+  }
+
+  .channel-hero .ch-description-info {
+    appearance: none !important;
+    width: 30px !important;
+    height: 30px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    border: 1px solid rgba(255,255,255,.14) !important;
+    border-radius: 10px !important;
+    color: rgba(248,250,252,.92) !important;
+    background: rgba(15,23,42,.58) !important;
+  }
+
+  .channel-hero .ch-description-info ion-icon {
+    font-size: 16px !important;
   }
 
   .channel-hero .ch-stats {
@@ -284,7 +312,14 @@ app-channel {
     gap: 12px !important;
   }
 
-  .empty-state,
+  .empty-state {
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding: 0 0 20px !important;
+  }
+
   .verification-alert {
     display: flex !important;
     justify-content: center !important;
