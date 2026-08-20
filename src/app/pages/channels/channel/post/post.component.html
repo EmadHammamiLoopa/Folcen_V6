@@ -10,6 +10,13 @@
         <div class="meta-row">
           <ion-icon name="time-outline" aria-hidden="true"></ion-icon>
           <span class="date">{{ post.createdAt | extractDiffTime }}</span>
+          <span
+            *ngIf="post.isOwner"
+            class="owner-privacy-status"
+            [attr.aria-label]="'Post visibility: ' + visibilityLabel()">
+            <ion-icon [name]="visibilityIcon()" aria-hidden="true"></ion-icon>
+            <span>{{ visibilityLabel() }}</span>
+          </span>
         </div>
       </div>
     </div>
@@ -25,9 +32,9 @@
         class="icon-btn privacy-toggle"
         [class.active]="visibilityOptionsOpen"
         (click)="toggleVisibilityOptions($event)"
-        aria-label="Change post visibility"
+        [attr.aria-label]="'Change post visibility. Current: ' + visibilityLabel()"
         [attr.aria-expanded]="visibilityOptionsOpen">
-        <ion-icon name="eye-outline"></ion-icon>
+        <ion-icon [name]="visibilityIcon()"></ion-icon>
       </button>
     </div>
   </header>
@@ -40,15 +47,15 @@
     role="menu"
     aria-label="Post privacy"
     #dropdown>
-    <button type="button" class="privacy-option" (click)="changeVisibility('public')" role="menuitem">
+    <button type="button" class="privacy-option" [class.selected]="isCurrentVisibility('public')" [attr.aria-checked]="isCurrentVisibility('public')" (click)="changeVisibility('public')" role="menuitemradio">
       <span class="privacy-icon"><ion-icon name="earth-outline"></ion-icon></span>
       <span class="privacy-copy"><strong>Public</strong><small>Anyone can see this post</small></span>
     </button>
-    <button type="button" class="privacy-option" (click)="changeVisibility('friends-only')" role="menuitem">
+    <button type="button" class="privacy-option" [class.selected]="isCurrentVisibility('friends-only')" [attr.aria-checked]="isCurrentVisibility('friends-only')" (click)="changeVisibility('friends-only')" role="menuitemradio">
       <span class="privacy-icon"><ion-icon name="people-outline"></ion-icon></span>
       <span class="privacy-copy"><strong>Friends</strong><small>Only your friends can see this post</small></span>
     </button>
-    <button type="button" class="privacy-option" (click)="changeVisibility('private')" role="menuitem">
+    <button type="button" class="privacy-option" [class.selected]="isCurrentVisibility('private')" [attr.aria-checked]="isCurrentVisibility('private')" (click)="changeVisibility('private')" role="menuitemradio">
       <span class="privacy-icon"><ion-icon name="lock-closed-outline"></ion-icon></span>
       <span class="privacy-copy"><strong>Private</strong><small>Only you can see this post</small></span>
     </button>
