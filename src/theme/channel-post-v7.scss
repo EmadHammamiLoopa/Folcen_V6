@@ -121,6 +121,19 @@ app-comments .post-focus app-post .post-privacy-panel .privacy-option {
   font: inherit !important;
 }
 
+app-channel app-post .post-privacy-panel .privacy-option.selected,
+app-comments .post-focus app-post .post-privacy-panel .privacy-option.selected {
+  border-color: rgba(124,108,255,.44) !important;
+  background: rgba(124,108,255,.16) !important;
+  box-shadow: inset 0 0 0 1px rgba(196,181,253,.08) !important;
+}
+
+app-channel app-post .post-privacy-panel .privacy-option.selected .privacy-icon,
+app-comments .post-focus app-post .post-privacy-panel .privacy-option.selected .privacy-icon {
+  color: #fff !important;
+  background: rgba(124,108,255,.34) !important;
+}
+
 app-channel app-post .post-privacy-panel .privacy-icon,
 app-comments .post-focus app-post .post-privacy-panel .privacy-icon {
   width: 30px !important;
