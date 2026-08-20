@@ -9,9 +9,6 @@
     <div class="header-container">
       <div class="header-top">
         <div class="brand-section">
-          <div class="feed-title-icon" aria-hidden="true">
-            <ion-icon name="newspaper-outline"></ion-icon>
-          </div>
           <h1 class="main-title">Feed</h1>
           <div class="status-dot" aria-hidden="true"></div>
         </div>
@@ -22,7 +19,8 @@
             class="budget-pill"
             *ngIf="budget > 0"
             routerLink="/tabs/messages"
-            aria-label="Open messages">
+            aria-label="Open messages"
+            style="font-family: inherit;">
             <ion-icon name="call-outline" aria-hidden="true"></ion-icon>
             <span>{{ budget }}</span>
           </button>
@@ -37,13 +35,16 @@
           </ion-button>
         </div>
       </div>
-      <p class="header-desc">Updates from people and channels you follow.</p>
+      <p class="header-desc" style="margin-left: 0;">Updates from people and channels you follow.</p>
     </div>
   </header>
 
   <app-loader *ngIf="pageLoading"></app-loader>
 
-  <section class="empty-state-creative" *ngIf="!pageLoading && posts.length === 0">
+  <section
+    class="empty-state-creative"
+    *ngIf="!pageLoading && posts.length === 0"
+    style="padding-bottom: calc(138px + env(safe-area-inset-bottom));">
     <div class="empty-glass">
       <div class="glow-orb" aria-hidden="true"></div>
       <ion-icon name="planet-outline" class="empty-icon" aria-hidden="true"></ion-icon>
@@ -56,7 +57,10 @@
     </div>
   </section>
 
-  <div class="feed-scroll-area" *ngIf="posts.length > 0">
+  <div
+    class="feed-scroll-area"
+    *ngIf="posts.length > 0"
+    style="padding-bottom: calc(138px + env(safe-area-inset-bottom));">
     <div class="creative-grid compact-mode">
       <article
         *ngFor="let activity of posts"
