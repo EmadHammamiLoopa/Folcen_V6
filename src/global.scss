@@ -142,8 +142,8 @@ ion-header {
   --backdrop-opacity: .58;
 
   .alert-wrapper {
-    width: min(88vw, 360px);
-    border-radius: 24px;
+    width: min(86vw, 344px);
+    border-radius: 22px;
     overflow: hidden;
     background:
       linear-gradient(150deg, rgba(124,108,255,.10), rgba(56,189,248,.025)),
@@ -155,38 +155,51 @@ ion-header {
   }
 
   .alert-head {
-    padding: 24px 22px 8px;
+    padding: 20px 20px 2px !important;
   }
 
+  .alert-head .alert-title,
   .alert-title {
+    margin: 0 !important;
     color: var(--ion-text-color, #fff) !important;
-    font-size: 20px;
-    font-weight: 760;
-    line-height: 1.2;
-    letter-spacing: -.02em;
+    font-size: 18px !important;
+    font-weight: 750 !important;
+    line-height: 1.18 !important;
+    letter-spacing: -.018em !important;
+    text-align: left !important;
   }
 
   .alert-message {
-    padding: 8px 22px 22px;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 8px 20px 16px !important;
     color: var(--folcen-text-muted, #94a3b8) !important;
-    font-size: 14px;
-    line-height: 1.55;
+    font-size: 13px !important;
+    line-height: 1.42 !important;
+    text-align: left !important;
+    white-space: normal !important;
   }
 
   .alert-button-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    padding: 0 18px 18px;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 9px !important;
+    padding: 0 16px 16px !important;
   }
 
   .alert-button {
-    min-height: 46px;
+    min-height: 44px !important;
     margin: 0 !important;
-    border-radius: 14px;
-    font-size: 13px;
-    font-weight: 720;
-    letter-spacing: 0;
+    padding: 0 14px !important;
+    border-radius: 13px !important;
+    font-size: 12.5px !important;
+    font-weight: 720 !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .alert-button .alert-button-inner {
+    justify-content: center !important;
   }
 
   .folcen-alert-cancel {
@@ -199,7 +212,7 @@ ion-header {
     color: #fff !important;
     background: linear-gradient(135deg, #ef4444, #f43f5e) !important;
     border: 1px solid rgba(244,63,94,.28) !important;
-    box-shadow: 0 10px 24px rgba(239,68,68,.20);
+    box-shadow: 0 8px 20px rgba(239,68,68,.18) !important;
   }
 }
 
