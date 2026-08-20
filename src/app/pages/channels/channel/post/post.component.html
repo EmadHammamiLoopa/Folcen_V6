@@ -1,34 +1,4 @@
 <ion-card class="jodel-card" [class.feed-card]="showCommentsBtn" [style]="{'--post-bg': post.backgroundColor, '--post-fg': post.color}">
-  <div class="jdl-top-rail" aria-label="Post options">
-    <ng-container *ngIf="post.isOwner">
-      <div class="rel">
-        <button type="button" class="icon-btn" (click)="toggleVisibilityOptions($event)" aria-label="Change post visibility">
-          <ion-icon name="eye-outline"></ion-icon>
-        </button>
-        <div class="custom-popover" [ngClass]="{'show': visibilityOptionsOpen}" #dropdown role="menu" aria-label="Post privacy">
-          <div class="visibility-dropdown">
-            <button type="button" class="privacy-option" (click)="changeVisibility('public')" role="menuitem">
-              <span class="privacy-icon"><ion-icon name="earth-outline"></ion-icon></span>
-              <span class="privacy-copy"><strong>Public</strong><small>Anyone can see this post</small></span>
-            </button>
-            <button type="button" class="privacy-option" (click)="changeVisibility('friends-only')" role="menuitem">
-              <span class="privacy-icon"><ion-icon name="people-outline"></ion-icon></span>
-              <span class="privacy-copy"><strong>Friends</strong><small>Only your friends</small></span>
-            </button>
-            <button type="button" class="privacy-option" (click)="changeVisibility('private')" role="menuitem">
-              <span class="privacy-icon"><ion-icon name="lock-closed-outline"></ion-icon></span>
-              <span class="privacy-copy"><strong>Private</strong><small>Only you</small></span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </ng-container>
-
-    <button type="button" class="icon-btn" (click)="presentPopover($event)" aria-label="Post options">
-      <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
-    </button>
-  </div>
-
   <header class="jdl-h">
     <div class="jdl-user" [style]="{'color':'var(--post-fg)'}" (click)="showUserProfile(post.user.id)" [style.cursor]="(post.anonyme || isAdminPost()) ? 'default' : 'pointer'">
       <div class="avatar-mini" [class.anonyme]="post.anonyme">
@@ -43,7 +13,46 @@
         </div>
       </div>
     </div>
+
+    <div class="jdl-top-rail" aria-label="Post options">
+      <button type="button" class="icon-btn" (click)="presentPopover($event)" aria-label="Post options">
+        <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
+      </button>
+
+      <button
+        *ngIf="post.isOwner"
+        type="button"
+        class="icon-btn privacy-toggle"
+        [class.active]="visibilityOptionsOpen"
+        (click)="toggleVisibilityOptions($event)"
+        aria-label="Change post visibility"
+        [attr.aria-expanded]="visibilityOptionsOpen">
+        <ion-icon name="eye-outline"></ion-icon>
+      </button>
+    </div>
   </header>
+
+  <section
+    *ngIf="post.isOwner"
+    class="post-privacy-panel"
+    [class.show]="visibilityOptionsOpen"
+    [attr.aria-hidden]="!visibilityOptionsOpen"
+    role="menu"
+    aria-label="Post privacy"
+    #dropdown>
+    <button type="button" class="privacy-option" (click)="changeVisibility('public')" role="menuitem">
+      <span class="privacy-icon"><ion-icon name="earth-outline"></ion-icon></span>
+      <span class="privacy-copy"><strong>Public</strong><small>Anyone can see this post</small></span>
+    </button>
+    <button type="button" class="privacy-option" (click)="changeVisibility('friends-only')" role="menuitem">
+      <span class="privacy-icon"><ion-icon name="people-outline"></ion-icon></span>
+      <span class="privacy-copy"><strong>Friends</strong><small>Only your friends can see this post</small></span>
+    </button>
+    <button type="button" class="privacy-option" (click)="changeVisibility('private')" role="menuitem">
+      <span class="privacy-icon"><ion-icon name="lock-closed-outline"></ion-icon></span>
+      <span class="privacy-copy"><strong>Private</strong><small>Only you can see this post</small></span>
+    </button>
+  </section>
 
   <div class="jdl-text" [style]="{'color':'var(--post-fg)'}" (click)="showComments()">
     <ng-container *ngIf="showCommentsBtn">
