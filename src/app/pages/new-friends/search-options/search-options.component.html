@@ -1,134 +1,181 @@
-<ion-header class="ion-no-border">
+<ion-header class="ion-no-border filter-modal-header">
   <ion-toolbar class="fancy-toolbar">
     <ion-buttons slot="start">
-      <ion-button (click)="modalCtrl.dismiss()" class="close-btn">
-        <ion-icon name="close-outline"></ion-icon>
+      <ion-button (click)="modalCtrl.dismiss()" class="close-btn" aria-label="Close discovery filters">
+        <ion-icon name="close-outline" slot="icon-only"></ion-icon>
       </ion-button>
     </ion-buttons>
-    <ion-title>Filter Discovery</ion-title>
+    <ion-title>Discovery Filters</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <div class="mesh-gradient"></div>
+<ion-content class="filter-modal-content">
+  <div class="mesh-gradient" aria-hidden="true"></div>
 
-  <!-- Gender Selection -->
-  <div class="filter-group">
-    <div class="group-header">
-      <ion-icon name="people-outline"></ion-icon>
-      <ion-label>I'm looking for</ion-label>
-    </div>
-    <ion-segment [(ngModel)]="gender" mode="ios" class="custom-segment">
-      <ion-segment-button value="both">
-        <ion-label>Any</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="male">
-        <ion-label>Male</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="female">
-        <ion-label>Female</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="other">
-        <ion-label>Other</ion-label>
-      </ion-segment-button>
-    </ion-segment>
-  </div>
-
-  <!-- Age Range -->
-  <div class="filter-group">
-    <div class="group-header">
-      <ion-icon name="calendar-outline"></ion-icon>
-      <ion-label>Age Range</ion-label>
-    </div>
-    <div class="age-container">
-      <div class="age-input-wrapper">
-        <span>Min</span>
-        <ion-input type="number" placeholder="18" [(ngModel)]="minAge" class="custom-input"></ion-input>
+  <main class="filter-modal-shell">
+    <section class="filter-intro" aria-labelledby="filter-intro-title">
+      <div class="filter-intro-icon" aria-hidden="true">
+        <ion-icon name="options-outline"></ion-icon>
       </div>
-      <div class="age-divider"></div>
-      <div class="age-input-wrapper">
-        <span>Max</span>
-        <ion-input type="number" placeholder="99" [(ngModel)]="maxAge" class="custom-input"></ion-input>
+      <div class="filter-intro-copy">
+        <span class="filter-intro-kicker">Refine discovery</span>
+        <h1 id="filter-intro-title">Choose who you want to meet</h1>
+        <p>Adjust any filters you care about. Leave the rest open for broader discovery.</p>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- Interests -->
-  <div class="filter-group">
-    <div class="group-header">
-      <ion-icon name="heart-outline"></ion-icon>
-      <ion-label>Interests</ion-label>
-    </div>
-    <div class="chip-container">
-      <ion-chip *ngFor="let t of interestsChips; let i = index" (click)="removeInterest(i)" class="custom-chip">
-        <ion-label>{{ t }}</ion-label>
-        <ion-icon name="close-circle"></ion-icon>
-      </ion-chip>
-      <ion-button fill="clear" class="add-list-btn" (click)="openInterestsModal()">
-        <ion-icon name="add-circle-outline" slot="start"></ion-icon>
-        Select from list
-      </ion-button>
-    </div>
-  </div>
-
-  <!-- Languages -->
-  <div class="filter-group">
-    <div class="group-header">
-      <ion-icon name="language-outline"></ion-icon>
-      <ion-label>Languages</ion-label>
-    </div>
-    <div class="chip-container">
-      <ion-chip *ngFor="let t of languagesChips; let i = index" (click)="removeLanguage(i)" class="custom-chip">
-        <ion-label>{{ t }}</ion-label>
-        <ion-icon name="close-circle"></ion-icon>
-      </ion-chip>
-      <ion-button fill="clear" class="add-list-btn" (click)="openLanguagesModal()">
-        <ion-icon name="add-circle-outline" slot="start"></ion-icon>
-        Select from list
-      </ion-button>
-    </div>
-  </div>
-
-  <!-- Online Only (Grid Mode) -->
-  <div class="filter-group" *ngIf="!isRandomMode">
-    <div class="toggle-item">
-      <div class="toggle-info">
-        <ion-icon name="radio-outline" color="success"></ion-icon>
-        <div class="toggle-text">
-          <span class="title">Online Only</span>
-          <span class="subtitle">Show users currently active</span>
+    <section class="filter-group">
+      <div class="group-header">
+        <ion-icon name="people-outline" aria-hidden="true"></ion-icon>
+        <div class="group-heading-copy">
+          <ion-label>I'm looking for</ion-label>
+          <span>Choose who appears in discovery.</span>
         </div>
       </div>
-      <ion-toggle [(ngModel)]="online" mode="ios"></ion-toggle>
-    </div>
-  </div>
+      <ion-segment [(ngModel)]="gender" mode="ios" class="custom-segment" aria-label="Gender filter">
+        <ion-segment-button value="both">
+          <ion-label>Any</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="male">
+          <ion-label>Male</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="female">
+          <ion-label>Female</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="other">
+          <ion-label>Other</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </section>
 
-  <!-- Additional Filters (Grid Mode) -->
-  <div class="filter-group" *ngIf="!isRandomMode && checkItemsNames && checkItemsNames.length">
-    <div class="group-header">
-      <ion-icon name="options-outline"></ion-icon>
-      <ion-label>Additional Filters</ion-label>
-    </div>
-    <div class="custom-list">
-      <div class="toggle-item" *ngFor="let item of checkItemsNames">
+    <section class="filter-group">
+      <div class="group-header">
+        <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
+        <div class="group-heading-copy">
+          <ion-label>Age Range</ion-label>
+          <span>Set a minimum, maximum, or both.</span>
+        </div>
+      </div>
+      <div class="age-container">
+        <label class="age-input-wrapper">
+          <span>Min</span>
+          <ion-input
+            type="number"
+            inputmode="numeric"
+            placeholder="18"
+            [(ngModel)]="minAge"
+            class="custom-input"
+            aria-label="Minimum age">
+          </ion-input>
+        </label>
+        <div class="age-divider" aria-hidden="true"></div>
+        <label class="age-input-wrapper">
+          <span>Max</span>
+          <ion-input
+            type="number"
+            inputmode="numeric"
+            placeholder="99"
+            [(ngModel)]="maxAge"
+            class="custom-input"
+            aria-label="Maximum age">
+          </ion-input>
+        </label>
+      </div>
+    </section>
+
+    <section class="filter-group">
+      <div class="group-header">
+        <ion-icon name="heart-outline" aria-hidden="true"></ion-icon>
+        <div class="group-heading-copy">
+          <ion-label>Interests</ion-label>
+          <span>Add shared interests to narrow the results.</span>
+        </div>
+      </div>
+      <div class="chip-container">
+        <ion-chip
+          *ngFor="let t of interestsChips; let i = index"
+          (click)="removeInterest(i)"
+          class="custom-chip"
+          [attr.aria-label]="'Remove interest ' + t">
+          <ion-label>{{ t }}</ion-label>
+          <ion-icon name="close-outline" aria-hidden="true"></ion-icon>
+        </ion-chip>
+        <ion-button fill="clear" class="add-list-btn" (click)="openInterestsModal()">
+          <ion-icon name="add-outline" slot="start"></ion-icon>
+          Select interests
+        </ion-button>
+      </div>
+    </section>
+
+    <section class="filter-group">
+      <div class="group-header">
+        <ion-icon name="language-outline" aria-hidden="true"></ion-icon>
+        <div class="group-heading-copy">
+          <ion-label>Languages</ion-label>
+          <span>Find people who speak the languages you prefer.</span>
+        </div>
+      </div>
+      <div class="chip-container">
+        <ion-chip
+          *ngFor="let t of languagesChips; let i = index"
+          (click)="removeLanguage(i)"
+          class="custom-chip"
+          [attr.aria-label]="'Remove language ' + t">
+          <ion-label>{{ t }}</ion-label>
+          <ion-icon name="close-outline" aria-hidden="true"></ion-icon>
+        </ion-chip>
+        <ion-button fill="clear" class="add-list-btn" (click)="openLanguagesModal()">
+          <ion-icon name="add-outline" slot="start"></ion-icon>
+          Select languages
+        </ion-button>
+      </div>
+    </section>
+
+    <section class="filter-group compact-filter-group" *ngIf="!isRandomMode">
+      <div class="toggle-item">
         <div class="toggle-info">
+          <div class="toggle-icon online-toggle-icon" aria-hidden="true">
+            <ion-icon name="radio-outline"></ion-icon>
+          </div>
           <div class="toggle-text">
-            <span class="title">{{ item | titlecase }}</span>
+            <span class="title">Online Only</span>
+            <span class="subtitle">Show people who are currently active.</span>
           </div>
         </div>
-        <ion-toggle [(ngModel)]="checkItems[item]" mode="ios"></ion-toggle>
+        <ion-toggle [(ngModel)]="online" mode="ios" aria-label="Online users only"></ion-toggle>
       </div>
-    </div>
-  </div>
+    </section>
+
+    <section class="filter-group" *ngIf="!isRandomMode && checkItemsNames && checkItemsNames.length">
+      <div class="group-header">
+        <ion-icon name="options-outline" aria-hidden="true"></ion-icon>
+        <div class="group-heading-copy">
+          <ion-label>Additional Filters</ion-label>
+          <span>Apply any additional matching preferences.</span>
+        </div>
+      </div>
+      <div class="custom-list">
+        <div class="toggle-item" *ngFor="let item of checkItemsNames">
+          <div class="toggle-info">
+            <div class="toggle-text">
+              <span class="title">{{ item | titlecase }}</span>
+            </div>
+          </div>
+          <ion-toggle [(ngModel)]="checkItems[item]" mode="ios" [attr.aria-label]="(item | titlecase) + ' filter'"></ion-toggle>
+        </div>
+      </div>
+    </section>
+  </main>
 </ion-content>
 
-<ion-footer class="ion-no-border">
+<ion-footer class="ion-no-border filter-modal-footer">
   <div class="footer-actions">
     <ion-button (click)="reset()" class="vibrant-btn reset-btn">
       <ion-icon name="refresh-outline" slot="start"></ion-icon>
       Reset
     </ion-button>
     <ion-button (click)="submit()" class="vibrant-btn apply-btn">
+      <ion-icon name="checkmark-outline" slot="start"></ion-icon>
       Apply Filters
     </ion-button>
   </div>
