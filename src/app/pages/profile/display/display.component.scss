@@ -244,6 +244,30 @@ $ui-font: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI Variabl
       font-size: 15px;
     }
   }
+
+  .private-identity-label {
+    width: fit-content;
+    min-height: 30px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 6px 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid rgba(124,108,255,.18);
+    border-radius: 999px;
+    color: var(--f-accent);
+    background: var(--f-accent-soft);
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1;
+
+    ion-icon {
+      flex: 0 0 auto;
+      font-size: 13px;
+    }
+  }
 }
 
 .stats-bar {
@@ -343,36 +367,43 @@ $ui-font: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI Variabl
 
 .visitor-actions {
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
   margin-bottom: 24px;
+
+  &.private-actions {
+    max-width: 390px;
+  }
 
   ion-button.primary-action,
   ion-button.secondary-action {
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
     min-height: 46px;
     height: auto;
     margin: 0;
     --border-radius: 15px;
-    --padding-start: 11px;
-    --padding-end: 11px;
+    --padding-start: clamp(6px, 2vw, 11px);
+    --padding-end: clamp(6px, 2vw, 11px);
     font-family: $ui-font;
-    font-size: 13px;
+    font-size: clamp(10px, 2.8vw, 13px);
     font-weight: 650;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    text-transform: none;
     overflow: hidden;
 
     ion-icon {
       flex: 0 0 auto;
-      margin-inline-end: 6px;
-      font-size: 17px;
+      margin-inline-end: clamp(3px, 1.4vw, 6px);
+      font-size: clamp(14px, 3.8vw, 17px);
     }
 
     &::part(native) {
       min-width: 0;
-      white-space: normal;
+      overflow: hidden;
+      white-space: nowrap;
       line-height: 1.12;
       text-align: center;
     }
@@ -831,7 +862,14 @@ $ui-font: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI Variabl
     }
   }
 
-  .visitor-actions { grid-template-columns: 1fr 1fr; }
+  .visitor-actions {
+    gap: 6px;
+
+    ion-button.primary-action,
+    ion-button.secondary-action {
+      min-height: 44px;
+    }
+  }
   .details-grid { grid-template-columns: 1fr; }
   .modern-gallery-grid { gap: 6px; }
 }
