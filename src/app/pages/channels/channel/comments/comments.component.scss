@@ -154,11 +154,34 @@
   background: linear-gradient(135deg, #f43f5e, #e11d48);
 }
 
-.restricted-card ion-button {
+.retry-content-btn {
+  @include ds.focus-ring;
+  appearance: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin-top: 18px;
-  --border-radius: 14px;
-  --color: var(--f-accent);
-  --border-color: var(--f-border-strong);
+  padding: 0 18px;
+  border: 1px solid var(--f-border-strong);
+  border-radius: 14px;
+  background: var(--f-accent-soft);
+  color: var(--f-accent);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  box-shadow: 0 8px 20px var(--f-accent-glow);
+
+  ion-icon {
+    flex: 0 0 auto;
+    font-size: 1rem;
+  }
+
+  &:active {
+    transform: scale(0.97);
+    background: var(--f-surface-muted);
+  }
 }
 
 .comment-footer {
