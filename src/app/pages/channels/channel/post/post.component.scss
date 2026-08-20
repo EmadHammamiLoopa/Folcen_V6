@@ -227,6 +227,34 @@
   }
 }
 
+.owner-privacy-status {
+  max-width: 92px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--post-fg);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.2;
+
+  ion-icon {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+  }
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .jdl-h-actions {
   display: flex;
   align-items: center;
