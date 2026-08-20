@@ -1,21 +1,8 @@
-<ion-header class="archive-topbar ion-no-border">
+<ion-header class="archive-topbar ion-no-border" *ngIf="!actorId">
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button
-        defaultHref="/tabs/profile"
-        icon="arrow-back-outline"
-        aria-label="Back to profile">
-      </ion-back-button>
-    </ion-buttons>
-
-    <ion-title>{{ actorId ? 'My Archive' : 'Activity' }}</ion-title>
-
+    <ion-title>Activity</ion-title>
     <ion-buttons slot="end">
-      <ion-button
-        (click)="close()"
-        *ngIf="!actorId"
-        fill="clear"
-        aria-label="Close activity">
+      <ion-button (click)="close()" fill="clear" aria-label="Close activity">
         <ion-icon name="close-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
@@ -25,14 +12,19 @@
 <ion-content class="archive-content">
   <div class="archive-backdrop" aria-hidden="true"></div>
 
-  <main class="archive-container">
+  <main class="archive-container" [style.padding-top]="actorId ? 'calc(18px + env(safe-area-inset-top))' : null">
     <section class="archive-header" *ngIf="actorId">
-      <div class="archive-icon-shell">
-        <ion-icon name="archive-outline" class="archive-icon"></ion-icon>
-      </div>
+      <ion-buttons class="archive-hero-back">
+        <ion-back-button
+          defaultHref="/tabs/profile"
+          text=""
+          icon="arrow-back-outline"
+          aria-label="Back to profile">
+        </ion-back-button>
+      </ion-buttons>
 
       <div class="header-text">
-        <span class="archive-eyebrow">Your history</span>
+        <span class="archive-eyebrow">My Archive</span>
         <h1>Personal Archive</h1>
         <p>Revisit your posts, comments and votes in one place.</p>
       </div>
@@ -40,66 +32,37 @@
 
     <div class="filters-wrapper">
       <ion-segment [value]="filter" (ionChange)="setFilter($event)" mode="ios" aria-label="Activity filter">
-        <ion-segment-button value="all" *ngIf="!actorId">
-          <ion-label>All</ion-label>
-        </ion-segment-button>
-
-        <ion-segment-button value="my" *ngIf="actorId">
-          <ion-label>Everything</ion-label>
-        </ion-segment-button>
-
-        <ion-segment-button value="posts">
-          <ion-label>Posts</ion-label>
-        </ion-segment-button>
-
-        <ion-segment-button value="comments">
-          <ion-label>Comments</ion-label>
-        </ion-segment-button>
+        <ion-segment-button value="all" *ngIf="!actorId"><ion-label>All</ion-label></ion-segment-button>
+        <ion-segment-button value="my" *ngIf="actorId"><ion-label>Everything</ion-label></ion-segment-button>
+        <ion-segment-button value="posts"><ion-label>Posts</ion-label></ion-segment-button>
+        <ion-segment-button value="comments"><ion-label>Comments</ion-label></ion-segment-button>
       </ion-segment>
     </div>
 
     <section class="activity-list" aria-live="polite">
       <div class="loading-state" *ngIf="loading && activities.length === 0">
-        <div class="loading-icon-shell">
-          <ion-spinner name="crescent"></ion-spinner>
-        </div>
-        <div>
-          <strong>Loading your archive</strong>
-          <p>Collecting your recent activity…</p>
-        </div>
+        <div class="loading-icon-shell"><ion-spinner name="crescent"></ion-spinner></div>
+        <div><strong>Loading your archive</strong><p>Collecting your recent activity…</p></div>
       </div>
 
       <ng-container *ngIf="loading && activities.length === 0">
         <div class="skeleton-item" *ngFor="let i of [1,2,3]">
           <div class="skeleton-icon"></div>
-          <div class="skeleton-content">
-            <div class="skeleton-line short"></div>
-            <div class="skeleton-line long"></div>
-          </div>
+          <div class="skeleton-content"><div class="skeleton-line short"></div><div class="skeleton-line long"></div></div>
         </div>
       </ng-container>
 
       <div class="empty-archive" *ngIf="!loading && activities.length === 0">
-        <div class="empty-icon-shell">
-          <ion-icon name="archive-outline"></ion-icon>
-        </div>
+        <div class="empty-icon-shell"><ion-icon name="archive-outline"></ion-icon></div>
         <h3>No activity found</h3>
         <p>Your posts, comments and votes will appear here.</p>
       </div>
 
-      <article
-        *ngFor="let a of activities"
-        (click)="openItem(a)"
-        class="activity-item"
-        role="button"
-        tabindex="0">
-
+      <article *ngFor="let a of activities" (click)="openItem(a)" class="activity-item" role="button" tabindex="0">
         <div class="item-icon-wrapper" [ngClass]="a.type">
-          <ion-icon
-            [name]="a.type === 'post' ? 'document-text-outline' : (a.type === 'comment' ? 'chatbubble-ellipses-outline' : 'heart-outline')">
-          </ion-icon>
+          <ion-icon [name]="a.type === 'post' ? 'document-text-outline' : (a.type === 'comment' ? 'chatbubble-ellipses-outline' : 'heart-outline')"></ion-icon>
         </div>
-        
+
         <div class="item-content">
           <div class="item-header">
             <span class="item-type">{{ a.type === 'like' ? 'Voted' : a.type }}</span>
@@ -107,56 +70,24 @@
           </div>
 
           <div class="item-body">
-            <div class="item-channel" *ngIf="a.channelName">
-              <span>in</span>
-              <strong>{{ a.channelName }}</strong>
+            <div class="item-channel" *ngIf="a.channelName"><span>in</span><strong>{{ a.channelName }}</strong></div>
+            <div class="item-text" [ngClass]="{'italic': !a.snippet}">{{ a.snippet || a.summary }}</div>
+
+            <div class="post-extras event" *ngIf="a.postExtras && (a.postExtras.eventDate || a.postExtras.eventLocation || a.postExtras.eventTime)">
+              <span class="extra-chip" *ngIf="a.postExtras.eventDate"><ion-icon name="calendar-outline"></ion-icon>{{ a.postExtras.eventDate | date:'dd MMM y' }}</span>
+              <span class="extra-chip" *ngIf="a.postExtras.eventTime"><ion-icon name="time-outline"></ion-icon>{{ a.postExtras.eventTime | date:'HH:mm' }}</span>
+              <span class="extra-chip" *ngIf="a.postExtras.eventLocation"><ion-icon name="location-outline"></ion-icon>{{ a.postExtras.eventLocation }}</span>
             </div>
 
-            <div class="item-text" [ngClass]="{'italic': !a.snippet}">
-              {{ a.snippet || a.summary }}
-            </div>
-
-            <div class="post-extras event"
-                 *ngIf="a.postExtras && (a.postExtras.eventDate || a.postExtras.eventLocation || a.postExtras.eventTime)">
-              <span class="extra-chip" *ngIf="a.postExtras.eventDate">
-                <ion-icon name="calendar-outline"></ion-icon>
-                {{ a.postExtras.eventDate | date:'dd MMM y' }}
-              </span>
-
-              <span class="extra-chip" *ngIf="a.postExtras.eventTime">
-                <ion-icon name="time-outline"></ion-icon>
-                {{ a.postExtras.eventTime | date:'HH:mm' }}
-              </span>
-
-              <span class="extra-chip" *ngIf="a.postExtras.eventLocation">
-                <ion-icon name="location-outline"></ion-icon>
-                {{ a.postExtras.eventLocation }}
-              </span>
-            </div>
-
-            <div class="post-extras dating"
-                 *ngIf="a.postExtras && (a.postExtras.relationshipGoals?.length || a.postExtras.ageRange || a.postExtras.interests?.length || a.postExtras.hintAboutMe)">
-              <span class="extra-chip" *ngIf="a.postExtras.relationshipGoals?.length">
-                <ion-icon name="heart-outline"></ion-icon>
-                {{ a.postExtras.relationshipGoals.join(', ') }}
-              </span>
-
-              <span class="extra-chip" *ngIf="a.postExtras.ageRange && (a.postExtras.ageRange.min || a.postExtras.ageRange.max)">
-                <ion-icon name="person-outline"></ion-icon>
-                {{ a.postExtras.ageRange.min }}–{{ a.postExtras.ageRange.max }} yrs
-              </span>
-
-              <span class="extra-chip" *ngIf="a.postExtras.interests?.length">
-                <ion-icon name="sparkles-outline"></ion-icon>
-                {{ a.postExtras.interests.slice(0,3).join(', ') }}
-              </span>
+            <div class="post-extras dating" *ngIf="a.postExtras && (a.postExtras.relationshipGoals?.length || a.postExtras.ageRange || a.postExtras.interests?.length || a.postExtras.hintAboutMe)">
+              <span class="extra-chip" *ngIf="a.postExtras.relationshipGoals?.length"><ion-icon name="heart-outline"></ion-icon>{{ a.postExtras.relationshipGoals.join(', ') }}</span>
+              <span class="extra-chip" *ngIf="a.postExtras.ageRange && (a.postExtras.ageRange.min || a.postExtras.ageRange.max)"><ion-icon name="person-outline"></ion-icon>{{ a.postExtras.ageRange.min }}–{{ a.postExtras.ageRange.max }} yrs</span>
+              <span class="extra-chip" *ngIf="a.postExtras.interests?.length"><ion-icon name="sparkles-outline"></ion-icon>{{ a.postExtras.interests.slice(0,3).join(', ') }}</span>
             </div>
           </div>
         </div>
-        
-        <div class="item-arrow" aria-hidden="true">
-          <ion-icon name="chevron-forward-outline"></ion-icon>
-        </div>
+
+        <div class="item-arrow" aria-hidden="true"><ion-icon name="chevron-forward-outline"></ion-icon></div>
       </article>
     </section>
 
