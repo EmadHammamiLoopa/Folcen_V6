@@ -206,34 +206,15 @@
 
 <ion-footer class="message-input-footer" *ngIf="!isAdminChat()">
   <ion-toolbar>
-    <div *ngIf="showMediaOptions" class="media-options" role="menu" aria-label="Add media">
-      <button type="button" class="media-option-card" (click)="pickMedia('image')" aria-label="Add photo">
-        <span class="media-option-icon photo"><ion-icon name="image-outline"></ion-icon></span>
-        <span class="media-option-copy">
-          <strong>Photo</strong>
-          <small>Camera or gallery</small>
-        </span>
-      </button>
-
-      <button type="button" class="media-option-card" (click)="pickMedia('video')" aria-label="Add video">
-        <span class="media-option-icon video"><ion-icon name="videocam-outline"></ion-icon></span>
-        <span class="media-option-copy">
-          <strong>Video</strong>
-          <small>Record or choose</small>
-        </span>
-      </button>
-    </div>
-
-    <ion-item lines="none" class="input-container">
+    <div class="composer-shell">
       <ion-button
-        slot="start"
         fill="clear"
         (click)="toggleMediaOptions()"
-        class="camera-button attach-toggle"
+        class="attach-toggle"
         [class.active]="showMediaOptions"
         [attr.aria-expanded]="showMediaOptions"
         aria-label="Add photo or video">
-        <ion-icon name="add-circle-outline"></ion-icon>
+        <ion-icon name="add-outline"></ion-icon>
       </ion-button>
 
       <ion-input
@@ -261,11 +242,29 @@
         </ion-button>
       </div>
 
-      <ion-button slot="end" fill="clear" (click)="addMessage()"
+      <ion-button fill="clear" (click)="addMessage()"
         [disabled]="(!messageText && !image) || !conversationStarted()"
         class="send-button" aria-label="Send message">
         <ion-icon name="send-outline"></ion-icon>
       </ion-button>
-    </ion-item>
+    </div>
   </ion-toolbar>
 </ion-footer>
+
+<div *ngIf="!isAdminChat() && showMediaOptions" class="chat-media-sheet" role="menu" aria-label="Add media">
+  <button type="button" class="media-option-card" (click)="pickMedia('image')" aria-label="Add photo">
+    <span class="media-option-icon photo"><ion-icon name="image-outline"></ion-icon></span>
+    <span class="media-option-copy">
+      <strong>Photo</strong>
+      <small>Camera or gallery</small>
+    </span>
+  </button>
+
+  <button type="button" class="media-option-card" (click)="pickMedia('video')" aria-label="Add video">
+    <span class="media-option-icon video"><ion-icon name="videocam-outline"></ion-icon></span>
+    <span class="media-option-copy">
+      <strong>Video</strong>
+      <small>Record or choose</small>
+    </span>
+  </button>
+</div>
