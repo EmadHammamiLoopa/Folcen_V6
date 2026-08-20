@@ -1,30 +1,22 @@
-<ion-header class="settings-header ion-no-border">
-  <ion-toolbar class="settings-toolbar">
-    <ion-buttons slot="start">
-      <ion-back-button
-        defaultHref="/tabs/profile"
-        text=""
-        icon="arrow-back-outline"
-        aria-label="Back to profile">
-      </ion-back-button>
-    </ion-buttons>
-    <ion-title>Settings</ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <app-loader *ngIf="pageLoading"></app-loader>
 
 <ion-content *ngIf="user && !pageLoading" class="settings-content">
-  <ion-progress-bar *ngIf="loading" type="indeterminate" class="top-progress"></ion-progress-bar>
+  <ion-progress-bar *ngIf="loading" type="indeterminate" class="top-progress" style="top: env(safe-area-inset-top);"></ion-progress-bar>
   <div class="settings-aurora" aria-hidden="true"></div>
 
-  <main class="settings-container">
+  <main class="settings-container" style="padding-top: calc(18px + env(safe-area-inset-top));">
     <header class="settings-intro">
-      <div class="intro-icon">
-        <ion-icon name="options-outline"></ion-icon>
-      </div>
+      <ion-buttons>
+        <ion-back-button
+          defaultHref="/tabs/profile"
+          text=""
+          icon="arrow-back-outline"
+          aria-label="Back to profile"
+          style="width:46px;height:46px;--color:var(--f-text-strong);--background:var(--f-surface-muted);--border-radius:15px;--padding-start:0;--padding-end:0;">
+        </ion-back-button>
+      </ion-buttons>
       <div>
-        <span class="intro-kicker">Preferences</span>
+        <span class="intro-kicker">Settings</span>
         <h1>Make Folcen yours</h1>
         <p>Manage your account, privacy, calls and appearance.</p>
       </div>
