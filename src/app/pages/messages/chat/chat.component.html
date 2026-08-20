@@ -204,18 +204,48 @@
   </div>
 </ion-content>
 
-<ion-footer class="message-input-footer" *ngIf="!isAdminChat()">
+<ion-footer class="message-input-footer" [class.has-attachment]="image" *ngIf="!isAdminChat()">
   <ion-toolbar>
+    <div *ngIf="image" class="attachment-preview-row" aria-live="polite">
+      <div class="attachment-preview-card">
+        <div class="preview-media">
+          <img *ngIf="selectedMediaType !== 'video'" [src]="image" alt="Selected photo preview">
+
+          <video
+            *ngIf="selectedMediaType === 'video'"
+            [src]="image"
+            muted
+            playsinline
+            preload="metadata"
+            aria-label="Selected video preview">
+          </video>
+
+          <span class="preview-type-icon" aria-hidden="true">
+            <ion-icon [name]="selectedMediaType === 'video' ? 'videocam' : 'image'"></ion-icon>
+          </span>
+        </div>
+
+        <div class="preview-copy">
+          <strong>{{ selectedMediaType === 'video' ? 'Video ready' : 'Photo ready' }}</strong>
+          <small>It will be sent with your message</small>
+        </div>
+
+        <button type="button" class="remove-attachment" (click)="removeImage()" aria-label="Remove attachment">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+    </div>
+
     <div class="composer-shell">
-      <ion-button
-        fill="clear"
+      <button
+        type="button"
         (click)="toggleMediaOptions()"
         class="attach-toggle"
         [class.active]="showMediaOptions"
         [attr.aria-expanded]="showMediaOptions"
         aria-label="Add photo or video">
         <ion-icon name="add-outline"></ion-icon>
-      </ion-button>
+      </button>
 
       <ion-input
         [(ngModel)]="messageText"
@@ -225,22 +255,6 @@
         class="message-input">
       </ion-input>
 
-      <div *ngIf="image" class="image-preview">
-        <img *ngIf="selectedMediaType !== 'video'" [src]="image" alt="Selected photo preview">
-
-        <video
-          *ngIf="selectedMediaType === 'video'"
-          [src]="image"
-          controls
-          playsinline
-          preload="metadata"
-          aria-label="Selected video preview">
-        </video>
-
-        <ion-button fill="clear" size="small" color="danger" (click)="removeImage()" aria-label="Remove attachment">
-          <ion-icon name="close-circle-outline"></ion-icon>
-        </ion-button>
-      </div>
 
       <ion-button fill="clear" (click)="addMessage()"
         [disabled]="(!messageText && !image) || !conversationStarted()"
