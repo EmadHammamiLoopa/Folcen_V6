@@ -1158,7 +1158,8 @@ exports.getPosts = async (req, res) => {
                 { _id: { $in: req.authUser.blockedUsers || [] } }, // People I blocked
                 { enabled: false },
                 { isDeleted: true },
-                { banned: true }
+                { banned: true },
+                { deletedAt: { $ne: null } }
             ]
         }).select('_id').lean();
         
