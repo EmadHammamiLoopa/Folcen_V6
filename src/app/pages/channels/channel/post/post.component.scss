@@ -945,7 +945,7 @@
 
 .jodel-card.feed-card {
   padding-right: clamp(72px, 18vw, 84px);
-  min-height: 210px;
+  min-height: 0;
 
   .jdl-meta.compact-meta {
     padding-right: 0;
@@ -1061,7 +1061,7 @@
 /* Device pass: right-side feed controls must never overlap or disappear. */
 .jodel-card.feed-card {
   padding-right: clamp(64px, 16vw, 76px) !important;
-  min-height: clamp(214px, 45vw, 248px) !important;
+  min-height: 0 !important;
 
   .jdl-top-rail {
     top: 12px !important;
