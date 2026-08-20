@@ -20,26 +20,10 @@
             "polyfills": "src/polyfills.ts",
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              {
-                "glob": "favicon.ico",
-                "input": "src/",
-                "output": "/"
-              },
-              {
-                "glob": "apple-touch-icon.png",
-                "input": "src/",
-                "output": "/"
-              },
-              {
-                "glob": "**/*",
-                "input": "src/assets",
-                "output": "assets"
-              },
-              {
-                "glob": "**/*.svg",
-                "input": "node_modules/ionicons/dist/ionicons/svg",
-                "output": "./svg"
-              }
+              {"glob":"favicon.ico","input":"src/","output":"/"},
+              {"glob":"apple-touch-icon.png","input":"src/","output":"/"},
+              {"glob":"**/*","input":"src/assets","output":"assets"},
+              {"glob":"**/*.svg","input":"node_modules/ionicons/dist/ionicons/svg","output":"./svg"}
             ],
             "styles": [
               "./node_modules/bootstrap/dist/css/bootstrap.min.css",
@@ -53,7 +37,8 @@
               "src/theme/channel-post-v3.scss",
               "src/theme/channel-post-v4.scss",
               "src/theme/channel-post-v5.scss",
-              "src/theme/channel-post-v6.scss"
+              "src/theme/channel-post-v6.scss",
+              "src/theme/channel-post-v7.scss"
             ],
             "scripts": [
               "./node_modules/@fortawesome/fontawesome-free/js/all.min.js",
@@ -66,26 +51,13 @@
             "extractLicenses": false,
             "buildOptimizer": false,
             "sourceMap": false,
-            "optimization": {
-              "scripts": false,
-              "styles": true,
-              "fonts": true
-            },
+            "optimization": {"scripts":false,"styles":true,"fonts":true},
             "namedChunks": true
           },
           "configurations": {
             "production": {
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.prod.ts"
-                }
-              ],
-              "optimization": {
-                "scripts": true,
-                "styles": false,
-                "fonts": false
-              },
+              "fileReplacements": [{"replace":"src/environments/environment.ts","with":"src/environments/environment.prod.ts"}],
+              "optimization": {"scripts":true,"styles":false,"fonts":false},
               "outputHashing": "all",
               "sourceMap": false,
               "namedChunks": false,
@@ -93,41 +65,21 @@
               "extractLicenses": true,
               "vendorChunk": false,
               "buildOptimizer": true,
-              "budgets": [
-                {
-                  "type": "initial",
-                  "maximumWarning": "6mb",
-                  "maximumError": "8mb"
-                }
-              ]
+              "budgets": [{"type":"initial","maximumWarning":"6mb","maximumError":"8mb"}]
             },
-            "ci": {
-              "progress": false
-            }
+            "ci": {"progress": false}
           },
           "defaultConfiguration": ""
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
-          "options": {
-            "browserTarget": "folcen:build",
-            "proxyConfig": "proxy.conf.json" 
-          },
+          "options": {"browserTarget":"folcen:build","proxyConfig":"proxy.conf.json"},
           "configurations": {
-            "production": {
-              "browserTarget": "folcen:build:production"
-            },
-            "ci": {
-              "browserTarget": "folcen:build:ci"
-            }
+            "production": {"browserTarget":"folcen:build:production"},
+            "ci": {"browserTarget":"folcen:build:ci"}
           }
         },
-        "extract-i18n": {
-          "builder": "@angular-devkit/build-angular:extract-i18n",
-          "options": {
-            "browserTarget": "folcen:build"
-          }
-        },
+        "extract-i18n": {"builder":"@angular-devkit/build-angular:extract-i18n","options":{"browserTarget":"folcen:build"}},
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
@@ -138,87 +90,37 @@
             "styles": [],
             "scripts": [],
             "assets": [
-              {
-                "glob": "favicon.ico",
-                "input": "src/",
-                "output": "/"
-              },
-              {
-                "glob": "**/*",
-                "input": "src/assets",
-                "output": "/assets"
-              }
+              {"glob":"favicon.ico","input":"src/","output":"/"},
+              {"glob":"**/*","input":"src/assets","output":"/assets"}
             ]
           },
-          "configurations": {
-            "ci": {
-              "progress": false,
-              "watch": false
-            }
-          }
+          "configurations": {"ci":{"progress":false,"watch":false}}
         },
         "lint": {
           "builder": "@angular-devkit/build-angular:tslint",
-          "options": {
-            "tsConfig": [
-              "tsconfig.app.json",
-              "tsconfig.spec.json",
-              "e2e/tsconfig.json"
-            ],
-            "exclude": ["**/node_modules/**"]
-          }
+          "options": {"tsConfig":["tsconfig.app.json","tsconfig.spec.json","e2e/tsconfig.json"],"exclude":["**/node_modules/**"]}
         },
         "e2e": {
           "builder": "@angular-devkit/build-angular:protractor",
-          "options": {
-            "protractorConfig": "e2e/protractor.conf.js",
-            "devServerTarget": "folcen:serve"
-          },
-          "configurations": {
-            "production": {
-              "devServerTarget": "folcen:serve:production"
-            },
-            "ci": {
-              "devServerTarget": "folcen:serve:ci"
-            }
-          }
+          "options": {"protractorConfig":"e2e/protractor.conf.js","devServerTarget":"folcen:serve"},
+          "configurations": {"production":{"devServerTarget":"folcen:serve:production"},"ci":{"devServerTarget":"folcen:serve:ci"}}
         },
         "ionic-cordova-build": {
           "builder": "@ionic/angular-toolkit:cordova-build",
-          "options": {
-            "browserTarget": "folcen:build"
-          },
-          "configurations": {
-            "production": {
-              "browserTarget": "folcen:build:production"
-            }
-          }
+          "options": {"browserTarget":"folcen:build"},
+          "configurations": {"production":{"browserTarget":"folcen:build:production"}}
         },
         "ionic-cordova-serve": {
           "builder": "@ionic/angular-toolkit:cordova-serve",
-          "options": {
-            "browserTarget": "folcen:ionic-cordova-build",
-            "devServerTarget": "folcen:serve"
-          },
-          "configurations": {
-            "production": {
-              "browserTarget": "folcen:ionic-cordova-build:production",
-              "devServerTarget": "folcen:serve:production"
-            }
-          }
+          "options": {"browserTarget":"folcen:ionic-cordova-build","devServerTarget":"folcen:serve"},
+          "configurations": {"production":{"browserTarget":"folcen:ionic-cordova-build:production","devServerTarget":"folcen:serve:production"}}
         }
       }
     }
   },
-  "cli": {
-    "defaultCollection": "@ionic/angular-toolkit"
-  },
+  "cli": {"defaultCollection":"@ionic/angular-toolkit"},
   "schematics": {
-    "@ionic/angular-toolkit:component": {
-      "styleext": "scss"
-    },
-    "@ionic/angular-toolkit:page": {
-      "styleext": "scss"
-    }
+    "@ionic/angular-toolkit:component": {"styleext":"scss"},
+    "@ionic/angular-toolkit:page": {"styleext":"scss"}
   }
 }
