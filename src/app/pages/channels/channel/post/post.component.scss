@@ -1130,8 +1130,9 @@
 }
 
 /* Final control contrast pass: feed cards and opened posts keep readable counts on light colors. */
+/* Owner controls now live in the header grid; do not reserve the legacy floating-rail gutter. */
 .jodel-card.feed-card {
-  padding-right: clamp(68px, 17vw, 82px) !important;
+  padding-right: clamp(14px, 4.2vw, 20px) !important;
 
   .jdl-top-rail,
   .jdl-reaction-rail {
