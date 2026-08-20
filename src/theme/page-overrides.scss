@@ -291,6 +291,62 @@ ion-modal.channel-category-modal app-list-search ion-header ion-button {
   }
 }
 
+/* Integrated hero navigation: Settings, Edit Profile, and My Archive. */
+app-settings .settings-intro > ion-buttons,
+app-form .profile-hero-back,
+app-activity .archive-hero-back {
+  flex: 0 0 auto !important;
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+app-settings .settings-intro > ion-buttons ion-back-button,
+app-form .profile-hero-back ion-back-button,
+app-activity .archive-hero-back ion-back-button {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  margin: 0 !important;
+  --padding-start: 0 !important;
+  --padding-end: 0 !important;
+  --color: var(--f-text-strong) !important;
+  --background: var(--f-surface-muted) !important;
+  --background-hover: var(--f-accent-soft) !important;
+  --background-activated: var(--f-accent-soft) !important;
+  --border-radius: 15px !important;
+  --icon-font-size: 21px !important;
+}
+
+app-settings .settings-intro,
+app-activity .archive-header {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+}
+
+app-settings .settings-intro {
+  display: grid !important;
+}
+
+app-form .profile-preview-card {
+  display: grid !important;
+  grid-template-columns: auto auto minmax(0, 1fr) !important;
+}
+
+@media (max-width: 420px) {
+  app-form .profile-preview-card {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    align-items: start !important;
+  }
+
+  app-form .profile-preview-card .preview-avatar-wrap {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+    order: 3 !important;
+  }
+}
+
 /* Edit Profile: use only the bottom Save action. */
 app-form .save-profile-button {
   display: none !important;
