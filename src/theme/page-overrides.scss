@@ -36,33 +36,25 @@ app-activity .filters-wrapper {
   padding-top: 0 !important;
 }
 
-/* New Friends: the floating tab dock overlays the page, so reserve scrollable space beneath the final cards. */
+/* New Friends: one compact clearance is enough to lift the final card above the floating dock. */
 app-new-friends .discovery-content {
-  --padding-bottom: calc(190px + env(safe-area-inset-bottom)) !important;
+  --padding-bottom: 0 !important;
 }
 
 app-new-friends .discovery-container {
   padding-top: calc(18px + env(safe-area-inset-top)) !important;
-  padding-bottom: calc(190px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(138px + env(safe-area-inset-bottom)) !important;
 }
 
 @media (max-width: 420px) {
-  app-new-friends .discovery-content {
-    --padding-bottom: calc(210px + env(safe-area-inset-bottom)) !important;
-  }
-
   app-new-friends .discovery-container {
-    padding-bottom: calc(210px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(145px + env(safe-area-inset-bottom)) !important;
   }
 }
 
 @media (min-width: 768px) {
-  app-new-friends .discovery-content {
-    --padding-bottom: calc(180px + env(safe-area-inset-bottom)) !important;
-  }
-
   app-new-friends .discovery-container {
-    padding-bottom: calc(180px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
   }
 }
 
