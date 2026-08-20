@@ -18,15 +18,15 @@ ion-alert:not(.folcen-confirm-alert):not(.forgot-password-alert):not(.folcen-cha
   }
 
   .alert-head {
-    padding: 20px 20px 3px !important;
+    padding: 18px 18px 2px !important;
   }
 
   .alert-title {
     margin: 0 !important;
     color: var(--ion-text-color, #fff) !important;
-    font-size: 18px !important;
+    font-size: 17px !important;
     font-weight: 750 !important;
-    line-height: 1.2 !important;
+    line-height: 1.18 !important;
     letter-spacing: -.018em !important;
     text-align: left !important;
   }
@@ -34,10 +34,10 @@ ion-alert:not(.folcen-confirm-alert):not(.forgot-password-alert):not(.folcen-cha
   .alert-message {
     max-height: none !important;
     margin: 0 !important;
-    padding: 8px 20px 15px !important;
+    padding: 7px 18px 14px !important;
     color: var(--folcen-text-muted, #94a3b8) !important;
-    font-size: 13px !important;
-    line-height: 1.45 !important;
+    font-size: 12.5px !important;
+    line-height: 1.42 !important;
     text-align: left !important;
     white-space: normal !important;
   }
@@ -46,25 +46,27 @@ ion-alert:not(.folcen-confirm-alert):not(.forgot-password-alert):not(.folcen-cha
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 8px !important;
-    padding: 4px 16px 16px !important;
+    padding: 2px 14px 14px !important;
   }
 
   .alert-button {
     min-height: 44px !important;
     margin: 0 !important;
-    padding: 0 12px !important;
+    padding: 0 10px !important;
     border: 1px solid rgba(124,108,255,.16) !important;
     border-radius: 13px !important;
     color: #fff !important;
     background: rgba(124,108,255,.10) !important;
-    font-size: 12.5px !important;
-    font-weight: 700 !important;
+    font-size: 11.5px !important;
+    font-weight: 720 !important;
     line-height: 1 !important;
     letter-spacing: 0 !important;
+    white-space: nowrap !important;
   }
 
   .alert-button .alert-button-inner {
     justify-content: center !important;
+    white-space: nowrap !important;
   }
 
   .alert-button[role="cancel"] {
@@ -102,97 +104,207 @@ ion-modal.image-fullscreen-modal::part(content) {
   background: #030712 !important;
 }
 
-/* Chat composer tray: anchor it to the toolbar, not the ion-item. */
+/* Chat composer */
+app-chat .message-input-footer {
+  padding: 7px 10px calc(7px + env(safe-area-inset-bottom)) !important;
+}
+
 app-chat .message-input-footer ion-toolbar {
   position: relative !important;
   overflow: visible !important;
+  max-width: 900px !important;
+  margin: 0 auto !important;
 }
 
-app-chat .message-input-footer .media-options {
+app-chat .message-input-footer .composer-shell {
+  position: relative !important;
+  min-height: 50px !important;
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) 42px !important;
+  align-items: center !important;
+  gap: 6px !important;
+  box-sizing: border-box !important;
+  padding: 4px 5px !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
+  border-radius: 20px !important;
+  background: var(--ion-card-background, #111827) !important;
+  box-shadow: 0 8px 26px rgba(0,0,0,.18) !important;
+}
+
+app-chat .message-input-footer .attach-toggle,
+app-chat .message-input-footer .send-button {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  margin: 0 !important;
+  --border-radius: 13px !important;
+}
+
+app-chat .message-input-footer .attach-toggle {
+  --background: rgba(124,108,255,.10) !important;
+  --background-activated: rgba(124,108,255,.18) !important;
+  --color: #8b7cff !important;
+  border: 1px solid rgba(124,108,255,.14) !important;
+  border-radius: 13px !important;
+}
+
+app-chat .message-input-footer .attach-toggle.active {
+  --background: rgba(124,108,255,.18) !important;
+  --color: #a78bfa !important;
+}
+
+app-chat .message-input-footer .attach-toggle ion-icon,
+app-chat .message-input-footer .send-button ion-icon {
+  font-size: 20px !important;
+}
+
+app-chat .message-input-footer .message-input {
+  min-width: 0 !important;
+  --padding-start: 8px !important;
+  --padding-end: 8px !important;
+  --color: var(--ion-text-color, #fff) !important;
+  --placeholder-color: var(--folcen-text-muted, #94a3b8) !important;
+  --placeholder-opacity: .72 !important;
+  font-size: 13.5px !important;
+}
+
+app-chat .message-input-footer .send-button {
+  --background: linear-gradient(135deg, #7c6cff, #6366f1) !important;
+  --background-activated: #5b5fdc !important;
+  --color: #fff !important;
+}
+
+app-chat .message-input-footer .send-button[disabled] {
+  --background: rgba(148,163,184,.07) !important;
+  --color: rgba(148,163,184,.48) !important;
+  opacity: 1 !important;
+}
+
+app-chat .message-input-footer .image-preview {
   position: absolute !important;
   left: 0 !important;
-  bottom: calc(100% + 12px) !important;
-  z-index: 120 !important;
-  width: min(320px, calc(100vw - 28px)) !important;
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 8px !important;
-  padding: 9px !important;
-  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
-  border-radius: 18px !important;
-  background: var(--ion-card-background, #111827) !important;
-  box-shadow: 0 18px 44px rgba(0,0,0,.34) !important;
-  backdrop-filter: blur(22px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(150%) !important;
+  bottom: calc(100% + 10px) !important;
+  z-index: 150 !important;
 }
 
-app-chat .message-input-footer .media-option-card {
+/* Fixed media sheet: outside ion-toolbar so Ionic cannot clip it. */
+app-chat .chat-media-sheet {
+  position: fixed !important;
+  left: 14px !important;
+  right: 14px !important;
+  bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+  z-index: 1000 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 9px !important;
+  padding: 10px !important;
+  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
+  border-radius: 20px !important;
+  background: var(--ion-card-background, #111827) !important;
+  box-shadow: 0 20px 50px rgba(0,0,0,.38) !important;
+  backdrop-filter: blur(24px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+}
+
+app-chat .chat-media-sheet .media-option-card {
   appearance: none !important;
   min-width: 0 !important;
-  min-height: 66px !important;
+  min-height: 68px !important;
   display: flex !important;
   align-items: center !important;
-  gap: 9px !important;
-  padding: 9px !important;
-  border: 1px solid var(--folcen-glass-border, rgba(255,255,255,.10)) !important;
-  border-radius: 14px !important;
+  gap: 10px !important;
+  padding: 10px !important;
+  border: 1px solid rgba(124,108,255,.12) !important;
+  border-radius: 15px !important;
   color: var(--ion-text-color, #fff) !important;
-  background: rgba(124,108,255,.06) !important;
+  background: rgba(124,108,255,.065) !important;
   text-align: left !important;
   font-family: inherit !important;
 }
 
-app-chat .message-input-footer .media-option-icon {
-  width: 38px !important;
-  height: 38px !important;
-  flex: 0 0 38px !important;
+app-chat .chat-media-sheet .media-option-icon {
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   border-radius: 12px !important;
   color: #8b7cff !important;
-  background: rgba(124,108,255,.12) !important;
+  background: rgba(124,108,255,.13) !important;
 }
 
-app-chat .message-input-footer .media-option-icon.video {
+app-chat .chat-media-sheet .media-option-icon.video {
   color: #38bdf8 !important;
-  background: rgba(56,189,248,.10) !important;
+  background: rgba(56,189,248,.11) !important;
 }
 
-app-chat .message-input-footer .media-option-icon ion-icon {
-  font-size: 19px !important;
+app-chat .chat-media-sheet .media-option-icon ion-icon {
+  font-size: 20px !important;
 }
 
-app-chat .message-input-footer .media-option-copy {
+app-chat .chat-media-sheet .media-option-copy {
   min-width: 0 !important;
 }
 
-app-chat .message-input-footer .media-option-copy strong,
-app-chat .message-input-footer .media-option-copy small {
+app-chat .chat-media-sheet .media-option-copy strong,
+app-chat .chat-media-sheet .media-option-copy small {
   display: block !important;
 }
 
-app-chat .message-input-footer .media-option-copy strong {
+app-chat .chat-media-sheet .media-option-copy strong {
   color: var(--ion-text-color, #fff) !important;
-  font-size: 12.5px !important;
-  font-weight: 700 !important;
+  font-size: 13px !important;
+  font-weight: 720 !important;
 }
 
-app-chat .message-input-footer .media-option-copy small {
+app-chat .chat-media-sheet .media-option-copy small {
   margin-top: 2px !important;
   color: var(--folcen-text-muted, #94a3b8) !important;
   font-size: 9.5px !important;
   line-height: 1.25 !important;
 }
 
-app-chat .message-input-footer .attach-toggle {
-  --background: rgba(124,108,255,.08) !important;
-  --color: var(--ion-color-primary, #7c6cff) !important;
-}
+/* Give the recipient more useful width in the phone header. */
+@media (max-width: 520px) {
+  app-chat .glass-header ion-toolbar {
+    --min-height: 58px !important;
+    --padding-start: 4px !important;
+    --padding-end: 4px !important;
+  }
 
-app-chat .message-input-footer .attach-toggle.active {
-  --background: rgba(124,108,255,.16) !important;
-  --color: #8b7cff !important;
+  app-chat .glass-header .back-button,
+  app-chat .glass-header .video-btn {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    margin-inline: 1px !important;
+    --border-radius: 11px !important;
+  }
+
+  app-chat .glass-header .user-info {
+    max-width: calc(100vw - 104px) !important;
+    gap: 7px !important;
+    padding-inline: 2px !important;
+  }
+
+  app-chat .glass-header .user-info .avatar-wrapper {
+    width: 34px !important;
+    height: 34px !important;
+    flex: 0 0 34px !important;
+  }
+
+  app-chat .glass-header .user-info .user-name {
+    font-size: 14px !important;
+  }
+
+  app-chat .glass-header .user-info .user-status {
+    font-size: 10.5px !important;
+  }
+
+  app-chat .chat-media-sheet {
+    grid-template-columns: 1fr 1fr !important;
+  }
 }
 
 /* Video-call requests are standalone cards, not normal purple chat bubbles. */
@@ -351,11 +463,6 @@ app-chat .video-request-message .message-meta {
 }
 
 @media (max-width: 520px) {
-  app-chat .message-input-footer .media-options {
-    left: 7px !important;
-    width: calc(100vw - 28px) !important;
-  }
-
   app-chat .message-wrapper .message-bubble.video-request-message,
   app-chat .message-wrapper .message-bubble.video-request-message.my-message,
   app-chat .message-wrapper .message-bubble.video-request-message.their-message {
