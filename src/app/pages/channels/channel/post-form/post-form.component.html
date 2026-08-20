@@ -4,16 +4,17 @@
   [back]="true"
 >
   <div id="end-buttons">
-    <ion-button
+    <button
+      type="button"
+      class="post-submit-btn"
       (click)="addPost()"
       [disabled]="postLoading"
-      class="post-submit-btn"
-      fill="solid"
+      [attr.aria-label]="postLoading ? 'Posting' : 'Publish post'"
     >
-      <span *ngIf="postLoading"><ion-spinner name="crescent"></ion-spinner></span>
-      <ion-icon name="send-outline" slot="end" *ngIf="!postLoading"></ion-icon>
-      Post
-    </ion-button>
+      <ion-spinner *ngIf="postLoading" name="crescent" aria-hidden="true"></ion-spinner>
+      <span>{{ postLoading ? 'Posting' : 'Post' }}</span>
+      <ion-icon *ngIf="!postLoading" name="send-outline" aria-hidden="true"></ion-icon>
+    </button>
   </div>
 </app-header>
 
@@ -240,8 +241,15 @@
             <ion-input
               [(ngModel)]="interests"
               placeholder="Enter interests or hobbies"
+              [maxlength]="interestsMaxLength"
               class="custom-input">
             </ion-input>
+            <div class="field-meta">
+              <span>Separate hobbies with commas</span>
+              <span [class.limit]="interests?.length >= interestsMaxLength">
+                {{ interests?.length || 0 }}/{{ interestsMaxLength }}
+              </span>
+            </div>
           </div>
 
           <div class="field-container">
@@ -249,9 +257,17 @@
             <ion-textarea
               [(ngModel)]="hintAboutMe"
               placeholder="Write a hint about yourself"
-              autoGrow="true"
+              [maxlength]="hintMaxLength"
+              rows="3"
+              [autoGrow]="true"
               class="custom-textarea">
             </ion-textarea>
+            <div class="field-meta">
+              <span>Share one memorable detail</span>
+              <span [class.limit]="hintAboutMe?.length >= hintMaxLength">
+                {{ hintAboutMe?.length || 0 }}/{{ hintMaxLength }}
+              </span>
+            </div>
           </div>
         </ion-card-content>
       </ion-card>
@@ -287,13 +303,14 @@
           (ionInput)="onPostInput($event)"
           (keydown)="onPostMentionKeyDown($event)"
           class="creative-textarea"
-          [maxlength]="255"
-          autoGrow="true"
+          [maxlength]="postMaxLength"
+          rows="5"
+          [autoGrow]="true"
           (ionFocus)="forceTextareaResize()">
         </ion-textarea>
 
-        <div class="char-counter" [class.limit]="postText?.length >= 255">
-          {{ postText?.length || 0 }}/255
+        <div class="char-counter" [class.limit]="postText?.length >= postMaxLength">
+          {{ postText?.length || 0 }}/{{ postMaxLength }}
         </div>
       </ion-card-content>
     </ion-card>
