@@ -3,8 +3,8 @@
 const fs = require('fs');
 
 const resultPath = process.argv[2];
-const expectedPassCount = 10;
-const expectedFailureCount = 1;
+const expectedPassCount = 11;
+const expectedFailureCount = 0;
 
 if (!resultPath || !fs.existsSync(resultPath)) {
   console.error('Security audit result file was not created.');

@@ -7,6 +7,7 @@ const helpers = require('../app/helpers');
 const User = require('../app/models/User');
 const Message = require('../app/models/Message');
 const Follow = require('../app/models/Follow');
+const ChatOpeningLease = require('../app/models/ChatOpeningLease');
 
 describe('normal messaging policy characterization', function () {
   this.timeout(30000);
@@ -40,6 +41,7 @@ describe('normal messaging policy characterization', function () {
   before(async () => {
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
+    await ChatOpeningLease.syncIndexes();
   });
 
   after(async () => {
@@ -48,7 +50,7 @@ describe('normal messaging policy characterization', function () {
   });
 
   beforeEach(async () => {
-    await Promise.all([User.deleteMany({}), Message.deleteMany({}), Follow.deleteMany({})]);
+    await Promise.all([User.deleteMany({}), Message.deleteMany({}), Follow.deleteMany({}), ChatOpeningLease.deleteMany({})]);
     await User.create([
       userData(senderId),
       userData(receiverId),

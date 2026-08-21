@@ -183,7 +183,7 @@ async function replayOfflineEvents(userId, socket) {
  * Enforces "Max 3 unique non-friend recipients per 24 hours" unless subscribed or friends.
  * Handles Block, Privacy (Follow fallback), and Thread Unlock.
  */
-async function canInitiateChat(senderId, receiverId) {
+async function evaluateChatInitiation(senderId, receiverId) {
   const User = require('./models/User');
   const Message = require('./models/Message');
   const Follow = require('./models/Follow');
@@ -252,7 +252,8 @@ async function canInitiateChat(senderId, receiverId) {
     return {
       allowed: true,
       reason: null,
-      budgetRemaining: Infinity
+      budgetRemaining: Infinity,
+      needsOpeningReservation: false
     };
   }
 
@@ -262,7 +263,8 @@ async function canInitiateChat(senderId, receiverId) {
     return {
       allowed: true,
       reason: null,
-      budgetRemaining: Infinity
+      budgetRemaining: Infinity,
+      needsOpeningReservation: false
     };
   }
 
@@ -294,13 +296,16 @@ async function canInitiateChat(senderId, receiverId) {
     };
   }
 
-  // Premium can contact unlimited new recipients,
-  // but reply-first remains enforced above.
-  if (await userSubscribed(sender)) {
+  const premium = await userSubscribed(sender);
+  if (premium) {
     return {
       allowed: true,
       reason: null,
-      budgetRemaining: Infinity
+      budgetRemaining: Infinity,
+      needsOpeningReservation: true,
+      premium: true,
+      recentRecipientIds: [],
+      friendIds: sender.friends || []
     };
   }
 
@@ -343,8 +348,101 @@ async function canInitiateChat(senderId, receiverId) {
       Math.max(
         0,
         3 - uniqueRecipients.size
-      )
+      ),
+    needsOpeningReservation: true,
+    premium: false,
+    recentRecipientIds: recentRecipients,
+    friendIds: sender.friends || []
   };
+}
+
+function publicChatPolicyResult(result) {
+  return {
+    allowed: !!result.allowed,
+    reason: result.reason || null,
+    ...(result.budgetRemaining !== undefined
+      ? { budgetRemaining: result.budgetRemaining }
+      : {})
+  };
+}
+
+/**
+ * Read-only chat permission check used by history/permission endpoints.
+ * It observes active MongoDB opener leases but never acquires one.
+ */
+async function canInitiateChatPreview(senderId, receiverId) {
+  const result = await evaluateChatInitiation(senderId, receiverId);
+  if (!result.allowed || !result.needsOpeningReservation) {
+    return publicChatPolicyResult(result);
+  }
+
+  const reservation = require('./services/chatOpeningReservation');
+  const availability = await reservation.peekOpeningAvailability({
+    senderId,
+    receiverId,
+    recentRecipientIds: result.recentRecipientIds || [],
+    friendIds: result.friendIds || [],
+    premium: !!result.premium
+  });
+
+  return publicChatPolicyResult(availability);
+}
+
+/**
+ * Authoritative acquisition check for an actual normal-message send.
+ * For a first non-friend opener this atomically acquires a MongoDB lease;
+ * callers must finalize it after Message persistence or release it if
+ * persistence itself fails.
+ */
+async function canInitiateChat(senderId, receiverId) {
+  const result = await evaluateChatInitiation(senderId, receiverId);
+  if (!result.allowed || !result.needsOpeningReservation) {
+    return publicChatPolicyResult(result);
+  }
+
+  const reservation = require('./services/chatOpeningReservation');
+  const acquired = await reservation.acquireOpeningReservation({
+    senderId,
+    receiverId,
+    recentRecipientIds: result.recentRecipientIds || [],
+    friendIds: result.friendIds || [],
+    premium: !!result.premium
+  });
+
+  if (!acquired.allowed) {
+    return publicChatPolicyResult(acquired);
+  }
+
+  return {
+    ...publicChatPolicyResult(acquired),
+    openingReservationToken: acquired.reservationToken
+  };
+}
+
+async function finalizeChatOpeningReservation(senderId, receiverId, token, openedAt) {
+  if (!token) return;
+  const reservation = require('./services/chatOpeningReservation');
+  return reservation.finalizeOpeningReservation({
+    senderId,
+    receiverId,
+    token,
+    openedAt: openedAt || new Date()
+  });
+}
+
+async function releaseChatOpeningReservation(senderId, receiverId, token) {
+  if (!token) return;
+  const reservation = require('./services/chatOpeningReservation');
+  return reservation.releaseOpeningReservation({
+    senderId,
+    receiverId,
+    token
+  });
+}
+
+async function releaseChatOpeningPair(senderId, receiverId) {
+  const reservation = require('./services/chatOpeningReservation');
+  return reservation.releaseOpeningPair(senderId, receiverId);
 }
 
 /** Simple memory-based rate limiting per user/type for reliability */
@@ -1170,6 +1268,10 @@ module.exports = {
 
   /* misc utilities */
   canInitiateChat,
+  canInitiateChatPreview,
+  finalizeChatOpeningReservation,
+  releaseChatOpeningReservation,
+  releaseChatOpeningPair,
   extractDashParams,
   report,
   adminCheck,

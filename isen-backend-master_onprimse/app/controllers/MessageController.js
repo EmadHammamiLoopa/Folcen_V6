@@ -43,12 +43,17 @@ function messagePayload(savedMessage, tempId, delivery) {
 
 exports.storeMessage = async (req, res) => {
     const tempId = req.body?.tempId || req.body?.id || null;
+    let openingReservationToken = null;
+    let openingReservationTarget = null;
+    let messagePersisted = false;
 
     try {
         const senderId = req.auth && req.auth._id;
         const recipientId = req.body?.to || req.body?._to;
         const text = typeof req.body?.text === 'string' ? req.body.text : '';
         const image = normalizeImagePayload(req.body?.image);
+        const messageType = req.body?.type || 'friend';
+        const isNormalMessage = messageType !== 'video-call-request';
 
         if (!senderId) return Response.sendError(res, 401, 'Unauthorized');
         if (!mongoose.Types.ObjectId.isValid(recipientId)) {
@@ -74,10 +79,17 @@ exports.storeMessage = async (req, res) => {
         }
 
         const chatPolicy =
-            await helpers.canInitiateChat(
-                senderId,
-                recipientId
+            await (
+                isNormalMessage
+                    ? helpers.canInitiateChat(senderId, recipientId)
+                    : helpers.canInitiateChatPreview(senderId, recipientId)
             );
+
+        openingReservationToken =
+            chatPolicy.openingReservationToken || null;
+        openingReservationTarget = openingReservationToken
+            ? { senderId, recipientId }
+            : null;
 
         if (!chatPolicy.allowed) {
             const status =
@@ -110,9 +122,29 @@ exports.storeMessage = async (req, res) => {
             to: new mongoose.Types.ObjectId(recipientId),
             image,
             state: 'sent',
-            type: req.body?.type || 'friend',
+            type: messageType,
             productId: mongoose.Types.ObjectId.isValid(req.body?.productId) ? req.body.productId : null,
         });
+        messagePersisted = true;
+
+        if (openingReservationToken) {
+            try {
+                await helpers.finalizeChatOpeningReservation(
+                    senderId,
+                    recipientId,
+                    openingReservationToken,
+                    savedMessage.createdAt
+                );
+            } catch (reservationErr) {
+                // The message is already durable. Keep the reservation
+                // conservative rather than turning bookkeeping failure into a
+                // second opener opportunity.
+                logger.warn(
+                    '[message.store] opener reservation finalize failed:',
+                    reservationErr.message
+                );
+            }
+        }
 
         await Promise.all([
             User.findByIdAndUpdate(senderId, { $addToSet: { messages: savedMessage._id } }),
@@ -163,6 +195,25 @@ exports.storeMessage = async (req, res) => {
 
         return Response.sendResponse(res, messagePayload(savedMessage, tempId, delivered ? 'delivered' : 'sent'));
     } catch (error) {
+        if (
+            openingReservationToken &&
+            openingReservationTarget &&
+            !messagePersisted
+        ) {
+            try {
+                await helpers.releaseChatOpeningReservation(
+                    openingReservationTarget.senderId,
+                    openingReservationTarget.recipientId,
+                    openingReservationToken
+                );
+            } catch (releaseErr) {
+                logger.warn(
+                    '[message.store] opener reservation release failed:',
+                    releaseErr.message
+                );
+            }
+        }
+
         logger.error('storeMessage error:', error);
         return Response.sendError(res, 500, 'Message could not be saved. Please try again.');
     }
@@ -218,7 +269,7 @@ exports.indexMessages = async (req, res) => {
         // Infinite-scroll history pages do not need the extra DB reads.
         const policyPromise =
             page === 0
-                ? helpers.canInitiateChat(
+                ? helpers.canInitiateChatPreview(
                     authUserId,
                     userId
                 )
@@ -408,6 +459,28 @@ exports.deleteMessage = async (req, res) => {
         // Delete the message
         await Message.deleteOne({ _id: messageId });
 
+        // Opener leases are retained for the rolling recipient-budget window.
+        // If the only normal message in this direction is deleted, release
+        // that pair so deletion preserves the historical retry behavior.
+        if (message.type !== 'video-call-request') {
+            try {
+                const stillHasNormalMessage = await Message.exists({
+                    from: message.from,
+                    to: message.to,
+                    type: { $ne: 'video-call-request' }
+                });
+                if (!stillHasNormalMessage) {
+                    await helpers.releaseChatOpeningPair(message.from, message.to);
+                }
+            } catch (leaseErr) {
+                // The message is already deleted. Reservation reconciliation is
+                // best-effort here and must not turn a successful delete into a
+                // misleading 500 response. Any stale lease is also bounded by
+                // request-time recovery in the reservation service.
+                logger.warn('deleteMessage opener lease reconciliation failed:', leaseErr);
+            }
+        }
+
         return Response.sendResponse(res, { success: true, message: 'Message deleted successfully' });
     } catch (error) {
         logger.error('Error deleting message:', error);
@@ -421,7 +494,7 @@ exports.sendMessagePermission = async (req, res) => {
         const targetId = req.params.userId || req.body.to;
         const authId = req.auth._id;
 
-        const check = await helpers.canInitiateChat(authId, targetId);
+        const check = await helpers.canInitiateChatPreview(authId, targetId);
 
         return Response.sendResponse(res, check.allowed, check.allowed ? 'Allowed' : check.reason);
     } catch (error) {

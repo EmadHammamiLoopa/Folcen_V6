@@ -610,6 +610,9 @@ socket.on("connect-user", async (user_id) => {
 
   socket.on("send-message", async (msg, image, ind) => {
     const tempId = msg?.id;
+    let openingReservationToken = null;
+    let openingReservationTarget = null;
+    let messagePersisted = false;
 
     try {
       // Enforce sender identity from authenticated socket only (privacy-first).
@@ -665,11 +668,20 @@ socket.on("connect-user", async (user_id) => {
 
       // Normal text/media chat uses the same server-authoritative policy
       // as the REST endpoint. Video permission is separate.
+      const messageType = msg.type || "friend";
+      const isNormalMessage = messageType !== 'video-call-request';
       const chatPolicy =
-        await helpers.canInitiateChat(
-          senderId,
-          msg.to
+        await (
+          isNormalMessage
+            ? helpers.canInitiateChat(senderId, msg.to)
+            : helpers.canInitiateChatPreview(senderId, msg.to)
         );
+
+      openingReservationToken =
+        chatPolicy.openingReservationToken || null;
+      openingReservationTarget = openingReservationToken
+        ? { senderId, recipientId: msg.to }
+        : null;
 
       if (!chatPolicy.allowed) {
         try {
@@ -687,7 +699,10 @@ socket.on("connect-user", async (user_id) => {
         return;
       }
 
-      // Simple per-socket rate limiting (privacy-abuse protection)
+      // Simple per-socket rate limiting (privacy-abuse protection). Keep
+      // this after the policy check so rejected chat attempts preserve the
+      // existing rate-limit behavior. If this request acquired an opener
+      // lease, release it before returning because no message was persisted.
       try {
         const windowMs = 60 * 1000; // 1 minute
         const maxPerWindow = Number(process.env.MSG_RATE_LIMIT_PER_MIN || 60);
@@ -699,6 +714,19 @@ socket.on("connect-user", async (user_id) => {
         socket._msgCount += 1;
         if (socket._msgCount > maxPerWindow) {
           console.warn(`Rate limit exceeded for ${senderId}`);
+          if (openingReservationToken && openingReservationTarget) {
+            try {
+              await helpers.releaseChatOpeningReservation(
+                openingReservationTarget.senderId,
+                openingReservationTarget.recipientId,
+                openingReservationToken
+              );
+              openingReservationToken = null;
+              openingReservationTarget = null;
+            } catch (releaseErr) {
+              console.warn('[chat] rate-limit opener release failed:', releaseErr.message);
+            }
+          }
           try { await recordMessageEvent({ from: senderId, to: msg.to, event: 'blocked', reason: 'rate_limit' }); } catch (e) {}
           try { socket.emit('send-message-error', { tempId, reason: 'rate_limited' }); } catch (_) {}
           emitToUser(senderId, 'message-rate-limited', { perMinute: maxPerWindow });
@@ -713,7 +741,7 @@ socket.on("connect-user", async (user_id) => {
         to  : new mongoose.Types.ObjectId(msg.to),
         image: null,
         state: "sent",
-        type : msg.type || "friend",
+        type : messageType,
         productId: msg.productId || null,
       };
 
@@ -751,7 +779,26 @@ socket.on("connect-user", async (user_id) => {
       // Save message (author is enforced server-side)
       const message = new Message(messageData);
       const savedMessage = await message.save();
+      messagePersisted = true;
       console.log("✅ Message saved:", savedMessage._id);
+
+      if (openingReservationToken) {
+        try {
+          await helpers.finalizeChatOpeningReservation(
+            senderId,
+            msg.to,
+            openingReservationToken,
+            savedMessage.createdAt
+          );
+        } catch (reservationErr) {
+          // The message is already durable. Keep the reservation conservative
+          // rather than turning bookkeeping failure into a second opener.
+          console.warn(
+            '[chat] opener reservation finalize failed:',
+            reservationErr.message
+          );
+        }
+      }
 
       // Record minimal send attempt event (no content stored)
       try { await recordMessageEvent({ messageId: savedMessage._id, from: senderId, to: msg.to, event: 'send_attempt' }); } catch (e) { console.warn('Failed to record message event', e); }
@@ -847,6 +894,25 @@ socket.on("connect-user", async (user_id) => {
       // emitToUser(msg.to, 'messages-updated', { delta: 1 });
 
     } catch (err) {
+      if (
+        openingReservationToken &&
+        openingReservationTarget &&
+        !messagePersisted
+      ) {
+        try {
+          await helpers.releaseChatOpeningReservation(
+            openingReservationTarget.senderId,
+            openingReservationTarget.recipientId,
+            openingReservationToken
+          );
+        } catch (releaseErr) {
+          console.warn(
+            '[chat] opener reservation release failed:',
+            releaseErr.message
+          );
+        }
+      }
+
       console.error("❌ Error in send-message:", err);
       try { socket.emit('send-message-error', { tempId, reason: 'save_failed' }); } catch (_) {}
     }
