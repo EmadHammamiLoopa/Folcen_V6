@@ -3,7 +3,8 @@
 const fs = require('fs');
 
 const resultPath = process.argv[2];
-const expectedFailureCount = 11;
+const expectedPassCount = 3;
+const expectedFailureCount = 8;
 
 if (!resultPath || !fs.existsSync(resultPath)) {
   console.error('Security audit result file was not created.');
@@ -15,8 +16,8 @@ if (!resultPath || !fs.existsSync(resultPath)) {
     !/before all|before each|after all|after each/i.test(item.title)
   );
   const expected =
-    result.tests === expectedFailureCount &&
-    result.passes === 0 &&
+    result.tests === expectedPassCount + expectedFailureCount &&
+    result.passes === expectedPassCount &&
     result.failures === expectedFailureCount &&
     result.pending === 0 &&
     result.failed.length === expectedFailureCount &&

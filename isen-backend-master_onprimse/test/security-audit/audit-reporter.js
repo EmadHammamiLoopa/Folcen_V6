@@ -16,7 +16,7 @@ module.exports = function AuditReporter(runner) {
   });
   runner.on('pass', test => {
     result.passes += 1;
-    process.stdout.write(`UNEXPECTED PASS ${test.fullTitle()}\n`);
+    process.stdout.write(`FIXED SECURITY REGRESSION ${test.fullTitle()}\n`);
   });
   runner.on('pending', test => {
     result.pending += 1;
@@ -28,13 +28,13 @@ module.exports = function AuditReporter(runner) {
       title: runnable.fullTitle(),
       message: error && error.message ? error.message : String(error),
     });
-    process.stdout.write(`EXPECTED SECURITY FAILURE ${runnable.fullTitle()}\n`);
+    process.stdout.write(`UNRESOLVED SECURITY FAILURE ${runnable.fullTitle()}\n`);
   });
   runner.once('end', () => {
     const output = process.env.AUDIT_RESULT_FILE;
     if (output) fs.writeFileSync(output, `${JSON.stringify(result, null, 2)}\n`);
     process.stdout.write(
-      `Security audit: ${result.passes} passing, ${result.failures} intentionally failing, ` +
+      `Security audit: ${result.passes} fixed/passing, ${result.failures} intentionally failing, ` +
       `${result.pending} pending\n`
     );
   });

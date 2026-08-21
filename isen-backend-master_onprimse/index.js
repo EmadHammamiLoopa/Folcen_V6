@@ -76,8 +76,7 @@ const commentRoutes = require('./routes/comment');
 const subscriptionRoutes = require('./routes/subscription');
 const reportRoutes = require('./routes/report');
 const followRoutes = require('./routes/follow');
-const jwt = require('jsonwebtoken');
-const tokenBlacklist = require('./app/utils/tokenBlacklist');
+const { createSocketAuthMiddleware } = require('./app/middlewares/socketAuth');
 
 // import middlewares
 const { notFoundError, invalidTokenError } = require('./app/middlewares/errors');
@@ -195,46 +194,7 @@ const io = require('socket.io')(http, {
 
 helpers.initSocket(io);
 
-io.use((socket, next) => {
-  const token = socket.handshake.auth?.token;
-  if (!token) {
-    console.log("❌ No token provided in socket connection");
-    return next(new Error("Authentication error"));
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // Reject revoked tokens for websocket connections using `jti` as the key
-    const jti = decoded && decoded.jti;
-    if (!jti) return next(new Error('Authentication error'));
-    tokenBlacklist.isRevokedByJti(jti).then(async (revoked) => {
-      if (revoked) return next(new Error('Authentication error'));
-      try {
-        // Load user from DB to ensure user still exists and is not soft-deleted
-        const user = await User.findById(decoded._id).select('-password -tokens -refreshToken').lean();
-        if (!user) return next(new Error('Authentication error'));
-        if (user.deletedAt || user.isDeleted) return next(new Error('Authentication error'));
-        socket.authUser = user; // sanitized auth user
-        socket.userId = String(user._id);
-        console.log(`✅ WebSocket authenticated for userId: ${socket.userId}`);
-        next();
-      } catch (e) {
-        console.error('WebSocket user lookup failed', e);
-        return next(new Error('Authentication error'));
-      }
-    }).catch(err => {
-      console.error('WebSocket token blacklist check failed', err);
-      return next(new Error('Authentication error'));
-    });
-  } catch (err) {
-    if (err && err.name === 'TokenExpiredError') {
-      console.warn('❌ Authentication failed: token expired at', err.expiredAt);
-      return next(new Error('Authentication error'));
-    }
-    console.error("❌ Invalid token", err && err.message ? err.message : err);
-    return next(new Error("Authentication error"));
-  }
-});
+io.use(createSocketAuthMiddleware());
 
 
 app.set('io', io);

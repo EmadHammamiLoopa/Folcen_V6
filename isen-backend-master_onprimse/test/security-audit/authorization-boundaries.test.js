@@ -17,8 +17,7 @@ function section(source, start, end) {
 }
 
 describe('P0 authorization boundary security specifications', () => {
-  const serverSource = read('index.js');
-  const socketAuth = section(serverSource, 'io.use((socket, next) => {', '\n\napp.set(\'io\', io);');
+  const socketAuth = read('app/middlewares/socketAuth.js');
   const userRoutes = read('routes/user.js');
   const userController = read('app/controllers/UserController.js');
 
@@ -26,7 +25,7 @@ describe('P0 authorization boundary security specifications', () => {
     expect(
       socketAuth,
       'SECURITY_ASSERTION: Socket authentication must enforce the REST banned-account policy.'
-    ).to.match(/user\.(?:banned|isBanned)/);
+    ).to.match(/user\.banned/);
   });
 
   it('SECURITY_SPEC socket authentication rejects a disabled account', () => {
