@@ -31,9 +31,7 @@ const Notification = require('../../../app/models/Notification');
 const PushToken    = require('../../../app/models/PushToken');
 const helpers      = require('../../../app/helpers');
 
-// Patch helpers' socket emitters to use our socket mock at load time
-// (safe — these properties are plain values, not closed-over by other modules)
-Object.assign(helpers, {
+const helperOverrides = {
   emitToUser:                socketMock.emitToUser,
   emitToAll:                 socketMock.emitToAll,
   emitToUsers:               socketMock.emitToUsers,
@@ -42,7 +40,7 @@ Object.assign(helpers, {
   emitFriendRequestDeclined: socketMock.emitFriendRequestDeclined,
   emitFriendRequestsUpdated: socketMock.emitFriendRequestsUpdated,
   realtime:                  socketMock.realtime,
-});
+};
 
 const { IDS, ALICE, BOB, CHANNEL, POST, EXPECTED } = require('../fixtures');
 
@@ -64,6 +62,9 @@ describe('Notification triggers (integration)', function () {
   let mongod;
   let aliceDoc;
   let bobDoc;
+  let originalHelperExports;
+  let originalFcmCache;
+  let originalAdminCache;
 
   // ── DB lifecycle ────────────────────────────────────────────────────────────
   before(async () => {
@@ -72,6 +73,12 @@ describe('Notification triggers (integration)', function () {
     // the fcm-cleanup suite's after() hook, which may have cleared the entry.
     const FCM_PATH   = require.resolve('../../../app/services/fcmPushService');
     const ADMIN_PATH = require.resolve('../../../app/services/firebaseAdmin');
+    originalFcmCache = require.cache[FCM_PATH];
+    originalAdminCache = require.cache[ADMIN_PATH];
+    originalHelperExports = Object.fromEntries(
+      Object.keys(helperOverrides).map(key => [key, helpers[key]])
+    );
+    Object.assign(helpers, helperOverrides);
     require.cache[FCM_PATH] = {
       id: FCM_PATH, filename: FCM_PATH, loaded: true, exports: fcmMock,
     };
@@ -95,6 +102,14 @@ describe('Notification triggers (integration)', function () {
   after(async () => {
     await mongoose.disconnect();
     await mongod.stop();
+    Object.assign(helpers, originalHelperExports);
+
+    const FCM_PATH   = require.resolve('../../../app/services/fcmPushService');
+    const ADMIN_PATH = require.resolve('../../../app/services/firebaseAdmin');
+    if (originalFcmCache) require.cache[FCM_PATH] = originalFcmCache;
+    else delete require.cache[FCM_PATH];
+    if (originalAdminCache) require.cache[ADMIN_PATH] = originalAdminCache;
+    else delete require.cache[ADMIN_PATH];
   });
 
   beforeEach(async () => {

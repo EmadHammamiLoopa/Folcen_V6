@@ -48,6 +48,8 @@ describe('FCM invalid token cleanup (integration)', function () {
 
   let mongod;
   let sendPushToUser;
+  let originalFcmCache;
+  let originalAdminCache;
 
   before(async () => {
     // Boot DB
@@ -58,6 +60,8 @@ describe('FCM invalid token cleanup (integration)', function () {
     // injected by triggers.test.js (which runs first in the suite).
     const FCM_PATH   = require.resolve('../../../app/services/fcmPushService');
     const ADMIN_PATH = require.resolve('../../../app/services/firebaseAdmin');
+    originalFcmCache = require.cache[FCM_PATH];
+    originalAdminCache = require.cache[ADMIN_PATH];
     delete require.cache[FCM_PATH];
 
     // Inject a "success" admin mock for the base case.
@@ -76,6 +80,13 @@ describe('FCM invalid token cleanup (integration)', function () {
   after(async () => {
     await mongoose.disconnect();
     await mongod.stop();
+
+    const FCM_PATH   = require.resolve('../../../app/services/fcmPushService');
+    const ADMIN_PATH = require.resolve('../../../app/services/firebaseAdmin');
+    if (originalFcmCache) require.cache[FCM_PATH] = originalFcmCache;
+    else delete require.cache[FCM_PATH];
+    if (originalAdminCache) require.cache[ADMIN_PATH] = originalAdminCache;
+    else delete require.cache[ADMIN_PATH];
   });
 
   beforeEach(async () => {

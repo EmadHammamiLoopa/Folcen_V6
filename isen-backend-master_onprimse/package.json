@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "start:worker": "cross-env REDIS_HOST=127.0.0.1 REDIS_PORT=6379 node tools/image-worker/worker.js",
-    "test": "mocha --recursive --exit test/**/*.test.js",
+    "test": "mocha --require test/support/bootstrap.js --recursive --exit \"test/**/*.test.js\" --ignore \"test/security-audit/**/*.test.js\"",
+    "test:audit": "mocha --require test/support/bootstrap.js --recursive --exit \"test/security-audit/**/*.test.js\"",
     "test:privacy": "node scripts/test_privacy_checks.js"
   },
   "author": "",

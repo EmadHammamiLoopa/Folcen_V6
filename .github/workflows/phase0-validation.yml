@@ -1,0 +1,29 @@
+name: Phase 0 regression baseline
+
+on:
+  push:
+    branches:
+      - refactor/v1-architecture
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: isen-backend-master_onprimse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: isen-backend-master_onprimse/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Backend regression run 1
+        run: npm test
+      - name: Backend regression run 2
+        run: npm test
