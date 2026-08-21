@@ -27,3 +27,19 @@ jobs:
         run: npm test
       - name: Backend regression run 2
         run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --legacy-peer-deps --ignore-scripts
+      - name: Compile Angular compatibility entry points
+        run: ./node_modules/.bin/ngcc --properties es2015 browser module main --first-only --create-ivy-entry-points
+      - name: Compile frontend spec sources
+        run: ./node_modules/.bin/tsc -p tsconfig.spec.json --noEmit
+      - name: Production frontend build
+        run: npm run build:prod

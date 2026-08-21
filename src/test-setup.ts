@@ -73,23 +73,6 @@ const originalConfigure = TestBed.configureTestingModule.bind(TestBed);
 // Helpful global: silence console warnings during tests
 try { console.debug = console.debug || (() => {}); } catch (e) {}
 
-// Prevent real socket connections during unit tests by stubbing SocketService
-try {
-  const svc = require('./app/services/socket.service');
-  const SocketService = svc?.SocketService;
-  if (SocketService) {
-    SocketService.initializeSocket = async () => { return; };
-    // Return a minimal socket-like object with safe no-op methods so tests that call .on/.emit don't fail
-    SocketService.getSocket = async () => {
-      return {
-        on: (ev: string, cb?: any) => { /* noop */ },
-        emit: (ev: string, data?: any) => { /* noop */ },
-        off: (ev?: string) => { /* noop */ },
-        disconnect: () => { /* noop */ }
-      };
-    };
-    SocketService.emit = (event: string, data: any) => { /* noop */ };
-  }
-} catch (e) {
-  // ignore if service not present in test environment
-}
+// SocketService is deliberately not replaced globally. Socket lifecycle specs
+// install and restore their own socket.io-client fake so they exercise the real
+// static ownership and listener behavior without opening a network connection.
