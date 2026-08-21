@@ -53,6 +53,13 @@ describe('video call request flow', function () {
     };
 
     try {
+      // This path is intentionally offline, but notifyPeerNeeded still needs
+      // the shared Socket.IO facade initialized. Do not depend on another
+      // test leaving that global helper state behind.
+      helpers.initSocket({
+        to: () => ({ emit: () => {} }),
+        emit: () => {},
+      });
       helpers.notifyPeerNeeded(calleeId, callerId, {
         callId: 'call-test-offline',
         callerName: 'Caller One'
@@ -643,4 +650,3 @@ describe('video call request flow', function () {
     }
   });
 });
-
