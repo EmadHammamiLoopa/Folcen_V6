@@ -29,6 +29,23 @@ const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 const mediaStore = require('../utils/mediaStore');
 
+function authorizeAvatarMutation(req, res, targetId) {
+    const actor = req.authUser || req.auth;
+
+    if (!actor || !actor._id) {
+        Response.sendError(res, 401, 'Unauthorized');
+        return false;
+    }
+
+    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
+    if (String(targetId || '') !== String(actor._id) && !isAdmin) {
+        Response.sendError(res, 403, 'Unauthorized');
+        return false;
+    }
+
+    return true;
+}
+
 exports.resetBudget = async (req, res) => {
     try {
         const userId = req.authUser._id;
@@ -78,14 +95,10 @@ exports.reportUser = async (req, res) => {
 
 exports.removeAvatar = async (req, res) => {
     try {
-        const actor = req.authUser;
-        const isAdmin = actor && (actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN');
+        const actor = req.authUser || req.auth;
         const targetId = req.params.userId || req.params.id;
 
-        // 🔥 SECURITY: Only admins or owner can remove avatar
-        if (targetId && String(targetId) !== String(actor._id)) {
-            if (!isAdmin) return Response.sendError(res, 403, 'Unauthorized');
-        }
+        if (!authorizeAvatarMutation(req, res, targetId)) return;
 
         const user = await User.findById(targetId || actor._id);
         if (!user) return res.status(404).send('User not found');
@@ -1200,7 +1213,10 @@ exports.storeAvatar = async (avatar, user) => {
 exports.updateMainAvatar = async (req, res) => {
     try {
       const userId = req.params.userId;
+      const targetId = userId || req.params.id;
       const { avatarUrl } = req.body;
+
+      if (!authorizeAvatarMutation(req, res, targetId)) return;
   
       if (!userId || !avatarUrl) {
         return Response.sendError(res, 400, 'Missing userId or avatarUrl.');
@@ -1245,7 +1261,10 @@ exports.updateMainAvatar = async (req, res) => {
   
 exports.updateAvatar = async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId);
+        const targetId = req.params.userId || req.params.id;
+        if (!authorizeAvatarMutation(req, res, targetId)) return;
+
+        const user = await User.findById(targetId);
         if (!user) return res.status(404).send('User not found');
 
         if (req.file) {

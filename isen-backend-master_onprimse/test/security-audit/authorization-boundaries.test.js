@@ -59,6 +59,11 @@ describe('P0 authorization boundary security specifications', () => {
   });
 
   it('SECURITY_SPEC avatar mutations reject a cross-user target', () => {
+    const ownershipHelper = section(
+      userController,
+      'function authorizeAvatarMutation',
+      'exports.resetBudget ='
+    );
     const mainAvatar = section(
       userController,
       'exports.updateMainAvatar =',
@@ -69,13 +74,15 @@ describe('P0 authorization boundary security specifications', () => {
       'exports.updateAvatar =',
       'exports.deleteAccount ='
     );
+    const helperEnforcesOwnership =
+      /req\.(?:authUser|auth)[\s\S]*?_id/.test(ownershipHelper) &&
+      /403|unauthorized|forbidden/i.test(ownershipHelper);
     const allProtected = [mainAvatar, avatarList].every(handler =>
-      /req\.(?:authUser|auth)[\s\S]*?_id/.test(handler) &&
-      /403|unauthorized|forbidden/i.test(handler)
+      /authorizeAvatarMutation\(req, res, targetId\)/.test(handler)
     );
 
     expect(
-      allProtected,
+      helperEnforcesOwnership && allProtected,
       'SECURITY_ASSERTION: Main-avatar and avatar-list updates must authorize the actor against the target user.'
     ).to.equal(true);
   });
