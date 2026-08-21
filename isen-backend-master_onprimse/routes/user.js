@@ -366,7 +366,7 @@ router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeU
 
 /**
  * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Store Peer ID when a user connects
- */router.post('/:userId/peer', [requireSignin, withAuthUser], async (req, res) => {
+ */router.post('/:userId/peer', [requireSignin, withAuthUser, isAuth], async (req, res) => {
   const { userId } = req.params;
   const { peerId }  = req.body;
 
@@ -509,7 +509,7 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
 /**
  * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Delete Peer ID
  */
-router.delete('/:userId/peer', [requireSignin, withAuthUser], async (req, res) => {
+router.delete('/:userId/peer', [requireSignin, withAuthUser, isAuth], async (req, res) => {
     const userId = req.params.userId;
 
     try {
@@ -541,7 +541,7 @@ router.delete('/:userId/peer', [requireSignin, withAuthUser], async (req, res) =
     }
 });
 
-router.patch('/:userId/peer/heartbeat', [requireSignin, withAuthUser], async (req, res) => {
+router.patch('/:userId/peer/heartbeat', [requireSignin, withAuthUser, isAuth], async (req, res) => {
   const { userId } = req.params;
 
   try {

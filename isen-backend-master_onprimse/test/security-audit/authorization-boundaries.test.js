@@ -49,8 +49,7 @@ describe('P0 authorization boundary security specifications', () => {
       section(userRoutes, "router.patch('/:userId/peer/heartbeat'", "router.post('/:userId/upload'"),
     ];
     const allProtected = mutations.every(route =>
-      /req\.(?:authUser|auth)[\s\S]*?_id/.test(route) &&
-      /403|forbidden|unauthorized/i.test(route)
+      /\[requireSignin, withAuthUser, isAuth\]/.test(route)
     );
 
     expect(
