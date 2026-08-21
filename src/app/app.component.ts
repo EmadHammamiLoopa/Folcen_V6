@@ -171,22 +171,9 @@ export class AppComponent implements OnDestroy {
     } catch (e) {}
 
     // --- Observable-based socket subscriptions (reconnect-safe) ---
-    // follow-update: patch local user stats without a full API round-trip
-    SocketService.followUpdate$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
-      try {
-        if (!this.user?.id) return;
-        if (payload.followerId !== this.user.id && payload.followedId !== this.user.id) return;
-        const isActor = payload.followerId === this.user.id;
-        const stats = isActor ? payload.actorStatistics : payload.targetStatistics;
-        if (stats) {
-          if (stats.followers !== undefined) this.user.followers = Array(stats.followers).fill('');
-          if (stats.following !== undefined) this.user.following = Array(stats.following).fill('');
-          if (stats.friends   !== undefined) this.user.friends   = Array(stats.friends).fill('');
-          this.userService.setCurrentUser(this.user);
-          this.changeDetectorRef.detectChanges();
-        }
-      } catch (e) {}
-    });
+    // Social relationship identity state is owned by UserService. AppComponent
+    // receives the canonical current user through userService.currentUser and
+    // must not reconstruct identity arrays from count-only follow statistics.
 
     // user-profile-updated: patch local user if the update concerns us
     SocketService.userProfileUpdated$.pipe(takeUntil(this.destroy$)).subscribe((payload: any) => {
