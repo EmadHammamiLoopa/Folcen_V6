@@ -1547,10 +1547,6 @@ exports.follow = async(req, res) => {
     let followed = false
 
     if(!authUser.following.includes(user._id)){
-        // Ensure they are NOT friends if they are following
-        authUser.friends = authUser.friends.filter(id => id.toString() !== user._id.toString());
-        user.friends = user.friends.filter(id => id.toString() !== authUser._id.toString());
-
         authUser.following.push(user._id)
         if(!user.followers.includes(authUser._id))
             user.followers.push(authUser._id)
