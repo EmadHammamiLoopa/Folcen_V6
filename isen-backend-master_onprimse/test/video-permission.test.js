@@ -113,10 +113,35 @@ describe('directional video permission characterization', function () {
   it('LEGACY_CHARACTERIZATION observes concurrent duplicate requests creating two records', async () => {
     const firstSocket = socketFor(aliceId, 'alice-concurrent-one');
     const secondSocket = socketFor(aliceId, 'alice-concurrent-two');
-    const responses = await Promise.all([
-      requestPermission(firstSocket),
-      requestPermission(secondSocket),
-    ]);
+    const originalFindOne = Message.findOne;
+
+    // Force the race interleaving deterministically: both handlers complete
+    // their pending-request preflight before either write becomes visible.
+    // The production path has no atomic reservation or unique constraint, so
+    // both handlers then persist a request.
+    Message.findOne = function (query) {
+      if (
+        query?.type === 'video-call-request' &&
+        query?.status === 'pending'
+      ) {
+        return {
+          sort: () => ({
+            select: () => ({ lean: async () => null }),
+          }),
+        };
+      }
+      return originalFindOne.apply(this, arguments);
+    };
+
+    let responses;
+    try {
+      responses = await Promise.all([
+        requestPermission(firstSocket),
+        requestPermission(secondSocket),
+      ]);
+    } finally {
+      Message.findOne = originalFindOne;
+    }
 
     expect(responses.filter(result => result?.success)).to.have.length(2);
     expect(await Message.countDocuments({
