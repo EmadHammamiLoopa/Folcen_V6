@@ -4,6 +4,7 @@ const { expect } = require('chai');
 const FakeSocket = require('../support/fake-socket');
 const callSessions = require('../../app/utils/callSessionStore');
 const socketManager = require('../../app/utils/socketManager');
+const videoCallEligibility = require('../../app/services/videoCallEligibility');
 
 describe('P0 call signaling authorization security specifications', () => {
   const callerId = '64b000000000000000000401';
@@ -17,6 +18,7 @@ describe('P0 call signaling authorization security specifications', () => {
   let originalPush;
   let originalCreateCallRequest;
   let originalAppendCallLifecycle;
+  let originalGetVideoCallEligibility;
   let emitted;
 
   function socketFor(userId, name) {
@@ -45,6 +47,7 @@ describe('P0 call signaling authorization security specifications', () => {
     };
     originalCreateCallRequest = eventLogger.createCallRequest;
     originalAppendCallLifecycle = eventLogger.appendCallLifecycle;
+    originalGetVideoCallEligibility = videoCallEligibility.getVideoCallEligibility;
     push.sendIncomingVideoCallPush = async () => ({ successCount: 0, failureCount: 0 });
     push.sendVideoCallLifecyclePush = async () => ({ successCount: 0, failureCount: 0 });
     eventLogger.createCallRequest = async () => ({ callId: 'audit-call-generated' });
@@ -61,6 +64,7 @@ describe('P0 call signaling authorization security specifications', () => {
     push.sendVideoCallLifecyclePush = originalPush.sendVideoCallLifecyclePush;
     eventLogger.createCallRequest = originalCreateCallRequest;
     eventLogger.appendCallLifecycle = originalAppendCallLifecycle;
+    videoCallEligibility.getVideoCallEligibility = originalGetVideoCallEligibility;
     delete require.cache[videoPath];
     if (originalVideoCache) require.cache[videoPath] = originalVideoCache;
   });
@@ -70,6 +74,7 @@ describe('P0 call signaling authorization security specifications', () => {
     socketManager.connectedUsers.clear();
     socketManager.socketUserMap.clear();
     emitted = [];
+    videoCallEligibility.getVideoCallEligibility = originalGetVideoCallEligibility;
   });
 
   afterEach(() => {
@@ -79,6 +84,10 @@ describe('P0 call signaling authorization security specifications', () => {
   it('SECURITY_SPEC raw call start requires friendship or accepted directional permission', async () => {
     const callId = 'audit-unauthorized-start';
     const attacker = socketFor(attackerId, 'raw-start');
+    videoCallEligibility.getVideoCallEligibility = async () => ({
+      allowed: false,
+      code: 'video_permission_required',
+    });
 
     await attacker.trigger('video-call-started', { from: callerId, to: calleeId, callId });
 

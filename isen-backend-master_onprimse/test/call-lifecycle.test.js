@@ -4,6 +4,7 @@ const { expect } = require('chai');
 const FakeSocket = require('./support/fake-socket');
 const callSessions = require('../app/utils/callSessionStore');
 const socketManager = require('../app/utils/socketManager');
+const videoCallEligibility = require('../app/services/videoCallEligibility');
 
 describe('call lifecycle and teardown characterization', function () {
   const callerId = '64b000000000000000000301';
@@ -16,6 +17,7 @@ describe('call lifecycle and teardown characterization', function () {
   let originalPush;
   let originalCreateCallRequest;
   let originalAppendCallLifecycle;
+  let originalEligibility;
   let emitted;
 
   function setupPair(callId, state = 'ringing') {
@@ -49,6 +51,11 @@ describe('call lifecycle and teardown characterization', function () {
     };
     originalCreateCallRequest = eventLogger.createCallRequest;
     originalAppendCallLifecycle = eventLogger.appendCallLifecycle;
+    originalEligibility = videoCallEligibility.getVideoCallEligibility;
+    videoCallEligibility.getVideoCallEligibility = async () => ({
+      allowed: true,
+      isFriend: true,
+    });
 
     push.sendIncomingVideoCallPush = async () => ({ successCount: 0, failureCount: 0 });
     push.sendVideoCallLifecyclePush = async () => ({ successCount: 0, failureCount: 0 });
@@ -67,6 +74,7 @@ describe('call lifecycle and teardown characterization', function () {
     push.sendVideoCallLifecyclePush = originalPush.sendVideoCallLifecyclePush;
     eventLogger.createCallRequest = originalCreateCallRequest;
     eventLogger.appendCallLifecycle = originalAppendCallLifecycle;
+    videoCallEligibility.getVideoCallEligibility = originalEligibility;
     delete require.cache[videoPath];
     if (originalVideoCache) require.cache[videoPath] = originalVideoCache;
   });

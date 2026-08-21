@@ -26,6 +26,7 @@ const peerStore = require('.././app/utils/peerStorage');
 const { notifyPeerNeeded, emitToUser, normalizeId } = require('../app/helpers');
 const callSessions = require('../app/utils/callSessionStore');
 const { sendVideoCallLifecyclePush } = require('../app/services/videoCallPushService');
+const videoCallEligibility = require('../app/services/videoCallEligibility');
 
 const Response = require('../app/controllers/Response');
 
@@ -404,35 +405,21 @@ router.get('/:userId/peer', [requireSignin, withAuthUser], async (req, res, next
       return res.status(403).json({ success: false, code: 'invalid_call_target', message: 'Invalid call target' });
     }
 
-    const [callerDoc, calleeDoc] = await Promise.all([
-      User.findById(callerId).select('friends').lean(),
-      User.findById(userId).select('friends allowVideoRequestsFromNonFriends').lean()
-    ]);
-    if (!callerDoc || !calleeDoc) {
+    const eligibility = await videoCallEligibility.getVideoCallEligibility(callerId, userId);
+    if (eligibility.code === 'user_not_found') {
       return res.status(404).json({ success: false, code: 'user_not_found', message: 'User not found' });
     }
-
-    const callerHasCallee = (callerDoc.friends || []).map(String).includes(String(userId));
-    const calleeHasCaller = (calleeDoc.friends || []).map(String).includes(callerId);
-    const isFriend = callerHasCallee || calleeHasCaller;
-    let persistentVideoPermission = null;
-
-    if (!isFriend) {
-      persistentVideoPermission = await Message.findOne({
-        type: 'video-call-request',
-        status: 'accepted',
-        from: callerId,
-        to: userId
-      }).sort({ updatedAt: -1 }).select('_id').lean();
-    }
-
-    if (!isFriend && !persistentVideoPermission) {
+    if (!eligibility.allowed) {
       return res.status(403).json({
         success: false,
-        code: 'video_permission_required',
-        message: 'Video calls require friendship or accepted video-call permission'
+        code: eligibility.code || 'video_permission_required',
+        message: eligibility.code === 'invalid_call_target'
+          ? 'Invalid call target'
+          : 'Video calls require friendship or accepted video-call permission'
       });
     }
+
+    const persistentVideoPermission = eligibility.persistentVideoPermission;
 
     const record = await peerStore.get(userId); // { peerId, lastUpdated } | null
     const caller = req.authUser || {};

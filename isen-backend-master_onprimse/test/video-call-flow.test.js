@@ -157,21 +157,23 @@ describe('video call request flow', function () {
       assert.strictEqual(state.to, calleeId);
 
       const emitted = [];
-      const socket = { id: 'callee-socket', userId: calleeId, handlers: {}, on(event, handler) { this.handlers[event] = handler; } };
+      const calleeSocket = { id: 'callee-socket', userId: calleeId, handlers: {}, on(event, handler) { this.handlers[event] = handler; } };
+      const callerSocket = { id: 'caller-socket', userId: callerId, handlers: {}, on(event, handler) { this.handlers[event] = handler; } };
       const io = { to: sid => ({ emit: (event, payload) => emitted.push({ sid, event, payload }) }) };
       const { connectedUsers } = require('../app/utils/socketManager');
       connectedUsers.set(callerId, new Set(['caller-socket']));
       connectedUsers.set(calleeId, new Set(['callee-socket']));
-      registerVideoSocket(io, socket);
+      registerVideoSocket(io, calleeSocket);
+      registerVideoSocket(io, callerSocket);
 
       let beforeAccept;
-      socket.handlers['call-state-check']({ callId: 'call-peer-wake-1' }, value => { beforeAccept = value; });
+      calleeSocket.handlers['call-state-check']({ callId: 'call-peer-wake-1' }, value => { beforeAccept = value; });
       assert.strictEqual(beforeAccept.answerable, true);
       assert.strictEqual(beforeAccept.status, 'ringing');
 
-      socket.handlers['video-call-accepted']({ from: callerId, to: calleeId, callId: 'call-peer-wake-1' });
+      await calleeSocket.handlers['video-call-accepted']({ from: callerId, to: calleeId, callId: 'call-peer-wake-1' });
       let afterAccept;
-      socket.handlers['call-state-check']({ callId: 'call-peer-wake-1' }, value => { afterAccept = value; });
+      calleeSocket.handlers['call-state-check']({ callId: 'call-peer-wake-1' }, value => { afterAccept = value; });
       assert.strictEqual(afterAccept.answerable, false);
       assert.strictEqual(afterAccept.status, 'accepted');
       assert.ok(emitted.some(e => e.event === 'video-call-accepted' && e.payload.callId === 'call-peer-wake-1'));
@@ -179,14 +181,14 @@ describe('video call request flow', function () {
       // New signaling contract:
       // acceptance means the callee is ready; media start transitions
       // the authoritative call session to connected.
-      socket.handlers['video-call-started']({
+      await callerSocket.handlers['video-call-started']({
         from: callerId,
         to: calleeId,
         callId: 'call-peer-wake-1'
       });
 
       let afterStarted;
-      socket.handlers['call-state-check'](
+      calleeSocket.handlers['call-state-check'](
         { callId: 'call-peer-wake-1' },
         value => { afterStarted = value; }
       );
@@ -438,6 +440,7 @@ describe('video call request flow', function () {
     const Message = require('../app/models/Message');
     const User = require('../app/models/User');
     const eventLogger = require('../app/utils/eventLogger');
+    const videoCallEligibility = require('../app/services/videoCallEligibility');
     const { connectedUsers } = require('../app/utils/socketManager');
     const videoPath = require.resolve('../app/sockets/video');
 
@@ -445,12 +448,17 @@ describe('video call request flow', function () {
     const originalSave = Message.prototype.save;
     const originalCreateCallRequest = eventLogger.createCallRequest;
     const originalAppendCallLifecycle = eventLogger.appendCallLifecycle;
+    const originalEligibility = videoCallEligibility.getVideoCallEligibility;
     delete require.cache[videoPath];
 
     User.findById = async id => ({ _id: id, friends: [String(id) === callerId ? calleeId : callerId] });
     Message.prototype.save = async function () { return this; };
     eventLogger.createCallRequest = async () => ({ callId: 'call-state-1' });
     eventLogger.appendCallLifecycle = async () => {};
+    videoCallEligibility.getVideoCallEligibility = async () => ({
+      allowed: true,
+      isFriend: true,
+    });
 
     connectedUsers.set(callerId, new Set(['caller-socket']));
     connectedUsers.set(calleeId, new Set(['callee-socket']));
@@ -478,7 +486,7 @@ describe('video call request flow', function () {
       assert.strictEqual(requestAck.success, true);
       assert.strictEqual(requestAck.callId, 'call-state-1');
 
-      socket.handlers['video-call-started']({ from: callerId, to: calleeId });
+      await socket.handlers['video-call-started']({ from: callerId, to: calleeId });
 
       let stateAfterStarted;
       socket.handlers['call-state-check']({ callId: 'call-state-1' }, value => { stateAfterStarted = value; });
@@ -498,6 +506,7 @@ describe('video call request flow', function () {
       Message.prototype.save = originalSave;
       eventLogger.createCallRequest = originalCreateCallRequest;
       eventLogger.appendCallLifecycle = originalAppendCallLifecycle;
+      videoCallEligibility.getVideoCallEligibility = originalEligibility;
       delete require.cache[videoPath];
     }
   });
