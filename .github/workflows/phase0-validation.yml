@@ -27,6 +27,19 @@ jobs:
         run: npm test
       - name: Backend regression run 2
         run: npm test
+      - name: Verify isolated P0 security specifications
+        env:
+          AUDIT_RESULT_FILE: ${{ runner.temp }}/phase0-security-audit.json
+        run: |
+          set +e
+          npm run test:audit
+          AUDIT_RC=$?
+          node test/security-audit/verify-audit-result.js "$AUDIT_RESULT_FILE"
+          VERIFY_RC=$?
+          echo "audit_exit=$AUDIT_RC"
+          echo "audit_verify_exit=$VERIFY_RC"
+          test "$AUDIT_RC" -ne 0
+          test "$VERIFY_RC" -eq 0
 
   frontend:
     runs-on: ubuntu-latest
