@@ -5,7 +5,6 @@ import { SigninComponent } from '../pages/auth/signin/signin.component';
 import { SignupComponent } from '../pages/auth/signup/signup.component';
 
 import { SocketService } from './socket.service';
-import { DataService } from './data.service';
 import { SessionCredentialStore } from './session-credential-store.service';
 
 describe('authentication token publication failure characterization', () => {
@@ -118,18 +117,6 @@ describe('authentication token publication failure characterization', () => {
         )
     };
 
-    const socketSpy =
-      spyOn(
-        SocketService,
-        'setTokenCache'
-      );
-
-    const dataSpy =
-      spyOn(
-        DataService,
-        'setTokenCache'
-      );
-
     const component =
       buildSignin(
         true,
@@ -155,12 +142,9 @@ describe('authentication token publication failure characterization', () => {
     ).toBeNull();
 
     expect(
-      socketSpy
-    ).not.toHaveBeenCalled();
-
-    expect(
-      dataSpy
-    ).not.toHaveBeenCalled();
+      SessionCredentialStore
+        .getCachedToken()
+    ).toBeNull();
   });
 
   it('signup Cordova native persistence failure prevents later token publication in the current implementation', async () => {
@@ -176,12 +160,6 @@ describe('authentication token publication failure characterization', () => {
         )
     };
 
-    const socketSpy =
-      spyOn(
-        SocketService,
-        'setTokenCache'
-      );
-
     const component =
       buildSignup(
         true,
@@ -207,8 +185,9 @@ describe('authentication token publication failure characterization', () => {
     ).toBeNull();
 
     expect(
-      socketSpy
-    ).not.toHaveBeenCalled();
+      SessionCredentialStore
+        .getCachedToken()
+    ).toBeNull();
   });
 
   it('signin browser publication does not consult NativeStorage', async () => {
@@ -216,18 +195,6 @@ describe('authentication token publication failure characterization', () => {
       setItem: jasmine
         .createSpy('setItem')
     };
-
-    const socketSpy =
-      spyOn(
-        SocketService,
-        'setTokenCache'
-      );
-
-    const dataSpy =
-      spyOn(
-        DataService,
-        'setTokenCache'
-      );
 
     const component =
       buildSignin(
@@ -251,29 +218,16 @@ describe('authentication token publication failure characterization', () => {
     ).toBe(token);
 
     expect(
-      socketSpy
-    ).toHaveBeenCalledWith(
-      token
-    );
-
-    expect(
-      dataSpy
-    ).toHaveBeenCalledWith(
-      token
-    );
+      SessionCredentialStore
+        .getCachedToken()
+    ).toBe(token);
   });
 
-  it('signup browser publication does not consult NativeStorage and still publishes the socket token', async () => {
+  it('signup browser publication does not consult NativeStorage and publishes shared authentication state', async () => {
     const nativeStorage = {
       setItem: jasmine
         .createSpy('setItem')
     };
-
-    const socketSpy =
-      spyOn(
-        SocketService,
-        'setTokenCache'
-      );
 
     const component =
       buildSignup(
@@ -297,9 +251,8 @@ describe('authentication token publication failure characterization', () => {
     ).toBe(token);
 
     expect(
-      socketSpy
-    ).toHaveBeenCalledWith(
-      token
-    );
+      SessionCredentialStore
+        .getCachedToken()
+    ).toBe(token);
   });
 });
