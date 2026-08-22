@@ -183,6 +183,68 @@ describe('SessionCredentialStore coordination', () => {
     ).toBeNull();
   });
 
+  it('native persisted-token read backfills localStorage', async () => {
+    const nativeStorage = {
+      getItem: jasmine
+        .createSpy('getItem')
+        .and.returnValue(
+          Promise.resolve(
+            'native-request-token'
+          )
+        )
+    };
+
+    await expectAsync(
+      SessionCredentialStore
+        .readNativeTokenAndBackfill(
+          nativeStorage
+        )
+    ).toBeResolvedTo(
+      'native-request-token'
+    );
+
+    expect(
+      nativeStorage.getItem
+    ).toHaveBeenCalledWith(
+      'token'
+    );
+
+    expect(
+      localStorage.getItem(
+        'token'
+      )
+    ).toBe(
+      'native-request-token'
+    );
+  });
+
+  it('native persisted-token read leaves error handling to its caller', async () => {
+    const nativeStorage = {
+      getItem: jasmine
+        .createSpy('getItem')
+        .and.returnValue(
+          Promise.reject(
+            new Error(
+              'native read failed'
+            )
+          )
+        )
+    };
+
+    await expectAsync(
+      SessionCredentialStore
+        .readNativeTokenAndBackfill(
+          nativeStorage
+        )
+    ).toBeRejected();
+
+    expect(
+      localStorage.getItem(
+        'token'
+      )
+    ).toBeNull();
+  });
+
   it('authenticated browser publication persists local state and shared cache without NativeStorage', async () => {
     const nativeStorage = {
       setItem: jasmine

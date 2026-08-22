@@ -6,6 +6,7 @@ import { Platform, ToastController } from '@ionic/angular';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { switchMap, catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
+import { SessionCredentialStore } from '../services/session-credential-store.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
@@ -48,21 +49,35 @@ export class AuthInterceptor implements HttpInterceptor {
       return next.handle(req);
     }
 
-    const localToken = (() => {
-      try { return localStorage.getItem('token'); } catch (_) { return null; }
-    })();
+    const localToken =
+      SessionCredentialStore.readLocalToken();
 
     const token$ = localToken
-      ? from(Promise.resolve(localToken))
-      : (this.platform.is('cordova')
-        ? from(this.nativeStorage.getItem('token').then(token => {
-            try { if (token) localStorage.setItem('token', token); } catch (_) {}
-            return token;
-          }).catch(err => {
-            devLogger.log('Auth token not found in NativeStorage', err);
-            return null;
-          }))
-        : from(Promise.resolve(null)));
+      ? from(
+          Promise.resolve(
+            localToken
+          )
+        )
+      : (
+          this.platform.is('cordova')
+            ? from(
+                SessionCredentialStore
+                  .readNativeTokenAndBackfill(
+                    this.nativeStorage
+                  )
+                  .catch(err => {
+                    devLogger.log(
+                      'Auth token not found in NativeStorage',
+                      err
+                    );
+
+                    return null;
+                  })
+              )
+            : from(
+                Promise.resolve(null)
+              )
+        );
 
     return token$.pipe(
       switchMap(token => {

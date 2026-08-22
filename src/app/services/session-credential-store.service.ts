@@ -5,7 +5,7 @@
  * This store owns:
  *   - safe local token read/write mechanics
  *   - the single in-memory token fallback cache
- *   - startup token restoration from local/native persistence
+ *   - persisted token reads/backfill for startup and request consumers
  *   - authenticated token publication after sign-in/sign-up
  *
  * Interceptor orchestration, socket lifecycle, user persistence, and
@@ -93,6 +93,39 @@ export class SessionCredentialStore {
   }
 
   /**
+   * Read a token from NativeStorage and backfill local persistence.
+   *
+   * Error policy intentionally belongs to the caller:
+   * startup swallows an unavailable native store, while request
+   * interception retains its existing diagnostic logging.
+   */
+  static async readNativeTokenAndBackfill(
+    nativeStorage: {
+      getItem(key: string): Promise<any>;
+    }
+  ): Promise<string | null> {
+    const nativeToken =
+      await nativeStorage.getItem(
+        'token'
+      );
+
+    if (!nativeToken) {
+      return null;
+    }
+
+    const token =
+      typeof nativeToken === 'string'
+        ? nativeToken
+        : String(nativeToken);
+
+    SessionCredentialStore.writeLocalToken(
+      token
+    );
+
+    return token;
+  }
+
+  /**
    * Restore the persisted token during application startup.
    *
    * Preserve the existing AppComponent semantics:
@@ -116,31 +149,14 @@ export class SessionCredentialStore {
       return localToken;
     }
 
-    let nativeToken: any = null;
-
     try {
-      nativeToken =
-        await nativeStorage.getItem(
-          'token'
+      return await SessionCredentialStore
+        .readNativeTokenAndBackfill(
+          nativeStorage
         );
     } catch (_) {
-      nativeToken = null;
-    }
-
-    if (!nativeToken) {
       return null;
     }
-
-    const token =
-      typeof nativeToken === 'string'
-        ? nativeToken
-        : String(nativeToken);
-
-    SessionCredentialStore.writeLocalToken(
-      token
-    );
-
-    return token;
   }
 
   static readSynchronousToken(): string | null {
