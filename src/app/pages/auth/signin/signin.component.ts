@@ -12,6 +12,7 @@ import { User } from '../../../models/User';
 import { WelcomeAlertComponent } from '../welcome-alert/welcome-alert.component';
 import { SocketService } from 'src/app/services/socket.service';
 import { SessionCredentialStore } from 'src/app/services/session-credential-store.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 
 @Component({
   selector: 'app-signin',
@@ -257,16 +258,18 @@ export class SigninComponent implements OnInit {
   }
 
   private async clearStaleAuthData() {
+    // Sign-in entry cleanup is targeted persisted-auth cleanup,
+    // not the application's authoritative/full logout.
     try {
-      if (this.platform.is('cordova')) {
-        await this.nativeStorage.remove('token').catch(() => {});
-        await this.nativeStorage.remove('currentUser').catch(() => {});
-        await this.nativeStorage.remove('user').catch(() => {});
-      }
+      await new SessionAuthStateService(
+        this.nativeStorage
+      ).clearStoredAuth(
+        this.platform.is('cordova')
+      );
     } catch (_) {}
-    try { localStorage.removeItem('token'); } catch (_) {}
-    try { localStorage.removeItem('currentUser'); } catch (_) {}
-    try { localStorage.removeItem('user'); } catch (_) {}
+
+    // SocketService owns socket teardown and socket authentication
+    // ownership cleanup.
     try { await SocketService.logout(); } catch (_) {}
   }
   
