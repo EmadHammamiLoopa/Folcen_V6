@@ -182,4 +182,129 @@ describe('SessionCredentialStore coordination', () => {
       )
     ).toBeNull();
   });
+
+  it('authenticated browser publication persists local state and shared cache without NativeStorage', async () => {
+    const nativeStorage = {
+      setItem: jasmine
+        .createSpy('setItem')
+    };
+
+    await SessionCredentialStore
+      .publishAuthenticatedToken(
+        'browser-auth-token',
+        nativeStorage,
+        false
+      );
+
+    expect(
+      nativeStorage.setItem
+    ).not.toHaveBeenCalled();
+
+    expect(
+      localStorage.getItem(
+        'token'
+      )
+    ).toBe(
+      'browser-auth-token'
+    );
+
+    expect(
+      SessionCredentialStore.getCachedToken()
+    ).toBe(
+      'browser-auth-token'
+    );
+  });
+
+  it('authenticated Cordova publication writes NativeStorage before publishing local/cache state', async () => {
+    const events: string[] = [];
+
+    const nativeStorage = {
+      setItem: jasmine
+        .createSpy('setItem')
+        .and.callFake(
+          async (
+            key: string,
+            value: any
+          ) => {
+            events.push(
+              `native:${key}:${value}`
+            );
+
+            return value;
+          }
+        )
+    };
+
+    const originalWriteLocal =
+      SessionCredentialStore.writeLocalToken;
+
+    spyOn(
+      SessionCredentialStore,
+      'writeLocalToken'
+    ).and.callFake(
+      (value: string | null) => {
+        events.push(
+          `local:${value}`
+        );
+
+        originalWriteLocal.call(
+          SessionCredentialStore,
+          value
+        );
+      }
+    );
+
+    await SessionCredentialStore
+      .publishAuthenticatedToken(
+        'cordova-auth-token',
+        nativeStorage,
+        true
+      );
+
+    expect(
+      events
+    ).toEqual([
+      'native:token:cordova-auth-token',
+      'local:cordova-auth-token'
+    ]);
+
+    expect(
+      SessionCredentialStore.getCachedToken()
+    ).toBe(
+      'cordova-auth-token'
+    );
+  });
+
+  it('authenticated Cordova publication stops before local/cache state when NativeStorage fails', async () => {
+    const nativeStorage = {
+      setItem: jasmine
+        .createSpy('setItem')
+        .and.returnValue(
+          Promise.reject(
+            new Error(
+              'native persistence failed'
+            )
+          )
+        )
+    };
+
+    await expectAsync(
+      SessionCredentialStore
+        .publishAuthenticatedToken(
+          'failed-auth-token',
+          nativeStorage,
+          true
+        )
+    ).toBeRejected();
+
+    expect(
+      localStorage.getItem(
+        'token'
+      )
+    ).toBeNull();
+
+    expect(
+      SessionCredentialStore.getCachedToken()
+    ).toBeNull();
+  });
 });

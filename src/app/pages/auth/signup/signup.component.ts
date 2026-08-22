@@ -16,6 +16,7 @@ import { User } from '../../../models/User';
 import { SocketService } from '../../../services/socket.service';
 import { OneSignalService } from '../../../services/one-signal.service';
 import { GuidedTourService } from 'src/app/services/guided-tour.service';
+import { SessionCredentialStore } from 'src/app/services/session-credential-store.service';
 
 @Component({
   selector: 'app-signup',
@@ -606,11 +607,19 @@ export class SignupComponent implements OnInit, OnDestroy {
 
   private async storeUserData(token: string, user: any) {
     try {
-      if (this.platform.is('cordova')) {
-        await this.nativeStorage.setItem('token', token);
-      }
-      try { localStorage.setItem('token', token); } catch (e) {}
-      try { SocketService.setTokenCache(token); } catch (e) {}
+      await SessionCredentialStore.publishAuthenticatedToken(
+        token,
+        this.nativeStorage,
+        this.platform.is('cordova')
+      );
+
+      // Preserve the existing SocketService publication observation
+      // while the shared credential store becomes authoritative.
+      try {
+        SocketService.setTokenCache(
+          token
+        );
+      } catch (e) {}
     } catch (e) {}
 
     try {

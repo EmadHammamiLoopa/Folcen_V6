@@ -6,9 +6,10 @@
  *   - safe local token read/write mechanics
  *   - the single in-memory token fallback cache
  *   - startup token restoration from local/native persistence
+ *   - authenticated token publication after sign-in/sign-up
  *
- * Login/signup publication, interceptor orchestration, socket lifecycle,
- * and authoritative session invalidation remain outside this store.
+ * Interceptor orchestration, socket lifecycle, user persistence, and
+ * authoritative session invalidation remain outside this store.
  */
 export class SessionCredentialStore {
   private static tokenCache: string | null = null;
@@ -47,6 +48,48 @@ export class SessionCredentialStore {
 
   static getCachedToken(): string | null {
     return SessionCredentialStore.tokenCache;
+  }
+
+  /**
+   * Publish a newly authenticated token into the authoritative
+   * credential state.
+   *
+   * Preserve the current authentication semantics:
+   *   1. Cordova NativeStorage is written first when enabled;
+   *   2. a NativeStorage failure rejects before local/cache publication;
+   *   3. localStorage persistence remains best-effort;
+   *   4. the shared synchronous cache is always populated after the
+   *      native persistence boundary succeeds.
+   */
+  static async publishAuthenticatedToken(
+    token: string,
+    nativeStorage: {
+      setItem(
+        key: string,
+        value: any
+      ): Promise<any>;
+    },
+    persistNative: boolean
+  ): Promise<void> {
+    const tokenValue =
+      typeof token === 'string'
+        ? token
+        : String(token);
+
+    if (persistNative) {
+      await nativeStorage.setItem(
+        'token',
+        tokenValue
+      );
+    }
+
+    SessionCredentialStore.writeLocalToken(
+      tokenValue
+    );
+
+    SessionCredentialStore.setCachedToken(
+      tokenValue
+    );
   }
 
   /**
