@@ -4,50 +4,21 @@ import { Platform } from '@ionic/angular';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import { SessionAuthStateService } from '../services/session-auth-state.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthGuard implements CanActivate {
+  private readonly sessionAuthState: SessionAuthStateService;
+
   constructor(
     private nativeStorage: NativeStorage,
     private router: Router,
     private platform: Platform,
     private http: HttpClient
-  ) {}
-
-  private parseJwtPayload(token: string): any | null {
-    try {
-      const parts = token?.split('.') || [];
-      if (parts.length < 2) {
-        return null;
-      }
-      const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-      return JSON.parse(atob(padded));
-    } catch (e) {
-      return null;
-    }
-  }
-
-  private isTokenExpired(token: string): boolean {
-    const payload = this.parseJwtPayload(token);
-    if (!payload || !payload.exp) {
-      return true;
-    }
-    return Date.now() >= Number(payload.exp) * 1000;
-  }
-
-  private async clearStoredAuth(): Promise<void> {
-    try { localStorage.removeItem('token'); } catch (e) {}
-    try { localStorage.removeItem('currentUser'); } catch (e) {}
-    try { localStorage.removeItem('user'); } catch (e) {}
-
-    if (this.platform.is('cordova')) {
-      try { await this.nativeStorage.remove('token'); } catch (e) {}
-      try { await this.nativeStorage.remove('currentUser'); } catch (e) {}
-      try { await this.nativeStorage.remove('user'); } catch (e) {}
-    }
+  ) {
+    this.sessionAuthState = new SessionAuthStateService(this.nativeStorage);
   }
 
   private async refreshVerificationStatus(token: string, user: any): Promise<any> {
@@ -63,12 +34,10 @@ export class AuthGuard implements CanActivate {
       const freshUser = resp?.data || user;
 
       if (freshUser) {
-        try { localStorage.setItem('currentUser', JSON.stringify(freshUser)); } catch (e) {}
-        try { localStorage.setItem('user', JSON.stringify(freshUser)); } catch (e) {}
-        if (this.platform.is('cordova')) {
-          try { await this.nativeStorage.setItem('currentUser', freshUser); } catch (e) {}
-          try { await this.nativeStorage.setItem('user', freshUser); } catch (e) {}
-        }
+        await this.sessionAuthState.persistCurrentUser(
+          freshUser,
+          this.platform.is('cordova')
+        );
       }
 
       return freshUser;
@@ -85,20 +54,15 @@ export class AuthGuard implements CanActivate {
 
     if (this.platform.is('cordova')) {
       try {
-        token = await this.nativeStorage.getItem('token');
-        // Prefer canonical key 'currentUser', fallback to legacy 'user'
-        try {
-          user = await this.nativeStorage.getItem('currentUser');
-        } catch (e) {
-          try { user = await this.nativeStorage.getItem('user'); } catch (e2) { user = null; }
-        }
+        token = await this.sessionAuthState.getNativeToken();
+        user = await this.sessionAuthState.getNativeUser();
         console.log('Auth token found in NativeStorage:', token);
       } catch (err) {
         console.log('Auth token not found in NativeStorage', err);
       }
     } else {
-      token = localStorage.getItem('token');
-      const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+      token = this.sessionAuthState.getLocalToken();
+      const raw = this.sessionAuthState.getLocalUserRaw();
       user = raw ? JSON.parse(raw) : null;
       if (token) {
         console.log('Auth token found in localStorage:', token);
@@ -108,9 +72,9 @@ export class AuthGuard implements CanActivate {
     }
 
     if (token && user) {
-      if (this.isTokenExpired(token)) {
+      if (this.sessionAuthState.isTokenExpired(token)) {
         console.warn('AuthGuard: Token is expired or invalid. Clearing storage and redirecting to signin.');
-        await this.clearStoredAuth();
+        await this.sessionAuthState.clearStoredAuth(this.platform.is('cordova'));
         this.router.navigate(['/auth/signin']);
         return false;
       }
@@ -127,14 +91,14 @@ export class AuthGuard implements CanActivate {
       if (token && !user) {
         // On Cordova, NativeStorage writes are async fire-and-forget; the user object
         // may not be persisted yet. Try localStorage as a fallback before clearing.
-        const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+        const raw = this.sessionAuthState.getLocalUserRaw();
         if (raw) {
           try { user = JSON.parse(raw); } catch (e) { user = null; }
         }
         if (user) {
           // Found user in localStorage — re-run the verified check
-          if (this.isTokenExpired(token)) {
-            await this.clearStoredAuth();
+          if (this.sessionAuthState.isTokenExpired(token)) {
+            await this.sessionAuthState.clearStoredAuth(this.platform.is('cordova'));
             this.router.navigate(['/auth/signin']);
             return false;
           }
@@ -146,7 +110,7 @@ export class AuthGuard implements CanActivate {
           return true;
         }
         console.warn('AuthGuard: Token found but user missing. Clearing inconsistent storage to prevent loop.');
-        await this.clearStoredAuth();
+        await this.sessionAuthState.clearStoredAuth(this.platform.is('cordova'));
       }
       console.log('Auth token not found, redirecting to /auth/signin');
       this.router.navigate(['/auth/signin']);
