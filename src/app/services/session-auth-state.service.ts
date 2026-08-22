@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
+import { SessionCredentialStore } from './session-credential-store.service';
 
 /**
  * Low-level persisted authentication state mechanics shared by route guards.
@@ -119,6 +120,13 @@ export class SessionAuthStateService {
     try {
       localStorage.removeItem('token');
     } catch (e) {}
+
+    // A targeted guard rejection must also invalidate the shared
+    // synchronous fallback credential. Otherwise request/socket
+    // consumers could continue using a token removed from persistence.
+    SessionCredentialStore.setCachedToken(
+      null
+    );
 
     try {
       localStorage.removeItem('currentUser');
