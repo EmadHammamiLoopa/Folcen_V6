@@ -28,6 +28,7 @@ import { SessionStoreService } from './services/session-store.service';
 import { DataService } from './services/data.service';
 import { SessionInvalidationCoordinator } from './services/session-invalidation-coordinator.service';
 import { PerformanceMonitorService } from './services/performance-monitor.service';
+import { SessionCredentialStore } from './services/session-credential-store.service';
 
 import { AnnouncementModalComponent } from './components/announcement-modal/announcement-modal.component';
 
@@ -374,27 +375,27 @@ export class AppComponent implements OnDestroy {
       // Initialize Theme
       this.themeService.initializeTheme();
 
-      // Backfill localStorage from NativeStorage so SocketService (which reads
-      // localStorage only) can authenticate the WebSocket on Android. Also
-      // populate SocketService.tokenCache as a synchronous fallback in case
-      // localStorage.setItem is unreliable under Capacitor.
+      // Restore the startup token from persisted credential state.
+      // Socket publication and refresh sequencing remain here so socket
+      // startup behavior is unchanged.
       try {
-        let tok: any = null;
-        try { tok = localStorage.getItem('token'); } catch {}
-        if (!tok) {
-          tok = await this.nativeStorage.getItem('token').catch(() => null);
-          if (tok) {
-            const tokStr = typeof tok === 'string' ? tok : String(tok);
-            try { localStorage.setItem('token', tokStr); } catch {}
-            SocketService.setTokenCache(tokStr);
-            console.log('🔑 Token backfilled from NativeStorage to localStorage+cache');
-          }
-        } else {
-          SocketService.setTokenCache(typeof tok === 'string' ? tok : String(tok));
-        }
-        // Force socket re-init now that token cache is populated
+        const tok =
+          await SessionCredentialStore.restoreStartupToken(
+            this.nativeStorage
+          );
+
         if (tok) {
-          try { await SocketService.refreshAuth(); } catch (e) { console.warn('socket refreshAuth failed', e); }
+          SocketService.setTokenCache(tok);
+
+          // Force socket re-init now that token cache is populated
+          try {
+            await SocketService.refreshAuth();
+          } catch (e) {
+            console.warn(
+              'socket refreshAuth failed',
+              e
+            );
+          }
         }
       } catch (e) { /* ignore */ }
 

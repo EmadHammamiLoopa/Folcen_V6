@@ -97,4 +97,89 @@ describe('SessionCredentialStore coordination', () => {
       'socket-token'
     );
   });
+
+  it('startup restoration prefers localStorage without consulting NativeStorage', async () => {
+    localStorage.setItem(
+      'token',
+      'local-startup-token'
+    );
+
+    const nativeStorage = {
+      getItem: jasmine
+        .createSpy('getItem')
+        .and.returnValue(
+          Promise.resolve(
+            'native-startup-token'
+          )
+        )
+    };
+
+    await expectAsync(
+      SessionCredentialStore.restoreStartupToken(
+        nativeStorage
+      )
+    ).toBeResolvedTo(
+      'local-startup-token'
+    );
+
+    expect(
+      nativeStorage.getItem
+    ).not.toHaveBeenCalled();
+  });
+
+  it('startup restoration falls back to NativeStorage and backfills localStorage', async () => {
+    const nativeStorage = {
+      getItem: jasmine
+        .createSpy('getItem')
+        .and.returnValue(
+          Promise.resolve(
+            'native-startup-token'
+          )
+        )
+    };
+
+    await expectAsync(
+      SessionCredentialStore.restoreStartupToken(
+        nativeStorage
+      )
+    ).toBeResolvedTo(
+      'native-startup-token'
+    );
+
+    expect(
+      nativeStorage.getItem
+    ).toHaveBeenCalledWith(
+      'token'
+    );
+
+    expect(
+      localStorage.getItem(
+        'token'
+      )
+    ).toBe(
+      'native-startup-token'
+    );
+  });
+
+  it('startup restoration resolves null when neither persistence store has a token', async () => {
+    const nativeStorage = {
+      getItem: jasmine
+        .createSpy('getItem')
+        .and.returnValue(
+          Promise.resolve(null)
+        )
+    };
+
+    await expectAsync(
+      SessionCredentialStore.restoreStartupToken(
+        nativeStorage
+      )
+    ).toBeResolvedTo(null);
+
+    expect(
+      localStorage.getItem(
+        'token'
+      )
+    ).toBeNull();
+  });
 });
