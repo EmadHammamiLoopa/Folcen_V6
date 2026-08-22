@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { environment } from 'src/environments/environment';
 import { Subject, Observable } from 'rxjs';
+import { SessionCredentialStore } from './session-credential-store.service';
 
 type UserStatus = { userId: string; online: boolean };
 
@@ -111,16 +112,18 @@ export class SocketService {
   }
 
   /** Synchronous fallback token cache, populated from NativeStorage at app boot. */
-  private static tokenCache: string | null = null;
-  static setTokenCache(token: string | null): void {
-    SocketService.tokenCache = token || null;
+  static get tokenCache(): string | null {
+    return SessionCredentialStore.getCachedToken();
   }
+
+  static setTokenCache(token: string | null): void {
+    SessionCredentialStore.setCachedToken(
+      token
+    );
+  }
+
   private static readToken(): string | null {
-    try {
-      const t = localStorage.getItem('token');
-      if (t) return t;
-    } catch {}
-    return SocketService.tokenCache;
+    return SessionCredentialStore.readSynchronousToken();
   }
 
   /** Read current auth token & compute owner id. */

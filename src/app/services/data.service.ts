@@ -9,6 +9,7 @@ import { SessionStoreService } from './session-store.service';
 import { SocketService } from './socket.service';
 import { UserService } from './user.service';
 import { OneSignalService } from './one-signal.service';
+import { SessionCredentialStore } from './session-credential-store.service';
 import constants from './../helpers/constants';
 
 type HttpMethod = 'get' | 'post' | 'put' | 'delete';
@@ -28,14 +29,13 @@ type RequestOptions = {
   providedIn: 'root'
 })
 export class DataService {
-  private static tokenCache: string | null = null;
-
   static setTokenCache(token: string | null) {
-    DataService.tokenCache = token || null;
-    try {
-      if (token) localStorage.setItem('token', token);
-      else localStorage.removeItem('token');
-    } catch (_) {}
+    SessionCredentialStore.setCachedToken(
+      token
+    );
+    SessionCredentialStore.writeLocalToken(
+      token
+    );
   }
 
   constructor(
@@ -50,16 +50,23 @@ export class DataService {
   ) {}
 
   getToken() {
-    const localToken = (() => {
-      try { return localStorage.getItem('token'); } catch (_) { return null; }
-    })();
+    const localToken =
+      SessionCredentialStore.readLocalToken();
+
     if (localToken) {
-      DataService.tokenCache = localToken;
+      SessionCredentialStore.setCachedToken(
+        localToken
+      );
       return Promise.resolve(localToken);
     }
-    if (DataService.tokenCache) {
-      return Promise.resolve(DataService.tokenCache);
+
+    const cachedToken =
+      SessionCredentialStore.getCachedToken();
+
+    if (cachedToken) {
+      return Promise.resolve(cachedToken);
     }
+
     return this.platform.is('cordova')
       ? this.nativeStorage.getItem('token').then(token => {
           DataService.setTokenCache(token || null);
