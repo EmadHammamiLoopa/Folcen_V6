@@ -521,6 +521,13 @@ export class SocketService {
   /** Call on real logout (or when switching accounts). */
   static async logout(): Promise<void> {
     localStorage.removeItem('token');
+
+    // Logout/account-switch teardown must invalidate the shared
+    // synchronous credential fallback as well as persisted state.
+    SessionCredentialStore.setCachedToken(
+      null
+    );
+
     SocketService.ownerId = null;
     SocketService.emitQueue.length = 0;
 
