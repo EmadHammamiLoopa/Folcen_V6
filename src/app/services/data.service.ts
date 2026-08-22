@@ -143,14 +143,8 @@ export class DataService {
 
   private handleError(err: any) {
     devLogger.error('HTTP error', err);
-    if (err.status === 401) {
-      // If we are already on the auth page, don't trigger a logout redirect loop,
-      // but we still want to reject so the signin component can show "Invalid credentials".
-      const isAuthPage = this.router.url.includes('/auth');
-      if (!isAuthPage) {
-        this.logout();
-      }
-    }
+    // Request-level HTTP failures are not authoritative session invalidation.
+    // Callers receive the rejection and decide how to handle endpoint-specific errors.
     return Promise.reject(err);
   }
 

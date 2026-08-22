@@ -19,7 +19,7 @@ describe('DataService auth/session characterization', () => {
     DataService.setTokenCache(null);
 
     nativeStorage = {
-      getItem: jasmine.createSpy('getItem').and.returnValue(Promise.reject(new Error('missing'))),
+      getItem: jasmine.createSpy('getItem').and.returnValue(Promise.resolve(null)),
       setItem: jasmine.createSpy('setItem').and.returnValue(Promise.resolve()),
       clear: jasmine.createSpy('clear').and.returnValue(Promise.resolve()),
     };
@@ -74,22 +74,22 @@ describe('DataService auth/session characterization', () => {
     expect(options.headers.Authorization).toBe('Bearer request-token');
   });
 
-  it('LEGACY_CHARACTERIZATION ordinary 401 invokes the full logout path', async () => {
+  it('ordinary 401 rejects without invoking the full logout path', async () => {
     const logout = spyOn(service, 'logout').and.returnValue(Promise.resolve());
 
     await expectAsync((service as any).handleError({ status: 401, kind: 'ordinary' }))
       .toBeRejected();
 
-    expect(logout).toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
   });
 
-  it('characterizes revoked or invalid-token 401 as the same full logout path', async () => {
+  it('does not treat a 401 code label alone as authoritative session invalidation', async () => {
     const logout = spyOn(service, 'logout').and.returnValue(Promise.resolve());
 
     await expectAsync((service as any).handleError({ status: 401, code: 'token_revoked' }))
       .toBeRejected();
 
-    expect(logout).toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
   });
 
   [
@@ -106,7 +106,7 @@ describe('DataService auth/session characterization', () => {
     });
   });
 
-  it('rejects a failed authenticated request after applying the existing 401 policy', async () => {
+  it('rejects a failed authenticated request without destroying the session', async () => {
     localStorage.setItem('token', 'request-token');
     httpClient.get.and.returnValue(throwError({ status: 401 }));
     const logout = spyOn(service, 'logout').and.returnValue(Promise.resolve());
@@ -114,7 +114,7 @@ describe('DataService auth/session characterization', () => {
     await expectAsync(service.sendRequest({ method: 'get', url: '/resource' }))
       .toBeRejected();
 
-    expect(logout).toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
   });
 
   it('explicit logout clears persistence, socket/user state, and navigates to auth', async () => {
@@ -136,8 +136,6 @@ describe('DataService auth/session characterization', () => {
 });
 
 /**
- * Current ordinary-401 call path (documented, not fixed in Phase 0):
- * HTTP rejection -> DataService.handleError() -> 401 outside /auth ->
- * DataService.logout() -> persistent/session clearing -> socket/user cleanup ->
- * navigation to /auth.
+ * Ordinary endpoint failures, including 401, remain request-local.
+ * Full client cleanup is reserved for explicit/authoritative invalidation paths.
  */

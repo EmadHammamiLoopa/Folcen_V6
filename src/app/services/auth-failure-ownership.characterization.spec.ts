@@ -1,9 +1,11 @@
 import { throwError } from 'rxjs';
+import { AppComponent } from '../app.component';
 import { DataService } from './data.service';
+import { SessionInvalidationCoordinator } from './session-invalidation-coordinator.service';
 import { SocketService } from './socket.service';
 import { UserService } from './user.service';
 
-describe('Phase 3 auth failure ownership characterization', () => {
+describe('Phase 3 auth failure ownership', () => {
   let nativeStorage: any;
   let nativeHttp: any;
   let httpClient: any;
@@ -19,7 +21,7 @@ describe('Phase 3 auth failure ownership characterization', () => {
     DataService.setTokenCache(null);
 
     nativeStorage = {
-      getItem: jasmine.createSpy('getItem').and.returnValue(Promise.reject(new Error('missing'))),
+      getItem: jasmine.createSpy('getItem').and.returnValue(Promise.resolve(null)),
       setItem: jasmine.createSpy('setItem').and.returnValue(Promise.resolve()),
       remove: jasmine.createSpy('remove').and.returnValue(Promise.resolve()),
       clear: jasmine.createSpy('clear').and.returnValue(Promise.resolve()),
@@ -66,21 +68,59 @@ describe('Phase 3 auth failure ownership characterization', () => {
     DataService.setTokenCache(null);
   });
 
-  it('LEGACY_CHARACTERIZATION generic authenticated endpoint 401 escalates to full logout ownership', async () => {
+  it('generic authenticated browser endpoint 401 rejects and preserves the valid session', async () => {
+    const userJson = JSON.stringify({ _id: 'user-1' });
     localStorage.setItem('token', 'valid-token');
-    localStorage.setItem('currentUser', JSON.stringify({ _id: 'user-1' }));
+    localStorage.setItem('currentUser', userJson);
     httpClient.get.and.returnValue(throwError({ status: 401, kind: 'ordinary-endpoint' }));
+
     const logout = spyOn(service, 'logout').and.returnValue(Promise.resolve());
+    const socketLogout = spyOn(SocketService, 'logout').and.returnValue(Promise.resolve());
+    const clearUser = spyOn(UserService, 'clearUserState');
+    const localClear = spyOn(localStorage, 'clear').and.callThrough();
 
     await expectAsync(
       service.sendRequest({ method: 'get', url: '/ordinary-resource' })
     ).toBeRejected();
 
-    expect(logout).toHaveBeenCalledTimes(1);
+    expect(logout).not.toHaveBeenCalled();
+    expect(localStorage.getItem('token')).toBe('valid-token');
+    expect(localStorage.getItem('currentUser')).toBe(userJson);
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    expect(socketLogout).not.toHaveBeenCalled();
+    expect(clearUser).not.toHaveBeenCalled();
+    expect(nativeStorage.clear).not.toHaveBeenCalled();
+    expect(localClear).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('generic authenticated Cordova endpoint 401 follows the same request-local policy', async () => {
+    const userJson = JSON.stringify({ _id: 'user-1' });
+    localStorage.setItem('token', 'valid-token');
+    localStorage.setItem('currentUser', userJson);
+    platform.is.and.callFake((name: string) => name === 'cordova');
+    nativeHttp.sendRequest.and.returnValue(Promise.reject({ status: 401, kind: 'ordinary-native-endpoint' }));
+
+    const logout = spyOn(service, 'logout').and.returnValue(Promise.resolve());
+    const socketLogout = spyOn(SocketService, 'logout').and.returnValue(Promise.resolve());
+    const clearUser = spyOn(UserService, 'clearUserState');
+
+    await expectAsync(
+      service.sendRequest({ method: 'get', url: '/ordinary-native-resource' })
+    ).toBeRejected();
+
+    expect(logout).not.toHaveBeenCalled();
+    expect(localStorage.getItem('token')).toBe('valid-token');
+    expect(localStorage.getItem('currentUser')).toBe(userJson);
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    expect(socketLogout).not.toHaveBeenCalled();
+    expect(clearUser).not.toHaveBeenCalled();
+    expect(nativeStorage.clear).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
   [400, 403, 404, 500, 0].forEach((status) => {
-    it(`generic endpoint ${status} rejects without escalating to full logout`, async () => {
+    it(`generic endpoint ${status} rejects without authoritative invalidation`, async () => {
       const logout = spyOn(service, 'logout').and.returnValue(Promise.resolve());
 
       await expectAsync(
@@ -88,10 +128,12 @@ describe('Phase 3 auth failure ownership characterization', () => {
       ).toBeRejected();
 
       expect(logout).not.toHaveBeenCalled();
+      expect(sessionStore.clear).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
     });
   });
 
-  it('auth-page invalid-credentials 401 rejects without starting global logout or redirect recursion', async () => {
+  it('auth-page invalid-credentials 401 rejects without global logout or redirect recursion', async () => {
     router.url = '/auth/signin';
     const logout = spyOn(service, 'logout').and.returnValue(Promise.resolve());
 
@@ -103,7 +145,7 @@ describe('Phase 3 auth failure ownership characterization', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
-  it('explicit logout owns the complete client cleanup path', async () => {
+  it('explicit physical logout still owns the complete client cleanup path', async () => {
     localStorage.setItem('token', 'valid-token');
     localStorage.setItem('currentUser', JSON.stringify({ _id: 'user-1' }));
     sessionStorage.setItem('ephemeral', 'value');
@@ -127,22 +169,75 @@ describe('Phase 3 auth failure ownership characterization', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/auth', { replaceUrl: true });
   });
 
-  it('LEGACY_CHARACTERIZATION concurrent direct full-logouts are not deduplicated', async () => {
+  it('deduplicates simultaneous authoritative invalidation into one physical logout', async () => {
+    localStorage.setItem('token', 'valid-token');
+    localStorage.setItem('currentUser', JSON.stringify({ _id: 'user-1' }));
+    nativeStorage.getItem.and.returnValue(Promise.resolve(null));
+
+    let releaseClear!: () => void;
+    let clearStartedResolve!: () => void;
+    const clearStarted = new Promise<void>(resolve => { clearStartedResolve = resolve; });
+    const clearGate = new Promise<void>(resolve => { releaseClear = resolve; });
+    nativeStorage.clear.and.callFake(() => {
+      clearStartedResolve();
+      return clearGate;
+    });
+
     const socketLogout = spyOn(SocketService, 'logout').and.returnValue(Promise.resolve());
-    spyOn(UserService, 'clearUserState');
+    const clearUser = spyOn(UserService, 'clearUserState');
+    const coordinator = new SessionInvalidationCoordinator();
+
+    const first = coordinator.invalidate('server-force-logout', () => service.logout());
+    const second = coordinator.invalidate('server-force-logout-duplicate', () => service.logout());
+
+    expect(first).toBe(second);
+    await clearStarted;
+    expect(nativeStorage.clear).toHaveBeenCalledTimes(1);
+
+    releaseClear();
+    await Promise.all([first, second]);
+
+    expect(nativeStorage.clear).toHaveBeenCalledTimes(1);
+    expect(sessionStore.clear).toHaveBeenCalledTimes(1);
+    expect(socketLogout).toHaveBeenCalledTimes(1);
+    expect(clearUser).toHaveBeenCalledTimes(1);
+    expect(oneSignal.close).toHaveBeenCalledTimes(1);
+    expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets coordinator ownership after completion so a later session can invalidate', async () => {
+    const coordinator = new SessionInvalidationCoordinator();
+    const executor = jasmine.createSpy('executor').and.returnValue(Promise.resolve());
 
     await Promise.all([
-      service.logout(),
-      service.logout(),
+      coordinator.invalidate('first', executor),
+      coordinator.invalidate('duplicate', executor),
     ]);
+    await coordinator.invalidate('later-session', executor);
 
-    expect(nativeStorage.clear).toHaveBeenCalledTimes(2);
-    expect(socketLogout).toHaveBeenCalledTimes(2);
-    expect(router.navigateByUrl).toHaveBeenCalledTimes(2);
+    expect(executor).toHaveBeenCalledTimes(2);
+  });
+
+  it('AppComponent force-logout integration delegates to the authoritative coordinator', () => {
+    const source = AppComponent.toString();
+
+    expect(source).toContain('sessionInvalidation.invalidate');
+    expect(source).toContain('requestAuthoritativeLogout');
+    expect(source).not.toContain('await this.dataService.logout()');
+  });
+
+  it('DataService transport handling has no direct generic 401-to-logout escalation', () => {
+    const source = DataService.toString();
+    const handleErrorSource = source.slice(
+      source.indexOf('handleError'),
+      source.indexOf('logout()', source.indexOf('handleError'))
+    );
+
+    expect(handleErrorSource).not.toContain('this.logout');
   });
 
   [401, 403].forEach((status) => {
-    it(`startup persisted-session validation ${status} clears the invalid stored session`, async () => {
+    it(`startup persisted-session validation ${status} still clears the invalid stored session`, async () => {
       localStorage.setItem('token', 'stale-token');
       localStorage.setItem('currentUser', JSON.stringify({ _id: 'user-1' }));
       localStorage.setItem('user', JSON.stringify({ _id: 'user-1' }));

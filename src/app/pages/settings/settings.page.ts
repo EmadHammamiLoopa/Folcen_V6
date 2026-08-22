@@ -5,6 +5,7 @@ import { AlertController, ModalController } from '@ionic/angular';
 import constants from 'src/app/helpers/constants';
 import { User } from 'src/app/models/User';
 import { AuthService } from 'src/app/services/auth.service';
+import { DataService } from 'src/app/services/data.service';
 import { SocketService } from 'src/app/services/socket.service';
 import { ToastService } from 'src/app/services/toast.service';
 import { UserService } from 'src/app/services/user.service';
@@ -17,6 +18,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { environment } from 'src/environments/environment';
 import { GuidedTourService } from 'src/app/services/guided-tour.service';
+import { SessionInvalidationCoordinator } from 'src/app/services/session-invalidation-coordinator.service';
 
 @Component({
   selector: 'app-settings',
@@ -47,11 +49,13 @@ export class SettingsPage implements OnInit, OnDestroy {
     private toastService: ToastService,
     private router: Router,
     private auth: AuthService,
+    private dataService: DataService,
     private modalCtrl: ModalController,
     private themeService: ThemeService,
     private changeDetectorRef: ChangeDetectorRef
     , private idService: IdService,
-    private guidedTour: GuidedTourService
+    private guidedTour: GuidedTourService,
+    private sessionInvalidation: SessionInvalidationCoordinator
   ) {}
 
   async ngOnInit() {
@@ -361,7 +365,7 @@ export class SettingsPage implements OnInit, OnDestroy {
       try { await this.auth.signout(); } catch (e) { console.warn('Server signout failed', e); }
       
       // 2. Perform full client-side cleanup
-      await this.auth.logout();
+      await this.sessionInvalidation.invalidate('explicit-user-logout', () => this.dataService.logout());
       
       this.loading = false;
       console.log('Signout successful');
@@ -370,7 +374,7 @@ export class SettingsPage implements OnInit, OnDestroy {
       console.error('Signout error:', err);
       this.toastService.presentErrorToastr('Sorry, an error has occurred. Please try again later.');
       // Fallback to basic logout if something fails
-      this.auth.logout();
+      await this.sessionInvalidation.invalidate('explicit-user-logout-fallback', () => this.dataService.logout()).catch(() => {});
     }
   }
 

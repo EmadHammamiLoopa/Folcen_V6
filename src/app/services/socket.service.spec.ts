@@ -1,4 +1,3 @@
-import * as socketIoClient from 'socket.io-client';
 import { SocketService } from './socket.service';
 
 class FakeClientSocket {
@@ -88,7 +87,7 @@ describe('SocketService ownership and lifecycle characterization', () => {
     await SocketService.logout().catch(() => undefined);
     SocketService.setTokenCache(null);
     localStorage.clear();
-    ioSpy = spyOn<any>(socketIoClient as any, 'io');
+    ioSpy = spyOn<any>(SocketService as any, 'socketFactory');
   });
 
   afterEach(async () => {
@@ -219,8 +218,9 @@ describe('SocketService ownership and lifecycle characterization', () => {
     expect(consumerB.connected).toBeFalse();
   });
 
-  it('force-logout dispatches the application event and resets socket authentication state', async () => {
-    localStorage.setItem('token', tokenFor('owner-1'));
+  it('force-logout dispatches the authoritative application event without independently clearing socket auth', async () => {
+    const token = tokenFor('owner-1');
+    localStorage.setItem('token', token);
     const socket = await initialize();
     const received: any[] = [];
     const handler = (event: any) => received.push(event.detail);
@@ -228,8 +228,8 @@ describe('SocketService ownership and lifecycle characterization', () => {
     socket.trigger('force-logout', { reason: 'revoked' });
     await Promise.resolve();
     expect(received).toEqual([{ reason: 'revoked' }]);
-    expect(localStorage.getItem('token')).toBeNull();
-    expect(SocketService.getOwnerId()).toBeNull();
+    expect(localStorage.getItem('token')).toBe(token);
+    expect(SocketService.getOwnerId()).toBe('owner-1');
     window.removeEventListener('force-logout', handler);
   });
 

@@ -26,6 +26,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 import { SessionStoreService } from './services/session-store.service';
 import { DataService } from './services/data.service';
+import { SessionInvalidationCoordinator } from './services/session-invalidation-coordinator.service';
 import { PerformanceMonitorService } from './services/performance-monitor.service';
 
 import { AnnouncementModalComponent } from './components/announcement-modal/announcement-modal.component';
@@ -100,6 +101,7 @@ export class AppComponent implements OnDestroy {
     private appEvents: AppEventsService,
     private sessionStore: SessionStoreService,
     private dataService: DataService,
+    private sessionInvalidation: SessionInvalidationCoordinator,
     public webRTC: WebrtcService,
     private perfMonitor: PerformanceMonitorService
   ) {
@@ -114,7 +116,7 @@ export class AppComponent implements OnDestroy {
       this.forceLogoutHandler = async (ev: any) => {
         try {
           console.warn('AppComponent: handling global force-logout event', ev?.detail || ev);
-          try { await this.dataService.logout(); } catch (e) { console.warn('Error during forced DataService.logout', e); }
+          try { await this.requestAuthoritativeLogout('server-force-logout'); } catch (e) { console.warn('Error during authoritative force logout', e); }
         } catch (e) { console.warn('Error handling force-logout event', e); }
       };
       window.addEventListener('force-logout', this.forceLogoutHandler as any);
@@ -124,7 +126,7 @@ export class AppComponent implements OnDestroy {
         try {
           if (m?.data && m.data.type === 'force-logout') {
             console.warn('AppComponent: handling force-logout via postMessage', m.data.payload);
-            try { await this.dataService.logout(); } catch (e) { console.warn('Error during forced DataService.logout', e); }
+            try { await this.requestAuthoritativeLogout('server-force-logout-postmessage'); } catch (e) { console.warn('Error during authoritative force logout', e); }
           }
         } catch (e) {}
       };
@@ -239,7 +241,13 @@ export class AppComponent implements OnDestroy {
     });
   }
 
-  
+
+  private requestAuthoritativeLogout(reason: string): Promise<void> {
+    return this.sessionInvalidation.invalidate(
+      reason,
+      () => this.dataService.logout()
+    );
+  }
 
   ngOnInit() {
   }

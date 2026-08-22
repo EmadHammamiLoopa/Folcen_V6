@@ -11,6 +11,10 @@ export class SocketService {
   private static initializationPromise: Promise<void> | null = null;
   private static reconnectionInProgress = false;
 
+  // Narrow construction seam used by characterization tests.
+  // Production behavior still delegates directly to socket.io-client.
+  private static socketFactory = io;
+
   // The ONLY id we bind to (derived from JWT)
   private static ownerId: string | null = null;
 
@@ -246,7 +250,7 @@ export class SocketService {
       SocketService.ownerId = authId;
 
       // Create socket
-      SocketService.socketInstance = io(environment.socketUrl, {
+      SocketService.socketInstance = SocketService.socketFactory(environment.socketUrl, {
         path: environment.socketPath || '/socket.io',
         // Railway currently rejects websocket upgrades with "Invalid frame
         // header". Use polling-only until the production proxy supports WS.
@@ -461,8 +465,8 @@ export class SocketService {
             try { window.postMessage({ type: 'force-logout', payload }, '*'); } catch (e2) {}
           }
 
-          // best-effort: disconnect socket and reset static state
-          SocketService.logout().catch(() => {});
+          // App-level authoritative invalidation owns full cleanup.
+          // Do not independently clear token/socket state here.
         } catch (e) { console.warn('Error handling force-logout', e); }
       });
     });
