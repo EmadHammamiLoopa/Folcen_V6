@@ -12,6 +12,7 @@ import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { IdService } from './id.service';
 import { SocketService } from './socket.service';
 import { AppEventsService } from './app-events.service';
+import { SessionAuthStateService } from './session-auth-state.service';
 
 @Injectable({
   providedIn: 'root'
@@ -431,18 +432,19 @@ export class UserService {
               const status = e?.status || e?.error?.status;
               if (status === 401 || status === 403) {
                 devLogger.warn('Stored user validation failed; clearing persisted user and token', e);
+
+                // Startup validation rejection is targeted persisted-auth
+                // invalidation, not a full application logout. Reuse the
+                // shared low-level auth-state owner so local/native state
+                // and the synchronous credential fallback stay consistent.
                 try {
-                  localStorage.removeItem('currentUser');
-                  localStorage.removeItem('user');
-                  localStorage.removeItem('token');
+                  new SessionAuthStateService(
+                    this.nativeStorage
+                  )
+                    .clearStoredAuth(true)
+                    .catch(() => {});
                 } catch (er) {}
-                try {
-                  if (this.nativeStorage && typeof this.nativeStorage.remove === 'function') {
-                    this.nativeStorage.remove('currentUser').catch(()=>{});
-                    this.nativeStorage.remove('user').catch(()=>{});
-                    this.nativeStorage.remove('token').catch(()=>{});
-                  }
-                } catch (er) {}
+
                 this.setCurrentUser(null);
               }
             }
