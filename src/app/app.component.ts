@@ -392,12 +392,6 @@ export class AppComponent implements OnDestroy {
         } else {
           SocketService.setTokenCache(typeof tok === 'string' ? tok : String(tok));
         }
-        if (!localStorage.getItem('currentUser')) {
-          const u = await this.nativeStorage.getItem('currentUser').catch(() => null);
-          if (u) {
-            try { localStorage.setItem('currentUser', typeof u === 'string' ? u : JSON.stringify(u)); } catch {}
-          }
-        }
         // Force socket re-init now that token cache is populated
         if (tok) {
           try { await SocketService.refreshAuth(); } catch (e) { console.warn('socket refreshAuth failed', e); }

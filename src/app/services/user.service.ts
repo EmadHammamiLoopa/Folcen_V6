@@ -27,6 +27,7 @@ export class UserService {
   public viewedUser: Observable<User>;
   private inflightCurrentUser$: Observable<User> | null = null;
   private destroy$ = new Subject<void>();
+  private startupRestorationPromise: Promise<void> = Promise.resolve();
 
   // Subject to notify components when friends list changes
   private friendsUpdatedSubject = new Subject<void>();
@@ -74,7 +75,7 @@ export class UserService {
     this.viewedUserSubject = new BehaviorSubject<User>(null);
     this.viewedUser = this.viewedUserSubject.asObservable();
   
-    this.initCurrentUser(); 
+    this.startupRestorationPromise = this.initCurrentUser();
     this.initializeRealtimeOrchestration();
   }
 
@@ -455,6 +456,10 @@ export class UserService {
       devLogger.error('❌ Initialization error:', error);
     }
   }
+  public waitForStartupRestoration(): Promise<void> {
+    return this.startupRestorationPromise;
+  }
+
   public get currentUserValue(): User {
     return this.currentUserSubject.value;
   }

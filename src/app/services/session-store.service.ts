@@ -54,6 +54,22 @@ export class SessionStoreService {
 
     const runInit = (async () => {
       try {
+        if (!forceRefresh) {
+          const waitForStartupRestoration =
+            (this.userService as any).waitForStartupRestoration;
+
+          if (typeof waitForStartupRestoration === 'function') {
+            await waitForStartupRestoration.call(this.userService);
+
+            const restored = this.userService.currentUserValue;
+            if (restored) {
+              this.metrics.profileHits += 1;
+              this.userSubject.next(restored);
+              return restored;
+            }
+          }
+        }
+
         const refreshed = await firstValueFrom(this.userService.refreshCurrentUser());
         this.metrics.profileMisses += 1;
         this.userSubject.next(refreshed);
