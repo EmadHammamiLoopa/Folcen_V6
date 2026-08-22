@@ -612,14 +612,6 @@ export class SignupComponent implements OnInit, OnDestroy {
         this.nativeStorage,
         this.platform.is('cordova')
       );
-
-      // Preserve the existing SocketService publication observation
-      // while the shared credential store becomes authoritative.
-      try {
-        SocketService.setTokenCache(
-          token
-        );
-      } catch (e) {}
     } catch (e) {}
 
     try {

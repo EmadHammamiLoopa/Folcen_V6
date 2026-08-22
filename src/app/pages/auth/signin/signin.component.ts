@@ -11,7 +11,6 @@ import { FirebaseService } from '../../../services/firebase.service';
 import { User } from '../../../models/User';
 import { WelcomeAlertComponent } from '../welcome-alert/welcome-alert.component';
 import { SocketService } from 'src/app/services/socket.service';
-import { DataService } from 'src/app/services/data.service';
 import { SessionCredentialStore } from 'src/app/services/session-credential-store.service';
 
 @Component({
@@ -274,27 +273,14 @@ export class SigninComponent implements OnInit {
 
   private async storeUserData(token: string, user: any) {
     console.log('Storing user data');
-    // Publish token state through the shared credential owner.
-    // Legacy SocketService/DataService mirrors remain temporarily so
-    // existing consumer observation surfaces stay unchanged.
+    // Publish authenticated token state through the shared
+    // credential owner.
     try {
       await SessionCredentialStore.publishAuthenticatedToken(
         token,
         this.nativeStorage,
         this.platform.is('cordova')
       );
-
-      try {
-        SocketService.setTokenCache(
-          token
-        );
-      } catch (e) {}
-
-      try {
-        DataService.setTokenCache(
-          token
-        );
-      } catch (e) {}
     } catch (e) {
       // token persistence failed, continue
     }
