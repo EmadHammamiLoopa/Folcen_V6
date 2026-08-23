@@ -325,7 +325,7 @@ export class AppComponent implements OnDestroy {
       await SocketService.initializeSocket();
       // If no token present, socket init resolves but no socket was created.
       // Only attempt to get the live socket if a token exists.
-      const token = localStorage.getItem('token');
+      const token = SessionCredentialStore.readLocalTokenRaw();
       if (!token) {
         console.log('ℹ️ No auth token — skipping socket listener setup until sign-in.');
         return; // do not schedule a retry here; listeners will be set after sign-in
@@ -352,7 +352,7 @@ export class AppComponent implements OnDestroy {
     } catch (error) {
       console.error('Failed to setup socket listeners:', error);
       // Only retry if the user likely has a token (transient init error).
-      const token = localStorage.getItem('token');
+      const token = SessionCredentialStore.readLocalTokenRaw();
       if (token) {
         setTimeout(() => this.setupSocketListeners(), 5000);
       } else {

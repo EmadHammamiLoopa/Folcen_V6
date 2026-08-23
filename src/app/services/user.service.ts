@@ -13,6 +13,7 @@ import { IdService } from './id.service';
 import { SocketService } from './socket.service';
 import { AppEventsService } from './app-events.service';
 import { SessionAuthStateService } from './session-auth-state.service';
+import { SessionCredentialStore } from './session-credential-store.service';
 
 @Injectable({
   providedIn: 'root'
@@ -562,7 +563,7 @@ export class UserService {
 
   updateAvatar(userId: string, formData: FormData): Observable<any> {
     const url = `${this.apiUrl}/${userId}/avatar`;
-    const token = localStorage.getItem('token');
+    const token = SessionCredentialStore.readLocalTokenRaw();
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`
     });
@@ -1016,7 +1017,7 @@ getCurrentUserId(): string | null {
 
 
   getFriends(page: number): Observable<any> {
-    const token = localStorage.getItem('token'); // or wherever you store your token
+    const token = SessionCredentialStore.readLocalTokenRaw(); // or wherever you store your token
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'

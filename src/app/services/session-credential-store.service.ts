@@ -16,7 +16,14 @@
 export class SessionCredentialStore {
   private static tokenCache: string | null = null;
 
-  private static readLocalTokenRaw(): string | null {
+  /**
+   * Raw persisted local-token read for callers whose existing
+   * error/fallback policy must remain unchanged.
+   *
+   * Deliberately performs no error swallowing, fallback,
+   * cache lookup, or persistence mutation.
+   */
+  static readLocalTokenRaw(): string | null {
     return localStorage.getItem('token');
   }
 
