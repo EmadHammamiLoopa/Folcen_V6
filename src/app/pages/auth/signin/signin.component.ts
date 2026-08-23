@@ -264,7 +264,7 @@ export class SigninComponent implements OnInit {
       await new SessionAuthStateService(
         this.nativeStorage
       ).clearStoredAuth(
-        this.platform.is('cordova')
+        this.platform?.is?.('cordova') === true
       );
     } catch (_) {}
 
@@ -337,10 +337,12 @@ export class SigninComponent implements OnInit {
           role: 'cancel',
           handler: async () => {
             try { await this.auth.signOutFirebase(); } catch (_) {}
-            try { await SocketService.logout(); } catch (_) {}
-            try { localStorage.removeItem('token'); } catch (_) {}
-            try { localStorage.removeItem('currentUser'); } catch (_) {}
-            try { localStorage.removeItem('user'); } catch (_) {}
+
+            // Reuse the targeted sign-in cleanup owner so Keep Deleted
+            // clears local/shared credentials and Cordova NativeStorage
+            // before returning to the signed-out route.
+            try { await this.clearStaleAuthData(); } catch (_) {}
+
             await this.router.navigate(['/auth/signin']);
           }
         },
