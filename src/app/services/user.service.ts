@@ -391,7 +391,7 @@ export class UserService {
       }
 
       if (!user) {
-        const localStorageUser = localStorage.getItem('currentUser') || localStorage.getItem('user');
+        const localStorageUser = SessionAuthStateService.readLocalUserRaw();
         if (localStorageUser && typeof localStorageUser === 'string') {
           try {
             if (localStorageUser === '[object Object]' || localStorageUser === 'null' || localStorageUser === 'undefined') {
@@ -588,7 +588,7 @@ getCurrentUserId(): string | null {
 
   // Fallback to localStorage canonical key then legacy key -- attempt normalization
   try {
-    const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+    const raw = SessionAuthStateService.readLocalUserRaw();
     const user = raw ? JSON.parse(raw) : null;
     if (!user) return null;
 
@@ -1138,7 +1138,7 @@ getCurrentUserId(): string | null {
         try { u = await this.nativeStorage.getItem('currentUser'); } catch (e) { /* ignore */ }
         if (!u) { try { u = await this.nativeStorage.getItem('user'); } catch (e2) { /* ignore */ } }
         if (!u) {
-          const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+          const raw = SessionAuthStateService.readLocalUserRaw();
           u = raw ? JSON.parse(raw) : null;
         }
 

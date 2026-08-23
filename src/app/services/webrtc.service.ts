@@ -14,6 +14,7 @@ import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { DeviceManagerService } from './device-manager.service';
 import { VideoEvents } from '../pages/messages/chat/video/events';
 import { AppEventsService } from './app-events.service';
+import { SessionAuthStateService } from './session-auth-state.service';
 
 interface MissedCall {
   userId: string;
@@ -696,8 +697,7 @@ export class WebrtcService {
   private readStoredAuthUserId(): any {
     try {
       const raw =
-        localStorage.getItem('currentUser') ||
-        localStorage.getItem('user');
+        SessionAuthStateService.readLocalUserRaw();
 
       if (!raw) {
         return null;

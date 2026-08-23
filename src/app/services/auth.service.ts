@@ -8,6 +8,7 @@ import { Platform } from '@ionic/angular';
 import { GooglePlus } from '@ionic-native/google-plus/ngx';
 import { FirebaseService } from './firebase.service';
 import { environment } from 'src/environments/environment';
+import { SessionAuthStateService } from './session-auth-state.service';
 
 declare const gapi: any; // Declare gapi for TypeScript
 
@@ -461,7 +462,7 @@ export class AuthService extends DataService {
 
   getUserId(): string | null {
     try {
-      const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+      const raw = SessionAuthStateService.readLocalUserRaw();
       const user = raw ? JSON.parse(raw) : null;
       return user ? user._id : null;
     } catch (error) {

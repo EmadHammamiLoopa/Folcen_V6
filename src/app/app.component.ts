@@ -29,6 +29,7 @@ import { DataService } from './services/data.service';
 import { SessionInvalidationCoordinator } from './services/session-invalidation-coordinator.service';
 import { PerformanceMonitorService } from './services/performance-monitor.service';
 import { SessionCredentialStore } from './services/session-credential-store.service';
+import { SessionAuthStateService } from './services/session-auth-state.service';
 
 import { AnnouncementModalComponent } from './components/announcement-modal/announcement-modal.component';
 
@@ -928,7 +929,7 @@ export class AppComponent implements OnDestroy {
   }
 
   private fetchUserFromLocalStorage() {
-    const userString = localStorage.getItem('currentUser') || localStorage.getItem('user');
+    const userString = SessionAuthStateService.readLocalUserRaw();
     if (userString) {
       try {
         const parsedUser = JSON.parse(userString);

@@ -47,11 +47,16 @@ export class SessionAuthStateService {
     return localStorage.getItem('token');
   }
 
-  getLocalUserRaw(): string | null {
+  static readLocalUserRaw(): string | null {
     return (
       localStorage.getItem('currentUser') ||
       localStorage.getItem('user')
     );
+  }
+
+  getLocalUserRaw(): string | null {
+    return SessionAuthStateService
+      .readLocalUserRaw();
   }
 
   getNativeToken(): Promise<any> {
