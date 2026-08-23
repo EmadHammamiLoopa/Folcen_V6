@@ -7,6 +7,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { SocketService } from 'src/app/services/socket.service';
+import { SessionCredentialStore } from 'src/app/services/session-credential-store.service';
 import { MessengerService } from './../../../messenger.service';
 import { AdMobFeeService } from './../../../../services/admobfree.service';
 import { Socket } from 'socket.io-client';
@@ -975,7 +976,13 @@ getUser() {
     if (this.isCordovaAvailable()) {
       console.log('ðŸ“± Cordova platform detected - using NativeStorage');
       try {
-        const token = await this.nativeStorage.getItem('token');
+        const token =
+          await SessionCredentialStore
+            .readPlatformScopedToken(
+              this.nativeStorage,
+              true
+            );
+
         console.log('âœ… Token retrieved from NativeStorage');
         return token;
       } catch (err) {
@@ -984,7 +991,14 @@ getUser() {
       }
     } else {
       console.log('ðŸ–¥ï¸ Web platform detected - using localStorage');
-      const token = localStorage.getItem('token');
+
+      const token =
+        await SessionCredentialStore
+          .readPlatformScopedToken(
+            this.nativeStorage,
+            false
+          );
+
       console.log(token ? 'âœ… Token retrieved from localStorage' : 'âŒ No token in localStorage');
       return token;
     }

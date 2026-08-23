@@ -4,6 +4,8 @@
  *
  * This store owns:
  *   - safe local token read/write mechanics
+ *   - raw platform-scoped token reads for consumers whose existing
+ *     platform policy must not introduce fallback or backfill
  *   - the single in-memory token fallback cache
  *   - persisted token reads/backfill for startup and request consumers
  *   - authenticated token publication after sign-in/sign-up
@@ -14,9 +16,22 @@
 export class SessionCredentialStore {
   private static tokenCache: string | null = null;
 
+  private static readLocalTokenRaw(): string | null {
+    return localStorage.getItem('token');
+  }
+
+  private static readNativeTokenRaw(
+    nativeStorage: {
+      getItem(key: string): Promise<any>;
+    }
+  ): Promise<any> {
+    return nativeStorage.getItem('token');
+  }
+
   static readLocalToken(): string | null {
     try {
-      return localStorage.getItem('token');
+      return SessionCredentialStore
+        .readLocalTokenRaw();
     } catch (_) {
       return null;
     }
@@ -93,6 +108,36 @@ export class SessionCredentialStore {
   }
 
   /**
+   * Read the token from exactly the platform selected by the caller.
+   *
+   * This deliberately performs:
+   *   - no native/local fallback;
+   *   - no local backfill;
+   *   - no cache publication;
+   *   - no error swallowing.
+   *
+   * Those semantics preserve consumers such as video authentication
+   * where Cordova historically reads NativeStorage only and browser
+   * historically reads localStorage only.
+   */
+  static readPlatformScopedToken(
+    nativeStorage: {
+      getItem(key: string): Promise<any>;
+    },
+    useNativeStorage: boolean
+  ): Promise<any> | string | null {
+    if (useNativeStorage) {
+      return SessionCredentialStore
+        .readNativeTokenRaw(
+          nativeStorage
+        );
+    }
+
+    return SessionCredentialStore
+      .readLocalTokenRaw();
+  }
+
+  /**
    * Read a token from NativeStorage and backfill local persistence.
    *
    * Error policy intentionally belongs to the caller:
@@ -105,9 +150,10 @@ export class SessionCredentialStore {
     }
   ): Promise<string | null> {
     const nativeToken =
-      await nativeStorage.getItem(
-        'token'
-      );
+      await SessionCredentialStore
+        .readNativeTokenRaw(
+          nativeStorage
+        );
 
     if (!nativeToken) {
       return null;
