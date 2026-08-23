@@ -143,6 +143,96 @@ describe('UserService startup restoration characterization', () => {
     tick(0);
   }));
 
+  it('does not consult native legacy user when native currentUser resolves falsy', fakeAsync(() => {
+    localStorage.setItem(
+      'currentUser',
+      JSON.stringify(localUser)
+    );
+
+    nativeStorage.getItem.and.callFake(
+      (key: string) => {
+        if (key === 'currentUser') {
+          return Promise.resolve(null);
+        }
+
+        if (key === 'user') {
+          return Promise.resolve({
+            _id: 'native-legacy-user',
+            firstName: 'Native Legacy'
+          });
+        }
+
+        return Promise.reject(
+          new Error('missing')
+        );
+      }
+    );
+
+    (service as any).initCurrentUser();
+    flushMicrotasks();
+
+    expect(
+      nativeStorage.getItem.calls.allArgs()
+    ).toEqual([
+      ['currentUser']
+    ]);
+
+    expect(
+      service.setCurrentUser.calls.first().args
+    ).toEqual([
+      localUser,
+      { force: true }
+    ]);
+
+    tick(0);
+  }));
+
+  it('does not consult native legacy user when native currentUser rejects', fakeAsync(() => {
+    localStorage.setItem(
+      'currentUser',
+      JSON.stringify(localUser)
+    );
+
+    nativeStorage.getItem.and.callFake(
+      (key: string) => {
+        if (key === 'currentUser') {
+          return Promise.reject(
+            new Error('canonical unavailable')
+          );
+        }
+
+        if (key === 'user') {
+          return Promise.resolve({
+            _id: 'native-legacy-user',
+            firstName: 'Native Legacy'
+          });
+        }
+
+        return Promise.reject(
+          new Error('missing')
+        );
+      }
+    );
+
+    (service as any).initCurrentUser();
+    flushMicrotasks();
+
+    expect(
+      nativeStorage.getItem.calls.allArgs()
+    ).toEqual([
+      ['currentUser']
+    ]);
+
+    expect(
+      service.setCurrentUser.calls.first().args
+    ).toEqual([
+      localUser,
+      { force: true }
+    ]);
+
+    tick(0);
+  }));
+
   it('rejects the malformed local currentUser sentinel and clears both persisted user keys', fakeAsync(() => {
     localStorage.setItem(
       'currentUser',
