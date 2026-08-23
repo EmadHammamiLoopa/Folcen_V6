@@ -681,16 +681,60 @@ export class WebrtcService {
     } catch(e) { console.warn('[webrtc] addMissedCall: appEvents.setMissedCalls failed', e); }
   }
 
+  /**
+   * Feature-level fallback for recovering the authenticated user id
+   * during WebRTC startup/resume races.
+   *
+   * Preserve the historical storage semantics exactly:
+   * - canonical currentUser wins over legacy user;
+   * - legacy user is used only when currentUser is absent/falsy;
+   * - malformed canonical JSON does not fall through to legacy user.
+   *
+   * This helper owns only the persisted-user read/parsing mechanics.
+   * Call sites retain their existing normalization and call policy.
+   */
+  private readStoredAuthUserId(): any {
+    try {
+      const raw =
+        localStorage.getItem('currentUser') ||
+        localStorage.getItem('user');
+
+      if (!raw) {
+        return null;
+      }
+
+      const parsed =
+        JSON.parse(raw);
+
+      return (
+        parsed?._id ||
+        parsed?.id ||
+        null
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   // webrtc.service.ts
   addMissedCallFromSignaling(ev: any, myId: string, eventName?: string) {
     console.log('[webrtc] addMissedCallFromSignaling received', { ev, myId, eventName });
-    // defensive: if myId not provided (race during startup), try to recover from localStorage
+    // defensive: if myId not provided (race during startup), recover
+    // through the WebRTC feature-level authenticated identity fallback.
     if (!myId) {
-      try {
-        const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-        myId = raw ? (JSON.parse(raw)?._id || JSON.parse(raw)?.id) : myId;
-        if (myId) console.log('[webrtc] recovered myId from storage in addMissedCallFromSignaling', myId);
-      } catch(e) {}
+      const storedUserId =
+        this.readStoredAuthUserId();
+
+      myId =
+        storedUserId ||
+        myId;
+
+      if (myId) {
+        console.log(
+          '[webrtc] recovered myId from storage in addMissedCallFromSignaling',
+          myId
+        );
+      }
     }
     const callerId = ev?.callerId ?? ev?.from;
     const calleeId = ev?.calleeId ?? ev?.to;
@@ -1023,20 +1067,15 @@ public async bindMissedCallSocketHandlers() {
     // Background/resume can reach this method before PeerJS has been
     // recreated. Recover the authenticated user id first if necessary.
     if (!this.userId) {
-      try {
-        const raw =
-          localStorage.getItem('currentUser') ||
-          localStorage.getItem('user');
+      const storedUserId =
+        this.readStoredAuthUserId();
 
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          this.userId =
-            this.idService.normalizeId(parsed?._id || parsed?.id) ||
-            parsed?._id ||
-            parsed?.id ||
-            this.userId;
-        }
-      } catch (_) {}
+      if (storedUserId) {
+        this.userId =
+          this.idService.normalizeId(storedUserId) ||
+          storedUserId ||
+          this.userId;
+      }
     }
 
     while (Date.now() - started < timeoutMs) {
@@ -1159,16 +1198,22 @@ WebrtcService.peer.once('open', async () => {
       this.myPeerId = undefined as any;
       try { localStorage.removeItem('peerId'); } catch {}
     }
-    // defensive: recover authUserId from localStorage if missing
+    // defensive: recover authUserId from persisted auth identity
+    // if the caller did not supply one.
     if (!authUserId) {
-      try {
-        const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          authUserId = parsed?._id || parsed?.id || authUserId;
-          if (authUserId) console.log('[webrtc] createPeer recovered authUserId from localStorage', authUserId);
-        }
-      } catch (e) { /* ignore */ }
+      const storedUserId =
+        this.readStoredAuthUserId();
+
+      authUserId =
+        storedUserId ||
+        authUserId;
+
+      if (authUserId) {
+        console.log(
+          '[webrtc] createPeer recovered authUserId from localStorage',
+          authUserId
+        );
+      }
     }
     // Normalize authUserId using IdService to avoid object-shaped ids
     const normalized = this.idService.normalizeId(authUserId as any);
