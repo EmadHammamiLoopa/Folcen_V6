@@ -6,6 +6,7 @@ import { ToastService } from './../../../services/toast.service';
 import { ChannelService } from './../../../services/channel.service';
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { User } from 'src/app/models/User';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 import * as _ from 'lodash';
 import { ChannelPopoverComponent } from '../list/ChannelPopoverComponent';
 
@@ -271,7 +272,7 @@ export class ListComponent implements OnInit {
   }
 
   loadUserDataFromLocalStorage() {
-    const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+    const raw = SessionAuthStateService.readLocalUserRaw();
     const user = raw ? JSON.parse(raw) : null;
     if (user) {
       this.user = new User().initialize(user);

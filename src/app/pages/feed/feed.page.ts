@@ -6,6 +6,7 @@ import { ChannelService } from './../../services/channel.service';
 import { User } from 'src/app/models/User';
 import { Post } from 'src/app/models/Post';
 import { UserService } from 'src/app/services/user.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 import { AppEventsService } from 'src/app/services/app-events.service';
 import { SocketService } from 'src/app/services/socket.service';
 import { Subject, Subscription } from 'rxjs';
@@ -94,12 +95,12 @@ export class FeedPage implements OnInit, OnDestroy {
       this.nativeStorage.getItem('user').then(u => {
         this.user = new User().initialize(u);
       }).catch(() => {
-        const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+        const raw = SessionAuthStateService.readLocalUserRaw();
         const u = raw ? JSON.parse(raw) : null;
         if (u) this.user = new User().initialize(u);
       });
     } else {
-      const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+      const raw = SessionAuthStateService.readLocalUserRaw();
       const u = raw ? JSON.parse(raw) : null;
       if (u) this.user = new User().initialize(u);
     }

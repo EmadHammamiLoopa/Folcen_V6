@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { IonInfiniteScroll, IonSlides, ModalController } from '@ionic/angular';
 import { UserService } from 'src/app/services/user.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 import { RequestService } from 'src/app/services/request.service';
 import { ToastService } from 'src/app/services/toast.service';
 import { SearchOptionsComponent } from './search-options/search-options.component';
@@ -105,7 +106,7 @@ export class NewFriendsPage implements OnInit, OnDestroy {
 
   fallbackToLocalStorage() {
     try {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+  const raw = SessionAuthStateService.readLocalUserRaw();
   const user = raw ? JSON.parse(raw) : null;
       if (user) {
         this.authUser = new User().initialize(user);

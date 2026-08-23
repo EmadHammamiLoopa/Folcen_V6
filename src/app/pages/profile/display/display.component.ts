@@ -6,6 +6,7 @@ import { AuthService } from './../../../services/auth.service';
 import { RequestService } from './../../../services/request.service';
 import { ToastService } from './../../../services/toast.service';
 import { UserService } from './../../../services/user.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 import { User } from './../../../models/User';
 import { Request } from './../../../models/Request';
 import { NativeStorage } from '@ionic-native/native-storage/ngx';
@@ -481,7 +482,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
   private readCachedUserSync(): any {
     const current = this.userService.currentUserValue;
     if (current && (current._id || current.id)) return current;
-    const storedRaw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+    const storedRaw = SessionAuthStateService.readLocalUserRaw();
     return this.normalizeCachedUser(storedRaw);
   }
 
@@ -891,7 +892,7 @@ export class DisplayComponent implements OnInit, OnDestroy {
   
 
   checkUserStatus() {
-  const storedRaw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+  const storedRaw = SessionAuthStateService.readLocalUserRaw();
   const storedUser = storedRaw ? JSON.parse(storedRaw) : null;
     if (storedUser && storedUser._id) {
       if (storedUser._id === this.user._id) {

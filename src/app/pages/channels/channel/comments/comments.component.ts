@@ -11,6 +11,7 @@ import { NativeStorage } from '@ionic-native/native-storage/ngx';
 import { DomSanitizer } from '@angular/platform-browser';
 import { AppEventsService } from 'src/app/services/app-events.service';
 import { UserService } from 'src/app/services/user.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 
 @Component({
   selector: 'app-comments',
@@ -462,7 +463,7 @@ export class CommentsComponent implements OnInit, OnDestroy {
 
 
   private fetchUserFromLocalStorage() {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+  const raw = SessionAuthStateService.readLocalUserRaw();
   const user = raw ? JSON.parse(raw) : null;
     if (user) {
       this.user = new User().initialize(user);

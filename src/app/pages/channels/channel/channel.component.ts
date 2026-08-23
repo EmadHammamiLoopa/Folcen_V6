@@ -13,6 +13,7 @@ import { ReportModalComponent } from '../../../components/report-modal/report-mo
 import { OneSignalService } from 'src/app/services/one-signal.service';
 import { AuthService } from 'src/app/services/auth.service';
 import { SocketService } from 'src/app/services/socket.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ChannelPopoverComponent } from '../list/ChannelPopoverComponent';
@@ -146,7 +147,7 @@ export class ChannelComponent implements OnInit {
   }
 
   private fetchUserFromLocalStorage() {
-  const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+  const raw = SessionAuthStateService.readLocalUserRaw();
   const user = raw ? JSON.parse(raw) : null;
     if (user) {
       console.log('Fetched user data from localStorage:', user);

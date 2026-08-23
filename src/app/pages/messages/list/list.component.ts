@@ -6,6 +6,7 @@ import { map } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { AlertButton, AlertController, ModalController } from '@ionic/angular';
 import { UserService } from 'src/app/services/user.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 import { WebrtcService } from 'src/app/services/webrtc.service';
 import { Router } from '@angular/router';
 import { AppEventsService } from 'src/app/services/app-events.service';
@@ -135,7 +136,7 @@ export class ListComponent implements OnInit, OnDestroy {
   ngOnInit() {
     // Load authId early so mapping logic can derive the other party correctly
     try {
-      const raw = localStorage.getItem('currentUser') || localStorage.getItem('user');
+      const raw = SessionAuthStateService.readLocalUserRaw();
       this.authId = raw ? (JSON.parse(raw)?._id || JSON.parse(raw)?.id) : null;
     } catch {}
     this.loadLastReadMap();
