@@ -85,6 +85,39 @@ export class SessionAuthStateService {
     return user;
   }
 
+  /**
+   * Native identity fallback for legacy callers that historically retry
+   * canonical currentUser once when its first value is falsy, then consult
+   * legacy user only if the retry also produces no user.
+   *
+   * Every NativeStorage read failure is swallowed independently.
+   * This behavior is intentionally distinct from both getNativeUser()
+   * and readNativeUserFalsyFallback().
+   */
+  static async readNativeUserRetryCanonicalFallback(
+    nativeStorage: NativeStorage
+  ): Promise<any> {
+    let user: any = null;
+
+    try {
+      user = await nativeStorage.getItem('currentUser');
+    } catch (e) {}
+
+    if (!user) {
+      try {
+        user = await nativeStorage.getItem('currentUser');
+      } catch (e) {}
+    }
+
+    if (!user) {
+      try {
+        user = await nativeStorage.getItem('user');
+      } catch (e) {}
+    }
+
+    return user;
+  }
+
   getNativeToken(): Promise<any> {
     return this.nativeStorage.getItem('token');
   }

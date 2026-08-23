@@ -127,12 +127,12 @@ export class CommentsComponent implements OnInit, OnDestroy {
   private getUserData() {
     (async () => {
       try {
-        let u: any = null;
-        try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-        if (!u) {
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) { /* ignore */ }
-        }
-        if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
+        const u =
+          await SessionAuthStateService
+            .readNativeUserRetryCanonicalFallback(
+              this.nativeStorage
+            );
+
         if (u) {
           this.user = new User().initialize(u);
           this.loadFriendTagUsers();
