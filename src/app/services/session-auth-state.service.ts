@@ -59,6 +59,32 @@ export class SessionAuthStateService {
       .readLocalUserRaw();
   }
 
+  /**
+   * Native identity fallback for callers whose existing behavior is:
+   * canonical currentUser first, then legacy user whenever the canonical
+   * value is falsy. Each NativeStorage read failure is swallowed.
+   *
+   * This is intentionally distinct from getNativeUser(), whose legacy
+   * fallback occurs only when reading currentUser rejects.
+   */
+  static async readNativeUserFalsyFallback(
+    nativeStorage: NativeStorage
+  ): Promise<any> {
+    let user: any = null;
+
+    try {
+      user = await nativeStorage.getItem('currentUser');
+    } catch (e) {}
+
+    if (!user) {
+      try {
+        user = await nativeStorage.getItem('user');
+      } catch (e) {}
+    }
+
+    return user;
+  }
+
   getNativeToken(): Promise<any> {
     return this.nativeStorage.getItem('token');
   }

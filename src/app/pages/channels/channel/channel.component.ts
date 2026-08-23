@@ -127,9 +127,12 @@ export class ChannelComponent implements OnInit {
     if (this.platform.is('cordova')) {
       (async () => {
         try {
-          let u: any = null;
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-          if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
+          const u =
+            await SessionAuthStateService
+              .readNativeUserFalsyFallback(
+                this.nativeStorage
+              );
+
           if (u) {
             console.log('Fetched user data from NativeStorage:', u);
             this.initializeUser(u);

@@ -1134,9 +1134,12 @@ getCurrentUserId(): string | null {
 
       // Try NativeStorage 'currentUser' then legacy 'user', then localStorage
       try {
-        let u = null;
-        try { u = await this.nativeStorage.getItem('currentUser'); } catch (e) { /* ignore */ }
-        if (!u) { try { u = await this.nativeStorage.getItem('user'); } catch (e2) { /* ignore */ } }
+        let u =
+          await SessionAuthStateService
+            .readNativeUserFalsyFallback(
+              this.nativeStorage
+            );
+
         if (!u) {
           const raw = SessionAuthStateService.readLocalUserRaw();
           u = raw ? JSON.parse(raw) : null;

@@ -252,9 +252,12 @@ export class ListComponent implements OnInit {
     if (window.cordova) {
       (async () => {
         try {
-          let u: any = null;
-          try { u = await this.nativeStorage.getItem('currentUser'); } catch(e) {}
-          if (!u) try { u = await this.nativeStorage.getItem('user'); } catch(e) {}
+          const u =
+            await SessionAuthStateService
+              .readNativeUserFalsyFallback(
+                this.nativeStorage
+              );
+
           if (u) {
             this.user = new User().initialize(u);
             try { this.authUserId = this.user.id || this.user._id || ''; } catch(e) { this.authUserId = ''; }

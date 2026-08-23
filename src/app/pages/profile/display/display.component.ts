@@ -491,11 +491,12 @@ export class DisplayComponent implements OnInit, OnDestroy {
     if (syncUser) return syncUser;
     if (!this.platform.is('cordova')) return null;
     try {
-      let nativeUser: any = null;
-      try { nativeUser = await this.nativeStorage.getItem('currentUser'); } catch (e) {}
-      if (!nativeUser) {
-        try { nativeUser = await this.nativeStorage.getItem('user'); } catch (e) {}
-      }
+      const nativeUser =
+        await SessionAuthStateService
+          .readNativeUserFalsyFallback(
+            this.nativeStorage
+          );
+
       return this.normalizeCachedUser(nativeUser);
     } catch (e) {
       return null;
