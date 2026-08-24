@@ -297,8 +297,10 @@ export class SigninComponent implements OnInit {
       const userData = JSON.stringify(user);
       try {
         if (this.platform.is('cordova')) {
-          try { await this.nativeStorage.setItem('currentUser', userData); } catch(e) {}
-          try { await this.nativeStorage.setItem('user', userData); } catch(e) {}
+          await SessionAuthStateService.writeNativeUserJsonPairSequential(
+            this.nativeStorage,
+            userData
+          );
         } else {
           try { localStorage.setItem('currentUser', userData); } catch(e) {}
           try { localStorage.setItem('user', userData); } catch(e) {}

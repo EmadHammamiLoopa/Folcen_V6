@@ -181,6 +181,33 @@ export class SessionAuthStateService {
     }
   }
 
+  /**
+   * Preserve the Signin Cordova fallback write semantics:
+   * write the already-serialized user JSON to currentUser first,
+   * then to legacy user, awaiting each write sequentially while
+   * swallowing each NativeStorage failure independently.
+   *
+   * Serialization deliberately remains owned by the caller.
+   */
+  static async writeNativeUserJsonPairSequential(
+    nativeStorage: NativeStorage,
+    userData: string
+  ): Promise<void> {
+    try {
+      await nativeStorage.setItem(
+        'currentUser',
+        userData
+      );
+    } catch (e) {}
+
+    try {
+      await nativeStorage.setItem(
+        'user',
+        userData
+      );
+    } catch (e) {}
+  }
+
   async persistCurrentUser(
     user: any,
     includeNative: boolean
