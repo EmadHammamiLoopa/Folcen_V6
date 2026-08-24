@@ -899,8 +899,7 @@ export class AppComponent implements OnDestroy {
   getUserData() {
     if (this.platform.is('cordova')) {
       // prefer new 'currentUser' key, fallback to legacy 'user'
-      this.nativeStorage
-        .getItem('currentUser')
+      SessionAuthStateService.readNativeCurrentUserRaw(this.nativeStorage)
         .then((userData) => {
           const parsedUser = typeof userData === 'string' ? JSON.parse(userData) : userData;
           this.initializeUser(parsedUser);
@@ -910,8 +909,8 @@ export class AppComponent implements OnDestroy {
           (async () => {
             try {
               let u: any = null;
-              try { u = await this.nativeStorage.getItem('currentUser'); } catch (e) { /* ignore */ }
-              if (!u) { try { u = await this.nativeStorage.getItem('user'); } catch (e2) { /* ignore */ } }
+              try { u = await SessionAuthStateService.readNativeCurrentUserRaw(this.nativeStorage); } catch (e) { /* ignore */ }
+              if (!u) { try { u = await SessionAuthStateService.readNativeLegacyUser(this.nativeStorage); } catch (e2) { /* ignore */ } }
               if (u) {
                 const parsedUser = typeof u === 'string' ? JSON.parse(u) : u;
                 this.initializeUser(parsedUser);

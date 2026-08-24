@@ -102,6 +102,20 @@ export class SessionAuthStateService {
   }
 
   /**
+   * Read only the canonical native currentUser key without altering
+   * the NativeStorage Promise.
+   *
+   * Rejection is intentionally preserved for callers whose existing
+   * control flow distinguishes a rejected read from a fulfilled
+   * falsy value.
+   */
+  static readNativeCurrentUserRaw(
+    nativeStorage: NativeStorage
+  ): Promise<any> {
+    return nativeStorage.getItem('currentUser');
+  }
+
+  /**
    * Read only the legacy native user key.
    *
    * Rejection is intentionally preserved for callers whose existing
