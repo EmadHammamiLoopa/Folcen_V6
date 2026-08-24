@@ -182,6 +182,30 @@ export class SessionAuthStateService {
   }
 
   /**
+   * Preserve UserService native identity publication semantics:
+   * publish raw user objects to canonical and legacy keys without
+   * awaiting either write. Synchronous throws and Promise rejections
+   * are swallowed independently so the caller can continue local,
+   * cache, and in-memory publication immediately.
+   */
+  static writeNativeUserRawPairFireAndForget(
+    nativeStorage: NativeStorage,
+    user: any
+  ): void {
+    try {
+      nativeStorage
+        .setItem('currentUser', user)
+        .catch(() => {});
+    } catch (_) {}
+
+    try {
+      nativeStorage
+        .setItem('user', user)
+        .catch(() => {});
+    } catch (_) {}
+  }
+
+  /**
    * Preserve the Signup Cordova fallback write semantics:
    * write only the already-serialized user JSON to currentUser,
    * await that write, and swallow NativeStorage failure.

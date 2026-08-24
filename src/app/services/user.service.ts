@@ -503,8 +503,10 @@ export class UserService {
     const rawData = userObj.toObject ? userObj.toObject() : userObj;
     try {
       if (this.nativeStorage && typeof this.nativeStorage.setItem === 'function') {
-        try { this.nativeStorage.setItem('currentUser', rawData).catch(() => {}); } catch (_) {}
-        try { this.nativeStorage.setItem('user', rawData).catch(() => {}); } catch (_) {}
+        SessionAuthStateService.writeNativeUserRawPairFireAndForget(
+          this.nativeStorage,
+          rawData
+        );
       }
     } catch (e) {}
 
