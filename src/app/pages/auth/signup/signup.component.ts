@@ -17,6 +17,7 @@ import { SocketService } from '../../../services/socket.service';
 import { OneSignalService } from '../../../services/one-signal.service';
 import { GuidedTourService } from 'src/app/services/guided-tour.service';
 import { SessionCredentialStore } from 'src/app/services/session-credential-store.service';
+import { SessionAuthStateService } from 'src/app/services/session-auth-state.service';
 
 @Component({
   selector: 'app-signup',
@@ -621,7 +622,10 @@ export class SignupComponent implements OnInit, OnDestroy {
       const userData = JSON.stringify(user);
       try {
         if (this.platform.is('cordova')) {
-          await this.nativeStorage.setItem('currentUser', userData);
+          await SessionAuthStateService.writeNativeCurrentUserJsonSequential(
+            this.nativeStorage,
+            userData
+          );
         } else {
           localStorage.setItem('currentUser', userData);
         }
