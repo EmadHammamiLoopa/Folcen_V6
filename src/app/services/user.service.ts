@@ -383,12 +383,11 @@ export class UserService {
     this.callCounters.initCalls += 1;
     try {
       // Prefer the new key 'currentUser' in storage, fall back to legacy 'user' for compatibility
-      let user: User = null;
-      try {
-        user = await this.nativeStorage.getItem('currentUser');
-      } catch (e) {
-        // ignore native storage errors
-      }
+      let user: User =
+        await SessionAuthStateService
+          .readNativeCurrentUser(
+            this.nativeStorage
+          );
 
       if (!user) {
         const localStorageUser = SessionAuthStateService.readLocalUserRaw();

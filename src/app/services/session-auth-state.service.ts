@@ -86,6 +86,22 @@ export class SessionAuthStateService {
   }
 
   /**
+   * Read only the canonical native currentUser key.
+   *
+   * A NativeStorage read failure is swallowed and represented as null.
+   * This owner deliberately does not consult the legacy native user key.
+   */
+  static async readNativeCurrentUser(
+    nativeStorage: NativeStorage
+  ): Promise<any> {
+    try {
+      return await nativeStorage.getItem('currentUser');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
    * Native identity fallback for legacy callers that historically retry
    * canonical currentUser once when its first value is falsy, then consult
    * legacy user only if the retry also produces no user.
