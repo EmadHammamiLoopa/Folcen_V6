@@ -92,9 +92,13 @@ export class FeedPage implements OnInit, OnDestroy {
     }
     // fallback: try local/native storage
     if (this.platform.is('cordova')) {
-      this.nativeStorage.getItem('user').then(u => {
-        this.user = new User().initialize(u);
-      }).catch(() => {
+      SessionAuthStateService
+        .readNativeLegacyUser(
+          this.nativeStorage
+        )
+        .then(u => {
+          this.user = new User().initialize(u);
+        }).catch(() => {
         const raw = SessionAuthStateService.readLocalUserRaw();
         const u = raw ? JSON.parse(raw) : null;
         if (u) this.user = new User().initialize(u);

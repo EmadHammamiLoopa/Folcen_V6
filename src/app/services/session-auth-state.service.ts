@@ -102,6 +102,19 @@ export class SessionAuthStateService {
   }
 
   /**
+   * Read only the legacy native user key.
+   *
+   * Rejection is intentionally preserved for callers whose existing
+   * behavior distinguishes a rejected NativeStorage read from a
+   * fulfilled falsy value.
+   */
+  static readNativeLegacyUser(
+    nativeStorage: NativeStorage
+  ): Promise<any> {
+    return nativeStorage.getItem('user');
+  }
+
+  /**
    * Native identity fallback for legacy callers that historically retry
    * canonical currentUser once when its first value is falsy, then consult
    * legacy user only if the retry also produces no user.
