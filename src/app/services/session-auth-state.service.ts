@@ -233,6 +233,32 @@ export class SessionAuthStateService {
    * are swallowed independently so the caller can continue local,
    * cache, and in-memory publication immediately.
    */
+  /**
+   * Preserve UserService local identity publication semantics:
+   * serialize rawData independently for canonical currentUser
+   * and legacy user, swallowing each serialization/storage
+   * failure independently.
+   *
+   * The separate JSON.stringify calls are intentional.
+   */
+  static writeLocalUserRawAsJsonPair(
+    rawData: any
+  ): void {
+    try {
+      localStorage.setItem(
+        'currentUser',
+        JSON.stringify(rawData)
+      );
+    } catch (e) {}
+
+    try {
+      localStorage.setItem(
+        'user',
+        JSON.stringify(rawData)
+      );
+    } catch (e) {}
+  }
+
   static writeNativeUserRawPairFireAndForget(
     nativeStorage: NativeStorage,
     user: any

@@ -510,8 +510,9 @@ export class UserService {
       }
     } catch (e) {}
 
-    try { localStorage.setItem('currentUser', JSON.stringify(rawData)); } catch (e) {}
-    try { localStorage.setItem('user', JSON.stringify(rawData)); } catch (e) {}
+    SessionAuthStateService.writeLocalUserRawAsJsonPair(
+      rawData
+    );
 
     // Invalidate profile cache for this user to ensure real-time updates across the app
     if (userObj._id) {
