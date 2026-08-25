@@ -302,8 +302,9 @@ export class SigninComponent implements OnInit {
             userData
           );
         } else {
-          try { localStorage.setItem('currentUser', userData); } catch(e) {}
-          try { localStorage.setItem('user', userData); } catch(e) {}
+          SessionAuthStateService.writeLocalUserJsonPair(
+            userData
+          );
         }
       } catch (e2) {
         // swallow fallback errors

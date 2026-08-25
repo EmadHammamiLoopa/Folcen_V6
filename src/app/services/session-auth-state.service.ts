@@ -182,6 +182,32 @@ export class SessionAuthStateService {
   }
 
   /**
+   * Preserve the Signin browser fallback local identity semantics:
+   * write the already-serialized user JSON to currentUser first,
+   * then to legacy user, swallowing each localStorage failure
+   * independently.
+   *
+   * Serialization deliberately remains owned by the caller.
+   */
+  static writeLocalUserJsonPair(
+    userData: string
+  ): void {
+    try {
+      localStorage.setItem(
+        'currentUser',
+        userData
+      );
+    } catch (e) {}
+
+    try {
+      localStorage.setItem(
+        'user',
+        userData
+      );
+    } catch (e) {}
+  }
+
+  /**
    * Preserve UserService native identity publication semantics:
    * publish raw user objects to canonical and legacy keys without
    * awaiting either write. Synchronous throws and Promise rejections
