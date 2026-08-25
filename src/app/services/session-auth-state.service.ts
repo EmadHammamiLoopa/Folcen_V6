@@ -189,6 +189,25 @@ export class SessionAuthStateService {
    *
    * Serialization deliberately remains owned by the caller.
    */
+  /**
+   * Preserve the Signup browser fallback local identity semantics:
+   * write only the already-serialized user JSON to canonical
+   * currentUser and swallow localStorage failure.
+   *
+   * Legacy "user" is intentionally not written here.
+   * Serialization deliberately remains owned by the caller.
+   */
+  static writeLocalCurrentUserJson(
+    userData: string
+  ): void {
+    try {
+      localStorage.setItem(
+        'currentUser',
+        userData
+      );
+    } catch (e) {}
+  }
+
   static writeLocalUserJsonPair(
     userData: string
   ): void {

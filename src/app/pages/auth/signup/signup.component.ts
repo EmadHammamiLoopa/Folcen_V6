@@ -627,7 +627,9 @@ export class SignupComponent implements OnInit, OnDestroy {
             userData
           );
         } else {
-          localStorage.setItem('currentUser', userData);
+          SessionAuthStateService.writeLocalCurrentUserJson(
+            userData
+          );
         }
       } catch (e2) {}
     }
