@@ -1,5 +1,6 @@
 const Validator = require('validatorjs')
 const Response = require('../../controllers/Response')
+const { isAtLeast18 } = require('../../utils/agePolicy')
 const { check, validationResult } = require('express-validator');
 
 exports.signupValidator = (req, res, next) => {
@@ -16,15 +17,11 @@ exports.signupValidator = (req, res, next) => {
         'profession': 'string|max:100', // Ensure it's a string and optional
         'aboutMe': 'string|max:500' // Ensure it's a string and optional
     });
-    const birthDate = new Date(req.body.birthDate).getTime();
-    const currDate = new Date().getTime();
-    const diffDate = currDate - birthDate;
-
     if(validation.fails()) {
         console.log('DEBUG: signupValidator fails', JSON.stringify(validation.errors.all(), null, 2));
         return Response.sendError(res, 400, validation.errors);
     }
-    else if(diffDate < 8 * 365 * 24 * 60 * 60 * 1000) {
+    else if(!isAtLeast18(req.body.birthDate)) {
         return Response.sendError(res, 400, {
             errors: {
                 birthDate: ['invalid birth date']

@@ -57,7 +57,11 @@ router.post('/', [
   requireLegalAcceptance([
     { type: 'terms_and_conditions', versionEnvVar: 'TERMS_VERSION' },
     { type: 'privacy_policy', versionEnvVar: 'PRIVACY_VERSION' },
-    { type: 'channels_disclaimer', versionEnvVar: 'CHANNELS_DISCLAIMER_VERSION' }
+    {
+      type: 'channels_disclaimer',
+      versionEnvVar: 'CHANNELS_DISCLAIMER_VERSION',
+      acceptanceField: 'acceptedChannelRules'
+    }
   ])
 ], storeChannel);
 router.post('/follow/:channelId', [requireSignin, withAuthUser], followChannel);

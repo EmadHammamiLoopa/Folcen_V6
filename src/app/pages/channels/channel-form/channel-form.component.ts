@@ -249,7 +249,7 @@ export class ChannelFormComponent implements OnInit {
     form.append('type', 'user');
 
     if (this.termsAccepted) {
-      form.append('acceptedTerms', 'true');
+      form.append('acceptedChannelRules', 'true');
     }
 
     return form;

@@ -13,6 +13,7 @@ const AuthEvent = require('../models/AuthEvent');
 const admin = require('firebase-admin');
 const peerStore = require('../utils/peerStorage');
 const logger = require('../utils/logger');
+const { isAtLeast18 } = require('../utils/agePolicy');
 
 function recordAuthEvent(event) {
     AuthEvent.create(event).catch(() => {});
@@ -577,6 +578,25 @@ exports.firebaseLogin = async (req, res) => {
             googleId: googleId || profileInput.googleId,
             emailVerified: email_verified || profileInput.emailVerified || false
         };
+
+        // Birth date supplied during Firebase/Google profile completion is
+        // authoritative server input: clients cannot bypass Folcen's 18+ rule.
+        if (
+            socialProfile.birthDate &&
+            !isAtLeast18(socialProfile.birthDate)
+        ) {
+            return Response.sendError(
+                res,
+                422,
+                {
+                    errors: {
+                        birthDate: [
+                            'You must be at least 18 years old to join Folcen.'
+                        ]
+                    }
+                }
+            );
+        }
         const loginContext = String(socialProfile.acceptanceContext || profileInput.context || '').toLowerCase();
         const isExplicitSignup = loginContext.includes('signup') && socialProfile.acceptedTerms === true;
         const hasCompletedSignupProfile = (candidate = {}, requireTerms = true) => {

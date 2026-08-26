@@ -253,7 +253,7 @@ export class SignupComponent implements OnInit, OnDestroy {
         email,
         firstName,
         lastName,
-        acceptedTerms: true
+        acceptedTerms: false
       });
 
       const nameStepIndex = this.steps.indexOf('name');
@@ -491,8 +491,7 @@ export class SignupComponent implements OnInit, OnDestroy {
             ...this.googleProfileSeed,
             ...userInfo,
             password: undefined,
-            password_confirmation: undefined,
-            acceptedTerms: true
+            password_confirmation: undefined
           })
         : await this.auth.firebaseSignup(email, password, userInfo);
       if (resp && resp.data && resp.data.token) {
@@ -766,6 +765,52 @@ export class SignupComponent implements OnInit, OnDestroy {
     return currDate.toJSON().slice(0, 10);
   }
 
+  private isAtLeast18(dateStr: string): boolean {
+    const match = String(dateStr || '').match(
+      /^(\d{4})-(\d{2})-(\d{2})$/
+    );
+
+    if (!match) {
+      return false;
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+
+    const birth = new Date(
+      year,
+      month - 1,
+      day
+    );
+
+    if (
+      birth.getFullYear() !== year ||
+      birth.getMonth() !== month - 1 ||
+      birth.getDate() !== day
+    ) {
+      return false;
+    }
+
+    const eighteenthBirthday = new Date(
+      year + 18,
+      month - 1,
+      day
+    );
+
+    const now = new Date();
+    const today = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+
+    return (
+      eighteenthBirthday.getTime() <=
+      today.getTime()
+    );
+  }
+
   async openBirthdayPicker() {
     const currentYear = new Date().getFullYear();
     const maxYear = currentYear - 18;
@@ -812,6 +857,14 @@ export class SignupComponent implements OnInit, OnDestroy {
           cssClass: 'picker-confirm-btn',
           handler: (value) => {
             const dateStr = `${value.year.value}-${value.month.value}-${value.day.value}`;
+
+            if (!this.isAtLeast18(dateStr)) {
+              this.toastService.presentErrorToastr(
+                'You must be at least 18 years old to join Folcen.'
+              );
+              return false;
+            }
+
             this.form.get('birthDate')?.setValue(dateStr);
             this.form.get('birthDate')?.markAsDirty();
             this.birthDateDisplay = `${value.month.text} ${parseInt(value.day.value, 10)}, ${value.year.value}`;

@@ -3,7 +3,7 @@ const Response = require('../controllers/Response');
 
 /**
  * Middleware to enforce legal document acceptance.
- * @param {Array<{type: string, versionEnvVar: string}>} requirements 
+ * @param {Array<{type: string, versionEnvVar: string, acceptanceField?: string}>} requirements
  */
 exports.requireLegalAcceptance = (requirements) => {
     return async (req, res, next) => {
@@ -21,31 +21,111 @@ exports.requireLegalAcceptance = (requirements) => {
             const userId = req.auth && req.auth._id;
             if (!userId) return Response.sendError(res, 401, 'Unauthorized');
 
-            // If the user is providing acceptance in the request body or fields (formidable), record it and proceed
-            const acceptedTerms = (req.body && req.body.acceptedTerms) || (req.fields && req.fields.acceptedTerms);
-            console.log(`DEBUG: Legal check for user ${userId}. acceptedTerms in body/fields:`, acceptedTerms);
-            
-            if (acceptedTerms === 'true' || acceptedTerms === true || (req.body && req.body.acceptedTerms === 'on')) {
+            // Explicit feature-specific legal acceptance must be tied to the
+            // document the user actually reviewed. A generic acceptedTerms
+            // signal is preserved only for legacy routes that have no
+            // per-document acceptance fields configured.
+            const readAcceptanceValue = (field) => {
+                let value;
+
+                if (
+                    req.body &&
+                    Object.prototype.hasOwnProperty.call(req.body, field)
+                ) {
+                    value = req.body[field];
+                } else if (
+                    req.fields &&
+                    Object.prototype.hasOwnProperty.call(req.fields, field)
+                ) {
+                    value = req.fields[field];
+                }
+
+                return Array.isArray(value)
+                    ? value[0]
+                    : value;
+            };
+
+            const isAffirmativeAcceptance = (value) => (
+                value === true ||
+                value === 'true' ||
+                value === 'on'
+            );
+
+            const acceptedTerms =
+                readAcceptanceValue('acceptedTerms');
+
+            const explicitRequirements =
+                requirements.filter(
+                    reqmt => !!reqmt.acceptanceField
+                );
+
+            const requirementsToRecord =
+                explicitRequirements.length > 0
+                    ? explicitRequirements.filter(
+                        reqmt =>
+                            isAffirmativeAcceptance(
+                                readAcceptanceValue(
+                                    reqmt.acceptanceField
+                                )
+                            )
+                    )
+                    : (
+                        isAffirmativeAcceptance(
+                            acceptedTerms
+                        )
+                            ? requirements
+                            : []
+                    );
+
+            if (requirementsToRecord.length > 0) {
                 try {
-                    const { recordAcceptance } = require('../utils/legalAccept');
-                    console.log(`DEBUG: Recording ${requirements.length} requirements for user ${userId}`);
-                    for (const reqmt of requirements) {
-                        const requiredVersion = process.env[reqmt.versionEnvVar] || '1.0.0';
+                    const {
+                        recordAcceptance
+                    } = require('../utils/legalAccept');
+
+                    for (
+                        const reqmt of requirementsToRecord
+                    ) {
+                        const requiredVersion =
+                            process.env[
+                                reqmt.versionEnvVar
+                            ] || '1.0.0';
+
                         await recordAcceptance({
-                            user: req.authUser || req.auth,
-                            documentType: reqmt.type,
-                            documentVersion: requiredVersion,
-                            acceptanceContext: 'middleware_auto_record',
-                            meta: { clientType: 'mobile_app', route: req.originalUrl, method: req.method },
-                            ip: req.ip,
-                            userAgent: req.get('User-Agent')
+                            user:
+                                req.authUser ||
+                                req.auth,
+                            documentType:
+                                reqmt.type,
+                            documentVersion:
+                                requiredVersion,
+                            acceptanceContext:
+                                reqmt.acceptanceField
+                                    ? 'explicit_feature_acceptance'
+                                    : 'legacy_middleware_auto_record',
+                            meta: {
+                                clientType:
+                                    'mobile_app',
+                                route:
+                                    req.originalUrl,
+                                method:
+                                    req.method,
+                                acceptanceField:
+                                    reqmt.acceptanceField ||
+                                    'acceptedTerms'
+                            },
+                            ip:
+                                req.ip,
+                            userAgent:
+                                req.get('User-Agent')
                         });
                     }
-                    console.log(`✅ Legal acceptances auto-recorded for user ${userId} via request body/fields`);
-                    return next();
                 } catch (recordErr) {
-                    console.error('Failed to auto-record legal acceptance in middleware:', recordErr);
-                    // Continue to check existing acceptances if recording fails
+                    console.error(
+                        'Failed to record legal acceptance in middleware:',
+                        recordErr
+                    );
+                    // Continue to existing-acceptance verification.
                 }
             }
 
@@ -58,10 +138,34 @@ exports.requireLegalAcceptance = (requirements) => {
                 const requiredVersion = process.env[reqmt.versionEnvVar] || '1.0.0';
                 versions[reqmt.type] = requiredVersion;
 
-                const hasAccepted = acceptances.some(a => 
-                    a.documentType === reqmt.type && 
+                const directAccepted = acceptances.some(a =>
+                    a.documentType === reqmt.type &&
                     a.documentVersion === requiredVersion
                 );
+
+                // Compatibility bridge for users whose signup recorded the
+                // historical combined terms_and_privacy document. This does
+                // not create a new acceptance; it only recognizes the old
+                // evidence when its version matches the current Terms version.
+                const legacyCombinedVersion =
+                    process.env.TERMS_VERSION ||
+                    '1.0.0';
+
+                const legacyCombinedAccepted = (
+                    (
+                        reqmt.type === 'terms_and_conditions' ||
+                        reqmt.type === 'privacy_policy'
+                    ) &&
+                    requiredVersion === legacyCombinedVersion &&
+                    acceptances.some(a =>
+                        a.documentType === 'terms_and_privacy' &&
+                        a.documentVersion === legacyCombinedVersion
+                    )
+                );
+
+                const hasAccepted =
+                    directAccepted ||
+                    legacyCombinedAccepted;
 
                 if (!hasAccepted) {
                     missing.push({

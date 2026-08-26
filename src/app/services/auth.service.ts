@@ -215,7 +215,6 @@ export class AuthService extends DataService {
       mainAvatar: photoURL,
       avatar: photoURL ? [photoURL] : [],
       emailVerified: fbUser?.emailVerified === true,
-      acceptedTerms: true,
       signupProvider: 'google',
       acceptanceContext: context
     };
