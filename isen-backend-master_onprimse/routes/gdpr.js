@@ -6,7 +6,6 @@ const { requireSignin, withAuthUser, isAdmin } = require('../app/middlewares/aut
 const rateLimit = require('express-rate-limit');
 const { recordAcceptance, getAcceptancesForUser } = require('../app/utils/legalAccept');
 const { recordAudit } = require('../app/utils/audit');
-const { requireLatestTermsPrivacy } = require('../app/middlewares/legal');
 const logger = require('../app/utils/logger');
 
 // Get current versions of legal documents
@@ -150,14 +149,14 @@ router.get('/events', requireSignin, withAuthUser, isAdmin, rateLimit({ windowMs
 // Record a new acceptance (delegates to the /acceptance POST route above)
 // Note: GdprController.accept is not defined; use /acceptance instead.
 
-// Right of access (self or admin query)
-router.get('/access', [requireSignin, withAuthUser, requireLatestTermsPrivacy, dsarLimiter], GdprController.access);
+// Right of access (self; admins may target another user after controller authorization)
+router.get('/access', [requireSignin, withAuthUser, dsarLimiter], GdprController.access);
 
-// Portability / data export (admin or self with latest terms agreed)
-router.get('/portability', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.portability);
+// Portability / data export (self; admins may target another user after controller authorization)
+router.get('/portability', [requireSignin, withAuthUser, dsarLimiter], GdprController.portability);
 
-// Right to be forgotten (soft-delete + redact)
-router.post('/erase', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.erase);
+// Right to erasure (self-service; cross-user erasure remains controller-authorized admin only)
+router.post('/erase', [requireSignin, withAuthUser, dsarLimiter], GdprController.erase);
 
 // Erase preview (admin only — counts data before erasure)
 router.get('/erase-preview', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.erasePreview);
@@ -169,11 +168,11 @@ router.put('/rectify/:userId', [requireSignin, withAuthUser, isAdmin, dsarLimite
 // Anonymize author (admin only)
 router.post('/anonymize-author', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.anonymizeAuthor);
 
-// Consent status (admin lookup)
-router.get('/consent-status', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.consentStatus);
+// Consent status (self-service; controller authorizes explicit cross-user admin lookup)
+router.get('/consent-status', [requireSignin, withAuthUser, dsarLimiter], GdprController.consentStatus);
 
-// Update consent flag (admin)
-router.put('/consent', [requireSignin, withAuthUser, isAdmin, dsarLimiter], GdprController.updateConsent);
+// Update optional consent choice (self-service; explicit cross-user targets remain controller-authorized)
+router.put('/consent', [requireSignin, withAuthUser, dsarLimiter], GdprController.updateConsent);
 
 // Consent history
 router.get('/consents', requireSignin, withAuthUser, dsarLimiter, GdprController.consentHistory);

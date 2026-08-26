@@ -9,7 +9,24 @@ const { connectedUsers, socketUserMap } = require('../utils/socketManager');
 const { purgeUser, userSocketIds } = require('../helpers');
 
 // Allowed fields for rectification (minimization principle)
-const ALLOWED_RECTIFY_FIELDS = ['firstName','lastName','email','gender','birthDate','aboutMe','school','education','profession','interests'];
+const ALLOWED_RECTIFY_FIELDS = [
+  'firstName', 'lastName', 'email', 'birthDate', 'gender',
+  'city', 'country', 'address', 'aboutMe', 'school',
+  'education', 'profession', 'interests', 'languages'
+];
+
+function canActOnUser(actor, targetId) {
+  if (!actor || !targetId) return false;
+
+  if (
+    actor.role === 'ADMIN' ||
+    actor.role === 'SUPER ADMIN'
+  ) {
+    return true;
+  }
+
+  return String(actor._id) === String(targetId);
+}
 
 // Helper: sanitize user public info using existing publicInfo method if available
 function sanitizeUserForDsar(user){
@@ -21,11 +38,17 @@ exports.access = async (req, res) => {
   try {
     const actor = req.authUser;
     let target = actor;
-    // Allow admins with explicit role to fetch other users via query param
+    // Explicit cross-user target is permitted only for an admin.
+    // A normal user may target only their own id.
     if (req.query && req.query.userId) {
-      // require server-side RBAC check: only allowed if caller has privacy/admin role (handled at route level)
+      if (!canActOnUser(actor, req.query.userId)) {
+        return Response.sendError(res, 403, 'Access forbidden');
+      }
+
       target = await User.findById(req.query.userId);
-      if (!target) return Response.sendResponse(res, {}, 'Request processed'); // generic response to avoid enumeration
+      if (!target) {
+        return Response.sendResponse(res, {}, 'Request processed');
+      }
     }
 
     const sanitized = sanitizeUserForDsar(target);
@@ -74,8 +97,14 @@ exports.portability = async (req, res) => {
     const actor = req.authUser;
     let target = actor;
     if (req.query && req.query.userId) {
+      if (!canActOnUser(actor, req.query.userId)) {
+        return Response.sendError(res, 403, 'Access forbidden');
+      }
+
       target = await User.findById(req.query.userId);
-      if (!target) return Response.sendResponse(res, {}, 'Request processed');
+      if (!target) {
+        return Response.sendResponse(res, {}, 'Request processed');
+      }
     }
 
     // Paginate related data
@@ -199,25 +228,72 @@ exports.portability = async (req, res) => {
 exports.rectify = async (req, res) => {
   try {
     const actor = req.authUser;
+    const { field, newValue } = req.body || {};
+
+    const requestedTargetId =
+      (req.params && req.params.userId) ||
+      (req.body && req.body.userId) ||
+      actor._id;
+
+    if (!canActOnUser(actor, requestedTargetId)) {
+      return Response.sendError(res, 403, 'Access forbidden');
+    }
+
     let target = actor;
-    if (req.body && req.body.userId) {
-      // server-side RBAC required for other-user modifications
-      target = await User.findById(req.body.userId);
-      if (!target) return Response.sendResponse(res, {}, 'Request processed');
+
+    if (String(requestedTargetId) !== String(actor._id)) {
+      target = await User.findById(requestedTargetId);
+
+      if (!target) {
+        return Response.sendResponse(res, {}, 'Request processed');
+      }
     }
 
     const updates = {};
-    for (const k of Object.keys(req.body || {})) {
-      if (ALLOWED_RECTIFY_FIELDS.includes(k)) updates[k] = req.body[k];
-    }
-    if (Object.keys(updates).length === 0) return Response.sendError(res, 400, 'Invalid input');
 
-    // Apply updates and save
+    // Self-service POST contract validated by rectifySchema:
+    // { field, newValue }.
+    if (field) {
+      if (
+        !ALLOWED_RECTIFY_FIELDS.includes(field) ||
+        newValue === undefined
+      ) {
+        return Response.sendError(res, 400, 'Invalid input');
+      }
+
+      updates[field] = newValue;
+    } else if (req.params && req.params.userId) {
+      // Preserve the existing admin dashboard PUT compatibility path,
+      // which may submit multiple allowed fields in one request.
+      for (const key of Object.keys(req.body || {})) {
+        if (ALLOWED_RECTIFY_FIELDS.includes(key)) {
+          updates[key] = req.body[key];
+        }
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return Response.sendError(res, 400, 'Invalid input');
+    }
+
     Object.assign(target, updates);
     await target.save();
 
-    await recordAudit({ actorId: actor._id, actorRole: actor.role, action: 'DSAR_RECTIFY', targetUserId: target._id, details: { updates }, ip: req.ip, userAgent: req.get('User-Agent') });
-    return Response.sendResponse(res, { user: sanitizeUserForDsar(target) }, 'User updated');
+    await recordAudit({
+      actorId: actor._id,
+      actorRole: actor.role,
+      action: 'DSAR_RECTIFY',
+      targetUserId: target._id,
+      details: { updates },
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    return Response.sendResponse(
+      res,
+      { user: sanitizeUserForDsar(target) },
+      'User updated'
+    );
   } catch (e) {
     console.error('GDPR rectify error', e);
     return Response.sendError(res, 500, 'Server error');
@@ -325,8 +401,14 @@ exports.consentHistory = async (req, res) => {
     const actor = req.authUser;
     let target = actor;
     if (req.query && req.query.userId) {
+      if (!canActOnUser(actor, req.query.userId)) {
+        return Response.sendError(res, 403, 'Access forbidden');
+      }
+
       target = await User.findById(req.query.userId);
-      if (!target) return Response.sendResponse(res, {}, 'Request processed');
+      if (!target) {
+        return Response.sendResponse(res, {}, 'Request processed');
+      }
     }
 
     const { getAcceptancesForUser } = require('../utils/legalAccept');
