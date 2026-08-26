@@ -35,6 +35,18 @@ export class SessionCredentialStore {
     return nativeStorage.getItem('token');
   }
 
+  /**
+   * Raw persisted local-token removal for callers whose existing
+   * control flow depends on localStorage removal failure propagating.
+   *
+   * Deliberately performs no error swallowing and no cache mutation.
+   */
+  static removeLocalTokenRaw(): void {
+    localStorage.removeItem(
+      'token'
+    );
+  }
+
   static readLocalToken(): string | null {
     try {
       return SessionCredentialStore

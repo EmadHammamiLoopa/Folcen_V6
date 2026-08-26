@@ -520,7 +520,7 @@ export class SocketService {
 
   /** Call on real logout (or when switching accounts). */
   static async logout(): Promise<void> {
-    localStorage.removeItem('token');
+    SessionCredentialStore.removeLocalTokenRaw();
 
     // Logout/account-switch teardown must invalidate the shared
     // synchronous credential fallback as well as persisted state.
