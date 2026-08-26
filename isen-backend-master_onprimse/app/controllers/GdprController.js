@@ -2407,7 +2407,6 @@ exports.consentStatus = async (req, res) => {
     return Response.sendResponse(res, {
       userId: targetId,
       analytics_optin: consent ? consent.analytics_optin : false,
-      personalization: consent ? consent.personalization : false,
       updatedAt: consent ? consent.updatedAt : null,
     });
   } catch (e) {
@@ -2416,7 +2415,7 @@ exports.consentStatus = async (req, res) => {
   }
 };
 
-const ALLOWED_CONSENT_KEYS = ['analytics_optin', 'personalization'];
+const ALLOWED_CONSENT_KEYS = ['analytics_optin'];
 exports.updateConsent = async (req, res) => {
   try {
     const actor = req.authUser;
@@ -2431,11 +2430,32 @@ exports.updateConsent = async (req, res) => {
     if (!ALLOWED_CONSENT_KEYS.includes(key)) return Response.sendError(res, 400, 'Invalid consent key');
     if (typeof value !== 'boolean') return Response.sendError(res, 400, 'value must be boolean');
 
+    const isCrossUserConsentChange =
+      String(targetId) !== String(actor._id);
+
+    // Optional affirmative consent must originate from the data subject.
+    // An administrator may withdraw/disable consent for another user when
+    // handling a request, but cannot manufacture an opt-in on their behalf.
+    if (isCrossUserConsentChange && value === true) {
+      return Response.sendError(
+        res,
+        403,
+        'Only the data subject can grant optional consent'
+      );
+    }
+
     const UserConsent = require('../models/UserConsent');
     const existing = await UserConsent.findOne({ userId: targetId });
     const oldValue = existing ? existing[key] : false;
 
-    const historyEntry = { key, oldValue, newValue: value, changedAt: new Date(), changedBy: actor._id, source: isAdmin && String(targetId) !== String(actor._id) ? 'admin' : 'self' };
+    const historyEntry = {
+      key,
+      oldValue,
+      newValue: value,
+      changedAt: new Date(),
+      changedBy: actor._id,
+      source: isCrossUserConsentChange ? 'admin' : 'self'
+    };
 
     const updated = await UserConsent.findOneAndUpdate(
       { userId: targetId },

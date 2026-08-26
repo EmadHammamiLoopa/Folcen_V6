@@ -2,7 +2,7 @@
 
   <div class="comp-header">
     <h2 class="comp-title">Consent Controls</h2>
-    <p class="comp-sub">View and update a user's GDPR consent flags &mdash; GDPR Art. 7. Changes are audit-logged.</p>
+    <p class="comp-sub">View a user's optional analytics consent. Administrators may withdraw consent when handling a request, but cannot opt a user in. Changes are audit-logged.</p>
   </div>
 
   <div class="page-body">
@@ -61,12 +61,12 @@
               class="toggle-btn"
               [class.on]="consent[item.key] === true"
               [class.off]="consent[item.key] !== true"
-              [disabled]="saving"
-              (click)="toggle(item.key)"
-              [title]="consent[item.key] ? 'Click to disable' : 'Click to enable'"
+              [disabled]="saving || consent[item.key] !== true"
+              (click)="withdraw(item.key)"
+              [title]="consent[item.key] ? 'Withdraw this consent' : 'Only the user can grant this consent'"
             ></button>
             <span class="toggle-label" [class.on]="consent[item.key] === true" [class.off]="consent[item.key] !== true">
-              {{ consent[item.key] === true ? 'Enabled' : 'Disabled' }}
+              {{ consent[item.key] === true ? 'Consented' : 'Not consented' }}
             </span>
           </div>
         </div>

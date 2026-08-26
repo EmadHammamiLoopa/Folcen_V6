@@ -169,24 +169,176 @@ describe('GDPR — consent update writes history', function () {
 
   beforeEach(async () => { await UserConsent.deleteMany({}); });
 
-  it('creates consent record with history on first update', async () => {
+  it('creates consent record with self history on first user opt-in', async () => {
     const userId = new mongoose.Types.ObjectId();
-    const adminId = new mongoose.Types.ObjectId();
 
     const req = mockReq({
-      authUser: { _id: adminId, role: 'ADMIN' },
-      body: { userId: String(userId), key: 'analytics_optin', value: true }
+      authUser: { _id: userId, role: 'USER' },
+      body: {
+        key: 'analytics_optin',
+        value: true
+      }
     });
+
     const res = mockRes();
+
     await GdprController.updateConsent(req, res);
 
-    assert.isTrue(res._json.success, 'Response should be success');
+    assert.isTrue(
+      res._json.success,
+      'Self opt-in should succeed'
+    );
 
-    const consent = await UserConsent.findOne({ userId });
-    assert.isNotNull(consent, 'Consent record should exist');
-    assert.isTrue(consent.analytics_optin, 'flag should be true');
-    assert.isArray(consent.history, 'history should be an array');
-    assert.isAtLeast(consent.history.length, 1, 'history should have at least 1 entry');
+    const consent =
+      await UserConsent.findOne({
+        userId
+      });
+
+    assert.isNotNull(
+      consent,
+      'Consent record should exist'
+    );
+
+    assert.isTrue(
+      consent.analytics_optin,
+      'analytics flag should be true'
+    );
+
+    assert.isArray(
+      consent.history,
+      'history should be an array'
+    );
+
+    assert.lengthOf(
+      consent.history,
+      1,
+      'first opt-in should create exactly one history entry'
+    );
+
+    assert.equal(
+      consent.history[0].key,
+      'analytics_optin'
+    );
+
+    assert.strictEqual(
+      consent.history[0].oldValue,
+      false
+    );
+
+    assert.strictEqual(
+      consent.history[0].newValue,
+      true
+    );
+
+    assert.equal(
+      String(consent.history[0].changedBy),
+      String(userId)
+    );
+
+    assert.equal(
+      consent.history[0].source,
+      'self'
+    );
+  });
+
+
+  it('rejects ADMIN granting affirmative analytics consent for another user', async () => {
+    const userId =
+      new mongoose.Types.ObjectId();
+
+    const adminId =
+      new mongoose.Types.ObjectId();
+
+    const req = mockReq({
+      authUser: {
+        _id: adminId,
+        role: 'ADMIN'
+      },
+
+      body: {
+        userId: String(userId),
+        key: 'analytics_optin',
+        value: true
+      }
+    });
+
+    const res = mockRes();
+
+    await GdprController.updateConsent(
+      req,
+      res
+    );
+
+    assert.equal(
+      res._code,
+      403,
+      'ADMIN affirmative consent must be forbidden'
+    );
+
+    assert.isFalse(
+      res._json.success,
+      'Response should reject admin opt-in'
+    );
+
+    const consent =
+      await UserConsent.findOne({
+        userId
+      });
+
+    assert.isNull(
+      consent,
+      'Rejected admin opt-in must not create a consent record'
+    );
+  });
+
+
+  it('rejects SUPER ADMIN granting affirmative analytics consent for another user', async () => {
+    const userId =
+      new mongoose.Types.ObjectId();
+
+    const superAdminId =
+      new mongoose.Types.ObjectId();
+
+    const req = mockReq({
+      authUser: {
+        _id: superAdminId,
+        role: 'SUPER ADMIN'
+      },
+
+      body: {
+        userId: String(userId),
+        key: 'analytics_optin',
+        value: true
+      }
+    });
+
+    const res = mockRes();
+
+    await GdprController.updateConsent(
+      req,
+      res
+    );
+
+    assert.equal(
+      res._code,
+      403,
+      'SUPER ADMIN affirmative consent must be forbidden'
+    );
+
+    assert.isFalse(
+      res._json.success,
+      'Response should reject super-admin opt-in'
+    );
+
+    const consent =
+      await UserConsent.findOne({
+        userId
+      });
+
+    assert.isNull(
+      consent,
+      'Rejected super-admin opt-in must not create a consent record'
+    );
   });
 });
 

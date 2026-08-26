@@ -20,14 +20,8 @@ export class ConsentControlsComponent {
     {
       key: 'analytics_optin',
       label: 'Analytics Opt-In',
-      description: 'Allow aggregated usage analytics & interest profiling',
-      optOutNote: 'Disabling this will immediately delete the user\'s interest profile and stop all event tracking.'
-    },
-    {
-      key: 'personalization',
-      label: 'Personalisation',
-      description: 'Allow content recommendations based on usage patterns',
-      optOutNote: 'Disabling this will stop recommendation scoring for this user.'
+      description: 'Optional usage analytics and interest profiling chosen by the user',
+      optOutNote: 'The user has not opted in. Administrators cannot grant consent on the user\'s behalf.'
     },
   ];
 
@@ -60,24 +54,52 @@ export class ConsentControlsComponent {
     });
   }
 
-  toggle(key: string) {
-    if (!this.consent) return;
-    const current = this.consent[key] === true;
-    this.saving = true;
-    this.error = ''; this.info = '';
+  withdraw(key: string) {
+    if (!this.consent || this.consent[key] !== true) return;
 
-    this.gdpr.updateConsent(this.userId.trim(), key, !current).subscribe({
+    this.saving = true;
+    this.error = '';
+    this.info = '';
+
+    this.gdpr.updateConsent(
+      this.userId.trim(),
+      key,
+      false
+    ).subscribe({
       next: (res: any) => {
-        const newConsent = res.data?.consent || res.data || res;
-        this.consent = { ...this.consent, ...newConsent, [key]: !current };
-        this.info = `${key} updated to ${!current}`;
+        const newConsent =
+          res.data?.consent ||
+          res.data ||
+          res;
+
+        this.consent = {
+          ...this.consent,
+          ...newConsent,
+          [key]: false
+        };
+
+        this.info =
+          `${key} withdrawn`;
+
         this.saving = false;
-        this.notify.showSuccess(this.info, 'Consent Updated');
+
+        this.notify.showSuccess(
+          this.info,
+          'Consent Withdrawn'
+        );
       },
+
       error: (e: any) => {
-        this.error = e?.message || 'Update failed';
+        this.error =
+          e?.message ||
+          'Withdrawal failed';
+
         this.saving = false;
-        this.notify.showError(this.error, 'Update Failed');
+
+        this.notify.showError(
+          this.error,
+          'Withdrawal Failed'
+        );
       }
     });
   }

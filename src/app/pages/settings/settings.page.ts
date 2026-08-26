@@ -6,6 +6,7 @@ import constants from 'src/app/helpers/constants';
 import { User } from 'src/app/models/User';
 import { AuthService } from 'src/app/services/auth.service';
 import { DataService } from 'src/app/services/data.service';
+import { GdprConsentService } from 'src/app/services/gdpr-consent.service';
 import { SocketService } from 'src/app/services/socket.service';
 import { ToastService } from 'src/app/services/toast.service';
 import { UserService } from 'src/app/services/user.service';
@@ -42,6 +43,11 @@ export class SettingsPage implements OnInit, OnDestroy {
   blockedUsers: any[] = [];
   blockedLoading = false;
 
+  analyticsConsent = false;
+  analyticsConsentLoaded = false;
+  analyticsConsentLoading = false;
+  analyticsConsentUpdating = false;
+
   constructor(
     private alertController: AlertController,
     private nativeStorage: NativeStorage,
@@ -50,6 +56,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     private router: Router,
     private auth: AuthService,
     private dataService: DataService,
+    private gdprConsent: GdprConsentService,
     private modalCtrl: ModalController,
     private themeService: ThemeService,
     private changeDetectorRef: ChangeDetectorRef
@@ -77,6 +84,7 @@ export class SettingsPage implements OnInit, OnDestroy {
   async ionViewWillEnter() {
     this.pageLoading = true;
     await this.getUser();
+    await this.loadAnalyticsConsent();
   }
 
   async openBlockedModal() {
@@ -516,6 +524,124 @@ export class SettingsPage implements OnInit, OnDestroy {
       }
     );
   }
+
+  async loadAnalyticsConsent() {
+    this.analyticsConsentLoading = true;
+
+    try {
+      const response: any =
+        await this.gdprConsent.getStatus();
+
+      const data =
+        response?.data ||
+        response ||
+        {};
+
+      this.analyticsConsent =
+        data.analytics_optin === true;
+
+      this.analyticsConsentLoaded = true;
+
+    } catch (err) {
+      console.error(
+        'Failed to load analytics consent',
+        err
+      );
+
+      this.analyticsConsent = false;
+      this.analyticsConsentLoaded = false;
+
+      this.toastService.presentErrorToastr(
+        'Could not load your analytics preference.'
+      );
+
+    } finally {
+      this.analyticsConsentLoading = false;
+
+      try {
+        this.changeDetectorRef.detectChanges();
+      } catch (_) {}
+    }
+  }
+
+
+  async toggleAnalyticsConsent(event: any) {
+    const requested =
+      event?.detail?.checked;
+
+    if (
+      typeof requested !== 'boolean' ||
+      !this.analyticsConsentLoaded ||
+      this.analyticsConsentLoading ||
+      this.analyticsConsentUpdating
+    ) {
+      return;
+    }
+
+    if (
+      requested ===
+      this.analyticsConsent
+    ) {
+      return;
+    }
+
+    const previous =
+      this.analyticsConsent;
+
+    this.analyticsConsent =
+      requested;
+
+    this.analyticsConsentUpdating =
+      true;
+
+    try {
+      const response: any =
+        await this.gdprConsent
+          .setAnalyticsConsent(
+            requested
+          );
+
+      const data =
+        response?.data ||
+        response ||
+        {};
+
+      this.analyticsConsent =
+        data.analytics_optin === true;
+
+      if (this.analyticsConsent) {
+        this.toastService.presentSuccessToastr(
+          'Optional analytics enabled.'
+        );
+      } else {
+        this.toastService.presentSuccessToastr(
+          'Optional analytics disabled. New analytics tracking is stopped and your derived interest profile is removed.'
+        );
+      }
+
+    } catch (err) {
+      console.error(
+        'Failed to update analytics consent',
+        err
+      );
+
+      this.analyticsConsent =
+        previous;
+
+      this.toastService.presentErrorToastr(
+        'Could not update your analytics preference.'
+      );
+
+    } finally {
+      this.analyticsConsentUpdating =
+        false;
+
+      try {
+        this.changeDetectorRef.detectChanges();
+      } catch (_) {}
+    }
+  }
+
 
   async openPrivacyPolicy() {
     const modal = await this.modalCtrl.create({

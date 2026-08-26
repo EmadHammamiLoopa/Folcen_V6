@@ -156,6 +156,43 @@
       </div>
     </section>
 
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Data choices</span>
+          <h2>Data &amp; Privacy</h2>
+        </div>
+        <ion-icon name="analytics-outline"></ion-icon>
+      </div>
+
+      <div class="settings-card">
+        <ion-item lines="none" class="settings-row toggle-row">
+          <div class="icon-box privacy" slot="start">
+            <ion-icon name="analytics-outline"></ion-icon>
+          </div>
+
+          <ion-label>
+            <h3>Optional Analytics</h3>
+            <p>
+              When enabled, Folcen records limited usage events and may
+              derive an interest profile to understand engagement.
+              This is off by default. You can turn it off again at any
+              time; new analytics tracking stops and the derived interest
+              profile is deleted.
+            </p>
+          </ion-label>
+
+          <ion-toggle
+            slot="end"
+            aria-label="Optional analytics consent"
+            [checked]="analyticsConsent"
+            [disabled]="!analyticsConsentLoaded || analyticsConsentLoading || analyticsConsentUpdating"
+            (ionChange)="toggleAnalyticsConsent($event)">
+          </ion-toggle>
+        </ion-item>
+      </div>
+    </section>
+
     <section class="settings-section compact-section">
       <div class="section-heading">
         <div>
