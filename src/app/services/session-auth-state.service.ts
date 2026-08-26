@@ -197,6 +197,25 @@ export class SessionAuthStateService {
    * Legacy "user" is intentionally not written here.
    * Serialization deliberately remains owned by the caller.
    */
+  /**
+   * Preserve UserService malformed-local-identity cleanup semantics:
+   * remove canonical currentUser first, then legacy user.
+   *
+   * Deliberately performs no error swallowing. A canonical removal
+   * failure prevents the legacy attempt, while a legacy failure occurs
+   * only after canonical removal succeeds. The caller's existing outer
+   * try/catch remains responsible for absorbing either failure.
+   */
+  static removeLocalUserPairSequential(): void {
+    localStorage.removeItem(
+      'currentUser'
+    );
+
+    localStorage.removeItem(
+      'user'
+    );
+  }
+
   static writeLocalCurrentUserJson(
     userData: string
   ): void {

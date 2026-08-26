@@ -395,8 +395,7 @@ export class UserService {
           try {
             if (localStorageUser === '[object Object]' || localStorageUser === 'null' || localStorageUser === 'undefined') {
               devLogger.warn('localStorage user data is invalid string:', localStorageUser);
-              localStorage.removeItem('currentUser');
-              localStorage.removeItem('user');
+              SessionAuthStateService.removeLocalUserPairSequential();
               user = null;
             } else if (localStorageUser.startsWith('{') || localStorageUser.startsWith('[')) {
               user = JSON.parse(localStorageUser);
