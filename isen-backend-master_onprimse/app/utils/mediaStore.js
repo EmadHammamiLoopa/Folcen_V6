@@ -56,6 +56,71 @@ async function removeExisting(publicPath) {
   await Promise.all(existing.map(file => b.delete(file._id).catch(() => {})));
 }
 
+// GDPR/permanent-purge deletion path.
+//
+// Unlike removeExisting(), this deliberately does not swallow GridFS
+// deletion failures. A permanent erasure must not report completion while
+// a durable copy is still present.
+async function removeStored(publicPath) {
+  const b = bucket();
+  const variants = pathVariants(publicPath);
+
+  if (!variants.length) {
+    return 0;
+  }
+
+  const existing = await b.find({
+    $or: [
+      { filename: { $in: variants } },
+      { 'metadata.publicPath': { $in: variants } },
+      { 'metadata.aliases': { $in: variants } }
+    ]
+  }).toArray();
+
+  await Promise.all(
+    existing.map(file =>
+      b.delete(file._id)
+    )
+  );
+
+  return existing.length;
+}
+
+// Uploaded avatar/chat media carries metadata.userId. Cleaning by metadata
+// also covers abandoned uploads that were stored durably but never attached
+// to a later Message/User record.
+async function removeStoredByUser(userId) {
+  const normalizedUserId =
+    String(userId || '').trim();
+
+  if (!normalizedUserId) {
+    return 0;
+  }
+
+  const b = bucket();
+
+  const existing = await b.find({
+    'metadata.userId': normalizedUserId
+  }).toArray();
+
+  const publicPaths = existing
+    .map(file =>
+      (file.metadata && file.metadata.publicPath) ||
+      file.filename ||
+      ''
+    )
+    .map(normalizePublicPath)
+    .filter(Boolean);
+
+  await Promise.all(
+    existing.map(file =>
+      b.delete(file._id)
+    )
+  );
+
+  return publicPaths;
+}
+
 function saveStream(readable, publicPath, contentType, metadata = {}) {
   return new Promise((resolve, reject) => {
     const normalized = normalizePublicPath(publicPath);
@@ -134,5 +199,7 @@ module.exports = {
   normalizePublicPath,
   saveFile,
   saveBuffer,
+  removeStored,
+  removeStoredByUser,
   serveFallback
 };

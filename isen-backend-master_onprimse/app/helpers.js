@@ -830,152 +830,869 @@ async function purgeUser(userId) {
   const Notification = require('./models/Notification');
   const PushToken = require('./models/PushToken');
   const UserActivityDaily = require('./models/UserActivityDaily');
-  // new GDPR models â€” safe to skip if not yet migrated
+
+  // Operational records/references that must not survive permanent purge.
+  const Peer = require('./models/Peer');
+  const Subscription = require('./models/Subscription');
+  const ChatOpeningLease = require('./models/ChatOpeningLease');
+  const Announcement = require('./models/Announcement');
+  const PlanRule = require('./models/PlanRule');
+  const Content = require('./models/Content');
+
+  const mediaStore = require('./utils/mediaStore');
+
+  // New GDPR models — safe to skip if a deployment has not migrated them yet.
   let UserInterestProfile, UserConsent, AnalyticsEvent;
   try { UserInterestProfile = require('./models/UserInterestProfile'); } catch (e) {}
   try { UserConsent = require('./models/UserConsent'); } catch (e) {}
   try { AnalyticsEvent = require('./models/AnalyticsEvent'); } catch (e) {}
+
   const fs = require('fs').promises;
   const path = require('path');
 
-  // 0. Fetch user to get file paths and firebaseUid before deletion
-  const user = await User.findById(userId).select('mainAvatar avatar firebaseUid email').lean();
-  if (user) {
-    const filesToDelete = [];
-    if (user.mainAvatar && user.mainAvatar.startsWith('/uploads/')) {
-      filesToDelete.push(path.join(__dirname, '..', 'public', user.mainAvatar));
+  const normalizedUserId =
+    String(userId);
+
+  const publicRoot =
+    path.resolve(
+      __dirname,
+      '..',
+      'public'
+    );
+
+  const erasedMedia =
+    new Set();
+
+  /**
+   * Delete one managed media path from both:
+   *   - durable GridFS storage, when present
+   *   - local public storage, when present
+   *
+   * External URLs and shared defaults are never unlinked locally.
+   */
+  async function eraseStoredMedia(value) {
+    if (!value) {
+      return;
     }
-    if (Array.isArray(user.avatar)) {
-      user.avatar.forEach(av => {
-        if (av && av.startsWith('/uploads/')) {
-          filesToDelete.push(path.join(__dirname, '..', 'public', av));
-        }
-      });
+
+    const normalized =
+      mediaStore.normalizePublicPath(
+        value
+      );
+
+    if (!normalized) {
+      return;
     }
 
-    // Delete files from disk
-    for (const filePath of filesToDelete) {
-      try {
-        await fs.unlink(filePath);
-        console.log(`[GDPR Purge] Deleted file: ${filePath}`);
-      } catch (e) {
-        // Ignore if file doesn't exist
-        if (e.code !== 'ENOENT') console.warn(`[GDPR Purge] Failed to delete file: ${filePath}`, e.message);
-      }
+    // Never delete the shared channel placeholder.
+    if (
+      normalized ===
+      '/channels/channel-default.png'
+    ) {
+      return;
     }
-  }
 
-  // 0.1 Fetch posts to delete media files
-  const userPosts = await Post.find({ user: userId }).select('media.url').lean();
-  for (const p of userPosts) {
-    if (p.media && p.media.url && p.media.url.startsWith('/uploads/')) {
-      const filePath = path.join(__dirname, '..', 'public', p.media.url);
-      try {
-        await fs.unlink(filePath);
-        console.log(`[GDPR Purge] Deleted post media: ${filePath}`);
-      } catch (e) {
-        if (e.code !== 'ENOENT') console.warn(`[GDPR Purge] Failed to delete post media: ${filePath}`, e.message);
-      }
+    if (
+      erasedMedia.has(
+        normalized
+      )
+    ) {
+      return;
     }
-  }
 
-  // 0.2 Fetch comments to delete media files
-  const userComments = await Comment.find({ user: userId }).select('media.url').lean();
-  for (const c of userComments) {
-    if (c.media && c.media.url && c.media.url.startsWith('/uploads/')) {
-      const filePath = path.join(__dirname, '..', 'public', c.media.url);
-      try {
-        await fs.unlink(filePath);
-        console.log(`[GDPR Purge] Deleted comment media: ${filePath}`);
-      } catch (e) {
-        if (e.code !== 'ENOENT') console.warn(`[GDPR Purge] Failed to delete comment media: ${filePath}`, e.message);
-      }
+    erasedMedia.add(
+      normalized
+    );
+
+    // Strict durable deletion. Errors propagate so a purge cannot silently
+    // complete while a GridFS copy remains.
+    await mediaStore.removeStored(
+      normalized
+    );
+
+    let managedPath =
+      normalized;
+
+    if (
+      managedPath.startsWith(
+        '/public/uploads/'
+      )
+    ) {
+      managedPath =
+        managedPath.replace(
+          '/public/uploads/',
+          '/uploads/'
+        );
     }
-  }
 
-  // 1. Find all channels owned by the user to delete them
-  const userChannels = await Channel.find({ user: userId }).select('_id');
-  const channelIds = userChannels.map(c => c._id);
+    const managedPrefixes = [
+      '/uploads/',
+      '/upload_chat/',
+      '/channels/',
+      '/products/',
+      '/jobs/',
+      '/services/'
+    ];
 
-  await Promise.all([
-    // Delete the user
-    User.deleteOne({ _id: userId }),
-    
-    // Delete all social content
-    Post.deleteMany({ user: userId }),
-    Comment.deleteMany({ user: userId }),
-    
-    // Delete all marketplace content
-    Product.deleteMany({ user: userId }),
-    Job.deleteMany({ user: userId }),
-    Service.deleteMany({ user: userId }),
-    
-    // Delete all communication
-    Message.deleteMany({ $or: [{ from: userId }, { to: userId }] }),
-    Request.deleteMany({ $or: [{ from: userId }, { to: userId }] }),
-    
-    // Delete all social connections
-    Follow.deleteMany({ $or: [{ follower: userId }, { followed: userId }] }),
-    
-    // Delete all legal/activity traces
-    LegalAcceptance.deleteMany({ userId: userId }),
-    Activity.deleteMany({ actor: userId }),
-    
-    // Delete all reports (where user is reporter or the reported entity)
-    Report.deleteMany({ $or: [{ reporter: userId }, { entity: userId, entityModel: 'User' }] }),
+    if (
+      !managedPrefixes.some(prefix =>
+        managedPath.startsWith(prefix)
+      )
+    ) {
+      return;
+    }
 
-    // Delete channels owned by the user
-    Channel.deleteMany({ user: userId }),
+    const relative =
+      managedPath.replace(
+        /^\/+/,
+        ''
+      );
 
-    // GDPR: push tokens, notifications, daily activity, interest profile, consents, analytics events
-    PushToken.deleteMany({ userId }),
-    Notification.deleteMany({ $or: [{ recipient: userId }, { sender: userId }] }),
-    UserActivityDaily.deleteMany({ userId }),
-    ...(UserInterestProfile ? [UserInterestProfile.deleteOne({ userId })] : []),
-    ...(UserConsent ? [UserConsent.deleteOne({ userId })] : []),
-    ...(AnalyticsEvent ? [AnalyticsEvent.deleteMany({ userId })] : []),
-  ]);
+    const localPath =
+      path.resolve(
+        publicRoot,
+        relative
+      );
 
-  // 2. Cleanup references in other models (e.g., removing user from follower arrays)
-  await Promise.all([
-    User.updateMany({}, { $pull: { followers: userId, following: userId, friends: userId, blockedUsers: userId } }),
-    Channel.updateMany({}, { $pull: { followers: userId } })
-  ]);
+    // Prevent traversal outside backend/public.
+    if (
+      localPath !== publicRoot &&
+      !localPath.startsWith(
+        `${publicRoot}${path.sep}`
+      )
+    ) {
+      throw new Error(
+        'Refusing to erase media outside managed public storage'
+      );
+    }
 
-  // 3. Hard-delete from Firebase Auth (non-fatal if missing)
-  if (user && (user.firebaseUid || user.email)) {
     try {
-      const { admin: firebaseAdmin } = require('./services/firebaseAdmin');
-      if (firebaseAdmin && firebaseAdmin.apps && firebaseAdmin.apps.length && firebaseAdmin.auth) {
-        let firebaseUid = user.firebaseUid || null;
+      await fs.unlink(
+        localPath
+      );
 
-        if (!firebaseUid && user.email) {
+      console.log(
+        `[GDPR Purge] Deleted managed media: ${localPath}`
+      );
+
+    } catch (error) {
+
+      if (
+        error.code !==
+        'ENOENT'
+      ) {
+        throw error;
+      }
+    }
+  }
+
+
+  // ----------------------------------------------------------
+  // 0. Capture identity + media BEFORE deleting database rows.
+  // ----------------------------------------------------------
+
+  const user =
+    await User.findById(
+      userId
+    )
+      .select(
+        'mainAvatar avatar firebaseUid email'
+      )
+      .lean();
+
+
+  if (user) {
+
+    if (
+      user.mainAvatar
+    ) {
+      await eraseStoredMedia(
+        user.mainAvatar
+      );
+    }
+
+    if (
+      Array.isArray(
+        user.avatar
+      )
+    ) {
+
+      for (
+        const avatarPath
+        of user.avatar
+      ) {
+        await eraseStoredMedia(
+          avatarPath
+        );
+      }
+    }
+  }
+
+
+  // Posts.
+  const userPosts =
+    await Post.find({
+      user: userId
+    })
+      .select(
+        'media.url'
+      )
+      .lean();
+
+
+  for (
+    const p
+    of userPosts
+  ) {
+
+    if (
+      p.media &&
+      p.media.url
+    ) {
+      await eraseStoredMedia(
+        p.media.url
+      );
+    }
+  }
+
+
+  // Comments.
+  const userComments =
+    await Comment.find({
+      user: userId
+    })
+      .select(
+        'media.url'
+      )
+      .lean();
+
+
+  for (
+    const c
+    of userComments
+  ) {
+
+    if (
+      c.media &&
+      c.media.url
+    ) {
+      await eraseStoredMedia(
+        c.media.url
+      );
+    }
+  }
+
+
+  // Only media sent by the deleted user is owned by that user.
+  // Messages received from another user are deleted below as conversation
+  // records, but their sender's underlying uploaded media is not treated as
+  // media owned by the recipient.
+  const userMessages =
+    await Message.find({
+      from: userId
+    })
+      .select(
+        'image media'
+      )
+      .lean();
+
+
+  for (
+    const message
+    of userMessages
+  ) {
+
+    if (
+      message.image &&
+      message.image.path
+    ) {
+      await eraseStoredMedia(
+        message.image.path
+      );
+    }
+
+    if (
+      Array.isArray(
+        message.media
+      )
+    ) {
+
+      for (
+        const item
+        of message.media
+      ) {
+
+        if (
+          item &&
+          item.path
+        ) {
+          await eraseStoredMedia(
+            item.path
+          );
+        }
+
+        if (
+          item &&
+          item.thumbnail
+        ) {
+          await eraseStoredMedia(
+            item.thumbnail
+          );
+        }
+      }
+    }
+  }
+
+
+  // Channels.
+  const userChannels =
+    await Channel.find({
+      user: userId
+    })
+      .select(
+        '_id photo photos'
+      )
+      .lean();
+
+
+  const channelIds =
+    userChannels.map(
+      channel =>
+        channel._id
+    );
+
+
+  for (
+    const channel
+    of userChannels
+  ) {
+
+    if (
+      channel.photo &&
+      channel.photo.path
+    ) {
+      await eraseStoredMedia(
+        channel.photo.path
+      );
+    }
+
+    if (
+      Array.isArray(
+        channel.photos
+      )
+    ) {
+
+      for (
+        const photo
+        of channel.photos
+      ) {
+
+        if (
+          photo &&
+          photo.path
+        ) {
+          await eraseStoredMedia(
+            photo.path
+          );
+        }
+      }
+    }
+  }
+
+
+  // Products.
+  const userProducts =
+    await Product.find({
+      user: userId
+    })
+      .select(
+        'photos'
+      )
+      .lean();
+
+
+  for (
+    const product
+    of userProducts
+  ) {
+
+    if (
+      Array.isArray(
+        product.photos
+      )
+    ) {
+
+      for (
+        const photo
+        of product.photos
+      ) {
+
+        if (
+          photo &&
+          photo.path
+        ) {
+          await eraseStoredMedia(
+            photo.path
+          );
+        }
+      }
+    }
+  }
+
+
+  // Jobs.
+  const userJobs =
+    await Job.find({
+      user: userId
+    })
+      .select(
+        'photo'
+      )
+      .lean();
+
+
+  for (
+    const job
+    of userJobs
+  ) {
+
+    if (
+      job.photo &&
+      job.photo.path
+    ) {
+      await eraseStoredMedia(
+        job.photo.path
+      );
+    }
+  }
+
+
+  // Services.
+  const userServices =
+    await Service.find({
+      user: userId
+    })
+      .select(
+        'photo'
+      )
+      .lean();
+
+
+  for (
+    const service
+    of userServices
+  ) {
+
+    if (
+      service.photo &&
+      service.photo.path
+    ) {
+      await eraseStoredMedia(
+        service.photo.path
+      );
+    }
+  }
+
+
+  // Catch abandoned avatar/chat GridFS uploads that have a userId metadata
+  // value but were never attached to a later database record.
+  const orphanedUserMediaPaths =
+    await mediaStore.removeStoredByUser(
+      normalizedUserId
+    );
+
+
+  for (
+    const orphanedPath
+    of orphanedUserMediaPaths
+  ) {
+    await eraseStoredMedia(
+      orphanedPath
+    );
+  }
+
+
+  // ----------------------------------------------------------
+  // 1. Delete owned/user-specific operational records.
+  // ----------------------------------------------------------
+
+  await Promise.all([
+
+    User.deleteOne({
+      _id: userId
+    }),
+
+    Post.deleteMany({
+      user: userId
+    }),
+
+    Comment.deleteMany({
+      user: userId
+    }),
+
+    Product.deleteMany({
+      user: userId
+    }),
+
+    Job.deleteMany({
+      user: userId
+    }),
+
+    Service.deleteMany({
+      user: userId
+    }),
+
+    Message.deleteMany({
+      $or: [
+        {
+          from: userId
+        },
+        {
+          to: userId
+        }
+      ]
+    }),
+
+    Request.deleteMany({
+      $or: [
+        {
+          from: userId
+        },
+        {
+          to: userId
+        }
+      ]
+    }),
+
+    Follow.deleteMany({
+      $or: [
+        {
+          follower: userId
+        },
+        {
+          followed: userId
+        }
+      ]
+    }),
+
+    // Existing legal/activity behavior is preserved in B1.
+    // Retention classification is handled separately in C4-B2.
+    LegalAcceptance.deleteMany({
+      userId: userId
+    }),
+
+    Activity.deleteMany({
+      actor: userId
+    }),
+
+    Report.deleteMany({
+      $or: [
+        {
+          reporter: userId
+        },
+        {
+          entity: userId,
+          entityModel: 'User'
+        }
+      ]
+    }),
+
+    Channel.deleteMany({
+      user: userId
+    }),
+
+    PushToken.deleteMany({
+      userId
+    }),
+
+    Notification.deleteMany({
+      $or: [
+        {
+          recipient: userId
+        },
+        {
+          sender: userId
+        }
+      ]
+    }),
+
+    UserActivityDaily.deleteMany({
+      userId
+    }),
+
+    Peer.deleteMany({
+      userId: normalizedUserId
+    }),
+
+    Subscription.deleteMany({
+      userId
+    }),
+
+    ChatOpeningLease.deleteMany({
+      sender: userId
+    }),
+
+    Content.deleteMany({
+      user: userId
+    }),
+
+    ...(UserInterestProfile
+      ? [
+          UserInterestProfile.deleteOne({
+            userId
+          })
+        ]
+      : []),
+
+    ...(UserConsent
+      ? [
+          UserConsent.deleteOne({
+            userId
+          })
+        ]
+      : []),
+
+    ...(AnalyticsEvent
+      ? [
+          AnalyticsEvent.deleteMany({
+            userId
+          })
+        ]
+      : [])
+  ]);
+
+
+  // ----------------------------------------------------------
+  // 2. Remove references from surviving records.
+  // ----------------------------------------------------------
+
+  await Promise.all([
+
+    User.updateMany(
+      {},
+      {
+        $pull: {
+          followers: userId,
+          following: userId,
+          friends: userId,
+          blockedUsers: userId
+        }
+      }
+    ),
+
+    Channel.updateMany(
+      {},
+      {
+        $pull: {
+          followers: userId
+        }
+      }
+    ),
+
+    Channel.updateMany(
+      {
+        approvedBy: userId
+      },
+      {
+        $unset: {
+          approvedBy: 1
+        }
+      }
+    ),
+
+    Post.updateMany(
+      {
+        'votes.user': userId
+      },
+      {
+        $pull: {
+          votes: {
+            user: userId
+          }
+        }
+      }
+    ),
+
+    Comment.updateMany(
+      {
+        'votes.user': userId
+      },
+      {
+        $pull: {
+          votes: {
+            user: userId
+          }
+        }
+      }
+    ),
+
+    Announcement.updateMany(
+      {
+        seenBy: normalizedUserId
+      },
+      {
+        $pull: {
+          seenBy: normalizedUserId
+        }
+      }
+    ),
+
+    Announcement.updateMany(
+      {
+        createdBy: userId
+      },
+      {
+        $unset: {
+          createdBy: 1
+        }
+      }
+    ),
+
+    PlanRule.updateMany(
+      {
+        targetUsers: userId
+      },
+      {
+        $pull: {
+          targetUsers: userId
+        }
+      }
+    ),
+
+    ChatOpeningLease.updateMany(
+      {
+        'leases.receiver': userId
+      },
+      {
+        $pull: {
+          leases: {
+            receiver: userId
+          }
+        }
+      }
+    )
+  ]);
+
+
+  // ----------------------------------------------------------
+  // 3. Hard-delete Firebase Auth identity.
+  // ----------------------------------------------------------
+
+  if (
+    user &&
+    (
+      user.firebaseUid ||
+      user.email
+    )
+  ) {
+
+    try {
+
+      const {
+        admin: firebaseAdmin
+      } =
+        require(
+          './services/firebaseAdmin'
+        );
+
+
+      if (
+        firebaseAdmin &&
+        firebaseAdmin.apps &&
+        firebaseAdmin.apps.length &&
+        firebaseAdmin.auth
+      ) {
+
+        let firebaseUid =
+          user.firebaseUid ||
+          null;
+
+
+        if (
+          !firebaseUid &&
+          user.email
+        ) {
+
           try {
-            const firebaseRecord = await firebaseAdmin.auth().getUserByEmail(String(user.email).trim().toLowerCase());
-            firebaseUid = firebaseRecord.uid;
-          } catch (lookupErr) {
-            if (lookupErr.code !== 'auth/user-not-found') {
-              console.warn('[GDPR Purge] Firebase lookup by email failed (non-fatal):', lookupErr.message);
+
+            const firebaseRecord =
+              await firebaseAdmin
+                .auth()
+                .getUserByEmail(
+                  String(
+                    user.email
+                  )
+                    .trim()
+                    .toLowerCase()
+                );
+
+
+            firebaseUid =
+              firebaseRecord.uid;
+
+          } catch (
+            lookupErr
+          ) {
+
+            if (
+              lookupErr.code !==
+              'auth/user-not-found'
+            ) {
+
+              console.warn(
+                '[GDPR Purge] Firebase lookup by email failed (non-fatal):',
+                lookupErr.message
+              );
             }
           }
         }
 
-        if (firebaseUid) {
+
+        if (
+          firebaseUid
+        ) {
+
           try {
+
             await firebaseAdmin.auth().deleteUser(firebaseUid);
-            console.log(`[GDPR Purge] Deleted Firebase Auth user: ${firebaseUid}`);
-          } catch (deleteErr) {
-            if (deleteErr.code === 'auth/user-not-found') {
-              console.warn('[GDPR Purge] Firebase user already absent during delete');
+
+
+            console.log(
+              `[GDPR Purge] Deleted Firebase Auth user: ${firebaseUid}`
+            );
+
+          } catch (
+            deleteErr
+          ) {
+
+            if (
+              deleteErr.code ===
+              'auth/user-not-found'
+            ) {
+
+              console.warn(
+                '[GDPR Purge] Firebase user already absent during delete'
+              );
+
             } else {
+
               throw deleteErr;
             }
           }
         }
       }
-    } catch (fbErr) {
-      // User may already be deleted from Firebase; non-fatal
-      console.warn('[GDPR Purge] Firebase Auth delete failed (non-fatal):', fbErr.message);
+
+    } catch (
+      fbErr
+    ) {
+
+      // Existing Firebase deletion remains non-fatal because deployments may
+      // use local-only authentication or the Firebase identity may already be
+      // absent.
+      console.warn(
+        '[GDPR Purge] Firebase Auth delete failed (non-fatal):',
+        fbErr.message
+      );
     }
   }
 }
