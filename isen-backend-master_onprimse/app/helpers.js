@@ -1861,7 +1861,6 @@ async function report(req, res, entityName, entityId) {
       isAnonymous       : req.body.isAnonymous === true,
       evidence          : req.body.evidence || [],
       photoUrl          : req.body.photoUrl || null,
-      retentionDate     : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // Default 1 year retention
     }).save();
 
     // Record audit log for the report

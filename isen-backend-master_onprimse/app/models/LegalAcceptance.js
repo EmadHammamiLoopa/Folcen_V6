@@ -1,19 +1,103 @@
 const mongoose = require('mongoose');
 
+const LEGAL_ACCEPTANCE_RETENTION_DAYS =
+  Math.max(
+    1,
+    Number(
+      process.env.LEGAL_ACCEPTANCE_RETENTION_DAYS ||
+      1095
+    )
+  );
+
 const LegalAcceptanceSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  documentType: { type: String, required: true }, // e.g. terms, privacy, seller_disclaimer
-  documentVersion: { type: String, required: true }, // version string or content hash
-  acceptedAt: { type: Date, default: Date.now },
-  acceptanceContext: { type: String }, // e.g. signup, publish_product
-  meta: { type: Object, default: {} } // minimal non-sensitive metadata (clientType etc.)
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
+
+  documentType: {
+    type: String,
+    required: true
+  },
+
+  documentVersion: {
+    type: String,
+    required: true
+  },
+
+  acceptedAt: {
+    type: Date,
+    default: Date.now
+  },
+
+  acceptanceContext: {
+    type: String
+  },
+
+  meta: {
+    type: Object,
+    default: {}
+  },
+
+  /*
+   * Finite lifecycle for legal-acceptance evidence.
+   *
+   * This is a configurable Folcen retention policy, not a statement that
+   * GDPR itself requires 1095 days. Article 17 erasure may delete the record
+   * earlier where no independent lawful retention basis applies.
+   */
+  retentionDate: {
+    type: Date
+  }
 }, {
   collection: 'legal_acceptances',
   minimize: false,
   timestamps: true
 });
 
-// Append-only by design: do not expose update routes. Keep index for queries by user.
-LegalAcceptanceSchema.index({ userId: 1, documentType: 1, acceptedAt: -1 });
+LegalAcceptanceSchema.pre(
+  'validate',
+  function(next) {
+    if (
+      !this.retentionDate
+    ) {
+      const accepted =
+        this.acceptedAt instanceof Date
+          ? this.acceptedAt
+          : new Date();
 
-module.exports = mongoose.model('LegalAcceptance', LegalAcceptanceSchema);
+      this.retentionDate =
+        new Date(
+          accepted.getTime() +
+          LEGAL_ACCEPTANCE_RETENTION_DAYS *
+          24 *
+          60 *
+          60 *
+          1000
+        );
+    }
+
+    next();
+  }
+);
+
+// Append-only by design.
+LegalAcceptanceSchema.index({
+  userId: 1,
+  documentType: 1,
+  acceptedAt: -1
+});
+
+// MongoDB deletes the record once its finite retentionDate is reached.
+LegalAcceptanceSchema.index(
+  { retentionDate: 1 },
+  { expireAfterSeconds: 0 }
+);
+
+module.exports =
+  mongoose.model(
+    'LegalAcceptance',
+    LegalAcceptanceSchema
+  );

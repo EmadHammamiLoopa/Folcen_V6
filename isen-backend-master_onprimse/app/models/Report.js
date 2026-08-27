@@ -11,6 +11,15 @@
  */
 const mongoose = require('mongoose');
 
+const REPORT_RETENTION_DAYS =
+  Math.max(
+    1,
+    Number(
+      process.env.REPORT_RETENTION_DAYS ||
+      365
+    )
+  );
+
 const ReportSchema = new mongoose.Schema({
   // Who filed the report
   reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -34,10 +43,12 @@ const ReportSchema = new mongoose.Schema({
   consentGiven: { type: Boolean, default: false }, // GDPR: Explicit consent for processing report data
   isAnonymous: { type: Boolean, default: false }, // Reporter choice to remain anonymous to the reported party
   evidence: [{ type: String }], // URLs or snapshots of content
-  retentionDate: { type: Date }, // GDPR: Date when this report should be anonymized or deleted
+  // Set only once the moderation case is closed.
+  retentionDate: { type: Date, default: null },
 
   // Status / resolution fields
   status: { type: String, enum: ['open','under_review','resolved','dismissed'], default: 'open', index: true },
+  resolvedAt: { type: Date, default: null },
   resolutionAction: { type: String, enum: ['Content Removed','User Banned','User Deleted (GDPR)','Resolved','No Action'], default: 'No Action' },
   moderatorNotes: { type: String, default: null },
 
@@ -48,7 +59,51 @@ const ReportSchema = new mongoose.Schema({
   updatedAt: { type: Date }
 }, { collection: 'reports' });
 
-ReportSchema.pre('save', function(next) { this.updatedAt = new Date(); next(); });
+ReportSchema.pre('save', function(next) {
+  const now = new Date();
+  this.updatedAt = now;
+
+  const closed =
+    this.status === 'resolved' ||
+    this.status === 'dismissed';
+
+  if (closed) {
+    if (!this.resolvedAt) {
+      this.resolvedAt = now;
+    }
+
+    if (!this.retentionDate) {
+      this.retentionDate = new Date(
+        this.resolvedAt.getTime() +
+        REPORT_RETENTION_DAYS * 24 * 60 * 60 * 1000
+      );
+    }
+  } else {
+    // Open/reopened cases must never expire from a legacy creation date.
+    this.resolvedAt = null;
+    this.retentionDate = null;
+  }
+
+  next();
+});
+
+/*
+ * Rollout-safe TTL:
+ *
+ * Historical reports may still contain a retentionDate calculated from
+ * creation time. They must not become TTL-eligible merely because this
+ * index is deployed. Only records with an explicit resolvedAt date are
+ * eligible; the maintenance migration backfills legacy closed cases.
+ */
+ReportSchema.index(
+  { retentionDate: 1 },
+  {
+    expireAfterSeconds: 0,
+    partialFilterExpression: {
+      resolvedAt: { $type: 'date' }
+    }
+  }
+);
 
 // Avoid OverwriteModelError when the file is required multiple times
 module.exports = mongoose.models.Report || mongoose.model('Report', ReportSchema);

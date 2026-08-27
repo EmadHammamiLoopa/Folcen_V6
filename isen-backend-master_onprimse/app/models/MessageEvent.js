@@ -14,7 +14,7 @@ const MessageEventSchema = new mongoose.Schema({
   event: { type: String, enum: ['send_attempt','delivered','blocked','reported'], required: true },
   reason: { type: String, default: null },
   createdAt: { type: Date, default: Date.now, index: true },
-  expiresAt: { type: Date, index: { expireAfterSeconds: 0 } },
+  expiresAt: { type: Date, index: true }, // finite expiry enforced by purge job so linkedReport can be protected
   linkedReport: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null }
 }, { collection: 'message_events' });
 

@@ -38,10 +38,15 @@ module.exports = function(agenda){
       // Purge call events and message events that expired and are not linked to reports
       const CallEvent = require('../models/CallEvent');
       const MessageEvent = require('../models/MessageEvent');
-      const callCutoff = new Date(Date.now() - (Number(process.env.CALL_EVENT_RETENTION_DAYS || 90) * 24 * 3600 * 1000));
-      const msgCutoff  = new Date(Date.now() - (Number(process.env.MESSAGE_EVENT_RETENTION_DAYS || 60) * 24 * 3600 * 1000));
-      const deletedCalls = await CallEvent.deleteMany({ expiresAt: { $lte: callCutoff }, linkedReport: null });
-      const deletedMsgEvents = await MessageEvent.deleteMany({ expiresAt: { $lte: msgCutoff }, linkedReport: null });
+      const deletedCalls = await CallEvent.deleteMany({
+        expiresAt: { $lte: now },
+        linkedReport: null
+      });
+
+      const deletedMsgEvents = await MessageEvent.deleteMany({
+        expiresAt: { $lte: now },
+        linkedReport: null
+      });
       if ((deletedCalls && deletedCalls.deletedCount) || (deletedMsgEvents && deletedMsgEvents.deletedCount)) {
         await recordAudit({ actorId: null, actorRole: null, action: 'PURGE_EVENTS', targetUserId: null, details: { deletedCalls: deletedCalls.deletedCount, deletedMsgEvents: deletedMsgEvents.deletedCount }, ip: null, userAgent: null });
       }

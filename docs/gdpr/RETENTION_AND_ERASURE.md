@@ -17,11 +17,11 @@
 | `user_activity_daily` | 365 days | TTL index on `date` | New: requires index addition (see §3) |
 | `follows` | Until user erasure | Purge job cascade | |
 | `reports` | Until resolved + 180 days | TTL on `retentionDate` | Set `retentionDate = resolvedAt + 180d` |
-| `call_events` | 90 days | TTL index on `expiresAt` ✅ | Configurable via `CALL_EVENT_RETENTION_DAYS` |
-| `messageevent` | 60 days | Purge job + `expiresAt` | Configurable via `MESSAGE_EVENT_RETENTION_DAYS` |
-| `authevents` | 30 days | Conditional TTL index ✅ | Configurable via `AUTH_EVENT_RETENTION_DAYS` |
-| `audit_logs` | 2 years (legal obligation) | Archival job at 2y | Must not delete, only archive to cold storage |
-| `legal_acceptances` | Lifetime | None (append-only) | Legal obligation to retain |
+| `call_events` | 90 days | Agenda purge on `expiresAt` | Configurable via `CALL_EVENT_RETENTION_DAYS`; report-linked events are protected until their case lifecycle releases them |
+| `messageevent` | 60 days | Agenda purge on `expiresAt` | Configurable via `MESSAGE_EVENT_RETENTION_DAYS`; report-linked events are protected until their case lifecycle releases them |
+| `authevents` | 30 days | TTL index on `createdAt` | Bounded default 30 days; configurable via `AUTH_EVENT_RETENTION_DAYS` |
+| `audit_logs` | `AUDIT_LOG_RETENTION_DAYS` (default 1095 days; minimum 365) | TTL index on `timestamp` | Finite accountability/security evidence; direct erased-user identifiers are minimized during Article 17 erasure |
+| `legal_acceptances` | Finite — `LEGAL_ACCEPTANCE_RETENTION_DAYS` (default 1095 days), subject to purpose/legal-basis review | TTL index on `retentionDate` | Finite acceptance evidence; Article 17 erasure may delete it earlier where no independent lawful retention basis applies |
 | `analyticsevents` | 30 days | TTL index on `createdAt` | New model |
 | `userinterestprofiles` | Until erasure / opt-out | Purge job cascade | |
 | `userconsents` | Until erasure | Purge job cascade | |
@@ -40,7 +40,7 @@ AUTH_EVENT_RETENTION_DAYS=30     # AuthEvent TTL
 NOTIFICATION_RETENTION_DAYS=90   # Notifications TTL
 ACTIVITY_RETENTION_DAYS=90       # Activity TTL
 ANALYTICS_EVENT_RETENTION_DAYS=30 # AnalyticsEvent TTL
-AUDIT_LOG_ARCHIVE_DAYS=730       # AuditLog archival trigger
+AUDIT_LOG_RETENTION_DAYS=1095    # AuditLog TTL; model enforces minimum 365 days
 ```
 
 ---
@@ -60,7 +60,7 @@ db.activities.createIndex({ createdAt: 1 }, { expireAfterSeconds: 7776000 }); //
 db.user_activity_daily.createIndex({ date: 1 }, { expireAfterSeconds: 31536000 }); // 365d
 
 // reports (on retentionDate, after it is set by resolution handler)
-db.reports.createIndex({ retentionDate: 1 }, { expireAfterSeconds: 0, sparse: true });
+db.reports.createIndex({ retentionDate: 1 }, { expireAfterSeconds: 0, partialFilterExpression: { resolvedAt: { $type: "date" } } });
 
 // analytic_events (managed in model, 30d default)
 db.analyticsevents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 2592000 }); // 30d
@@ -146,3 +146,58 @@ No data is modified.
 - If `userId` is already absent, operations return `{ deletedCount: 0 }` — no error.
 - Audit record is written per run, timestamped.
 - Partial failures are caught per-operation and logged, not swallowed.
+
+
+## C4-B2 lifecycle controls
+
+### Legal acceptance evidence
+
+`legal_acceptances` are subject to a defined finite retention period.
+Each record receives a finite `retentionDate`, enforced by a MongoDB TTL
+index. The configurable policy is `LEGAL_ACCEPTANCE_RETENTION_DAYS`
+(default: 1095 days). This is a Folcen policy default and must be shortened
+or overridden where the applicable purpose or legal basis does not justify
+that period. Article 17 erasure may remove the record earlier.
+
+### Moderation reports
+
+Open and under-review reports do not expire based merely on their creation
+date. When a case becomes `resolved` or `dismissed`, the model records
+`resolvedAt` and calculates `retentionDate` from that resolution time using
+`REPORT_RETENTION_DAYS` (default: 365 days). A MongoDB TTL index on
+`retentionDate` performs final deletion.
+
+### User-identifying blacklist records
+
+Blacklist entries that identify a user, IP address or email require both
+finite retention and periodic necessity review. `BLACKLIST_REVIEW_DAYS`
+defaults to 90 days and `BLACKLIST_RETENTION_DAYS` defaults to 365 days.
+
+For Article 17, a direct `itemType=user` blacklist record is erased by
+default. Retention after erasure is allowed only when `retainOnErasure=true`
+has been explicitly set together with a non-empty `retentionReason` and a
+future finite `retentionDate`. Any such exception receives a new `reviewAt`
+date. Creator references belonging to the erased user are removed from
+otherwise surviving blacklist rules.
+
+### Legacy moderation-report migration
+
+Older report records may contain a `retentionDate` calculated from report
+creation time. The current lifecycle instead starts finite retention when the
+moderation case is resolved or dismissed.
+
+The `reports.retentionDate` TTL index is therefore partial: a report is
+TTL-eligible only when `resolvedAt` is a BSON date. This prevents legacy open
+reports from being deleted merely because an old creation-based
+`retentionDate` has elapsed.
+
+Before treating legacy report retention as migrated:
+
+1. Run `scripts/maintenance/migrateReportRetention.js` without `--apply` and
+   review the candidate counts.
+2. Run it with `--apply` against the intended database.
+3. Open and under-review reports have legacy lifecycle dates removed.
+4. Resolved and dismissed legacy reports use `updatedAt` as the preferred
+   resolution-time approximation, with `createdAt` only as a fallback.
+5. The migration is idempotent; already-complete closed lifecycle records are
+   left unchanged.

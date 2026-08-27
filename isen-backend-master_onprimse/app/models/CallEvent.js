@@ -19,7 +19,7 @@ const CallEventSchema = new mongoose.Schema({
     durationSeconds: { type: Number, default: null } // only for connected->ended
   }],
   createdAt: { type: Date, default: Date.now, index: true },
-  expiresAt: { type: Date, index: { expireAfterSeconds: 0 } }, // TTL index
+  expiresAt: { type: Date, index: true }, // finite expiry enforced by purge job so linkedReport can be protected
   linkedReport: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null }
 }, { collection: 'call_events' });
 

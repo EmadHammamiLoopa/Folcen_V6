@@ -9,9 +9,35 @@ const AuthEventSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: false });
 
-if (process.env.AUTH_EVENT_RETENTION_DAYS) {
-  const days = Number(process.env.AUTH_EVENT_RETENTION_DAYS) || 30;
-  AuthEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: days * 24 * 3600 });
-}
+const AUTH_EVENT_RETENTION_DAYS =
+  Number(
+    process.env.AUTH_EVENT_RETENTION_DAYS ||
+    30
+  );
+
+
+const boundedAuthEventRetentionDays =
+  Number.isFinite(
+    AUTH_EVENT_RETENTION_DAYS
+  ) &&
+  AUTH_EVENT_RETENTION_DAYS > 0
+    ? Math.floor(
+        AUTH_EVENT_RETENTION_DAYS
+      )
+    : 30;
+
+
+AuthEventSchema.index(
+  {
+    createdAt:
+      1
+  },
+  {
+    expireAfterSeconds:
+      boundedAuthEventRetentionDays *
+      24 *
+      3600
+  }
+);
 
 module.exports = mongoose.models.AuthEvent || mongoose.model('AuthEvent', AuthEventSchema);

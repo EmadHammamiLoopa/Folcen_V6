@@ -54,7 +54,6 @@ async function createReport({ reporter, targetType, targetId, reasonCode, reason
     severity,
     consentGiven,
     isAnonymous,
-    retentionDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
   });
   await r.save();
   try { await recordAudit({ action: 'report.created', actorId: reporter, details: { targetType, targetId, reportId: r._id } }); } catch (e) {}

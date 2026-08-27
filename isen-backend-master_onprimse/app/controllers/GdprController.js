@@ -8,6 +8,10 @@ const Message = require('../models/Message');
 const { connectedUsers, socketUserMap } = require('../utils/socketManager');
 const { purgeUser, userSocketIds } = require('../helpers');
 const { buildPaginationManifest } = require('../utils/dsarSupport');
+const {
+  buildErasureRetentionPlan,
+  minimizeRetainedErasureEvidence
+} = require('../utils/erasureRetention');
 
 // Allowed fields for rectification (minimization principle)
 const ALLOWED_RECTIFY_FIELDS = [
@@ -2144,96 +2148,320 @@ exports.rectify = async (req, res) => {
 // Soft delete (erase) with immediate revocation and scheduled purge
 exports.erase = async (req, res) => {
   try {
-    const io = req.app && typeof req.app.get === 'function'
-      ? req.app.get('io')
-      : null;
-    const actor = req.authUser;
-    let target = actor;
-    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN';
+    const io =
+      req.app &&
+      typeof req.app.get === 'function'
+        ? req.app.get('io')
+        : null;
 
-    if (req.body && req.body.userId) {
-      // Only admins can erase other users
-      if (!isAdmin) return Response.sendError(res, 403, 'Access forbidden');
-      target = await User.findById(req.body.userId);
-      if (!target) return Response.sendResponse(res, {}, 'Request processed');
+    const actor =
+      req.authUser;
+
+    let target =
+      actor;
+
+    const isAdmin =
+      actor.role === 'ADMIN' ||
+      actor.role === 'SUPER ADMIN';
+
+
+    if (
+      req.body &&
+      req.body.userId
+    ) {
+
+      // Only ADMIN / SUPER ADMIN may execute Article 17 erasure
+      // for another user.
+      if (
+        !isAdmin
+      ) {
+        return Response.sendError(
+          res,
+          403,
+          'Access forbidden'
+        );
+      }
+
+
+      target =
+        await User.findById(
+          req.body.userId
+        );
+
+
+      if (
+        !target
+      ) {
+        return Response.sendResponse(
+          res,
+          {},
+          'Request processed'
+        );
+      }
     }
 
-    const now = new Date();
-    const reason = req.body.reason || 'No reason provided';
 
-    if (isAdmin && String(actor._id) !== String(target._id)) {
-      // Hard Delete for Admin-initiated erasure of others
-      console.log(`[GDPR Hard Erase] Admin ${actor._id} is purging user ${target._id}. Reason: ${reason}`);
-      
-      await recordAudit({ 
-        actorId: actor._id, 
-        actorRole: actor.role, 
-        action: 'ERASURE_HARD', 
-        targetUserId: target._id, 
-        details: { reason, method: 'ADMIN_PURGE' }, 
-        ip: req.ip, 
-        userAgent: req.get('User-Agent') 
-      });
+    const targetId =
+      target._id;
 
-      // Perform physical purge
-      await purgeUser(target._id);
 
-      // Disconnect sockets
-      try {
-        const sockets = userSocketIds(target._id);
-        if (sockets && io && io.sockets) {
-          for (const sid of sockets) {
-            try { 
-              const s = io.sockets.sockets.get(sid); 
-              if (s) {
-                s.emit('force-logout', { reason: 'Account permanently erased per GDPR request' });
-                s.disconnect(true); 
-              }
-            } catch (e) {}
-          }
-        }
-      } catch (e) { console.warn('Failed to disconnect sockets on hard erase', e); }
+    const isCrossUserErasure =
+      String(actor._id) !==
+      String(targetId);
 
-      return Response.sendResponse(res, { deletedAt: now, purged: true }, 'Account permanently erased and data purged');
-    } else {
-      // Soft Delete for self-erasure or if we want to keep grace period
-      const days = parseInt(process.env.DATA_RETENTION_DAYS || '30');
-      
-      target.isDeleted = true;
-      target.deletedAt = now;
-      target.deletedBy = actor._id;
-      target.purgeAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
-      await target.save();
+    const now =
+      new Date();
 
-      // Immediate revocation
-      await tokenBlacklist.revokeUser(String(target._id));
 
-      // Disconnect sockets
-      try {
-        const sockets = userSocketIds(target._id);
-        if (sockets && io && io.sockets) {
-          for (const sid of sockets) {
-            try { const s = io.sockets.sockets.get(sid); if (s) s.disconnect(true); } catch (e) {}
-          }
-        }
-      } catch (e) { console.warn('Failed to disconnect sockets on soft erase', e); }
+    const reason =
+      (
+        req.body &&
+        req.body.reason
+      ) ||
+      'Data subject Article 17 erasure request';
 
-      await recordAudit({ 
-        actorId: actor._id, 
-        actorRole: actor.role, 
-        action: 'ERASURE_SOFT', 
-        targetUserId: target._id, 
-        details: { reason, retentionDays: days }, 
-        ip: req.ip, 
-        userAgent: req.get('User-Agent') 
-      });
 
-      return Response.sendResponse(res, { deletedAt: now, purgeAt: target.purgeAt }, 'Account scheduled for deletion');
+    /**
+     * GDPR Article 17 erasure is intentionally NOT the ordinary recoverable
+     * "Delete Account" flow.
+     *
+     * Delete Account may use a grace period and restore path.
+     * This endpoint performs the Article 17 exception assessment and then
+     * permanently purges erasable account data immediately.
+     */
+    const retentionPlan =
+      await buildErasureRetentionPlan(
+        targetId
+      );
+
+
+    // Optional/ordinary account processing must stop immediately even before
+    // the physical purge completes.
+    try {
+
+      await tokenBlacklist.revokeUser(
+        String(
+          targetId
+        )
+      );
+
+    } catch (
+      revokeError
+    ) {
+
+      console.warn(
+        '[GDPR Erasure] Token revocation warning:',
+        revokeError.message
+      );
     }
-  } catch (e) {
-    console.error('GDPR erase error', e);
-    return Response.sendError(res, 500, 'Server error');
+
+
+    const auditAction =
+      isCrossUserErasure
+        ? 'ERASURE_HARD'
+        : 'ERASURE_ART17_SELF';
+
+
+    // Record the request before physical purge. The retained audit category
+    // is subject to the separate B2 minimization/finite-retention controls.
+    await recordAudit({
+      actorId:
+        actor._id,
+
+      actorRole:
+        actor.role,
+
+      action:
+        auditAction,
+
+      targetUserId:
+        targetId,
+
+      details: {
+        reason,
+
+        method:
+          isCrossUserErasure
+            ? 'ADMIN_PURGE'
+            : 'ARTICLE_17_SELF_PURGE',
+
+        article17:
+          true,
+
+        exceptionAssessment:
+          retentionPlan.exceptionAssessment,
+
+        retainedCategories:
+          retentionPlan.retainedCategories.map(
+            item =>
+              item.category
+          )
+      },
+
+      ip:
+        req.ip,
+
+      userAgent:
+        req.get('User-Agent')
+    });
+
+
+    // Preserve the established ADMIN/SUPER ADMIN cross-user hard-erasure
+    // behavior while applying the same Article 17 assessment.
+    if (
+      isAdmin &&
+      String(actor._id) !== String(target._id)
+    ) {
+
+      console.log(
+        `[GDPR Hard Erase] Admin ${actor._id} is purging user ${target._id}. Reason: ${reason}`
+      );
+
+      // Existing audit action name retained for administrative evidence:
+      // ERASURE_HARD.
+    }
+
+
+    // Article 17 erasure performs an immediate physical purge.
+    await purgeUser(target._id);
+
+
+    // Security/accountability records are not blindly deleted. Instead,
+    // remove the erased user's direct identity and raw technical identifiers
+    // while their finite retention window remains applicable.
+    await minimizeRetainedErasureEvidence(
+      target._id
+    );
+
+
+    // Disconnect all active sessions/sockets for the erased identity.
+    try {
+
+      const sockets =
+        userSocketIds(
+          targetId
+        );
+
+
+      if (
+        sockets &&
+        io &&
+        io.sockets
+      ) {
+
+        for (
+          const sid
+          of sockets
+        ) {
+
+          try {
+
+            const socket =
+              io.sockets.sockets.get(
+                sid
+              );
+
+
+            if (
+              socket
+            ) {
+
+              socket.emit(
+                'force-logout',
+                {
+                  reason:
+                    'Account permanently erased following an Article 17 request'
+                }
+              );
+
+
+              socket.disconnect(
+                true
+              );
+            }
+
+          } catch (
+            socketError
+          ) {
+            // Best-effort disconnect after the server-side account purge.
+          }
+        }
+      }
+
+    } catch (
+      disconnectError
+    ) {
+
+      console.warn(
+        '[GDPR Erasure] Socket disconnect warning:',
+        disconnectError.message
+      );
+    }
+
+
+    const retainedCategories =
+      retentionPlan.retainedCategories;
+
+
+    const retentionReason =
+      retentionPlan.retentionReason;
+
+
+    const response = {
+      deletedAt:
+        now,
+
+      purged:
+        true,
+
+      article17:
+        true,
+
+      exceptionAssessment:
+        retentionPlan.exceptionAssessment,
+
+      retainedCategories,
+
+      retentionReason,
+
+      // Article 12(4) transparency/remedy information when any portion of
+      // personal data is retained under an Article 17 exception.
+      supervisoryAuthority:
+        'Datatilsynet — Norwegian Data Protection Authority',
+
+      judicialRemedy:
+        'You may lodge a complaint with the supervisory authority and seek an effective judicial remedy under GDPR Articles 78 and 79.'
+    };
+
+
+    const message =
+      retainedCategories.length
+        ? 'Account data erased. Limited categories may remain temporarily where an Article 17 exception applies; details are included in this response.'
+        : 'Account permanently erased and erasable personal data purged.';
+
+
+    return Response.sendResponse(
+      res,
+      response,
+      message
+    );
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      'GDPR erase error',
+      error
+    );
+
+
+    return Response.sendError(
+      res,
+      500,
+      'Server error'
+    );
   }
 };
 

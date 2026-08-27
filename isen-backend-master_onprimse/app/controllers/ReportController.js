@@ -5,6 +5,15 @@ const Content = require("../models/Content"); // Assuming a Content model for ma
 const Response = require("./Response");
 const mongoose = require('mongoose'); // ✅ Add this import
 
+const REPORT_RETENTION_DAYS =
+    Math.max(
+        1,
+        Number(
+            process.env.REPORT_RETENTION_DAYS ||
+            365
+        )
+    );
+
 
 const Post = require("../models/Post");
 const Comment = require("../models/Comment");
@@ -260,6 +269,34 @@ exports.takeActionOnReport = async (req, res) => {
 
             default:
                 return Response.sendError(res, 400, 'Invalid action');
+        }
+
+        /*
+         * GDPR storage-limitation lifecycle:
+         * retention starts when the moderation case closes, not when
+         * the report was originally created.
+         *
+         * Report.js enforces the same invariant as defence-in-depth.
+         */
+        if (
+            report.status === 'resolved' ||
+            report.status === 'dismissed'
+        ) {
+            if (!report.resolvedAt) {
+                report.resolvedAt = new Date();
+            }
+
+            if (!report.retentionDate) {
+                report.retentionDate =
+                    new Date(
+                        report.resolvedAt.getTime() +
+                        REPORT_RETENTION_DAYS *
+                        24 *
+                        60 *
+                        60 *
+                        1000
+                    );
+            }
         }
 
         await report.save();
