@@ -1,6 +1,6 @@
 const express = require('express');
 const passport = require('passport');
-const { signup, signin, signout, checkEmail, authUser, traitor, firebaseLogin, forgotPassword } = require('../app/controllers/AuthController');
+const { signup, signin, signout, checkEmail, authUser, firebaseLogin, forgotPassword } = require('../app/controllers/AuthController');
 const { requireSignin, withAuthUser } = require('../app/middlewares/auth');
 const { signupValidator, signinValidator, checkEmailValidator } = require('../app/middlewares/validators/authValidator');
 const { authLimiter } = require('../app/middlewares/rateLimiter');
@@ -13,7 +13,6 @@ router.get('/user', [requireSignin, withAuthUser], authUser);
 router.post('/signin', authLimiter, signinValidator, signin);
 router.post('/signup', authLimiter, signupValidator, signup);
 router.post('/signout', requireSignin, signout);
-router.post('/traitor', traitor);
 // Firebase auth (signup + signin via Firebase ID Token)
 router.post('/firebase-login', authLimiter, firebaseLogin);
 // Password reset (works for both Firebase and legacy MongoDB-only users)

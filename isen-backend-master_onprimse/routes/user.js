@@ -358,10 +358,10 @@ router.post('/announcements/:id/seen', [requireSignin, withAuthUser], markAnnoun
 // Budget
 router.post('/reset-budget', [requireSignin, withAuthUser], resetBudget);
 
-router.get('/all', [requireSignin, isAdmin], allUsers);
-router.get('/analytics', [requireSignin, isAdmin], getUsersAnalytics);
-router.get('/retention', [requireSignin, isAdmin], getRetentionStats);
-router.post('/', [form, requireSignin, isSuperAdmin, userStoreValidator], storeUser);
+router.get('/all', [requireSignin, withAuthUser, isAdmin], allUsers);
+router.get('/analytics', [requireSignin, withAuthUser, isAdmin], getUsersAnalytics);
+router.get('/retention', [requireSignin, withAuthUser, isAdmin], getRetentionStats);
+router.post('/', [requireSignin, withAuthUser, isSuperAdmin, form, userStoreValidator], storeUser);
 
 // Add PeerJS routes
 
@@ -568,9 +568,9 @@ router.post('/:userId/upload', [requireSignin, withAuthUser, chatUpload.single('
   }
 });
 
-router.get('/dash/:userId', [requireSignin, isAdmin], showUserDash);
-router.get('/dash/edit/:userId', [requireSignin, isAdmin], showUserEditDash);
-router.put('/dash/:userId', [form, requireSignin, isSuperAdmin, userDashUpdateValidator], updateUserDash);
+router.get('/dash/:userId', [requireSignin, withAuthUser, isAdmin], showUserDash);
+router.get('/dash/edit/:userId', [requireSignin, withAuthUser, isAdmin], showUserEditDash);
+router.put('/dash/:userId', [requireSignin, withAuthUser, isSuperAdmin, form, userDashUpdateValidator], updateUserDash);
 
 router.post('/follow/:userId', [requireSignin, isNotBlocked, withAuthUser], follow);
 router.put('/profile/main-avatar/:userId', [requireSignin, withAuthUser], updateMainAvatar);
@@ -614,10 +614,10 @@ router.get('/profile/:profileUserId', [
 
 router.put('/', [requireSignin, withAuthUser, userUpdateValidator], updateUser);
 
-router.post('/status/:userId', [requireSignin, isAdmin], toggleUserStatus);
-router.put('/toggle-status/:userId', [requireSignin, isAdmin], toggleUserStatus);
-router.post('/verify/:userId', [requireSignin, isAdmin], verifyUser);
-router.post('/role/:userId', [requireSignin, isSuperAdmin], changeRole);
+router.post('/status/:userId', [requireSignin, withAuthUser, isAdmin], toggleUserStatus);
+router.put('/toggle-status/:userId', [requireSignin, withAuthUser, isAdmin], toggleUserStatus);
+router.post('/verify/:userId', [requireSignin, withAuthUser, isAdmin], verifyUser);
+router.post('/role/:userId', [requireSignin, withAuthUser, isSuperAdmin], changeRole);
 router.delete('/remove-avatar/:userId/:avatarUrl', [requireSignin, withAuthUser], removeAvatar);
 router.put('/update-main-avatar/:userId', [requireSignin, withAuthUser], updateMainAvatar);
 
@@ -632,11 +632,11 @@ router.delete('/', [requireSignin, withAuthUser], deleteAccount);
 router.post('/me/delete', [requireSignin, withAuthUser], deleteAccount);
 // Self-restore alias ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â must NOT use withAuthUser, which blocks isDeleted users
 router.post('/me/restore', [requireSignin], restoreAccount);
-router.delete('/:userId', [requireSignin, isAdmin], deleteUser);
-router.delete('/delete/:userId', [requireSignin, isAdmin], deleteUser);
+router.delete('/:userId', [requireSignin, withAuthUser, isAdmin], deleteUser);
+router.delete('/delete/:userId', [requireSignin, withAuthUser, isAdmin], deleteUser);
 
-router.post('/:userId/clearReports', [requireSignin, isAdmin], clearUserReports);
-router.post('/:userId/restore', [requireSignin, isAdmin], restoreUser);
+router.post('/:userId/clearReports', [requireSignin, withAuthUser, isAdmin], clearUserReports);
+router.post('/:userId/restore', [requireSignin, withAuthUser, isAdmin], restoreUser);
 router.get('/:userId', [requireSignin, isAuth], showUser);
 
 // Analytics Aliases (Dashboard compatibility)
@@ -645,8 +645,8 @@ router.get('/analytics', [requireSignin, isAdmin], AdminController.getAnalytics)
 router.get('/retention', [requireSignin, isAdmin], AdminController.getRetention); // Fixed: use getRetention instead of getAnalytics alias
 
 router.post('/:userId/report', [requireSignin], reportUser);
-router.post('/:userId/ban', [requireSignin, isAdmin], banUser);
-router.post('/:userId/unban', [requireSignin, isAdmin], unbanUser);
+router.post('/:userId/ban', [requireSignin, withAuthUser, isAdmin], banUser);
+router.post('/:userId/unban', [requireSignin, withAuthUser, isAdmin], unbanUser);
 
 router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsPrivacy, isAdmin], async (req, res) => {
     try {

@@ -12,6 +12,10 @@ const {
   buildErasureRetentionPlan,
   minimizeRetainedErasureEvidence
 } = require('../utils/erasureRetention');
+const {
+  isAdminRole,
+  wouldRemoveLastActiveSuperAdmin
+} = require('../utils/adminLifecycle');
 
 // Allowed fields for rectification (minimization principle)
 const ALLOWED_RECTIFY_FIELDS = [
@@ -2208,6 +2212,41 @@ exports.erase = async (req, res) => {
     const isCrossUserErasure =
       String(actor._id) !==
       String(targetId);
+
+    // Cross-user administrative erasure is also an RBAC operation.
+    // A normal ADMIN must not be able to erase another administrator.
+    if (
+      isCrossUserErasure &&
+      isAdminRole(target.role) &&
+      actor.role !== 'SUPER ADMIN'
+    ) {
+      return Response.sendError(
+        res,
+        403,
+        'Only SUPER ADMIN can erase another administrator'
+      );
+    }
+
+    // Protect operational control from accidental cross-user removal of
+    // the final active SUPER ADMIN. This does not intercept the explicit
+    // self Article-17 path.
+    if (
+      isCrossUserErasure &&
+      target.role === 'SUPER ADMIN' &&
+      await wouldRemoveLastActiveSuperAdmin(
+        target,
+        {
+          enabled: false,
+          isDeleted: true
+        }
+      )
+    ) {
+      return Response.sendError(
+        res,
+        409,
+        'Cannot administratively erase the final active SUPER ADMIN'
+      );
+    }
 
 
     const now =

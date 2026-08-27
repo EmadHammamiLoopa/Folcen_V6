@@ -2,13 +2,25 @@ const mongoose = require('mongoose');
 const User = require('./models/User'); // Ensure the path is correct based on your project structure
 require('dotenv').config(); // Load environment variables from .env file, if available
 
-// Use the MONGODB_URL from your environment variables or replace it with your MongoDB connection string directly
-const db = process.env.MONGODB_URL || 'mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/?retryWrites=true&w=majority';
+// This is a legacy development/demo seed containing sample accounts.
+// Production administrator bootstrap must use scripts/seed-prod.js,
+// where credentials come from deployment environment variables.
+if (process.env.NODE_ENV === 'production') {
+  console.error(
+    'ERROR: app/seed.js is disabled in production. Use scripts/seed-prod.js instead.'
+  );
+  process.exit(1);
+}
 
-// Connect to MongoDB
-mongoose.connect(db, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log(err));
+// Use the MONGODB_URL from your environment variables or replace it with your MongoDB connection string directly
+const db = process.env.MONGODB_URL;
+
+if (!db || !db.startsWith('mongodb')) {
+  console.error(
+    'ERROR: MONGODB_URL must be provided via environment configuration'
+  );
+  process.exit(1);
+}
 
 // Upsert a user: update if email exists, create if not (preserves existing accounts)
 const createUser = async (userData) => {
@@ -16,7 +28,55 @@ const createUser = async (userData) => {
     const { password, ...rest } = userData;
     const existing = await User.findOne({ email: rest.email });
     if (existing) {
-      console.log(`User ${userData.email} already exists, skipping`);
+      // Never silently resurrect an account that entered the explicit
+      // deletion lifecycle.
+      if (existing.isDeleted) {
+        console.warn(
+          `User ${userData.email} is deleted; use the explicit restore flow`
+        );
+        return;
+      }
+
+      if (
+        rest.role === 'ADMIN' ||
+        rest.role === 'SUPER ADMIN'
+      ) {
+        let changed = false;
+
+        if (existing.role !== rest.role) {
+          existing.role = rest.role;
+          changed = true;
+        }
+
+        if (existing.emailVerified !== true) {
+          existing.emailVerified = true;
+          changed = true;
+        }
+
+        if (existing.enabled !== true) {
+          existing.enabled = true;
+          changed = true;
+        }
+
+        if (changed) {
+          await existing.save();
+
+          console.log(
+            `User ${userData.email} repaired as ${rest.role}`
+          );
+        } else {
+          console.log(
+            `User ${userData.email} already exists and is healthy`
+          );
+        }
+
+        return;
+      }
+
+      console.log(
+        `User ${userData.email} already exists, skipping`
+      );
+
       return;
     }
     const user = new User(userData);
@@ -39,6 +99,8 @@ const createUsers = async () => {
     password: 'superadmin123', // Use your desired password
     gender: 'male',
     role: 'SUPER ADMIN', // Super Admin role
+    emailVerified: true,
+    enabled: true,
     // Add any other fields your User model requires
   }));
 
@@ -50,6 +112,8 @@ const createUsers = async () => {
     password: 'admin123', // Use your desired password
     gender: 'male',
     role: 'ADMIN', // Admin role
+    emailVerified: true,
+    enabled: true,
     // Add any other fields your User model requires
   }));
 
@@ -61,6 +125,8 @@ userPromises.push(createUser({
   password: 'system123', // Set a password or leave empty if not needed
   gender: 'male',
   role: 'ADMIN', // You can set this to 'ADMIN' or any other appropriate role
+  emailVerified: true,
+  enabled: true,
 }));
 
 

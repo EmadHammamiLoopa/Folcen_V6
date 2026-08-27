@@ -7,7 +7,7 @@ const tokenBlacklist = require('../utils/tokenBlacklist');
 const logger = require('../utils/logger');
 
 const AUTH_USER_BASE_FIELDS =
-    '_id email role banned banUntil isDeleted emailVerified ' +
+    '_id email role enabled banned banUntil isDeleted emailVerified ' +
     'bannedReason lastSeen friends followers city country createdAt';
 
 function authUserSelect(req) {
@@ -224,18 +224,41 @@ exports.isAuth = (req, res, next) => {
 };
 
 exports.isAdmin = (req, res, next) => {
-    // avoid logging request headers
-    if(!adminCheck(req)) {
-        logger.warn(`isAdmin check failed for user ${req.auth?._id}. Role: ${req.auth?.role}`);
+    // Prefer the fresh database-backed actor loaded by withAuthUser.
+    // Fall back to JWT claims only for legacy routes that have not yet
+    // been migrated to withAuthUser.
+    const actor = req.authUser || req.auth;
+
+    if (
+        !actor ||
+        (actor.role !== 'ADMIN' && actor.role !== 'SUPER ADMIN') ||
+        actor.enabled === false ||
+        actor.isDeleted === true
+    ) {
+        logger.warn(
+            `isAdmin check failed for user ${req.auth?._id}. Role: ${actor?.role}`
+        );
         return Response.sendError(res, 403, 'Access forbidden');
     }
+
     next();
 };
 
 exports.isSuperAdmin = (req, res, next) => {
-    // avoid logging request headers
-    if(req.auth.role != 'SUPER ADMIN')
+    // Security-sensitive dashboard operations must use the live role when
+    // withAuthUser has loaded it. This prevents an old JWT from preserving
+    // SUPER ADMIN privileges after a role/status change.
+    const actor = req.authUser || req.auth;
+
+    if (
+        !actor ||
+        actor.role !== 'SUPER ADMIN' ||
+        actor.enabled === false ||
+        actor.isDeleted === true
+    ) {
         return Response.sendError(res, 403, 'Access forbidden');
+    }
+
     next();
 };
 
@@ -247,17 +270,21 @@ exports.withAuthUser = async (req, res, next) => {
             logger.info('withAuthUser: No userId in req.auth');
             return Response.sendError(res, 401, 'Unauthorized: No user ID found in token');
         }
-        // Avoid refetching if we've already loaded the user for this request
-        if (req._userLoaded && req.user && String(req.user._id) === String(userId)) {
-            req.authUser = req.user;
-            return next();
+        let user;
+
+        // Avoid refetching if we've already loaded the authenticated actor
+        // for this request, but DO NOT bypass lifecycle/security checks below.
+        if (
+            req._userLoaded &&
+            req.user &&
+            String(req.user._id) === String(userId)
+        ) {
+            user = req.user;
         }
 
         // Reuse a route-scoped user read started during token revocation
         // when available; all other routes retain the normal direct lookup.
-        let user;
-
-        if (req._authUserPrefetchPromise) {
+        else if (req._authUserPrefetchPromise) {
             const prefetched =
                 await req._authUserPrefetchPromise;
 
@@ -293,6 +320,16 @@ exports.withAuthUser = async (req, res, next) => {
             req.user = user;
         }
         req._userLoaded = true;
+
+        // A disabled account must stop working immediately even if an
+        // older JWT has not yet expired.
+        if (user.enabled === false) {
+            return Response.sendError(
+                res,
+                403,
+                'Your account has been disabled. Please contact support.'
+            );
+        }
 
         // Check if user is banned
         if (user.banned) {

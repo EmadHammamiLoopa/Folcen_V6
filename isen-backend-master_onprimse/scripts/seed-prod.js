@@ -102,7 +102,44 @@ async function seed() {
     });
 
     if (existing) {
-      console.log(`⏭  SKIP  ${account.email} — already exists (id: ${existing._id})`);
+      // Never silently resurrect an account that entered the explicit
+      // deletion lifecycle. Restoration remains an explicit admin action.
+      if (existing.isDeleted) {
+        console.warn(
+          `⚠️  DELETED ${account.email} — explicit restore required`
+        );
+        continue;
+      }
+
+      const repair = {};
+
+      if (existing.role !== account.role) {
+        repair.role = account.role;
+      }
+
+      if (existing.emailVerified !== true) {
+        repair.emailVerified = true;
+      }
+
+      if (existing.enabled !== true) {
+        repair.enabled = true;
+      }
+
+      if (Object.keys(repair).length > 0) {
+        await User.updateOne(
+          { _id: existing._id },
+          { $set: repair }
+        );
+
+        console.log(
+          `🔧 REPAIRED ${account.email} — ${Object.keys(repair).join(', ')}`
+        );
+      } else {
+        console.log(
+          `⏭  SKIP  ${account.email} — already healthy (id: ${existing._id})`
+        );
+      }
+
       continue;
     }
 

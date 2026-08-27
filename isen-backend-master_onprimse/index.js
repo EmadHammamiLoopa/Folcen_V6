@@ -227,6 +227,15 @@ async function purgeUnverifiedAccounts() {
         const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const result = await User.deleteMany({
             emailVerified: false,
+
+            // Platform administrators are provisioned/trusted accounts and
+            // must never be removed by the ordinary unverified-user cleanup.
+            role: { $nin: ['ADMIN', 'SUPER ADMIN'] },
+
+            // Soft-deleted accounts have their own purgeAt/retention
+            // lifecycle and must not be hard-deleted by this cleanup.
+            isDeleted: { $ne: true },
+
             createdAt: { $lt: cutoff }
         });
         if (result.deletedCount > 0) {

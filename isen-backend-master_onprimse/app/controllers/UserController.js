@@ -28,6 +28,10 @@ const tokenBlacklist = require('../utils/tokenBlacklist');
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 const mediaStore = require('../utils/mediaStore');
+const {
+    isAdminRole,
+    wouldRemoveLastActiveSuperAdmin
+} = require('../utils/adminLifecycle');
 
 function authorizeAvatarMutation(req, res, targetId) {
     const actor = req.authUser || req.auth;
@@ -292,15 +296,15 @@ exports.verifyUser = async (req, res) => {
 exports.changeRole = async (req, res) => {
     try {
         const user = req.user;
+        const actor = req.authUser || req.auth;
         let { role } = req.body;
-        
-        // Map numeric roles to strings if necessary
+
         const roleMap = {
             0: 'USER',
             1: 'ADMIN',
             2: 'SUPER ADMIN'
         };
-        
+
         if (roleMap[role] !== undefined) {
             role = roleMap[role];
         }
@@ -308,10 +312,73 @@ exports.changeRole = async (req, res) => {
         if (!['USER', 'ADMIN', 'SUPER ADMIN'].includes(role)) {
             return Response.sendError(res, 400, 'Invalid role');
         }
-        
+
+        if (!user) {
+            return Response.sendError(res, 404, 'User not found');
+        }
+
+        if (user.isDeleted) {
+            return Response.sendError(
+                res,
+                409,
+                'Restore the account before changing its administrative role'
+            );
+        }
+
+        if (
+            user.role === 'SUPER ADMIN' &&
+            role !== 'SUPER ADMIN' &&
+            await wouldRemoveLastActiveSuperAdmin(user, { role })
+        ) {
+            return Response.sendError(
+                res,
+                409,
+                'Cannot remove the final active SUPER ADMIN'
+            );
+        }
+
+        const previousRole = user.role;
+
         user.role = role;
+
+        // Dashboard-provisioned platform administrators are trusted
+        // administrative accounts and must not enter the ordinary
+        // unverified-user cleanup lifecycle.
+        if (isAdminRole(role)) {
+            user.emailVerified = true;
+        }
+
         await user.save();
-        return Response.sendResponse(res, user.publicInfo(), `User role updated to ${role}`);
+
+        if (previousRole !== role) {
+            // Role changes are enforced from the live database-backed actor state.
+            // Do not use account-level revokeUser here: without a TTL it
+            // persists until explicit unrevokeUser and would lock the account.
+
+            try {
+                const { recordAudit } = require('../utils/audit');
+                await recordAudit({
+                    actorId: actor && actor._id,
+                    actorRole: actor && actor.role,
+                    action: 'ADMIN_ROLE_CHANGE',
+                    targetUserId: user._id,
+                    details: {
+                        previousRole,
+                        newRole: role
+                    },
+                    ip: req.ip,
+                    userAgent: req.get('User-Agent')
+                });
+            } catch (e) {
+                logger.warn('Failed to audit role change', e);
+            }
+        }
+
+        return Response.sendResponse(
+            res,
+            user.publicInfo(),
+            `User role updated to ${role}`
+        );
     } catch (err) {
         logger.error('Error changing role:', err);
         return Response.sendError(res, 500, 'Server error');
@@ -501,55 +568,172 @@ exports.markAnnouncementSeen = async (req, res) => {
 
 exports.storeUser = async (req, res) => {
     try {
-        const fields = req.fields || req.body;
+        const fields = req.fields || req.body || {};
+        const actor = req.authUser || req.auth;
 
-        // Strip empty-string fields and fields that don't belong on a new User document
-        const STRIP_KEYS = ['id', 'createdAt', 'lastSeen', 'avatar', 'password_confirmation'];
+        // Never allow the generic dashboard form to inject lifecycle,
+        // authentication or persistence internals.
+        const STRIP_KEYS = [
+            'id',
+            '_id',
+            'createdAt',
+            'updatedAt',
+            'lastSeen',
+            'avatar',
+            'password_confirmation',
+            'emailVerified',
+            'isDeleted',
+            'deletedAt',
+            'purgeAt',
+            'hashed_password',
+            'salt',
+            'firebaseUid',
+            'googleId'
+        ];
+
         const cleanFields = Object.fromEntries(
-            Object.entries(fields).filter(([k, v]) => !STRIP_KEYS.includes(k) && v !== '' && v != null)
+            Object.entries(fields).filter(
+                ([k, v]) =>
+                    !STRIP_KEYS.includes(k) &&
+                    v !== '' &&
+                    v != null
+            )
         );
 
-        // Normalize email to lowercase to match signin behavior
-        if (cleanFields.email && typeof cleanFields.email === 'string') {
-            cleanFields.email = cleanFields.email.trim().toLowerCase();
+        if (
+            cleanFields.email &&
+            typeof cleanFields.email === 'string'
+        ) {
+            cleanFields.email =
+                cleanFields.email.trim().toLowerCase();
         }
 
-        let user = await User.findOne({ email: cleanFields.email });
-        if (user) return Response.sendError(res, 400, 'email already used in another account');
+        const role =
+            cleanFields.role || 'USER';
+
+        if (
+            !['USER', 'ADMIN', 'SUPER ADMIN'].includes(role)
+        ) {
+            return Response.sendError(
+                res,
+                400,
+                'Invalid role'
+            );
+        }
+
+        cleanFields.role = role;
+
+        // ADMIN/SUPER ADMIN accounts are explicitly provisioned by a live
+        // SUPER ADMIN and therefore must not be purged by the ordinary
+        // unverified-account cleanup.
+        if (isAdminRole(role)) {
+            cleanFields.emailVerified = true;
+            cleanFields.enabled = true;
+        }
+
+        cleanFields.isDeleted = false;
+        cleanFields.deletedAt = null;
+        cleanFields.purgeAt = null;
+
+        let user =
+            await User.findOne({
+                email: cleanFields.email
+            });
+
+        if (user) {
+            return Response.sendError(
+                res,
+                400,
+                'email already used in another account'
+            );
+        }
 
         user = new User(cleanFields);
 
         const files = req.files || {};
+
         if (files.avatar) {
-            await this.storeAvatar(files.avatar, user);
+            await this.storeAvatar(
+                files.avatar,
+                user
+            );
         } else {
-            const avatarPath = user.getDefaultAvatar();
-            user.mainAvatar = avatarPath;
-            user.avatar = [avatarPath];
+            const avatarPath =
+                user.getDefaultAvatar();
+
+            user.mainAvatar =
+                avatarPath;
+
+            user.avatar =
+                [avatarPath];
         }
 
         await user.save();
         await addGlobalChannels(user);
         await addFreeSubscription(user);
 
-        return Response.sendResponse(res, user.publicInfo(), 'User created successfully');
+        // Persist subscription and any channel-array mutations made
+        // after the initial insert.
+        await user.save();
+
+        try {
+            const { recordAudit } = require('../utils/audit');
+            await recordAudit({
+                actorId: actor && actor._id,
+                actorRole: actor && actor.role,
+                action: 'ADMIN_USER_CREATE',
+                targetUserId: user._id,
+                details: {
+                    createdRole: user.role
+                },
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
+            });
+        } catch (e) {
+            logger.warn(
+                'Failed to audit dashboard user creation',
+                e
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            user.publicInfo(),
+            'User created successfully'
+        );
     } catch (err) {
         logger.error('Error in storeUser:', err);
-        return Response.sendError(res, 500, 'Internal server error');
+        return Response.sendError(
+            res,
+            500,
+            'Internal server error'
+        );
     }
 };
 
-addFreeSubscription = async(user) => {
-    //assign one month subscription free
-    subscription = await Subscription.findOne({})
-    const expireDate = new Date()
-    expireDate.setMonth(expireDate.getMonth() + 1)
+const addFreeSubscription = async (user) => {
+    // A subscription plan is optional from the perspective of account
+    // creation. An empty Subscription collection must never make the
+    // dashboard fail to create an otherwise valid user/admin.
+    const subscription = await Subscription.findOne({});
+
+    if (!subscription) {
+        logger.warn(
+            'No subscription plan found; dashboard user created without free subscription'
+        );
+        return false;
+    }
+
+    const expireDate = new Date();
+    expireDate.setMonth(expireDate.getMonth() + 1);
 
     user.subscription = {
         _id: subscription._id,
         expireDate
-    }
-}
+    };
+
+    return true;
+};
 
 addLocalChannels = async (user) => {
     try{
@@ -588,62 +772,293 @@ addGlobalChannels = async(user) => {
 
 exports.updateUserDash = async (req, res) => {
     try {
-        let user = req.user;
-        const fields = _.omit(req.fields, ['password', 'avatar']);
+        const user = req.user;
 
-        // Sanitize fields: remove any string "undefined" or "null" values
+        if (!user) {
+            return Response.sendError(
+                res,
+                404,
+                'User not found'
+            );
+        }
+
+        if (user.isDeleted) {
+            return Response.sendError(
+                res,
+                409,
+                'Restore the account before editing it'
+            );
+        }
+
+        const actor =
+            req.authUser || req.auth;
+
+        const sourceFields =
+            req.fields || req.body || {};
+
+        const passwordValue =
+            sourceFields.password;
+
+        const previousRole =
+            user.role;
+
+        const previousEnabled =
+            user.enabled;
+
+        const fields = _.omit(
+            sourceFields,
+            [
+                'password',
+                'avatar',
+                'id',
+                '_id',
+                'createdAt',
+                'updatedAt',
+                'lastSeen',
+                'emailVerified',
+                'isDeleted',
+                'deletedAt',
+                'purgeAt',
+                'hashed_password',
+                'salt',
+                'firebaseUid',
+                'googleId'
+            ]
+        );
+
         Object.keys(fields).forEach(key => {
-            if (fields[key] === 'undefined' || fields[key] === 'null') {
+            if (
+                fields[key] === 'undefined' ||
+                fields[key] === 'null'
+            ) {
                 delete fields[key];
             }
         });
 
-        // Convert interests from comma-separated string to an array
         if (fields.interests) {
-            fields.interests = Array.isArray(fields.interests) ? fields.interests : fields.interests.split(',');
+            fields.interests =
+                Array.isArray(fields.interests)
+                    ? fields.interests
+                    : fields.interests.split(',');
         }
 
-        // Convert languages from comma-separated string to an array
         if (fields.languages) {
-            fields.languages = Array.isArray(fields.languages) ? fields.languages : fields.languages.split(',');
+            fields.languages =
+                Array.isArray(fields.languages)
+                    ? fields.languages
+                    : fields.languages.split(',');
         }
 
-        // Update the user object
-        Object.assign(user, fields);
-
-        // If password is provided, update it
-        if (req.fields.password && req.fields.password !== 'undefined') {
-            if (!validatePassword(req.fields.password)) {
-                return Response.sendError(res, 400, 'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.');
+        if (fields.role !== undefined) {
+            if (
+                ![
+                    'USER',
+                    'ADMIN',
+                    'SUPER ADMIN'
+                ].includes(fields.role)
+            ) {
+                return Response.sendError(
+                    res,
+                    400,
+                    'Invalid role'
+                );
             }
-            user.password = req.fields.password;
         }
 
-        // If avatar is provided, store it
-        if (req.files && req.files.avatar) {
-            await this.storeAvatar(req.files.avatar, user);
+        if (fields.enabled !== undefined) {
+            if (
+                typeof fields.enabled === 'string'
+            ) {
+                const normalized =
+                    fields.enabled
+                        .trim()
+                        .toLowerCase();
+
+                fields.enabled =
+                    normalized === 'true' ||
+                    normalized === '1' ||
+                    normalized === 'enabled' ||
+                    normalized === 'yes';
+            } else {
+                fields.enabled =
+                    Boolean(fields.enabled);
+            }
         }
 
-        // ✅ Save using `await` (without a callback)
+        const nextRole =
+            fields.role !== undefined
+                ? fields.role
+                : user.role;
+
+        const nextEnabled =
+            fields.enabled !== undefined
+                ? fields.enabled
+                : user.enabled;
+
+        if (
+            user.role === 'SUPER ADMIN' &&
+            await wouldRemoveLastActiveSuperAdmin(
+                user,
+                {
+                    role: nextRole,
+                    enabled: nextEnabled
+                }
+            )
+        ) {
+            return Response.sendError(
+                res,
+                409,
+                'Cannot disable or demote the final active SUPER ADMIN'
+            );
+        }
+
+        Object.assign(
+            user,
+            fields
+        );
+
+        if (isAdminRole(user.role)) {
+            user.emailVerified = true;
+        }
+
+        const passwordChanged =
+            Boolean(
+                passwordValue &&
+                passwordValue !== 'undefined' &&
+                passwordValue !== 'null'
+            );
+
+        if (passwordChanged) {
+            if (
+                !validatePassword(passwordValue)
+            ) {
+                return Response.sendError(
+                    res,
+                    400,
+                    'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.'
+                );
+            }
+
+            user.password =
+                passwordValue;
+        }
+
+        if (
+            req.files &&
+            req.files.avatar
+        ) {
+            await this.storeAvatar(
+                req.files.avatar,
+                user
+            );
+        }
+
         await user.save();
 
-        // 🔥 SECURITY: If password was changed, revoke tokens
-        if (req.fields.password && req.fields.password !== 'undefined') {
+        const roleChanged =
+            previousRole !== user.role;
+
+        const statusDisabled =
+            previousEnabled !== false &&
+            user.enabled === false;
+
+        const statusEnabled =
+            previousEnabled === false &&
+            user.enabled !== false;
+
+        const securityStateChanged =
+            roleChanged ||
+            previousEnabled !== user.enabled;
+
+        // Account-level revocation is reserved for states where the account
+        // itself must stop authenticating. A role-only change is enforced by
+        // live database-backed authorization and must not permanently revoke
+        // the user.
+        if (
+            statusDisabled ||
+            (
+                passwordChanged &&
+                !statusEnabled
+            )
+        ) {
             try {
-                const tokenBlacklist = require('../utils/tokenBlacklist');
-                await tokenBlacklist.revokeUser(String(user._id));
-            } catch (e) { logger.warn('Failed to revoke tokens on Dash password change', e); }
+                await tokenBlacklist.revokeUser(
+                    String(user._id)
+                );
+            } catch (e) {
+                logger.warn(
+                    'Failed to revoke user after dashboard security change',
+                    e
+                );
+            }
         }
 
-        // Emit socket event for real-time updates
+        if (statusEnabled) {
+            try {
+                await tokenBlacklist.unrevokeUser(
+                    String(user._id)
+                );
+            } catch (e) {
+                logger.warn(
+                    'Failed to clear account revocation after re-enable',
+                    e
+                );
+            }
+        }
+
+        if (securityStateChanged) {
+            try {
+                const { recordAudit } =
+                    require('../utils/audit');
+
+                await recordAudit({
+                    actorId:
+                        actor && actor._id,
+                    actorRole:
+                        actor && actor.role,
+                    action:
+                        'ADMIN_SECURITY_STATE_CHANGE',
+                    targetUserId:
+                        user._id,
+                    details: {
+                        previousRole,
+                        newRole:
+                            user.role,
+                        previousEnabled,
+                        newEnabled:
+                            user.enabled
+                    },
+                    ip:
+                        req.ip,
+                    userAgent:
+                        req.get('User-Agent')
+                });
+            } catch (e) {
+                logger.warn(
+                    'Failed to audit dashboard security state change',
+                    e
+                );
+            }
+        }
+
         realtime.emitProfileUpdate(user);
 
-        // Remove sensitive data before sending response
-        const updatedUser = user.publicInfo();
-        return Response.sendResponse(res, updatedUser, 'The user has been updated successfully');
+        return Response.sendResponse(
+            res,
+            user.publicInfo(),
+            'The user has been updated successfully'
+        );
     } catch (err) {
-        logger.error('Error updating user dashboard:', err);
-        return Response.sendError(res, 500, 'Server error');
+        logger.error(
+            'Error updating user dashboard:',
+            err
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Server error'
+        );
     }
 };
 
@@ -1400,10 +1815,43 @@ exports.deleteUser = async (req, res) => {
         if (!user) return Response.sendError(res, 404, 'User not found');
 
         const actorId = String(req.auth?._id || req.authUser?._id);
-        const actorRole = (req.auth && req.auth.role) || (req.authUser && req.authUser.role);
+        const actorRole = (req.authUser && req.authUser.role) || (req.auth && req.auth.role);
         const isAdmin = actorRole === 'ADMIN' || actorRole === 'SUPER ADMIN';
         const isSelf = actorId === String(user._id);
         const reason = req.query.reason || 'No reason provided';
+
+        // ADMIN cannot delete another administrator. Only SUPER ADMIN
+        // may perform cross-admin lifecycle operations.
+        if (
+            isAdminRole(user.role) &&
+            !isSelf &&
+            actorRole !== 'SUPER ADMIN'
+        ) {
+            return Response.sendError(
+                res,
+                403,
+                'Only SUPER ADMIN can delete another administrator'
+            );
+        }
+
+        // The ordinary admin-management deletion flow must never remove
+        // the final active SUPER ADMIN.
+        if (
+            user.role === 'SUPER ADMIN' &&
+            await wouldRemoveLastActiveSuperAdmin(
+                user,
+                {
+                    enabled: false,
+                    isDeleted: true
+                }
+            )
+        ) {
+            return Response.sendError(
+                res,
+                409,
+                'Cannot delete the final active SUPER ADMIN'
+            );
+        }
 
         // GDPR Logic: Admin delete is permanent (Hard Delete), User delete is retention (Soft Delete)
         if (isAdmin && !isSelf) {
@@ -1529,15 +1977,130 @@ exports.restoreUser = async (req, res) => {
 exports.toggleUserStatus = async (req, res) => {
     try {
         const user = req.user;
-        if (!user) return Response.sendError(res, 404, 'User not found');
+        const actor = req.authUser || req.auth;
 
-        user.enabled = !user.enabled;
+        if (!user) {
+            return Response.sendError(
+                res,
+                404,
+                'User not found'
+            );
+        }
+
+        // A normal ADMIN may manage ordinary users, but only a live
+        // SUPER ADMIN may disable another platform administrator.
+        if (
+            isAdminRole(user.role) &&
+            (!actor || actor.role !== 'SUPER ADMIN')
+        ) {
+            return Response.sendError(
+                res,
+                403,
+                'Only SUPER ADMIN can change another administrator status'
+            );
+        }
+
+        const nextEnabled =
+            !user.enabled;
+
+        if (
+            user.role === 'SUPER ADMIN' &&
+            nextEnabled === false &&
+            await wouldRemoveLastActiveSuperAdmin(
+                user,
+                { enabled: false }
+            )
+        ) {
+            return Response.sendError(
+                res,
+                409,
+                'Cannot disable the final active SUPER ADMIN'
+            );
+        }
+
+        const previousEnabled =
+            user.enabled;
+
+        user.enabled =
+            nextEnabled;
+
         await user.save();
 
-        return Response.sendResponse(res, user.enabled, 'The user account has been ' + (user.enabled ? 'enabled' : 'disabled'));
+        if (!user.enabled) {
+            try {
+                await tokenBlacklist.revokeUser(
+                    String(user._id)
+                );
+            } catch (e) {
+                logger.warn(
+                    'Failed to revoke disabled user tokens',
+                    e
+                );
+            }
+        } else {
+            try {
+                await tokenBlacklist.unrevokeUser(
+                    String(user._id)
+                );
+            } catch (e) {
+                logger.warn(
+                    'Failed to clear account revocation after re-enable',
+                    e
+                );
+            }
+        }
+
+        try {
+            const { recordAudit } =
+                require('../utils/audit');
+
+            await recordAudit({
+                actorId:
+                    actor && actor._id,
+                actorRole:
+                    actor && actor.role,
+                action:
+                    'ADMIN_ACCOUNT_STATUS_CHANGE',
+                targetUserId:
+                    user._id,
+                details: {
+                    previousEnabled,
+                    newEnabled:
+                        user.enabled
+                },
+                ip:
+                    req.ip,
+                userAgent:
+                    req.get('User-Agent')
+            });
+        } catch (e) {
+            logger.warn(
+                'Failed to audit account status change',
+                e
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            user.enabled,
+            'The user account has been ' +
+                (
+                    user.enabled
+                        ? 'enabled'
+                        : 'disabled'
+                )
+        );
     } catch (err) {
-        logger.error('Error toggling user status:', err);
-        return Response.sendError(res, 500, 'Server error, please try again later');
+        logger.error(
+            'Error toggling user status:',
+            err
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Server error, please try again later'
+        );
     }
 };
 

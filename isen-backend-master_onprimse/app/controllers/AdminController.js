@@ -8,6 +8,10 @@ const Channel = require('../models/Channel');
 const Subscription = require('../models/Subscription');
 const Response = require('./Response');
 const { emitToUsers, emitToAll, sendNotification } = require('../helpers');
+const {
+  isAdminRole,
+  wouldRemoveLastActiveSuperAdmin
+} = require('../utils/adminLifecycle');
 
 // Return aggregated counts for auth events and recent entries (privacy-safe)
 exports.authEventsOverview = async (req, res) => {
@@ -514,18 +518,107 @@ exports.getRetention = async (req, res) => {
 exports.deleteUserPermanent = async (req, res) => {
   try {
     const userId = req.params.id;
-    if (!userId) return Response.sendError(res, 400, 'User ID required');
+    const actor = req.authUser || req.auth;
 
-    const { purgeUser } = require('../helpers');
+    if (!userId) {
+      return Response.sendError(
+        res,
+        400,
+        'User ID required'
+      );
+    }
+
+    const target =
+      await User.findById(userId);
+
+    if (!target) {
+      return Response.sendError(
+        res,
+        404,
+        'User not found'
+      );
+    }
+
+    if (
+      isAdminRole(target.role) &&
+      (!actor || actor.role !== 'SUPER ADMIN')
+    ) {
+      return Response.sendError(
+        res,
+        403,
+        'Only SUPER ADMIN can permanently delete another administrator'
+      );
+    }
+
+    if (
+      target.role === 'SUPER ADMIN' &&
+      await wouldRemoveLastActiveSuperAdmin(
+        target,
+        {
+          enabled: false,
+          isDeleted: true
+        }
+      )
+    ) {
+      return Response.sendError(
+        res,
+        409,
+        'Cannot permanently delete the final active SUPER ADMIN'
+      );
+    }
+
+    const { purgeUser } =
+      require('../helpers');
+
     await purgeUser(userId);
-    try {
-      const { recordAudit } = require('../utils/audit');
-      await recordAudit({ actorId: req.auth && req.auth._id, actorRole: req.auth && req.auth.role, action: 'ADMIN_PERMANENT_DELETE', targetUserId: userId, details: { reason: req.body && req.body.reason ? req.body.reason : null }, ip: req.ip, userAgent: req.get('User-Agent') });
-    } catch (e) { console.warn('Failed to record audit for admin permanent delete', e); }
 
-    return Response.sendResponse(res, null, 'User and all related data permanently deleted');
+    try {
+      const { recordAudit } =
+        require('../utils/audit');
+
+      await recordAudit({
+        actorId:
+          actor && actor._id,
+        actorRole:
+          actor && actor.role,
+        action:
+          'ADMIN_PERMANENT_DELETE',
+        targetUserId:
+          userId,
+        details: {
+          reason:
+            req.body &&
+            req.body.reason
+              ? req.body.reason
+              : null
+        },
+        ip:
+          req.ip,
+        userAgent:
+          req.get('User-Agent')
+      });
+    } catch (e) {
+      console.warn(
+        'Failed to record audit for admin permanent delete',
+        e
+      );
+    }
+
+    return Response.sendResponse(
+      res,
+      null,
+      'User and all related data permanently deleted'
+    );
   } catch (err) {
-    console.error('AdminController.deleteUserPermanent error', err);
-    return Response.sendError(res, 500, 'Failed to permanently delete user');
+    console.error(
+      'AdminController.deleteUserPermanent error',
+      err
+    );
+
+    return Response.sendError(
+      res,
+      500,
+      'Failed to permanently delete user'
+    );
   }
 };
