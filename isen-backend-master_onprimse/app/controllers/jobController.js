@@ -1,4 +1,5 @@
 const Response = require('./Response');
+const { removeManagedMedia } = require('../utils/contentMediaLifecycle');
 const fs = require('fs');
 const fsp = fs.promises;
 const _ = require('lodash');
@@ -7,6 +8,7 @@ const Job = require('../models/Job');
 const mongoose = require('mongoose');
 const { extractDashParams, report } = require('../helpers');
 const Report = require('../models/Report');
+const { dismissEntityReports, resolveEntityReports } = require('../utils/reportModeration');
 
 // Create a short excerpt like Facebook: cut at word boundary and append ellipsis
 const makeExcerpt = (text, max = 150) => {
@@ -23,7 +25,7 @@ const makeExcerpt = (text, max = 150) => {
 exports.reportJob = async (req, res) => {
     try {
         const job = req.job;
-        
+
         const newReport = await report(req, res, 'Job', job._id);
         if (!newReport || res.headersSent) return;
 
@@ -39,11 +41,36 @@ exports.reportJob = async (req, res) => {
 
 exports.clearJobReports = async (req, res) => {
     try {
-        await Report.deleteMany({
-            "entity._id": req.job._id,
-            "entity.name": "job"
-        });
-        return Response.sendResponse(res, null, "Reports cleaned");
+        const result =
+            await dismissEntityReports({
+                entityId:
+                    req.job._id,
+                entityModel:
+                    'Job'
+            });
+
+        await Job.updateOne(
+            {
+                _id:
+                    req.job._id
+            },
+            {
+                $set: {
+                    reports: []
+                }
+            }
+        );
+
+        return Response.sendResponse(
+            res,
+            {
+                dismissedReports:
+                    result.dismissedReports,
+                retentionDate:
+                    result.retentionDate
+            },
+            'Reports cleared from active moderation queue'
+        );
     } catch (err) {
         console.log(err);
         return Response.sendError(res, 400, 'Failed to clear reports');
@@ -72,11 +99,11 @@ exports.showJobDash = async (req, res) => {
             .populate({
                 path: 'reports',
                 populate: {
-                    path: 'userId',
+                    path: 'reporter',
                     select: 'firstName lastName email'
                 }
             });
-        
+
         if (!job) return Response.sendError(res, 404, 'Job not found');
 
         // Transform photo for dashboard display if needed
@@ -187,7 +214,7 @@ exports.postedJobs = async (req, res) => {
 exports.availableJobs = async (req, res) => {
     try {
         // Get disabled, deleted, or banned users to exclude their jobs
-        const inactiveUsers = await User.find({ 
+        const inactiveUsers = await User.find({
             $or: [
                 { enabled: false },
                 { isDeleted: true },
@@ -258,18 +285,18 @@ console.log("userrrrrrrrrrrrrid",job.user);
         }
 
         await job.save();
-        
+
         // Send notification to followers and friends
         const notificationTitle = `${req.authUser.firstName} ${req.authUser.lastName}`;
         const notificationBody = `posted a new job: ${job.title}`;
-        
+
         let recipients = [];
         if (job.visibility === 'public') {
             recipients = [...(req.authUser.followers || []), ...(req.authUser.friends || [])];
         } else if (job.visibility === 'friends-only') {
             recipients = [...(req.authUser.friends || [])];
         }
-        
+
         recipients = [...new Set(recipients.map(id => id.toString()))].filter(id => id !== req.auth._id.toString());
 
         if (recipients.length > 0) {
@@ -298,7 +325,13 @@ console.log("userrrrrrrrrrrrrid",job.user);
 
 const storeJobPhoto = async (photo, job) => {
     try {
-        const photoName = `${job._id}.${fileExtension(photo.name)}`;
+        const fileExt = path.extname(photo.name || '');
+
+        if (!fileExt) {
+            throw new Error('Job photo file extension is required');
+        }
+
+        const photoName = `${job._id}${fileExt}`;
         const photoPath = path.join(__dirname, `./../../public/jobs/${photoName}`);
         const dir = path.dirname(photoPath);
 
@@ -308,7 +341,8 @@ const storeJobPhoto = async (photo, job) => {
         job.photo.path = `/jobs/${photoName}`;
         job.photo.type = photo.type;
     } catch (err) {
-        console.log(err);
+        console.error('Failed to store job photo:', err);
+        throw err;
     }
 };
 
@@ -316,14 +350,60 @@ const storeJobPhoto = async (photo, job) => {
 exports.updateJob = async (req, res) => {
     try {
         let job = req.job;
+
+        const previousJobPhotoPath =
+            typeof job.photo === 'string'
+                ? job.photo
+                : job.photo && job.photo.path
+                    ? job.photo.path
+                    : null;
         const fields = _.omit(req.fields, ['photo']);
         job = _.extend(job, fields);
 
         if (req.files.photo) {
-            await storeJobPhoto(req.files.photo, job);
+            if (
+                !job.photo ||
+                typeof job.photo !== 'object'
+            ) {
+                job.photo = {};
+            }
+
+            await storeJobPhoto(
+                req.files.photo,
+                job
+            );
         }
 
         await job.save();
+
+        if (req.files && req.files.photo) {
+            const currentJobPhotoPath =
+                typeof job.photo === 'string'
+                    ? job.photo
+                    : job.photo && job.photo.path
+                        ? job.photo.path
+                        : null;
+
+            const replacedJobPhotoPath =
+                previousJobPhotoPath &&
+                previousJobPhotoPath !== currentJobPhotoPath
+                    ? previousJobPhotoPath
+                    : null;
+
+            if (replacedJobPhotoPath) {
+                try {
+                    await removeManagedMedia(
+                        replacedJobPhotoPath
+                    );
+                } catch (error) {
+                    console.warn(
+                        'Failed to clean replaced job photo',
+                        replacedJobPhotoPath,
+                        error
+                    );
+                }
+            }
+        }
         return Response.sendResponse(res, job, 'Job updated successfully');
     } catch (err) {
         console.log(err);
@@ -345,27 +425,65 @@ exports.deleteJob = async (req, res) => {
 
 exports.destroyJob = async (req, res) => {
     try {
-        const job = req.job;
+        const job =
+            req.job;
 
-        if (!job) {
-            return Response.sendError(res, 404, 'Job not found');
+        if (
+            !job
+        ) {
+            return Response.sendError(
+                res,
+                404,
+                'Job not found'
+            );
         }
 
-        const photoPath = path.join(__dirname, `./../../public/${job.photo.path}`);
+        const photoPath =
+            typeof job.photo ===
+                'string'
+                ? job.photo
+                : (
+                    job.photo &&
+                    job.photo.path
+                );
 
-        // Use deleteOne instead of remove()
-        await Job.deleteOne({ _id: job._id });
-
-        try {
-            await fsp.access(photoPath);
-            await fsp.unlink(photoPath);
-        } catch (e) {
-            // ignore if not exists
+        if (
+            photoPath
+        ) {
+            await removeManagedMedia(
+                photoPath
+            );
         }
 
-        return Response.sendResponse(res, null, 'Job successfully removed');
+        await resolveEntityReports({
+            entityId:
+                job._id,
+
+            entityModel:
+                'Job',
+
+            moderatorNote:
+                'Job removed'
+        });
+
+        await Job.deleteOne({
+            _id:
+                job._id
+        });
+
+        return Response.sendResponse(
+            res,
+            null,
+            'Job successfully removed'
+        );
+
     } catch (err) {
         console.error(err);
-        return Response.sendError(res, 400, 'Failed to remove job');
+
+        return Response.sendError(
+            res,
+            400,
+            'Failed to remove job'
+        );
     }
 };

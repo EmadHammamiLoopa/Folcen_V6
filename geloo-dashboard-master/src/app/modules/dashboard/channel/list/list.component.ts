@@ -1,6 +1,6 @@
 import { User } from './../../../../models/User';
 import { Component, OnInit } from '@angular/core';
-import { environment } from '../../../../../environments/environment';
+import { DataService } from './../../../../services/data.service';
 
 @Component({
   selector: 'app-list',
@@ -66,18 +66,58 @@ export class ListComponent implements OnInit {
 
   user: User;
 
-  constructor() {}
+  constructor(
+    private dataService: DataService
+  ) {}
 
   ngOnInit(): void {
     this.getUser();
   }
 
   exportChannels(format: 'csv' | 'json') {
-    const token = window.localStorage.getItem('token');
-    const baseUrl = environment.apiUrl;
-    // Corrected URL to match backend route: /api/v1/admin/channels/export
-    const url = `${baseUrl}/admin/channels/export?format=${format}&token=${token}`;
-    window.open(url, '_blank');
+    this.dataService
+      .sendGetBlobRequest(
+        'admin/channels/export',
+        { format }
+      )
+      .subscribe({
+        next: (blob: Blob) => {
+          const objectUrl =
+            URL.createObjectURL(blob);
+
+          const link =
+            document.createElement('a');
+
+          link.href =
+            objectUrl;
+
+          link.download =
+            `folcen-channels.${format}`;
+
+          link.style.display =
+            'none';
+
+          document.body.appendChild(link);
+
+          link.click();
+          link.remove();
+
+          setTimeout(
+            () =>
+              URL.revokeObjectURL(
+                objectUrl
+              ),
+            0
+          );
+        },
+
+        error: (err) => {
+          alert(
+            err?.message ||
+            'Failed to export channels'
+          );
+        }
+      });
   }
 
   getDisplayLinkchannel = (row: any): string => {

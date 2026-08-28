@@ -837,6 +837,7 @@ async function purgeUser(userId) {
   const ChatOpeningLease = require('./models/ChatOpeningLease');
   const Announcement = require('./models/Announcement');
   const PlanRule = require('./models/PlanRule');
+  const SubscriptionPaymentReceipt = require('./models/SubscriptionPaymentReceipt');
   const Content = require('./models/Content');
 
   const mediaStore = require('./utils/mediaStore');
@@ -1428,6 +1429,10 @@ async function purgeUser(userId) {
       userId
     }),
 
+    SubscriptionPaymentReceipt.deleteMany({
+      userId
+    }),
+
     ChatOpeningLease.deleteMany({
       sender: userId
     }),
@@ -1893,8 +1898,25 @@ async function report(req, res, entityName, entityId) {
 }
 
 const adminCheck = (req) => {
-  const role = (req.auth && req.auth.role) || (req.authUser && req.authUser.role);
-  return role === 'ADMIN' || role === 'SUPER ADMIN';
+  // Whenever withAuthUser has loaded the actor, that live database state
+  // is authoritative. JWT role claims are only a compatibility fallback
+  // for routes that have not loaded the actor.
+  const actor =
+    req.authUser ||
+    req.auth;
+
+  if (
+    !actor ||
+    actor.enabled === false ||
+    actor.isDeleted === true
+  ) {
+    return false;
+  }
+
+  return (
+    actor.role === 'ADMIN' ||
+    actor.role === 'SUPER ADMIN'
+  );
 };
 
 /*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Push / FCM helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/

@@ -2,7 +2,6 @@ import { UserService } from './../../../../services/user.service';
 import { User } from './../../../../models/User';
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { TableComponent } from '../../../table/table.component';
-import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-list',
@@ -105,11 +104,32 @@ export class ListComponent implements OnInit {
   }
 
   exportUsers(format: 'csv' | 'json') {
-    const token = window.localStorage.getItem('token');
-    const baseUrl = environment.apiUrl;
-    // Corrected URL to match backend route: /api/v1/admin/users/export
-    const url = `${baseUrl}/admin/users/export?format=${format}&token=${token}`;
-    window.open(url, '_blank');
+    this.userService
+      .sendGetBlobRequest('admin/users/export', { format })
+      .subscribe({
+        next: (blob: Blob) => {
+          const objectUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+
+          link.href = objectUrl;
+          link.download = `folcen-users.${format}`;
+          link.style.display = 'none';
+
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+        },
+        error: (err) => {
+          const message =
+            err && typeof err.message === 'string'
+              ? err.message
+              : 'Failed to export users';
+
+          alert(`Error: ${message}`);
+        }
+      });
   }
 
   sendBulkMessage() {

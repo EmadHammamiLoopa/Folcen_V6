@@ -71,7 +71,7 @@ exports.sendAdminMessage = async (req, res) => {
 
     console.log('DEBUG AdminController.sendAdminMessage: body', { userIds, text });
     console.log('DEBUG AdminController.sendAdminMessage: auth', req.auth);
-    
+
     // Support single string or array
     if (typeof userIds === 'string') {
       userIds = [userIds];
@@ -95,7 +95,7 @@ exports.sendAdminMessage = async (req, res) => {
     // Helper to decode base64 if needed
     const decodeId = (id) => {
       if (!id || typeof id !== 'string') return id;
-      
+
       // If it's already a 24-char hex string (standard MongoDB ID), do NOT decode it.
       if (/^[0-9a-fA-F]{24}$/.test(id)) return id;
 
@@ -117,7 +117,7 @@ exports.sendAdminMessage = async (req, res) => {
     for (let userId of userIds) {
       try {
         userId = decodeId(userId);
-        
+
         if (!userId || typeof userId !== 'string' || userId.length < 12) {
           console.warn(`Skipping invalid userId: ${userId}`);
           continue;
@@ -131,7 +131,7 @@ exports.sendAdminMessage = async (req, res) => {
         });
         await msg.save();
         messages.push(msg);
-        
+
         // Emit via socket if user is online
         emitToUsers([userId], 'new-message', msg);
 
@@ -171,54 +171,129 @@ exports.sendAdminMessage = async (req, res) => {
 // Announcements Management
 exports.createAnnouncement = async (req, res) => {
   try {
-    const { title, content, type, target, expiresAt } = req.body;
-    const announcement = new Announcement({
+    const {
       title,
       content,
       type,
       target,
-      expiresAt,
-      createdBy: req.auth._id
-    });
+      expiresAt
+    } = req.body || {};
+
+    const normalizedTarget =
+      ['all', 'users', 'admins'].includes(target)
+        ? target
+        : 'all';
+
+    const actor =
+      req.authUser || req.auth;
+
+    const announcement =
+      new Announcement({
+        title,
+        content,
+        type,
+        target:
+          normalizedTarget,
+        expiresAt,
+        createdBy:
+          actor && actor._id
+      });
+
     await announcement.save();
 
-    // Notify recipients via socket + push fallback (offline users)
-    let recipientIds = [];
-    if (target === 'all' || !target) {
-      const users = await User.find(
-        { enabled: true, banned: { $ne: true }, isDeleted: { $ne: true } },
-        { _id: 1 }
-      ).lean();
-      recipientIds = users.map(u => String(u._id));
-    } else if (Array.isArray(target?.userIds)) {
-      recipientIds = target.userIds.map((id) => String(id)).filter(Boolean);
+    /*
+     * Targeting is enforced at delivery time as well as when users later
+     * fetch announcements. "admins" means ADMIN + SUPER ADMIN.
+     */
+    const recipientFilter = {
+      enabled: true,
+      banned: { $ne: true },
+      isDeleted: { $ne: true }
+    };
+
+    if (normalizedTarget === 'users') {
+      recipientFilter.role = 'USER';
+    } else if (normalizedTarget === 'admins') {
+      recipientFilter.role = {
+        $in: [
+          'ADMIN',
+          'SUPER ADMIN'
+        ]
+      };
     }
 
+    const users =
+      await User.find(
+        recipientFilter,
+        { _id: 1 }
+      ).lean();
+
+    const recipientIds =
+      users.map(
+        user =>
+          String(user._id)
+      );
+
     if (recipientIds.length > 0) {
-      emitToUsers(recipientIds, 'new_announcement', announcement);
+      emitToUsers(
+        recipientIds,
+        'new_announcement',
+        announcement
+      );
+
       try {
-        // Use the 5-argument signature so the push payload includes type/announcementId.
-        // The FCM tap handler in the app checks data.type === 'announcement' to show the modal.
         await sendNotification(
-          { en: title || content || 'New announcement' },
-          { en: content || title || 'You have a new announcement' },
-          { type: 'announcement', announcementId: String(announcement._id) },
+          {
+            en:
+              title ||
+              content ||
+              'New announcement'
+          },
+          {
+            en:
+              content ||
+              title ||
+              'You have a new announcement'
+          },
+          {
+            type:
+              'announcement',
+            announcementId:
+              String(
+                announcement._id
+              )
+          },
           null,
           recipientIds
         );
       } catch (pushErr) {
-        console.warn('AdminController.createAnnouncement push notify failed:', pushErr?.message || pushErr);
+        console.warn(
+          'AdminController.createAnnouncement push notify failed:',
+          pushErr?.message ||
+          pushErr
+        );
       }
-    } else {
-      emitToAll('new_announcement', announcement);
     }
 
-    return Response.sendResponse(res, announcement, 'Announcement created');
+    return Response.sendResponse(
+      res,
+      announcement,
+      'Announcement created'
+    );
   } catch (err) {
-    console.error('AdminController.createAnnouncement error', err);
-    return Response.sendError(res, 500, 'Failed to create announcement');
+    console.error(
+      'AdminController.createAnnouncement error',
+      err
+    );
+
+    return Response.sendError(
+      res,
+      500,
+      'Failed to create announcement'
+    );
   }
 };
+
 
 exports.getAnnouncements = async (req, res) => {
   try {

@@ -2,8 +2,8 @@ const express = require('express')
 
 const {
     storePost,
-    getPosts, 
-    deletePost, 
+    getPosts,
+    deletePost,
     voteOnPost,
     reportPost,
     getDashPosts,
@@ -22,21 +22,21 @@ const { storePostValidator } = require('../app/middlewares/validators/PostValida
 
 const router = express.Router()
 
-router.get('/post/all', [requireSignin, isAdmin], allPosts);
+router.get('/post/all', [requireSignin, withAuthUser, isAdmin], allPosts);
 // Allow POST as an alias for dashboard clients that POST to this endpoint
-router.post('/post/all', [requireSignin, isAdmin], allPosts);
-router.get('/post/:postId/dash', [requireSignin, isAdmin], showDashPost)
+router.post('/post/all', [requireSignin, withAuthUser, isAdmin], allPosts);
+router.get('/post/:postId/dash', [requireSignin, withAuthUser, isAdmin], showDashPost)
 router.get('/feed', [requireSignin, withAuthUser], getFeed)
-router.delete('/post/:postId', [requireSignin, postOwner], deletePost)
-router.get('/:channelId/posts', [requireSignin, isAdmin], channelPosts)
+router.delete('/post/:postId', [requireSignin, withAuthUser, postOwner], deletePost)
+router.get('/:channelId/posts', [requireSignin, withAuthUser, isAdmin], channelPosts)
 
 router.post('/post/:postId/vote', [requireSignin, isFollowedChannelPost, withAuthUser], voteOnPost)
 router.post('/post/:postId/report', [requireSignin, withAuthUser], reportPost)
 
 router.get('/post/:postId', [requireSignin, withAuthUser], showPost)
 router.post('/:channelId/post/', [
-    requireSignin, 
-    isFollowedChannel, 
+    requireSignin,
+    isFollowedChannel,
     withAuthUser
 ], storePost)
 router.get('/:channelId/getposts/', [requireSignin, withAuthUser], getPosts)

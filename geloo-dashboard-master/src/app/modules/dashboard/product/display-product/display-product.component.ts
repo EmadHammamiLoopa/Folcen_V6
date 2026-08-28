@@ -79,7 +79,7 @@ export class DisplayProductComponent implements OnInit {
   clearReports() {
     Swal.fire({
       title: 'Are you sure?',
-      text: 'This will clear all reports for this product',
+      text: 'Open and under-review reports will be dismissed. Moderation history will be retained.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, clear them'
@@ -88,9 +88,9 @@ export class DisplayProductComponent implements OnInit {
         this.dataService.sendPostRequest(`product/${this.productId}/clearReports`, {}).subscribe(
           (res: any) => {
             this.product.reports = [];
-            Swal.fire('Cleared', 'Reports have been cleared', 'success');
+            Swal.fire('Cleared', 'Reports have been dismissed', 'success');
           },
-          err => Swal.fire('Error', 'Failed to clear reports', 'error')
+          err => Swal.fire('Error', 'Failed to dismiss reports', 'error')
         );
       }
     });

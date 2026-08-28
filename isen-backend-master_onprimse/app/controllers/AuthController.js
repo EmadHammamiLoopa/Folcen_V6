@@ -1,3 +1,4 @@
+const { normalizeTokenVersion, bumpTokenVersion } = require('../utils/tokenVersion');
 const User = require("../models/User")
 const Response = require("./Response")
 const jwt = require('jsonwebtoken')
@@ -405,7 +406,7 @@ exports.signin = async (req, res) => {
         const jti = crypto.randomBytes(16).toString('hex');
 
         // Create the JWT token (include `jti` claim)
-        const token = jwt.sign({ _id: user._id, role: user.role, jti }, process.env.JWT_SECRET, {
+        const token = jwt.sign({ _id: user._id, role: user.role, jti, tokenVersion: normalizeTokenVersion(user.tokenVersion) }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRES_TIME
         });
 
@@ -778,10 +779,41 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
             // already authenticated with Firebase, so we trust this password is correct.
             // Re-hash it and store it in MongoDB so future MongoDB-only logins work.
             const { rawPassword } = req.body;
-            if (rawPassword && typeof rawPassword === 'string' && rawPassword.length >= 6) {
+            if (rawPassword && typeof rawPassword === 'string') {
                 const bcrypt = require('bcryptjs');
-                user.hashed_password = await bcrypt.hash(rawPassword, 12);
-                logger.info(`[firebaseLogin] MongoDB password hash synced for user: ${user._id}`);
+
+                const hadMongoPassword =
+                    Boolean(user.hashed_password);
+
+                const passwordMatchesMongo =
+                    hadMongoPassword
+                        ? await bcrypt.compare(
+                            rawPassword,
+                            user.hashed_password
+                        )
+                        : false;
+
+                if (!passwordMatchesMongo) {
+                    user.hashed_password =
+                        await bcrypt.hash(
+                            rawPassword,
+                            12
+                        );
+
+                    // If a prior Mongo credential existed, a different
+                    // Firebase-authenticated password represents a real
+                    // credential change (including password reset).
+                    if (hadMongoPassword) {
+                        user.tokenVersion =
+                            bumpTokenVersion(
+                                user.tokenVersion
+                            );
+                    }
+
+                    logger.info(
+                        `[firebaseLogin] MongoDB password hash synced for user: ${user._id}`
+                    );
+                }
             }
             await user.save();
         }
@@ -794,7 +826,7 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
         // Generate local JWT
         const jti = crypto.randomBytes(16).toString('hex');
         const token = jwt.sign(
-            { _id: user._id, role: user.role, jti }, 
+            { _id: user._id, role: user.role, jti, tokenVersion: normalizeTokenVersion(user.tokenVersion) },
             process.env.JWT_SECRET, 
             { expiresIn: process.env.JWT_EXPIRES_TIME }
         );

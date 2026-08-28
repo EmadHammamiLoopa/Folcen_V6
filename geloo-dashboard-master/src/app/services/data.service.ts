@@ -41,6 +41,18 @@ export class DataService {
     );
   }
 
+  public sendGetBlobRequest(url: string, params?: any): Observable<Blob> {
+    const fullUrl = this.getFullUrl(url, true);
+
+    return this.http.get(fullUrl, {
+      params,
+      headers: this.header(),
+      responseType: 'blob'
+    }).pipe(
+      catchError(err => this.handleError(err, fullUrl))
+    );
+  }
+
   public sendPostRequest(url: string, data: any): Observable<object> {
     const fullUrl = this.getFullUrl(url, true);
     return this.http.post(fullUrl, data, { headers: this.header() })

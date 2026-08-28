@@ -11,13 +11,14 @@ import { Color, Label } from 'ng2-charts';
 export class AnalyticsComponent implements OnInit {
 
   loading = true;
+  canDeleteAnnouncements = false;
   kpis: any = {};
   retention: any = {};
-  
+
   // Growth Chart
   growthChartData: ChartDataSets[] = [{ data: [], label: 'New Users' }];
   growthChartLabels: Label[] = [];
-  
+
   // Engagement Chart
   engagementChartData: ChartDataSets[] = [{ data: [], label: 'Active Users' }];
   engagementChartLabels: Label[] = [];
@@ -25,7 +26,7 @@ export class AnalyticsComponent implements OnInit {
   // Status Chart
   statusChartData: number[] = [];
   statusChartLabels: Label[] = ['Enabled', 'Disabled'];
-  
+
   // Feature Usage
   features: any = {};
 
@@ -65,6 +66,24 @@ export class AnalyticsComponent implements OnInit {
   constructor(private dataService: DataService) { }
 
   ngOnInit(): void {
+    try {
+      const rawUser =
+        localStorage.getItem('user');
+
+      const user =
+        rawUser
+          ? JSON.parse(rawUser)
+          : null;
+
+      this.canDeleteAnnouncements =
+        !!user &&
+        user.role === 'SUPER ADMIN';
+
+    } catch (_) {
+      this.canDeleteAnnouncements =
+        false;
+    }
+
     this.loadAnalytics();
     this.loadRetention();
     this.loadAnnouncements();
@@ -94,7 +113,7 @@ export class AnalyticsComponent implements OnInit {
 
   loadAnalytics() {
     this.loading = true;
-    this.dataService.sendGetRequest('user/analytics', {}).subscribe(
+    this.dataService.sendGetRequest('admin/analytics', {}).subscribe(
       (resp: any) => {
         const data = resp.data;
         this.kpis = data.kpis;
@@ -123,7 +142,7 @@ export class AnalyticsComponent implements OnInit {
   }
 
   loadRetention() {
-    this.dataService.sendGetRequest('user/retention', {}).subscribe(
+    this.dataService.sendGetRequest('admin/analytics/users/retention', {}).subscribe(
       (resp: any) => {
         this.retention = resp.data;
       }

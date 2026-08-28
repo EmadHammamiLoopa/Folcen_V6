@@ -1,10 +1,10 @@
 const express = require('express')
 
-const { 
-    storeComment, 
-    getComments, 
-    deleteComment, 
-    voteOnComment, 
+const {
+    storeComment,
+    getComments,
+    deleteComment,
+    voteOnComment,
     reportComment,
     getDashComments,
     showComment,
@@ -50,16 +50,16 @@ const loadCommentPostForRead = (req, res, next) =>
         req.params.postId
     );
 
-router.get('/all', [requireSignin, isAdmin], getAllCommentsForAdmin)
+router.get('/all', [requireSignin, withAuthUser, isAdmin], getAllCommentsForAdmin)
 router.get(
     '/post/:postId/comments',
-    [loadCommentPostForRead, requireSignin, isAdmin],
+    [loadCommentPostForRead, requireSignin, withAuthUser, isAdmin],
     postComments
 )
 
 router.get('/:commentId', [requireSignin], showComment)
-router.get('/dash/:commentId', [requireSignin, isAdmin], showDashComment)
-router.put('/:commentId', [requireSignin, isAdmin], updateComment)
+router.get('/dash/:commentId', [requireSignin, withAuthUser, isAdmin], showDashComment)
+router.put('/:commentId', [requireSignin, withAuthUser, isAdmin], updateComment)
 
 router.post(
     '/post/:postId/comment',
@@ -77,10 +77,10 @@ router.get(
     [loadCommentPostForRead, requireSignin, withAuthUser],
     getComments
 )
-router.delete('/:commentId', [requireSignin, commentOwner], deleteComment)
+router.delete('/:commentId', [requireSignin, withAuthUser, commentOwner], deleteComment)
 router.post('/:commentId/vote', [requireSignin, withAuthUser], voteOnComment)
 router.post('/:commentId/report', [requireSignin], reportComment)
-router.post('/:commentId/clearReports', [requireSignin, isAdmin], clearCommentReports)
+router.post('/:commentId/clearReports', [requireSignin, withAuthUser, isAdmin], clearCommentReports)
 
 
 

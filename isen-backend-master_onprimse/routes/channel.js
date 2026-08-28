@@ -8,6 +8,7 @@ const {
   deleteChannel,
   allChannels,
   showChannel,
+  showChannelEditDash,
   //disableChannel,
   updateChannel,
   clearChannelReports,
@@ -40,19 +41,20 @@ const { requireLegalAcceptance } = require('../app/middlewares/legal');
 const router = express.Router();
 
 // Admin Routes
-router.get('/all', [requireSignin, isAdmin], allChannels);
-router.delete('/dash/:channelId', [requireSignin, isAdmin], deleteChannel);
-router.post('/:channelId/status', [requireSignin, isAdmin], toggleChannelStatus);
-router.post('/:channelId/approvement', [requireSignin, isAdmin], toggleChannelApprovement);
-router.post('/:channelId/clearReports', [requireSignin, isAdmin], clearChannelReports);
-router.get('/comment/comment/all', [requireSignin, isAdmin], getAllCommentsForAdmin)
+router.get('/all', [requireSignin, withAuthUser, isAdmin], allChannels);
+router.get('/dash/edit/:channelId', [requireSignin, withAuthUser, isAdmin], showChannelEditDash);
+router.delete('/dash/:channelId', [requireSignin, withAuthUser, isAdmin], deleteChannel);
+router.post('/:channelId/status', [requireSignin, withAuthUser, isAdmin], toggleChannelStatus);
+router.post('/:channelId/approvement', [requireSignin, withAuthUser, isAdmin], toggleChannelApprovement);
+router.post('/:channelId/clearReports', [requireSignin, withAuthUser, isAdmin], clearChannelReports);
+router.get('/comment/comment/all', [requireSignin, withAuthUser, isAdmin], getAllCommentsForAdmin)
 
 // User Routes
 router.get('/myChannels', [requireSignin], myChannels);
 router.post('/', [
-  form, 
-  requireSignin, 
-  storeChannelValidator, 
+  form,
+  requireSignin,
+  storeChannelValidator,
   withAuthUser,
   requireLegalAcceptance([
     { type: 'terms_and_conditions', versionEnvVar: 'TERMS_VERSION' },
@@ -69,17 +71,17 @@ router.get('/followed', [requireSignin, withAuthUser], followedChannels);
 
 // Explore Channels Route (handles city, country, and global exploration)
 router.get('/explore', [requireSignin, withAuthUser], exploreChannels); // Handles all exploration levels
-router.get('/post/all', [requireSignin, isAdmin], allPosts);
+router.get('/post/all', [requireSignin, withAuthUser, isAdmin], allPosts);
 
 // Compatibility routes for existing mobile clients whose ChannelService is rooted at /channel.
-router.delete('/comment/:commentId', [requireSignin, commentOwner], deleteComment);
+router.delete('/comment/:commentId', [requireSignin, withAuthUser, commentOwner], deleteComment);
 router.post('/comment/:commentId/vote', [requireSignin, withAuthUser], voteOnComment);
 router.post('/comment/:commentId/report', [requireSignin], reportComment);
 
 // Channel Management Routes
-router.delete('/:channelId', [requireSignin, channelOwner], deleteChannel);
+router.delete('/:channelId', [requireSignin, withAuthUser, channelOwner], deleteChannel);
 router.get('/:channelId', [requireSignin], showChannel);
-router.put('/:channelId', [form, requireSignin, channelOwner], updateChannel);
+router.put('/:channelId', [form, requireSignin, withAuthUser, channelOwner], updateChannel);
 router.post('/:channelId/report', [requireSignin], reportChannel);
 
 router.post('/citychannels', getCityChannels);

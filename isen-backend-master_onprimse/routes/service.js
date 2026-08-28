@@ -1,15 +1,15 @@
 const express = require('express')
 const Response = require('../app/controllers/Response')
-const { 
-    showService, 
-    storeService, 
-    updateService, 
-    postedServices, 
-    availableServices, 
-    allServices, 
-    showServiceDash, 
-    destroyService, 
-    clearServiceReports, 
+const {
+    showService,
+    storeService,
+    updateService,
+    postedServices,
+    availableServices,
+    allServices,
+    showServiceDash,
+    destroyService,
+    clearServiceReports,
     reportService,
     toggleServiceStatus
 } = require('../app/controllers/ServiceController')
@@ -20,15 +20,15 @@ const { storeServiceValidator, updateServiceValidator } = require('../app/middle
 const { requireLegalAcceptance } = require('../app/middlewares/legal');
 const router = express.Router()
 
-router.get('/all', [requireSignin, isAdmin], allServices)
-router.get('/dash/:serviceId', [requireSignin, isAdmin], showServiceDash)
-router.delete('/dash/:serviceId', [requireSignin, isAdmin], destroyService)
+router.get('/all', [requireSignin, withAuthUser, isAdmin], allServices)
+router.get('/dash/:serviceId', [requireSignin, withAuthUser, isAdmin], showServiceDash)
+router.delete('/dash/:serviceId', [requireSignin, withAuthUser, isAdmin], destroyService)
 
 router.get('/posted', [requireSignin], postedServices)
 router.get('/available', [requireSignin, withAuthUser], availableServices)
 router.post('/', [
-    form, 
-    requireSignin, 
+    form,
+    requireSignin,
     withAuthUser,
     storeServiceValidator,
     requireLegalAcceptance([
@@ -37,15 +37,15 @@ router.post('/', [
         { type: 'service_disclaimer', versionEnvVar: 'SERVICE_DISCLAIMER_VERSION' }
     ])
 ], storeService)
-// router.post('/disable/:serviceId', [requireSignin, serviceOwner], disableService)
+// router.post('/disable/:serviceId', [requireSignin, withAuthUser, serviceOwner], disableService)
 router.get('/storePermession', [requireSignin, withAuthUser, serviceStorePermission], (req, res) => Response.sendResponse(res, true))
 
-router.post('/:serviceId/status', [requireSignin, isAdmin], toggleServiceStatus)
+router.post('/:serviceId/status', [requireSignin, withAuthUser, isAdmin], toggleServiceStatus)
 
-router.post('/:serviceId/clearReports', [requireSignin, isAdmin], clearServiceReports)
+router.post('/:serviceId/clearReports', [requireSignin, withAuthUser, isAdmin], clearServiceReports)
 router.get('/:serviceId',[requireSignin], showService)
-router.put('/:serviceId', [form, requireSignin, serviceOwner, updateServiceValidator], updateService)
-router.delete('/:serviceId', [requireSignin, serviceOwner], destroyService)
+router.put('/:serviceId', [form, requireSignin, withAuthUser, serviceOwner, updateServiceValidator], updateService)
+router.delete('/:serviceId', [requireSignin, withAuthUser, serviceOwner], destroyService)
 router.post('/:serviceId/report', [requireSignin], reportService)
 
 

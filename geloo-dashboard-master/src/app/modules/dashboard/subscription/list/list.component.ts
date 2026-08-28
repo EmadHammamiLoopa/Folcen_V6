@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { environment } from '../../../../../environments/environment';
+import { DataService } from './../../../../services/data.service';
 
 @Component({
   selector: 'app-list',
@@ -20,15 +20,56 @@ export class ListComponent implements OnInit {
     { name: "subscribed", title: "Subscribed", type: "boolean", values: ['No', 'Yes'] }
   ];
 
-  constructor() { }
+  constructor(
+    private dataService: DataService
+  ) { }
 
   ngOnInit(): void {}
 
   exportSubscriptions(format: 'csv' | 'json') {
-    const token = window.localStorage.getItem('token');
-    const baseUrl = environment.apiUrl;
-    const url = `${baseUrl}/admin/subscriptions/export?format=${format}&token=${token}`;
-    window.open(url, '_blank');
+    this.dataService
+      .sendGetBlobRequest(
+        'admin/subscriptions/export',
+        { format }
+      )
+      .subscribe({
+        next: (blob: Blob) => {
+          const objectUrl =
+            URL.createObjectURL(blob);
+
+          const link =
+            document.createElement('a');
+
+          link.href =
+            objectUrl;
+
+          link.download =
+            `folcen-subscriptions.${format}`;
+
+          link.style.display =
+            'none';
+
+          document.body.appendChild(link);
+
+          link.click();
+          link.remove();
+
+          setTimeout(
+            () =>
+              URL.revokeObjectURL(
+                objectUrl
+              ),
+            0
+          );
+        },
+
+        error: (err) => {
+          alert(
+            err?.message ||
+            'Failed to export subscriptions'
+          );
+        }
+      });
   }
 
   getDisplayLink = (row: any): string => {

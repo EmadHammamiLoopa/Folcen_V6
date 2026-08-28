@@ -1,4 +1,5 @@
 const Response = require('./Response');
+const { removeManagedMedia } = require('../utils/contentMediaLifecycle');
 const fs = require('fs');
 const fsp = fs.promises;
 const _ = require('lodash');
@@ -8,6 +9,7 @@ const User = require('../models/User');
 const mongoose = require('mongoose');
 const { extractDashParams, report } = require('../helpers');
 const Report = require('../models/Report');
+const { dismissEntityReports, resolveEntityReports } = require('../utils/reportModeration');
 
 // Create a short excerpt like Facebook: cut at word boundary and append ellipsis
 const makeExcerpt = (text, max = 150) => {
@@ -24,7 +26,7 @@ const makeExcerpt = (text, max = 150) => {
 exports.reportService = async (req, res) => {
     try {
         const service = req.service;
-        
+
         const newReport = await report(req, res, 'Service', service._id);
         if (!newReport || res.headersSent) return;
 
@@ -40,11 +42,36 @@ exports.reportService = async (req, res) => {
 
 exports.clearServiceReports = async (req, res) => {
     try {
-        await Report.deleteMany({
-            "entity._id": req.service._id,
-            "entity.name": "service"
-        });
-        return Response.sendResponse(res, null, "Reports cleaned");
+        const result =
+            await dismissEntityReports({
+                entityId:
+                    req.service._id,
+                entityModel:
+                    'Service'
+            });
+
+        await Service.updateOne(
+            {
+                _id:
+                    req.service._id
+            },
+            {
+                $set: {
+                    reports: []
+                }
+            }
+        );
+
+        return Response.sendResponse(
+            res,
+            {
+                dismissedReports:
+                    result.dismissedReports,
+                retentionDate:
+                    result.retentionDate
+            },
+            'Reports cleared from active moderation queue'
+        );
     } catch (err) {
         console.log(err);
         return Response.sendError(res, 400, 'Failed to clear reports');
@@ -73,11 +100,11 @@ exports.showServiceDash = async (req, res) => {
             .populate({
                 path: 'reports',
                 populate: {
-                    path: 'userId',
+                    path: 'reporter',
                     select: 'firstName lastName email'
                 }
             });
-        
+
         if (!service) return Response.sendError(res, 404, 'Service not found');
 
         // Transform photo for dashboard display if needed
@@ -173,7 +200,7 @@ exports.postedServices = async (req, res) => {
 exports.availableServices = async (req, res) => {
     try {
         // Get disabled, deleted, or banned users to exclude their services
-        const inactiveUsers = await User.find({ 
+        const inactiveUsers = await User.find({
             $or: [
                 { enabled: false },
                 { isDeleted: true },
@@ -268,14 +295,14 @@ exports.storeService = async (req, res) => {
         // Send notification to followers and friends
         const notificationTitle = `${req.authUser.firstName} ${req.authUser.lastName}`;
         const notificationBody = `offered a new service: ${service.title}`;
-        
+
         let recipients = [];
         if (service.visibility === 'public') {
             recipients = [...(req.authUser.followers || []), ...(req.authUser.friends || [])];
         } else if (service.visibility === 'friends-only') {
             recipients = [...(req.authUser.friends || [])];
         }
-        
+
         recipients = [...new Set(recipients.map(id => id.toString()))].filter(id => id !== req.auth._id.toString());
 
         if (recipients.length > 0) {
@@ -326,8 +353,15 @@ const storeServicePhoto = async (photo, service) => {
 exports.updateService = async (req, res) => {
     try {
         let service = req.service;
+
+        const previousServicePhotoPath =
+            typeof service.photo === 'string'
+                ? service.photo
+                : service.photo && service.photo.path
+                    ? service.photo.path
+                    : null;
         const fields = _.omit(req.fields, ['photo']);
-        
+
         // Include the new fields to be updated
         service = _.extend(service, fields, {
             serviceCategory: req.fields.serviceCategory,  // New field
@@ -342,10 +376,49 @@ exports.updateService = async (req, res) => {
         });
 
         if (req.files.photo) {
-            await storeServicePhoto(req.files.photo, service);
+            if (
+                !service.photo ||
+                typeof service.photo !== 'object'
+            ) {
+                service.photo = {};
+            }
+
+            await storeServicePhoto(
+                req.files.photo,
+                service
+            );
         }
 
         await service.save();
+
+        if (req.files && req.files.photo) {
+            const currentServicePhotoPath =
+                typeof service.photo === 'string'
+                    ? service.photo
+                    : service.photo && service.photo.path
+                        ? service.photo.path
+                        : null;
+
+            const replacedServicePhotoPath =
+                previousServicePhotoPath &&
+                previousServicePhotoPath !== currentServicePhotoPath
+                    ? previousServicePhotoPath
+                    : null;
+
+            if (replacedServicePhotoPath) {
+                try {
+                    await removeManagedMedia(
+                        replacedServicePhotoPath
+                    );
+                } catch (error) {
+                    console.warn(
+                        'Failed to clean replaced service photo',
+                        replacedServicePhotoPath,
+                        error
+                    );
+                }
+            }
+        }
         return Response.sendResponse(res, service, 'The service has been updated successfully');
     } catch (err) {
         console.log(err);
@@ -367,23 +440,55 @@ exports.deleteService = async (req, res) => {
 
 exports.destroyService = async (req, res) => {
     try {
-        const service = req.service;
-        const photoPath = path.join(__dirname, `./../../public/${service.photo.path}`);
+        const service =
+            req.service;
 
-        // Use deleteOne() to delete the service
-        await Service.deleteOne({ _id: service._id });
+        const photoPath =
+            typeof service.photo ===
+                'string'
+                ? service.photo
+                : (
+                    service.photo &&
+                    service.photo.path
+                );
 
-        // Check if the photo exists and delete it if necessary
-        try {
-            await fsp.access(photoPath);
-            await fsp.unlink(photoPath);
-        } catch (e) {
-            // ignore if file does not exist
+        if (
+            photoPath
+        ) {
+            await removeManagedMedia(
+                photoPath
+            );
         }
 
-        return Response.sendResponse(res, null, 'Service removed');
+        await resolveEntityReports({
+            entityId:
+                service._id,
+
+            entityModel:
+                'Service',
+
+            moderatorNote:
+                'Service removed'
+        });
+
+        await Service.deleteOne({
+            _id:
+                service._id
+        });
+
+        return Response.sendResponse(
+            res,
+            null,
+            'Service removed'
+        );
+
     } catch (err) {
         console.log(err);
-        return Response.sendError(res, 400, 'Failed to remove service');
+
+        return Response.sendError(
+            res,
+            400,
+            'Failed to remove service'
+        );
     }
 };

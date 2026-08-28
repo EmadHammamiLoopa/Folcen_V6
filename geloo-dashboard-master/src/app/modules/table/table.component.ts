@@ -289,7 +289,25 @@ export class TableComponent implements OnInit {
             this.notification.showSuccess(resp.message, 'Success');
           },
           (err) => {
-            this.notification.showError(err.error, 'Error');
+            const responseBody =
+              err && err.detail && err.detail.error !== undefined
+                ? err.detail.error
+                : (err && err.error !== undefined ? err.error : null);
+
+            const candidate =
+              (err && typeof err.message === 'string' && err.message) ||
+              (responseBody &&
+                typeof responseBody === 'object' &&
+                typeof responseBody.message === 'string' &&
+                responseBody.message) ||
+              (responseBody &&
+                typeof responseBody === 'object' &&
+                typeof responseBody.errors === 'string' &&
+                responseBody.errors) ||
+              (typeof responseBody === 'string' && responseBody) ||
+              'Delete failed';
+
+            this.notification.showError(candidate, 'Error');
           }
         );
       }

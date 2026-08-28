@@ -79,7 +79,7 @@ export class DisplayJobComponent implements OnInit {
   clearReports() {
     Swal.fire({
       title: 'Are you sure?',
-      text: 'This will clear all reports for this job',
+      text: 'Open and under-review reports will be dismissed. Moderation history will be retained.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, clear them'
@@ -88,9 +88,9 @@ export class DisplayJobComponent implements OnInit {
         this.dataService.sendPostRequest(`job/${this.jobId}/clearReports`, {}).subscribe(
           (res: any) => {
             this.job.reports = [];
-            Swal.fire('Cleared', 'Reports have been cleared', 'success');
+            Swal.fire('Cleared', 'Reports have been dismissed', 'success');
           },
-          err => Swal.fire('Error', 'Failed to clear reports', 'error')
+          err => Swal.fire('Error', 'Failed to dismiss reports', 'error')
         );
       }
     });

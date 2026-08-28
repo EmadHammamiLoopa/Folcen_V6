@@ -161,7 +161,7 @@
           <p class="text-xl font-bold text-indigo-600">{{ features.comments || 0 }}</p>
         </div>
       </div>
-      
+
       <div class="mt-8">
         <h4 class="text-sm font-medium text-gray-700 mb-4">Retention Indicators</h4>
         <div class="space-y-4">
@@ -265,7 +265,9 @@
               <span><i class="far fa-eye mr-1"></i> Seen by: {{ann.seenBy?.length || 0}}</span>
             </div>
           </div>
-          <button (click)="deleteAnnouncement(ann._id)" class="p-2 text-gray-400 hover:text-rose-600 transition-colors">
+          <button *ngIf="canDeleteAnnouncements"
+                  (click)="deleteAnnouncement(ann._id)"
+                  class="p-2 text-gray-400 hover:text-rose-600 transition-colors">
             <i class="fas fa-trash-alt"></i>
           </button>
         </div>

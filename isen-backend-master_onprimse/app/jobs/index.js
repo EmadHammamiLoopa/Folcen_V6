@@ -5,6 +5,11 @@ module.exports = function(agenda){
     console.warn('purgeDeletedUsers job load failed', e && e.message);
   }
   try {
+    require('./purgeExpiredMedia')(agenda);
+  } catch (e) {
+    console.warn('purgeExpiredMedia job load failed', e && e.message);
+  }
+  try {
     require('./recomputeInterestProfiles')(agenda);
   } catch (e) {
     console.warn('recomputeInterestProfiles job load failed', e && e.message);

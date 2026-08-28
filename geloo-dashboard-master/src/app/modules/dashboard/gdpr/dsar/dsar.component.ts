@@ -33,11 +33,28 @@ export class DsarComponent {
     this.error = '';
     this.exportData = null;
 
-    this.gdpr.exportUserData(this.userId.trim()).subscribe({
+    this.gdpr.exportUserDataAll(this.userId.trim()).subscribe({
       next: (res: any) => {
         this.exportData = res.data || res;
         this.loading = false;
-        this.notify.showSuccess('Export generated successfully', 'DSAR Export');
+
+        const pagesFetched =
+          this.exportData?.dashboardAggregation?.pagesFetched || 1;
+
+        if (this.exportData?.complete === false) {
+          this.error =
+            'The server did not mark the export complete. Do not treat this file as a complete DSAR.';
+          this.notify.showError(
+            this.error,
+            'Incomplete DSAR Export'
+          );
+          return;
+        }
+
+        this.notify.showSuccess(
+          `Complete export generated (${pagesFetched} page${pagesFetched === 1 ? '' : 's'} fetched)`,
+          'DSAR Export'
+        );
       },
       error: (e: any) => {
         this.error = e?.message || 'Failed to fetch export';

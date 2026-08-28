@@ -108,6 +108,14 @@ const userSchema = new mongoose.Schema({
     allowVideoRequestsFromNonFriends: { type: Boolean, default: true },
     ageVisible: { type: Boolean, default: true },
     loggedIn: { type: Boolean, default: false },
+
+    // Persistent JWT generation. Legacy users/tokens are generation 0.
+    // Increment whenever authentication credentials materially change.
+    tokenVersion: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
     visitProfile: { type: Boolean, default: false },
     isPrivate: { type: Boolean, default: false }, // GDPR: Privacy by design
     deletedAt: { type: Date, default: null },

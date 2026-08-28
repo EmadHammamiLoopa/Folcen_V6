@@ -9,20 +9,53 @@ function isAdminRole(role) {
   return ADMIN_ROLES.has(String(role || ''));
 }
 
+function hasActiveBan(user, now = new Date()) {
+  if (!user || user.banned !== true) {
+    return false;
+  }
+
+  // Permanent ban.
+  if (!user.banUntil) {
+    return true;
+  }
+
+  const until =
+    user.banUntil instanceof Date
+      ? user.banUntil
+      : new Date(user.banUntil);
+
+  // Invalid banUntil is treated conservatively as an active ban.
+  if (Number.isNaN(until.getTime())) {
+    return true;
+  }
+
+  return until > now;
+}
+
 function isActiveSuperAdmin(user) {
   return Boolean(
     user &&
     user.role === 'SUPER ADMIN' &&
     user.enabled !== false &&
-    user.isDeleted !== true
+    user.isDeleted !== true &&
+    !hasActiveBan(user)
   );
 }
 
 async function countOtherActiveSuperAdmins(userId) {
+  const now = new Date();
+
   const query = {
     role: 'SUPER ADMIN',
     enabled: { $ne: false },
-    isDeleted: { $ne: true }
+    isDeleted: { $ne: true },
+    $or: [
+      { banned: { $ne: true } },
+      {
+        banned: true,
+        banUntil: { $lte: now }
+      }
+    ]
   };
 
   if (userId) {
@@ -34,10 +67,16 @@ async function countOtherActiveSuperAdmins(userId) {
 
 /**
  * Return true only when the requested state transition would remove the
- * final active SUPER ADMIN from Folcen.
+ * final operationally active SUPER ADMIN from Folcen.
  *
- * This protects operational access from accidental dashboard/admin actions.
- * It is not used to silently override an explicit data-subject erasure flow.
+ * Active means:
+ * - SUPER ADMIN role
+ * - enabled
+ * - not soft-deleted
+ * - not under an active permanent/temporary ban
+ *
+ * This protects operational access from ordinary dashboard/admin actions.
+ * Explicit Article 17 erasure remains a separate legal workflow.
  */
 async function wouldRemoveLastActiveSuperAdmin(target, nextState = {}) {
   if (!isActiveSuperAdmin(target)) {
@@ -59,10 +98,24 @@ async function wouldRemoveLastActiveSuperAdmin(target, nextState = {}) {
       ? nextState.isDeleted
       : target.isDeleted;
 
+  const nextBanned =
+    nextState.banned !== undefined
+      ? nextState.banned
+      : target.banned;
+
+  const nextBanUntil =
+    nextState.banUntil !== undefined
+      ? nextState.banUntil
+      : target.banUntil;
+
   const remainsActiveSuperAdmin =
-    nextRole === 'SUPER ADMIN' &&
-    nextEnabled !== false &&
-    nextDeleted !== true;
+    isActiveSuperAdmin({
+      role: nextRole,
+      enabled: nextEnabled,
+      isDeleted: nextDeleted,
+      banned: nextBanned,
+      banUntil: nextBanUntil
+    });
 
   if (remainsActiveSuperAdmin) {
     return false;
@@ -77,6 +130,7 @@ async function wouldRemoveLastActiveSuperAdmin(target, nextState = {}) {
 module.exports = {
   ADMIN_ROLES,
   isAdminRole,
+  hasActiveBan,
   isActiveSuperAdmin,
   countOtherActiveSuperAdmins,
   wouldRemoveLastActiveSuperAdmin

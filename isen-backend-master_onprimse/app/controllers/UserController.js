@@ -1,3 +1,4 @@
+const { bumpTokenVersion } = require('../utils/tokenVersion');
 const User = require("../models/User")
 const mongoose = require('mongoose')
 
@@ -9,6 +10,7 @@ const _ = require('lodash')
 const Request = require("../models/Request")
 const { manAvatarPath, womenAvatarPath, normalizeId, normalizeLeanDoc, setOnlineUsers, extractDashParams, report, sendNotification, emitFriendRequestsUpdated, emitToUsers, validatePassword, realtime } = require("../helpers")
 const Report = require("../models/Report")
+const { dismissEntityReports } = require("../utils/reportModeration");
 const Channel = require("../models/Channel")
 const Product = require("../models/Product")
 const Job = require("../models/Job")
@@ -54,7 +56,7 @@ exports.resetBudget = async (req, res) => {
     try {
         const userId = req.authUser._id;
         const updatedUser = await User.findByIdAndUpdate(userId, { missedCallBudget: 0 }, { new: true });
-        
+
         // Emit budget update to the user
         const { emitToUser } = require("../helpers");
         emitToUser(userId, 'budget-update', { missedCallBudget: 0 });
@@ -208,17 +210,42 @@ exports.removeAvatar = async (req, res) => {
 };
 exports.clearUserReports = async (req, res) => {
     try {
-        await Report.deleteMany({
-            "entity._id": req.user._id,
-            "entity.name": "user"
-        }).exec();
-        return Response.sendResponse(res, null, "reports cleaned");
+        const result =
+            await dismissEntityReports({
+                entityId:
+                    req.user._id,
+                entityModel:
+                    'User'
+            });
+
+        await User.updateOne(
+            {
+                _id:
+                    req.user._id
+            },
+            {
+                $set: {
+                    reports: []
+                }
+            }
+        );
+
+        return Response.sendResponse(
+            res,
+            {
+                dismissedReports:
+                    result.dismissedReports,
+                retentionDate:
+                    result.retentionDate
+            },
+            'Reports cleared from active moderation queue'
+        );
     } catch (err) {
-        return Response.sendError(res, 400, 'failed to clear reports');
+        console.log(err);
+        return Response.sendError(res, 400, 'Failed to clear reports');
     }
 };
 
-// Export helpers for unit tests and external usage
 exports.parseAgeRange = parseAgeRange;
 exports.buildBaseFilter = buildBaseFilter;
 
@@ -226,40 +253,160 @@ exports.buildBaseFilter = buildBaseFilter;
 exports.banUser = async (req, res) => {
     try {
         const user = req.user;
-        const { message, duration } = req.body;
-        
-        // Update user properties
-        user.banned = true;
-        user.bannedReason = message;
+        const actor = req.authUser || req.auth;
 
-        if (duration && !isNaN(duration)) {
-            const banUntil = new Date();
-            banUntil.setDate(banUntil.getDate() + parseInt(duration));
-            user.banUntil = banUntil;
-        } else {
-            user.banUntil = null; // Permanent if no duration
+        if (!user) {
+            return Response.sendError(
+                res,
+                404,
+                'User not found'
+            );
         }
 
-        // Save user to the database
+        // Ordinary ADMIN may moderate ordinary users, but may not disable
+        // platform administrators through the ban lifecycle.
+        if (
+            isAdminRole(user.role) &&
+            (!actor || actor.role !== 'SUPER ADMIN')
+        ) {
+            return Response.sendError(
+                res,
+                403,
+                'Only SUPER ADMIN can ban another administrator'
+            );
+        }
+
+        const body = req.body || {};
+        const message =
+            String(body.message || '').trim() ||
+            'Administrative moderation action';
+
+        let banUntil = null;
+        let ttlSeconds = null;
+
+        if (
+            body.duration !== undefined &&
+            body.duration !== null &&
+            String(body.duration).trim() !== ''
+        ) {
+            const days = Number(body.duration);
+
+            if (
+                !Number.isFinite(days) ||
+                days <= 0
+            ) {
+                return Response.sendError(
+                    res,
+                    400,
+                    'Ban duration must be a positive number of days'
+                );
+            }
+
+            const durationMs =
+                days *
+                24 *
+                60 *
+                60 *
+                1000;
+
+            banUntil =
+                new Date(Date.now() + durationMs);
+
+            ttlSeconds =
+                Math.max(
+                    1,
+                    Math.ceil(durationMs / 1000)
+                );
+        }
+
+        if (
+            user.role === 'SUPER ADMIN' &&
+            await wouldRemoveLastActiveSuperAdmin(
+                user,
+                {
+                    banned: true,
+                    banUntil
+                }
+            )
+        ) {
+            return Response.sendError(
+                res,
+                409,
+                'Cannot ban the final active SUPER ADMIN'
+            );
+        }
+
+        const previousBanned =
+            user.banned === true;
+
+        user.banned = true;
+        user.bannedReason = message;
+        user.banUntil = banUntil;
+
         await user.save();
 
-        // Create log entry
-        const logMessage = `User ID: ${user._id}\nBanned Reason: ${message}\nBan Until: ${user.banUntil ? user.banUntil.toISOString() : 'Permanent'}\nDate: ${new Date().toISOString()}\n\n`;
+        // Account-level authentication must stop immediately. Temporary
+        // bans use the same TTL as the ban; permanent bans remain revoked
+        // until an explicit unban.
+        try {
+            await tokenBlacklist.revokeUser(
+                String(user._id),
+                ttlSeconds
+            );
+        } catch (e) {
+            logger.warn(
+                'Failed to revoke banned user',
+                e
+            );
+        }
 
-        // Define the log path for Blockingusers.txt
-        const logPath = path.join(process.cwd(), 'Blockingusers.txt');
-        
-        // Write log to the Blockingusers.txt file
-        fs.appendFile(logPath, logMessage, (err) => {
-            if (err) {
-                logger.error('Failed to write to log file', err);
-            }
-        });
+        try {
+            const { recordAudit } =
+                require('../utils/audit');
 
-    return Response.sendResponse(res, user.publicInfo(), 'User has been banned');
+            await recordAudit({
+                actorId:
+                    actor && actor._id,
+                actorRole:
+                    actor && actor.role,
+                action:
+                    'ADMIN_ACCOUNT_BAN_CHANGE',
+                targetUserId:
+                    user._id,
+                details: {
+                    previousBanned,
+                    newBanned: true,
+                    banUntil,
+                    reason: message
+                },
+                ip:
+                    req.ip,
+                userAgent:
+                    req.get('User-Agent')
+            });
+        } catch (e) {
+            logger.warn(
+                'Failed to audit admin ban',
+                e
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            user.publicInfo(),
+            'User has been banned'
+        );
     } catch (error) {
-        logger.info(error);
-        return Response.sendError(res, 500, 'Server error');
+        logger.error(
+            'Error banning user:',
+            error
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Server error'
+        );
     }
 };
 
@@ -267,20 +414,95 @@ exports.banUser = async (req, res) => {
 exports.unbanUser = async (req, res) => {
     try {
         const user = req.user;
+        const actor = req.authUser || req.auth;
 
-        // Update user's banned status
+        if (!user) {
+            return Response.sendError(
+                res,
+                404,
+                'User not found'
+            );
+        }
+
+        if (
+            isAdminRole(user.role) &&
+            (!actor || actor.role !== 'SUPER ADMIN')
+        ) {
+            return Response.sendError(
+                res,
+                403,
+                'Only SUPER ADMIN can unban another administrator'
+            );
+        }
+
+        const previousBanned =
+            user.banned === true;
+
         user.banned = false;
         user.bannedReason = '';
+        user.banUntil = null;
 
-        // Save the updated user object using async/await
         await user.save();
 
-    return Response.sendResponse(res, user.publicInfo(), 'User unbanned successfully');
+        try {
+            await tokenBlacklist.unrevokeUser(
+                String(user._id)
+            );
+        } catch (e) {
+            logger.warn(
+                'Failed to clear revocation after unban',
+                e
+            );
+        }
+
+        try {
+            const { recordAudit } =
+                require('../utils/audit');
+
+            await recordAudit({
+                actorId:
+                    actor && actor._id,
+                actorRole:
+                    actor && actor.role,
+                action:
+                    'ADMIN_ACCOUNT_BAN_CHANGE',
+                targetUserId:
+                    user._id,
+                details: {
+                    previousBanned,
+                    newBanned: false
+                },
+                ip:
+                    req.ip,
+                userAgent:
+                    req.get('User-Agent')
+            });
+        } catch (e) {
+            logger.warn(
+                'Failed to audit admin unban',
+                e
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            user.publicInfo(),
+            'User unbanned successfully'
+        );
     } catch (err) {
-        logger.error(err);
-        return Response.sendError(res, 500, 'Server error, unable to unban the user');
+        logger.error(
+            'Error unbanning user:',
+            err
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Server error, unable to unban the user'
+        );
     }
 };
+
 
 exports.verifyUser = async (req, res) => {
     try {
@@ -389,10 +611,10 @@ exports.changeRole = async (req, res) => {
 exports.allUsers = async (req, res) => {
     try {
         const dashParams = extractDashParams(req, ['_id', 'firstName', 'lastName', 'email', 'role']);
-        
+
         // Build aggregation pipeline
         const pipeline = [];
-        
+
         // Always filter out deleted users and apply other filters,
         // unless the admin explicitly requests them via ?includeDeleted=1.
         const filter = { ...dashParams.filter };
@@ -409,7 +631,7 @@ exports.allUsers = async (req, res) => {
         // Add reports size and ensure createdAt exists (fallback to ObjectId timestamp)
         pipeline.push({
             $addFields: {
-                reportsCount: { 
+                reportsCount: {
                     $cond: {
                         if: { $isArray: "$reports" },
                         then: { $size: "$reports" },
@@ -469,10 +691,10 @@ exports.allUsers = async (req, res) => {
         // Count total documents for pagination (considering filters)
         const countPipeline = [];
         countPipeline.push({ $match: filter });
-        
+
         countPipeline.push({
             $addFields: {
-                reportsCount: { 
+                reportsCount: {
                     $cond: {
                         if: { $isArray: "$reports" },
                         then: { $size: "$reports" },
@@ -487,7 +709,7 @@ exports.allUsers = async (req, res) => {
             });
         }
         countPipeline.push({ $count: "total" });
-        
+
         const countResult = await User.aggregate(countPipeline).exec();
         const count = countResult.length > 0 ? countResult[0].total : 0;
 
@@ -497,7 +719,7 @@ exports.allUsers = async (req, res) => {
             totalPages: Math.ceil(count / dashParams.limit),
             totalDocs: count
         });
-        
+
     } catch (err) {
         logger.info(err);
         return Response.sendError(res, 500, 'Server error, please try again later');
@@ -506,46 +728,174 @@ exports.allUsers = async (req, res) => {
 
 exports.getMyAnnouncements = async (req, res) => {
     try {
-        const userId = req.auth ? req.auth._id : (req.user ? req.user._id : null);
-        const user = req.authUser; // Populated by withAuthUser middleware
-        
-        if (!userId || !user) return Response.sendError(res, 401, 'Unauthorized');
+        const userId =
+            req.auth
+                ? req.auth._id
+                : (
+                    req.user
+                        ? req.user._id
+                        : null
+                );
 
-        let announcements = [];
-        try {
-            const now = new Date();
-            // Filter: active, not seen by user, not expired, AND created on/after user joined
-            const userIdStr = String(userId);
-            announcements = await Announcement.find({ 
-                isActive: true, 
-                seenBy: { $nin: [userIdStr] },
-                createdAt: { $gte: user.createdAt },
-                $or: [
-                    { expiresAt: { $exists: false } },
-                    { expiresAt: { $gt: now } },
-                    { expiresAt: null }
-                ]
-            }).sort({ createdAt: -1 }).lean();
-            
-            // Normalize ObjectIds to strings
-            announcements = normalizeLeanDoc(announcements);
-            
-            // Dedupe by _id in case of accidental duplicates
-            const map = new Map();
-            announcements.forEach(a => { if (a && a._id) map.set(String(a._id), a); });
-            announcements = Array.from(map.values()).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-        } catch (qErr) {
-            logger.error('Announcement.find failed:', qErr);
-            // Return empty result instead of failing the client with 400/500
-            return Response.sendResponse(res, []);
+        const user =
+            req.authUser;
+
+        if (!userId || !user) {
+            return Response.sendError(
+                res,
+                401,
+                'Unauthorized'
+            );
         }
 
-        return Response.sendResponse(res, announcements);
+        let announcements = [];
+
+        try {
+            const now =
+                new Date();
+
+            const userIdStr =
+                String(userId);
+
+            const audience =
+                (
+                    user.role === 'ADMIN' ||
+                    user.role === 'SUPER ADMIN'
+                )
+                    ? 'admins'
+                    : 'users';
+
+            announcements =
+                await Announcement.find({
+                    isActive: true,
+
+                    seenBy: {
+                        $nin: [
+                            userIdStr
+                        ]
+                    },
+
+                    createdAt: {
+                        $gte:
+                            user.createdAt
+                    },
+
+                    $and: [
+                        {
+                            $or: [
+                                {
+                                    expiresAt: {
+                                        $exists: false
+                                    }
+                                },
+                                {
+                                    expiresAt: {
+                                        $gt: now
+                                    }
+                                },
+                                {
+                                    expiresAt: null
+                                }
+                            ]
+                        },
+
+                        {
+                            // Missing/null target is treated as legacy "all".
+                            $or: [
+                                {
+                                    target:
+                                        'all'
+                                },
+                                {
+                                    target:
+                                        audience
+                                },
+                                {
+                                    target: {
+                                        $exists: false
+                                    }
+                                },
+                                {
+                                    target:
+                                        null
+                                }
+                            ]
+                        }
+                    ]
+                })
+                    .sort({
+                        createdAt: -1
+                    })
+                    .lean();
+
+            announcements =
+                normalizeLeanDoc(
+                    announcements
+                );
+
+            const map =
+                new Map();
+
+            announcements.forEach(
+                announcement => {
+                    if (
+                        announcement &&
+                        announcement._id
+                    ) {
+                        map.set(
+                            String(
+                                announcement._id
+                            ),
+                            announcement
+                        );
+                    }
+                }
+            );
+
+            announcements =
+                Array.from(
+                    map.values()
+                ).sort(
+                    (a, b) =>
+                        new Date(
+                            b.createdAt
+                        ) -
+                        new Date(
+                            a.createdAt
+                        )
+                );
+
+        } catch (qErr) {
+            logger.error(
+                'Announcement.find failed:',
+                qErr
+            );
+
+            return Response.sendResponse(
+                res,
+                []
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            announcements
+        );
+
     } catch (err) {
-        logger.error('getMyAnnouncements error:', err);
-        return Response.sendError(res, 500, 'Failed to load announcements');
+        logger.error(
+            'getMyAnnouncements error:',
+            err
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Failed to load announcements'
+        );
     }
 };
+
 
 exports.markAnnouncementSeen = async (req, res) => {
     try {
@@ -759,7 +1109,7 @@ addLocalChannels = async (user) => {
 }
 
 addGlobalChannels = async(user) => {
-    try { 
+    try {
         const channels = await Channel.find({global: true})
         channels.forEach((channel) => {
             user.followedChannels.push(channel._id)
@@ -821,6 +1171,7 @@ exports.updateUserDash = async (req, res) => {
                 'purgeAt',
                 'hashed_password',
                 'salt',
+                'tokenVersion',
                 'firebaseUid',
                 'googleId'
             ]
@@ -941,6 +1292,11 @@ exports.updateUserDash = async (req, res) => {
 
             user.password =
                 passwordValue;
+
+            user.tokenVersion =
+                bumpTokenVersion(
+                    user.tokenVersion
+                );
         }
 
         if (
@@ -953,8 +1309,6 @@ exports.updateUserDash = async (req, res) => {
             );
         }
 
-        await user.save();
-
         const roleChanged =
             previousRole !== user.role;
 
@@ -966,20 +1320,33 @@ exports.updateUserDash = async (req, res) => {
             previousEnabled === false &&
             user.enabled !== false;
 
+        /*
+         * A disable is a durable security boundary.
+         *
+         * The account-level blacklist blocks the account while disabled,
+         * while tokenVersion permanently invalidates credentials that existed
+         * before the disable. Re-enabling may therefore clear the lifecycle
+         * revocation without resurrecting an older JWT.
+         */
+        if (statusDisabled) {
+            user.tokenVersion =
+                bumpTokenVersion(
+                    user.tokenVersion
+                );
+        }
+
         const securityStateChanged =
             roleChanged ||
             previousEnabled !== user.enabled;
 
-        // Account-level revocation is reserved for states where the account
-        // itself must stop authenticating. A role-only change is enforced by
-        // live database-backed authorization and must not permanently revoke
-        // the user.
+        await user.save();
+
+        // Account-level revocation is reserved for lifecycle states where the
+        // account itself must stop authenticating. Password changes invalidate
+        // prior credentials through tokenVersion; role-only changes use live
+        // database-backed authorization.
         if (
-            statusDisabled ||
-            (
-                passwordChanged &&
-                !statusEnabled
-            )
+            statusDisabled
         ) {
             try {
                 await tokenBlacklist.revokeUser(
@@ -1169,10 +1536,10 @@ exports.showUserEditDash = async (req, res) => {
         const userId = normalizeId(req.params.userId);
         let user = await User.findById(userId).lean();
         if (!user) return Response.sendError(res, 404, 'User not found');
-        
+
         // Normalize ObjectIds to strings
         user = normalizeLeanDoc(user);
-        
+
         // Wrap in a user object to match FormComponent's expectation for 'users' plurarName
         return Response.sendResponse(res, { user: user });
     } catch (error) {
@@ -1194,7 +1561,7 @@ exports.updateUser = async (req, res) => {
     try {
         const actor = req.authUser;
         const isAdmin = actor && (actor.role === 'ADMIN' || actor.role === 'SUPER ADMIN');
-        
+
         // Determine which user to update: param userId (admin) or authenticated user
         let targetId = actor ? actor._id : null;
         const requestedId = req.params.userId || req.body._id || req.body.id;
@@ -1513,12 +1880,66 @@ exports.updateEmail = async (req, res) => {
 exports.updatePassword = async (req, res) => {
     try {
         const { current_password, password } = req.body;
-        const authUser = req.authUser;
+
+        const authUserId =
+            req.authUser && req.authUser._id
+                ? req.authUser._id
+                : req.auth && req.auth._id;
+
+        if (!authUserId) {
+            return Response.sendError(
+                res,
+                401,
+                'Unauthorized'
+            );
+        }
+
+        // withAuthUser intentionally returns a lean/plain object for normal
+        // request performance. Password mutation requires the real Mongoose
+        // document because authenticate(), the password virtual setter and
+        // save() are document methods.
+        const authUser =
+            await User.findById(
+                authUserId
+            );
+
+        if (!authUser) {
+            return Response.sendError(
+                res,
+                404,
+                'User not found'
+            );
+        }
+
+        // Re-check lifecycle state on the credential-mutation document so an
+        // account disabled/deactivated between middleware and this lookup
+        // cannot change its credential.
+        if (
+            authUser.enabled === false ||
+            authUser.isDeleted
+        ) {
+            return Response.sendError(
+                res,
+                403,
+                'Account is not active'
+            );
+        }
+
+        if (
+            authUser.banned &&
+            (
+                !authUser.banUntil ||
+                authUser.banUntil > new Date()
+            )
+        ) {
+            return Response.sendError(
+                res,
+                403,
+                'Account is not active'
+            );
+        }
 
         logger.info('Comparing current password for user:', authUser._id);
-        logger.info('Provided current password:', current_password);
-        logger.info('Stored hashed password in the database:', authUser.hashed_password);
-
         // Compare provided current password with the stored hashed password
         const isMatch = await authUser.authenticate(current_password);
 
@@ -1534,15 +1955,14 @@ exports.updatePassword = async (req, res) => {
             return Response.sendError(res, 400, 'New password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.');
         }
         authUser.password = password; // This will trigger the setter to hash the new password
+        authUser.tokenVersion =
+            bumpTokenVersion(
+                authUser.tokenVersion
+            );
         await authUser.save();
 
-        // 🔥 SECURITY: Revoke all existing sessions on password change
-        try {
-            const tokenBlacklist = require('../utils/tokenBlacklist');
-            await tokenBlacklist.revokeUser(String(authUser._id));
-        } catch (e) {
-            logger.error('Failed to revoke tokens on password change', e);
-        }
+        // tokenVersion is the durable credential-generation boundary.
+        // Account-level revocation is reserved for lifecycle states such as disable/deletion.
 
         logger.info('Password updated successfully for user:', authUser._id);
         return Response.sendResponse(res, authUser.publicInfo(), 'Password updated successfully');
@@ -1582,7 +2002,7 @@ exports.storeAvatar = async (avatar, user) => {
 
         // Remove the old avatar file if it exists and is not the default (async)
         const isOldDefault = (p) => p && (['male.webp', 'female.webp', 'other.webp'].some(d => p.includes(d)) || p.includes('dicebear.com'));
-        
+
         if (user.mainAvatar && !user.mainAvatar.startsWith('http') && !isOldDefault(user.mainAvatar)) {
             const lastAvatarPath = path.join(__dirname, `./../../public${user.mainAvatar}`);
             try {
@@ -1632,23 +2052,23 @@ exports.updateMainAvatar = async (req, res) => {
       const { avatarUrl } = req.body;
 
       if (!authorizeAvatarMutation(req, res, targetId)) return;
-  
+
       if (!userId || !avatarUrl) {
         return Response.sendError(res, 400, 'Missing userId or avatarUrl.');
       }
-  
+
       const user = await User.findById(userId)
         .populate('subscription._id', 'dayPrice weekPrice monthPrice yearPrice currency offers');
-  
+
       if (!user) return res.status(404).send('User not found');
-  
+
       // Convert absolute to relative
       const relativeAvatarUrl = avatarUrl.replace(`${req.protocol}://${req.get('host')}`, '');
-  
+
       if (!user.avatar.includes(relativeAvatarUrl)) {
         return res.status(400).send('Avatar URL not found in user avatars.');
       }
-  
+
             // ✅ Update and persist
             // NOTE: intentionally keep avatarStyle/avatarSeed/avatarOverrides intact so
             // the customized avatar can be restored if this photo is later removed.
@@ -1670,10 +2090,10 @@ exports.updateMainAvatar = async (req, res) => {
       return res.status(500).send('Server error');
     }
   };
-  
-  
 
-  
+
+
+
 exports.updateAvatar = async (req, res) => {
     try {
         const targetId = req.params.userId || req.params.id;
@@ -1859,9 +2279,9 @@ exports.deleteUser = async (req, res) => {
             try {
                 const { purgeUser } = require('../helpers');
                 const { recordAudit } = require('../utils/audit');
-                
+
                 await purgeUser(user._id);
-                
+
                 // Record Audit Log
                 await recordAudit({
                     actorId: req.auth?._id || req.authUser?._id,
@@ -1875,7 +2295,7 @@ exports.deleteUser = async (req, res) => {
 
                 // Revoke tokens for the purged user
                 try { await tokenBlacklist.revokeUser(String(user._id)); } catch (e) {}
-                
+
                 // Disconnect sockets for this user
                 try {
                     const io = req.app.get('io');
@@ -1918,10 +2338,10 @@ exports.deleteUser = async (req, res) => {
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
             });
-            
+
             // Revoke tokens so they can't keep using the app during the 30 days
             try { await tokenBlacklist.revokeUser(String(user._id)); } catch (e) {}
-            
+
             // Disconnect sockets for this user
             try {
                 const io = req.app.get('io');
@@ -2160,12 +2580,12 @@ exports.getUsers = async (req, res) => {
         if (type === 'near') {
             // 1. Search in City
             let cityUsers = await findUsersInCity(req, filter, skip, limit);
-            
+
             // If we found enough city users, or we are paginating deep into city results
             if (cityUsers.length >= 10 || (page > 0 && cityUsers.length > 0)) {
-                return Response.sendResponse(res, { 
-                    users: setOnlineUsers(plainifyUsers(cityUsers)), 
-                    more: hasMoreUsers(cityUsers, limit, page), 
+                return Response.sendResponse(res, {
+                    users: setOnlineUsers(plainifyUsers(cityUsers)),
+                    more: hasMoreUsers(cityUsers, limit, page),
                     isGlobalSearch: false,
                     scope: 'city'
                 });
@@ -2173,7 +2593,7 @@ exports.getUsers = async (req, res) => {
 
             // 2. Expand to Country if city results are low (< 10)
             let countryUsers = await findUsersInCountry(req, filter, skip, limit);
-            
+
             // Filter out users already in cityUsers to avoid duplicates on page 0
             const cityIds = new Set(cityUsers.map(u => u._id.toString()));
             countryUsers = countryUsers.filter(u => !cityIds.has(String(u._id)));
@@ -2184,9 +2604,9 @@ exports.getUsers = async (req, res) => {
                 if (combinedCount >= 10) {
                     // Enough local results — show city then country divider
                     const allUsers = cityUsers.concat(countryUsers.length ? [{ isDivider: true, scope: 'country' }, ...countryUsers] : []);
-                    return Response.sendResponse(res, { 
-                        users: setOnlineUsers(plainifyUsers(allUsers)), 
-                        more: hasMoreUsers(countryUsers, limit, page), 
+                    return Response.sendResponse(res, {
+                        users: setOnlineUsers(plainifyUsers(allUsers)),
+                        more: hasMoreUsers(countryUsers, limit, page),
                         isGlobalSearch: false,
                         scope: 'country'
                     });
@@ -2209,18 +2629,18 @@ exports.getUsers = async (req, res) => {
                     allUsers.push(...globalUsers);
                 }
 
-                return Response.sendResponse(res, { 
-                    users: setOnlineUsers(plainifyUsers(allUsers)), 
-                    more: hasMoreUsers(globalUsers, limit, page), 
+                return Response.sendResponse(res, {
+                    users: setOnlineUsers(plainifyUsers(allUsers)),
+                    more: hasMoreUsers(globalUsers, limit, page),
                     isGlobalSearch: true,
                     scope: 'global'
                 });
             } else {
                 // non-zero pages: return countryUsers if any, else fallthrough to global
                 if (countryUsers.length > 0) {
-                    return Response.sendResponse(res, { 
-                        users: setOnlineUsers(plainifyUsers(countryUsers)), 
-                        more: hasMoreUsers(countryUsers, limit, page), 
+                    return Response.sendResponse(res, {
+                        users: setOnlineUsers(plainifyUsers(countryUsers)),
+                        more: hasMoreUsers(countryUsers, limit, page),
                         isGlobalSearch: false,
                         scope: 'country'
                     });
@@ -2233,7 +2653,7 @@ exports.getUsers = async (req, res) => {
                 // On first page, we might have some city/country users to show before global
                 const seenIds = new Set([...cityIds, ...countryUsers.map(u => u._id.toString())]);
                 globalUsers = globalUsers.filter(u => !seenIds.has(u._id.toString()));
-                
+
                 let allUsers = [...cityUsers];
                 if (countryUsers.length) {
                     allUsers.push({ isDivider: true, scope: 'country' });
@@ -2243,18 +2663,18 @@ exports.getUsers = async (req, res) => {
                     allUsers.push({ isDivider: true, scope: 'global' });
                     allUsers.push(...globalUsers);
                 }
-                
-                return Response.sendResponse(res, { 
-                    users: setOnlineUsers(plainifyUsers(allUsers)), 
-                    more: hasMoreUsers(globalUsers, limit, page), 
+
+                return Response.sendResponse(res, {
+                    users: setOnlineUsers(plainifyUsers(allUsers)),
+                    more: hasMoreUsers(globalUsers, limit, page),
                     isGlobalSearch: true,
                     scope: 'global'
                 });
             } else {
                 // On subsequent pages, just return global results
-                return Response.sendResponse(res, { 
-                    users: setOnlineUsers(plainifyUsers(globalUsers)), 
-                    more: hasMoreUsers(globalUsers, limit, page), 
+                return Response.sendResponse(res, {
+                    users: setOnlineUsers(plainifyUsers(globalUsers)),
+                    more: hasMoreUsers(globalUsers, limit, page),
                     isGlobalSearch: true,
                     scope: 'global'
                 });
@@ -2265,10 +2685,10 @@ exports.getUsers = async (req, res) => {
             // Ensure randomVisible is true for random mode
             const randomFilter = { ...filter, randomVisible: true };
             let randomUsers = await findRandomUsers(req, randomFilter, limit);
-            
-            return Response.sendResponse(res, { 
-                users: setOnlineUsers(plainifyUsers(randomUsers)), 
-                more: false, 
+
+            return Response.sendResponse(res, {
+                users: setOnlineUsers(plainifyUsers(randomUsers)),
+                more: false,
                 isGlobalSearch: true,
                 scope: 'global'
             });
@@ -2290,7 +2710,7 @@ function buildBaseFilter(req) {
     // normalize query helpers: treat empty strings, literal 'null'/'undefined' and placeholder '0' as absent
     const isEmptyParam = (v) => v === undefined || v === null || String(v).trim() === '' || String(v).toLowerCase() === 'null' || String(v).toLowerCase() === 'undefined';
     const isPlaceholderZero = (v) => String(v) === '0';
-    
+
     const filter = {
         _id: { $ne: authUserId, $nin: authUserBlockedIds },  // Exclude the auth user and blocked users
         blockedUsers: { $ne: authUserId },  // Ensure the current user is not in blockedUsers
@@ -2814,13 +3234,13 @@ exports.prefetchUserProfile = (req, res, next) => {
 
 exports.getUserProfile = async (req, res) => {
     if (process.env.DEBUG_PROFILE === '1') logger.info(`Fetching user profile for ID: ${req.params.userId}`);
-  
+
     try {
       const userId = normalizeId(req.params.userId);
       const authUserId = req.auth._id.toString();
-  
+
       if (process.env.DEBUG_PROFILE === '1') logger.info(`Authenticated user ID: ${authUserId}`);
-  
+
       // The route may have started this query before withAuthUser so the
       // profile read and authenticated-user read overlap instead of running
       // as two sequential Mongo round trips.
@@ -2836,15 +3256,15 @@ exports.getUserProfile = async (req, res) => {
       }
 
       const userDoc = prefetchedProfile.userDoc;
-  
+
       if (!userDoc) {
         return Response.sendError(res, 404, "User not found");
       }
-      
+
       // If user is deleted, disabled, or banned, hide profile from others
       const isAdmin = req.auth && (req.auth.role === 'ADMIN' || req.auth.role === 'SUPER ADMIN');
       const isSelf = userDoc._id.toString() === authUserId;
-      
+
       if ((userDoc.deletedAt || userDoc.isDeleted || !userDoc.enabled || userDoc.banned) && !isAdmin && !isSelf) {
         return Response.sendError(res, 404, "User not found");
       }
@@ -2857,12 +3277,12 @@ exports.getUserProfile = async (req, res) => {
       if (userDoc.blockedUsers && userDoc.blockedUsers.some(id => id.toString() === authUserId)) {
         return res.status(403).send("You are blocked by this user");
       }
-  
+
       // 🚫 Defensive: if backend tries to return self when requesting another profile
       if (userDoc._id.toString() === authUserId && userId !== authUserId) {
         return res.status(404).send("User not found");
       }
-  
+
       // Convert to plain object and normalize all ObjectIds to strings
       const user = normalizeLeanDoc(userDoc.toObject());
       const isMe = authUserId === userId;
@@ -2889,12 +3309,12 @@ exports.getUserProfile = async (req, res) => {
           user.pendingFriendRequestsCount =
             prefetchedPendingCounts.counts.pendingFriendRequestsCount;
       }
-  
+
       // Default avatar if missing
       if (!user.mainAvatar && typeof userDoc.getDefaultAvatar === "function") {
         user.mainAvatar = userDoc.getDefaultAvatar();
       }
-  
+
       let isFriendResult = false;
       let relationshipStatus;
 
@@ -3053,8 +3473,8 @@ exports.getUserProfile = async (req, res) => {
         online: user.online,            // use virtual
         lastSeenText: user.lastSeenText // use virtual
       };
-      
-  
+
+
             if (process.env.DEBUG_PROFILE === '1') logger.info("Sending user profile:", {
                 _id: response._id,
                 isLoggedInUser: response.isLoggedInUser,
@@ -3078,7 +3498,7 @@ exports.getUserProfile = async (req, res) => {
       return res.status(500).send("Server error");
     }
   };
-  
+
 
 
 
@@ -3117,7 +3537,7 @@ exports.getFriends = async (req, res) => {
             return res.status(200).json({ friends: [], more: false });
         }
 
-        const filter = { 
+        const filter = {
             _id: { $in: user.friends },
             enabled: { $ne: false },
             isDeleted: { $ne: true },
@@ -3181,7 +3601,7 @@ exports.removeFriendship = async(req, res) => {
         // perform idempotent removal
         await User.updateOne({ _id: user._id }, { $pull: { friends: authUser._id } });
         await User.updateOne({ _id: authUser._id }, { $pull: { friends: user._id } });
-        
+
         // Also remove any pending friendship requests between these two
         await Request.deleteMany({
             $or: [
@@ -3246,18 +3666,18 @@ exports.blockUser = async (req, res) => {
     try {
       const user = req.user;
       const authUser = req.authUser;
-  
+
       // Remove user from the lists of friends, followers, and following
       user.friends = user.friends.filter(friend => !friend.equals(authUser._id));
       user.followers = user.followers.filter(follower => !follower.equals(authUser._id));
       user.following = user.following.filter(following => !following.equals(authUser._id));
-  
+
       // Block the user and update authUser's lists
       authUser.blockedUsers.push(user._id);
       authUser.friends = authUser.friends.filter(friend => !friend.equals(user._id));
       authUser.followers = authUser.followers.filter(follower => !follower.equals(user._id));
       authUser.following = authUser.following.filter(following => !following.equals(user._id));
-  
+
       // Save both authUser and user (use async/await for both saves)
       await authUser.save();
       await user.save();
@@ -3266,11 +3686,11 @@ exports.blockUser = async (req, res) => {
     emitFriendRequestsUpdated(authUser._id, user._id);
     // Notify clients to refresh profiles for both users
     try { emitToUsers([authUser._id, user._id], 'user-profile-updated', { userId: user._id }); } catch (e) {}
-  
+
       // Remove any requests between the two users
       const authUserId = String(req.auth._id);
       const targetUserId = String(req.user._id);
-      
+
       await Request.deleteMany({
         $or: [
           {
@@ -3287,10 +3707,10 @@ exports.blockUser = async (req, res) => {
           }
         ]
       });
-  
+
       // Send a successful response
       return Response.sendResponse(res, true, 'User blocked');
-      
+
     } catch (err) {
       logger.error(err);
       return Response.sendError(res, 500, 'Internal Server Error');
@@ -3331,7 +3751,7 @@ exports.updateRandomVisibility = async (req, res) => {
         const { visible } = req.body;
         const userId = req.authUser ? req.authUser._id : req.auth._id;
         logger.info(`[UserController] updateRandomVisibility: visible=${visible}, userId=${userId}`);
-        
+
         const user = await User.findByIdAndUpdate(userId, { $set: { randomVisible: visible } }, { new: true });
 
         if (!user) {
@@ -3358,7 +3778,7 @@ exports.updateAgeVisibility = async (req, res) => {
             logger.warn(`[UserController] updateAgeVisibility: User not found for ID ${userId}`);
             return Response.sendError(res, 404, 'User not found');
         }
-        
+
         return Response.sendResponse(res, user.publicInfo(true), 'Age visibility updated');
     } catch (error) {
         logger.error('[UserController] updateAgeVisibility error:', error);
@@ -3407,7 +3827,7 @@ exports.updatePrivacy = async (req, res) => {
             logger.warn(`[UserController] updatePrivacy: User not found for ID ${userId}`);
             return Response.sendError(res, 404, 'User not found');
         }
-        
+
         return Response.sendResponse(res, user.publicInfo(true), 'Privacy settings updated');
     } catch (error) {
         logger.error('[UserController] updatePrivacy error:', error);
@@ -3427,7 +3847,7 @@ exports.updateGenderVisibility = async (req, res) => {
             logger.warn(`[UserController] updateGenderVisibility: User not found for ID ${userId}`);
             return Response.sendError(res, 404, 'User not found');
         }
-        
+
         return Response.sendResponse(res, user.publicInfo(true), 'Gender visibility updated');
     } catch (error) {
         consoleee.error('[UserController] updateGenderVisibility error:', error);

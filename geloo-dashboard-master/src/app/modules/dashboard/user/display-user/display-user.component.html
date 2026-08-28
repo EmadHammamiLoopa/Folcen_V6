@@ -3,16 +3,16 @@
   <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
     <div class="flex flex-col md:flex-row items-center gap-6">
       <div class="relative">
-        <img [src]="getAvatarUrl(profile)" 
+        <img [src]="getAvatarUrl(profile)"
              class="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-md">
-        <span [ngClass]="profile.enabled ? 'bg-green-500' : 'bg-red-500'" 
+        <span [ngClass]="profile.enabled ? 'bg-green-500' : 'bg-red-500'"
               class="absolute bottom-2 right-2 w-5 h-5 rounded-full border-2 border-white"></span>
       </div>
-      
+
       <div class="flex-1 text-center md:text-left">
         <div class="flex items-center justify-center md:justify-start gap-3 mb-1">
           <h1 class="text-2xl font-bold text-gray-800">{{profile.firstName}} {{profile.lastName}}</h1>
-          <span [ngClass]="profile.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" 
+          <span [ngClass]="profile.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
                 class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider">
             {{profile.enabled ? 'Active' : 'Inactive'}}
           </span>
@@ -32,25 +32,26 @@
       </div>
 
       <div class="flex flex-wrap gap-2">
-        <button (click)="extractUserData(itemId(profile))" 
+        <button (click)="extractUserData(itemId(profile))"
                 class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i class="fas fa-file-export"></i> Extract
         </button>
-        <button *ngIf="counts && (counts.dsar || counts.gdpr || counts.dataRequests)" (click)="extractJson(itemId(profile))" 
+        <button *ngIf="counts && (counts.dsar || counts.gdpr || counts.dataRequests)" (click)="extractJson(itemId(profile))"
                 class="px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i class="fas fa-shield-alt"></i> GDPR Export
         </button>
-        <a [routerLink]="['/dashboard/Users/form/edit']" [queryParams]="{id: itemId(profile)}" 
+        <a *ngIf="currentUser && currentUser.role === 'SUPER ADMIN'"
+           [routerLink]="['/dashboard/Users/form/edit']" [queryParams]="{id: itemId(profile)}"
            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i class="fas fa-edit"></i> Edit User
         </a>
-        <button (click)="toggleStatus()" 
+        <button *ngIf="currentUser && (currentUser.role === 'SUPER ADMIN' || (profile.role !== 'ADMIN' && profile.role !== 'SUPER ADMIN'))" (click)="toggleStatus()"
                 [ngClass]="profile.enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
                 class="px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i [ngClass]="profile.enabled ? 'fas fa-user-slash' : 'fas fa-user-check'"></i>
           {{profile.enabled ? 'Disable User' : 'Enable User'}}
         </button>
-        <button (click)="verifyUser(!profile.verified)" 
+        <button (click)="verifyUser(!profile.verified)"
                 [ngClass]="profile.verified ? 'bg-gray-500 hover:bg-gray-600' : 'bg-blue-500 hover:bg-blue-600'"
                 class="px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i [ngClass]="profile.verified ? 'fas fa-times-circle' : 'fas fa-check-circle'"></i>
@@ -59,13 +60,13 @@
         <button *ngIf="currentUser && currentUser.role === 'SUPER ADMIN'" (click)="changeRole()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i class="fas fa-user-tag"></i> Role: {{profile.role}}
         </button>
-        <button *ngIf="!profile.banned" (click)="banUser()" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
+        <button *ngIf="currentUser && (currentUser.role === 'SUPER ADMIN' || (profile.role !== 'ADMIN' && profile.role !== 'SUPER ADMIN')) && !profile.banned" (click)="banUser()" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i class="fas fa-user-slash"></i> Ban User
         </button>
-        <button *ngIf="profile.banned" (click)="unbanUser()" class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
+        <button *ngIf="currentUser && (currentUser.role === 'SUPER ADMIN' || (profile.role !== 'ADMIN' && profile.role !== 'SUPER ADMIN')) && profile.banned" (click)="unbanUser()" class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i class="fas fa-user-check"></i> Unban User
         </button>
-        <button (click)="deleteUser()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
+        <button *ngIf="currentUser && (currentUser.role === 'SUPER ADMIN' || (profile.role !== 'ADMIN' && profile.role !== 'SUPER ADMIN'))" (click)="deleteUser()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
           <i class="fas fa-trash"></i> Delete
         </button>
         <button *ngIf="currentUser && currentUser.role === 'SUPER ADMIN'" (click)="gdprErase()" class="px-4 py-2 bg-black hover:bg-gray-900 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2">
@@ -77,30 +78,30 @@
 
   <!-- Tabs Navigation -->
   <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
-    <button (click)="tab = 'profile'" 
+    <button (click)="tab = 'profile'"
             [ngClass]="tab === 'profile' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Overview
     </button>
-    <button (click)="tab = 'content'" 
+    <button (click)="tab = 'content'"
             [ngClass]="tab === 'content' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Content ({{(counts.posts || 0) + (counts.comments || 0)}})
     </button>
-    <button (click)="tab = 'marketplace'" 
+    <button (click)="tab = 'marketplace'"
             [ngClass]="tab === 'marketplace' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Marketplace ({{(counts.products || 0) + (counts.services || 0) + (counts.jobs || 0)}})
     </button>
-    <button (click)="tab = 'reports'" 
+    <button (click)="tab = 'reports'"
             [ngClass]="tab === 'reports' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Reports ({{counts.reports || 0}})
-    </button>    <button (click)="tab = 'analytics'" 
+    </button>    <button (click)="tab = 'analytics'"
             [ngClass]="tab === 'analytics' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Analytics
-    </button>    <button (click)="tab = 'legal'" 
+    </button>    <button (click)="tab = 'legal'"
             [ngClass]="tab === 'legal' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Legal & Privacy
@@ -377,7 +378,7 @@
               </td>
               <td class="px-6 py-4 text-xs text-gray-600 max-w-xs truncate">{{r.message || 'No message'}}</td>
               <td class="px-6 py-4">
-                <span [ngClass]="r.status === 'open' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'" 
+                <span [ngClass]="r.status === 'open' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'"
                       class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
                   {{r.status}}
                 </span>
@@ -465,7 +466,7 @@
             <tbody class="divide-y divide-gray-50">
               <tr *ngFor="let log of auditLogs" class="hover:bg-gray-50 transition-colors">
                 <td class="px-6 py-4">
-                  <span class="px-2 py-1 rounded text-[10px] font-bold uppercase" 
+                  <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
                     [ngClass]="{
                       'bg-blue-100 text-blue-600': log.action === 'ACCESS' || log.action === 'DSAR_ACCESS' || log.action === 'DASHBOARD_VIEW_ACCEPTANCES',
                       'bg-yellow-100 text-yellow-600': log.action === 'UPDATE' || log.action === 'DSAR_RECTIFY',

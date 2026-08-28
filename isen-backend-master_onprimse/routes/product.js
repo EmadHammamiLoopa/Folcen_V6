@@ -1,6 +1,6 @@
 const express = require('express')
-const { 
-    storeProduct, 
+const {
+    storeProduct,
     showProduct,
     updateProduct,
     availableProducts,
@@ -26,14 +26,14 @@ const router = express.Router()
 
 router.param('productId', productById)
 
-router.get('/all', [requireSignin, isAdmin], allProducts)
-router.get('/dash/:productId', [requireSignin, isAdmin], showProductDash)
-router.delete('/dash/:productId', [requireSignin, isAdmin], destroyProduct)
+router.get('/all', [requireSignin, withAuthUser, isAdmin], allProducts)
+router.get('/dash/:productId', [requireSignin, withAuthUser, isAdmin], showProductDash)
+router.delete('/dash/:productId', [requireSignin, withAuthUser, isAdmin], destroyProduct)
 
 router.post('/', [
-    form, 
-    requireSignin, 
-    storeProductValidator, 
+    form,
+    requireSignin,
+    storeProductValidator,
     withAuthUser,
     requireLegalAcceptance([
         { type: 'terms_and_conditions', versionEnvVar: 'TERMS_VERSION' },
@@ -44,14 +44,14 @@ router.post('/', [
 router.get('/available', [requireSignin, withAuthUser], availableProducts)
 router.get('/posted', [requireSignin], postedProducts)
 router.get('/storePermession', [requireSignin, withAuthUser, productStorePermission], (req, res) => Response.sendResponse(res, true))
-router.post('/sold/:productId', [requireSignin, productOwner], soldProduct)
+router.post('/sold/:productId', [requireSignin, withAuthUser, productOwner], soldProduct)
 
-router.post('/:productId/status', [requireSignin, isAdmin], toggleProductStatus)
+router.post('/:productId/status', [requireSignin, withAuthUser, isAdmin], toggleProductStatus)
 
-router.post('/:productId/clearReports', [requireSignin, isAdmin], clearProductReports)
+router.post('/:productId/clearReports', [requireSignin, withAuthUser, isAdmin], clearProductReports)
 router.get('/:productId',[requireSignin], showProduct)
-router.put('/:productId', [form, requireSignin, productOwner, updateProductValidator], updateProduct);
-router.delete('/:productId', [requireSignin, productOwner], deleteProduct)
+router.put('/:productId', [form, requireSignin, withAuthUser, productOwner, updateProductValidator], updateProduct);
+router.delete('/:productId', [requireSignin, withAuthUser, productOwner], deleteProduct)
 router.post('/:productId/report', [requireSignin], reportProduct)
 
 

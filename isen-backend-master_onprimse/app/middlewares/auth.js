@@ -1,3 +1,4 @@
+const { tokenVersionMatches } = require('../utils/tokenVersion');
 const expressJWT = require('express-jwt');
 const Response = require('../controllers/Response');
 const { adminCheck, normalizeLeanDoc } = require('../helpers');
@@ -8,7 +9,7 @@ const logger = require('../utils/logger');
 
 const AUTH_USER_BASE_FIELDS =
     '_id email role enabled banned banUntil isDeleted emailVerified ' +
-    'bannedReason lastSeen friends followers city country createdAt';
+    'bannedReason lastSeen friends followers city country createdAt tokenVersion';
 
 function authUserSelect(req) {
     const extra =
@@ -23,9 +24,9 @@ function loadAuthUser(req, userId) {
         .lean();
 }
 
-function startAuthUserPrefetch(req, userId) {
+function startAuthUserPrefetch(req, userId, force = false) {
     if (
-        !req._prefetchAuthUser ||
+        (!force && !req._prefetchAuthUser) ||
         !userId ||
         req._authUserPrefetchPromise
     ) {
@@ -53,6 +54,86 @@ function startAuthUserPrefetch(req, userId) {
                 error
             })
         );
+}
+
+async function rejectIfTokenVersionStale(
+    req,
+    res
+) {
+    const userId =
+        req.auth && req.auth._id;
+
+    if (!userId) {
+        Response.sendError(
+            res,
+            401,
+            'Unauthorized: No user ID found in token'
+        );
+        return true;
+    }
+
+    let user = null;
+
+    if (
+        req._userLoaded &&
+        req.user &&
+        String(req.user._id) === String(userId)
+    ) {
+        user = req.user;
+    } else {
+        startAuthUserPrefetch(
+            req,
+            userId,
+            true
+        );
+
+        const prefetched =
+            req._authUserPrefetchPromise
+                ? await req._authUserPrefetchPromise
+                : null;
+
+        if (
+            prefetched &&
+            prefetched.error
+        ) {
+            throw prefetched.error;
+        }
+
+        user =
+            prefetched &&
+            prefetched.user;
+    }
+
+    if (!user) {
+        Response.sendError(
+            res,
+            401,
+            'Unauthorized: account not found'
+        );
+        return true;
+    }
+
+    if (
+        !tokenVersionMatches(
+            req.auth &&
+                req.auth.tokenVersion,
+            user.tokenVersion
+        )
+    ) {
+        logger.warn(
+            'Rejected request with stale token generation'
+        );
+
+        Response.sendError(
+            res,
+            401,
+            'Unauthorized: token expired by credential change'
+        );
+
+        return true;
+    }
+
+    return false;
 }
 
 exports.requireSignin = (req, res, next) => {
@@ -102,6 +183,8 @@ exports.requireSignin = (req, res, next) => {
                 return Response.sendError(res, 500, 'Server error');
             }
 
+            if (await rejectIfTokenVersionStale(req, res)) return;
+
             if (process.env.DEBUG_AUTH === '1') {
                 try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
             }
@@ -115,7 +198,6 @@ exports.requireSignin = (req, res, next) => {
         const h = req.headers && (req.headers.authorization || req.headers.Authorization);
         if (h && String(h).split(' ')[0] === 'Bearer') return true;
         if (req.cookies && req.cookies.token) return true;
-        if (req.query && req.query.token) return true;
         return false;
     })();
 
@@ -143,13 +225,9 @@ exports.requireSignin = (req, res, next) => {
             }
 
             // Cookie-based auth may be explicitly enabled; keep behavior controlled by env
-            // For dashboard downloads, we often need to allow cookies or query params
+            // Existing cookie-based authentication remains supported for compatible clients
             if (req.cookies && req.cookies.token) {
                 return req.cookies.token;
-            }
-
-            if (req.query && req.query.token) {
-                return req.query.token;
             }
 
             return null;
@@ -157,10 +235,19 @@ exports.requireSignin = (req, res, next) => {
     })(req, res, async (err) => {
         if (err) {
             logger.info('JWT error:', err.message || err);
-            // If it's a download request (CSV), maybe log more
-            if (req.path && req.path.includes('export')) {
-                logger.info('Export auth failure. Headers:', req.headers);
-                logger.info('Cookies:', req.cookies);
+            // Never log request headers/cookies here: they may contain
+            // bearer tokens or authenticated session material.
+            if (
+                req.path &&
+                req.path.includes('export')
+            ) {
+                logger.info(
+                    'Export auth failure',
+                    {
+                        method: req.method,
+                        path: req.path
+                    }
+                );
             }
             return Response.sendError(res, 401, 'Unauthorized: Invalid token');
         }
@@ -202,6 +289,8 @@ exports.requireSignin = (req, res, next) => {
         }
 
         // Only log non-sensitive identifiers
+        if (await rejectIfTokenVersionStale(req, res)) return;
+
         if (process.env.DEBUG_AUTH === '1') {
             try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
         }
@@ -313,7 +402,7 @@ exports.withAuthUser = async (req, res, next) => {
         if (process.env.DEBUG_AUTH === '1') {
             logger.info('withAuthUser: User loaded id/email:', user._id, user.email);
         }
-        // Attach to `req.authUser` always. Only attach to `req.user` if not already set 
+        // Attach to `req.authUser` always. Only attach to `req.user` if not already set
         // (to avoid overwriting param-loaded target users).
         req.authUser = user;
         if (!req.user) {
@@ -338,10 +427,37 @@ exports.withAuthUser = async (req, res, next) => {
             } else if (!user.banUntil) {
                 return Response.sendError(res, 403, `Your account is permanently banned. Reason: ${user.bannedReason || 'No reason provided'}`);
             } else {
-                // Ban expired
-                user.banned = false;
-                user.banUntil = null;
-                await user.save().catch(e => logger.warn('Failed to unban user after expiry', e));
+                // Ban expired. loadAuthUser() returns a lean/plain object,
+                // so persist the lifecycle transition explicitly instead of
+                // calling document.save() on a non-Mongoose object.
+                try {
+                    await User.updateOne(
+                        { _id: user._id },
+                        {
+                            $set: {
+                                banned: false,
+                                banUntil: null,
+                                bannedReason: ''
+                            }
+                        }
+                    );
+
+                    user.banned = false;
+                    user.banUntil = null;
+                    user.bannedReason = '';
+
+                } catch (e) {
+                    logger.warn(
+                        'Failed to unban user after expiry',
+                        e
+                    );
+
+                    return Response.sendError(
+                        res,
+                        500,
+                        'Failed to refresh account ban status'
+                    );
+                }
             }
         }
 

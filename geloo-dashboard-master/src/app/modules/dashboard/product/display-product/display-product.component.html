@@ -3,12 +3,12 @@
   <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
     <div class="flex flex-col md:flex-row items-center gap-6">
       <div class="relative">
-        <img [src]="(product.photos && product.photos.length > 0) ? (product.photos[0].path?.startsWith('http') ? product.photos[0].path : apiUrl + (product.photos[0].path?.startsWith('/') ? '' : '/') + product.photos[0].path) : 'assets/img/default-product.png'" 
+        <img [src]="(product.photos && product.photos.length > 0) ? (product.photos[0].path?.startsWith('http') ? product.photos[0].path : apiUrl + (product.photos[0].path?.startsWith('/') ? '' : '/') + product.photos[0].path) : 'assets/img/default-product.png'"
              class="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-md">
-        <span [class]="product.deletedAt ? 'bg-red-500' : 'bg-green-500'" 
+        <span [class]="product.deletedAt ? 'bg-red-500' : 'bg-green-500'"
               class="absolute bottom-2 right-2 w-5 h-5 rounded-full border-2 border-white"></span>
       </div>
-      
+
       <div class="flex-1 text-center md:text-left">
         <h1 class="text-2xl font-bold text-gray-800 mb-1">{{product.label}}</h1>
         <p class="text-indigo-600 font-bold text-xl mb-2">{{product.price | number}} {{product.currency}}</p>
@@ -38,22 +38,22 @@
 
   <!-- Tabs Navigation -->
   <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
-    <button (click)="activeTab = 'details'" 
+    <button (click)="activeTab = 'details'"
             [class]="activeTab === 'details' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Product Details
     </button>
-    <button (click)="activeTab = 'photos'" 
+    <button (click)="activeTab = 'photos'"
             [class]="activeTab === 'photos' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Photos ({{product.photos ? product.photos.length : 0}})
     </button>
-    <button (click)="activeTab = 'reports'" 
+    <button (click)="activeTab = 'reports'"
             [class]="activeTab === 'reports' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Reports ({{product.reports ? product.reports.length : 0}})
     </button>
-    <button (click)="activeTab = 'creator'" 
+    <button (click)="activeTab = 'creator'"
             [class]="activeTab === 'creator' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             class="px-6 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors">
       Seller Info
@@ -71,7 +71,7 @@
           </h3>
           <p class="text-gray-600 leading-relaxed whitespace-pre-wrap">{{product.description}}</p>
         </div>
-        
+
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
             <i class="fas fa-info-circle text-indigo-500"></i> Specifications
@@ -158,7 +158,7 @@
       <div class="p-6 border-b border-gray-100 flex justify-between items-center">
         <h3 class="text-lg font-semibold text-gray-800">Reports History</h3>
         <button *ngIf="product.reports?.length" (click)="clearReports()" class="text-sm text-red-600 hover:text-red-700 font-medium">
-          Clear All Reports
+          Dismiss Reports
         </button>
       </div>
       <div class="overflow-x-auto">
@@ -174,16 +174,16 @@
           <tbody class="divide-y divide-gray-50">
             <tr *ngFor="let report of product.reports" class="hover:bg-gray-50 transition-colors">
               <td class="px-6 py-4">
-                <div class="flex items-center gap-3" *ngIf="report.userId">
+                <div class="flex items-center gap-3" *ngIf="report.reporter">
                   <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                    {{report.userId.firstName ? report.userId.firstName[0] : ''}}{{report.userId.lastName ? report.userId.lastName[0] : ''}}
+                    {{report.reporter.firstName ? report.reporter.firstName[0] : ''}}{{report.reporter.lastName ? report.reporter.lastName[0] : ''}}
                   </div>
                   <div>
-                    <p class="text-sm font-medium text-gray-800">{{report.userId.firstName}} {{report.userId.lastName}}</p>
-                    <p class="text-xs text-gray-500">{{report.userId.email}}</p>
+                    <p class="text-sm font-medium text-gray-800">{{report.reporter.firstName}} {{report.reporter.lastName}}</p>
+                    <p class="text-xs text-gray-500">{{report.reporter.email}}</p>
                   </div>
                 </div>
-                <span *ngIf="!report.userId" class="text-gray-400 italic text-sm">Anonymous</span>
+                <span *ngIf="!report.reporter" class="text-gray-400 italic text-sm">Anonymous</span>
               </td>
               <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{{report.message}}</td>
               <td class="px-6 py-4 text-sm text-gray-500">{{report.createdAt | date:'short'}}</td>
@@ -203,13 +203,13 @@
     <div *ngSwitchCase="'creator'" class="animate-fadeIn">
       <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto text-center">
         <div class="mb-6">
-          <img [src]="product.user?.mainAvatar ? (product.user.mainAvatar.startsWith('http') ? product.user.mainAvatar : apiUrl + (product.user.mainAvatar.startsWith('/') ? '' : '/') + product.user.mainAvatar) : 'assets/user.jpeg'" 
+          <img [src]="product.user?.mainAvatar ? (product.user.mainAvatar.startsWith('http') ? product.user.mainAvatar : apiUrl + (product.user.mainAvatar.startsWith('/') ? '' : '/') + product.user.mainAvatar) : 'assets/user.jpeg'"
                class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-indigo-50 shadow-lg" (error)="$any($event.target).src='assets/user.jpeg'">
         </div>
         <h3 class="text-xl font-bold text-gray-800 mb-1">{{product.user?.firstName}} {{product.user?.lastName}}</h3>
         <p class="text-gray-500 mb-6">{{product.user?.email}}</p>
         <div class="flex justify-center gap-4">
-          <a [routerLink]="['/dashboard/Users/display', itemId(product.user)]" 
+          <a [routerLink]="['/dashboard/Users/display', itemId(product.user)]"
              class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
             View Seller Profile
           </a>

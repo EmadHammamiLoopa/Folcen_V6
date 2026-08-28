@@ -36,6 +36,7 @@ export class PaymentComponent implements OnInit {
   success = false;
 
   clientSecret: string;
+  paymentIntentId: string;
 
   constructor(private stripe: Stripe, private toastService: ToastService, private route: ActivatedRoute, private subscriptionService:
               SubscriptionService, private nativeStorage: NativeStorage, private stripeService: StripeService, private userService: UserService) { }
@@ -72,6 +73,7 @@ export class PaymentComponent implements OnInit {
     .then(
       (resp: any) => {
         this.clientSecret = resp.data.client_secret
+        this.paymentIntentId = resp.data.payment_intent_id
         this.pageLoading = false;
       },
       err => {
@@ -104,7 +106,8 @@ export class PaymentComponent implements OnInit {
 
   subscribe(){
     this.subscriptionService.subscribe(this.subscriptionId, {
-      duration: this.duration
+      duration: this.duration,
+      paymentIntentId: this.paymentIntentId
     })
     .then(
       (resp: any) => {

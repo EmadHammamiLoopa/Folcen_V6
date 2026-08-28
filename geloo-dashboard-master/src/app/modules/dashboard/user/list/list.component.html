@@ -17,14 +17,14 @@
       <a routerLink="/dashboard/Users/analytics" class="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm">
         <i class="fas fa-chart-line text-indigo-500"></i> View Analytics
       </a>
-      <a routerLink="/dashboard/Users/form/create" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
+      <a *ngIf="user?.role === 'SUPER ADMIN'" routerLink="/dashboard/Users/form/create" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
         <i class="fas fa-user-plus"></i> Create User
       </a>
     </div>
   </div>
 
   <!-- Bulk Actions & Messaging (Sticky when users selected) -->
-  <div *ngIf="selectedUsers.length > 0" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-bounce-in">
+  <div *ngIf="user?.role === 'SUPER ADMIN' && selectedUsers.length > 0" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-bounce-in">
     <div class="bg-white rounded-2xl shadow-2xl border border-indigo-100 p-4 flex flex-col gap-4">
       <div class="flex items-center justify-between border-b border-gray-50 pb-3">
         <div class="flex items-center gap-3">
@@ -148,10 +148,10 @@
         editLink="/dashboard/Users/form/edit"
         createLink="/dashboard/Users/form/create"
         [showDeleteButton]="true"
-        [showUpdateButton]="true"
+        [showUpdateButton]="user?.role === 'SUPER ADMIN'"
         [showCreateButton]="false"
         [hideHeader]="true"
-        [selectable]="true"
+        [selectable]="user?.role === 'SUPER ADMIN'"
         [promptReason]="true"
         (selectionChange)="onSelectionChange($event)"
         icon="fas fa-users"

@@ -226,12 +226,45 @@ export class FormComponent implements OnInit, OnChanges {
 
   handleError(err){
     this.saveLoading = false;
-    err = err.error;
-    if(err.errors){
-      this.errors = err.errors;
+
+    // DataService normalizes HTTP failures to
+    // { message, status, errorCode, detail, url }.
+    // Preserve support for direct HttpErrorResponse-shaped errors as well.
+    const responseBody =
+      err && err.detail && err.detail.error !== undefined
+        ? err.detail.error
+        : (err && err.error !== undefined ? err.error : null);
+
+    const validationErrors =
+      responseBody &&
+      typeof responseBody === 'object' &&
+      responseBody.errors &&
+      typeof responseBody.errors === 'object'
+        ? responseBody.errors
+        : null;
+
+    if (validationErrors) {
+      this.errors = validationErrors;
       this.error = "Invalid data";
+    } else {
+      this.errors = undefined;
+
+      const candidate =
+        (err && typeof err.message === 'string' && err.message) ||
+        (responseBody &&
+          typeof responseBody === 'object' &&
+          typeof responseBody.message === 'string' &&
+          responseBody.message) ||
+        (responseBody &&
+          typeof responseBody === 'object' &&
+          typeof responseBody.errors === 'string' &&
+          responseBody.errors) ||
+        (typeof responseBody === 'string' && responseBody) ||
+        'Request failed';
+
+      this.error = candidate;
     }
-    else this.error = err;
+
     const timer = setInterval(() => {
       if(document.body.scrollTop) document.body.scrollTop = --document.documentElement.scrollTop;
       else clearInterval(timer)

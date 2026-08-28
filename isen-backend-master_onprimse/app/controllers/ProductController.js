@@ -1,4 +1,5 @@
 const Response = require('./Response')
+const { removeManagedMedia } = require('../utils/contentMediaLifecycle');
 const fs = require('fs')
 const fsp = fs.promises
 const Product = require('../models/Product')
@@ -8,6 +9,7 @@ const path = require('path')
 const { asset, extractDashParams, report } = require('../helpers')
 const mongoose  = require('mongoose')
 const Report = require('../models/Report')
+const { dismissEntityReports, resolveEntityReports } = require('../utils/reportModeration');
 const { authUser } = require('./AuthController')
 
 // Create a short excerpt like Facebook: cut at word boundary and append ellipsis
@@ -42,11 +44,36 @@ exports.reportProduct = async (req, res) => {
 
 exports.clearProductReports = async (req, res) => {
     try {
-        const rmRes = await Report.deleteMany({
-            "entity._id": req.product._id,
-            "entity.name": "product"
-        });
-        return Response.sendResponse(res, null, "reports cleaned");
+        const result =
+            await dismissEntityReports({
+                entityId:
+                    req.product._id,
+                entityModel:
+                    'Product'
+            });
+
+        await Product.updateOne(
+            {
+                _id:
+                    req.product._id
+            },
+            {
+                $set: {
+                    reports: []
+                }
+            }
+        );
+
+        return Response.sendResponse(
+            res,
+            {
+                dismissedReports:
+                    result.dismissedReports,
+                retentionDate:
+                    result.retentionDate
+            },
+            'Reports cleared from active moderation queue'
+        );
     } catch (err) {
         console.log(err);
         return Response.sendError(res, 400, 'failed to clear reports');
@@ -78,7 +105,7 @@ exports.showProductDash = async (req, res) => {
             .populate({
                 path: 'reports',
                 populate: {
-                    path: 'userId',
+                    path: 'reporter',
                     select: 'firstName lastName email'
                 }
             });
@@ -94,7 +121,6 @@ exports.showProductDash = async (req, res) => {
         return Response.sendError(res, 500, 'Server error');
     }
 };
-
 
 exports.allProducts = async (req, res) => {
     try {
@@ -192,7 +218,7 @@ exports.postedProducts = async (req, res) => {
 exports.availableProducts = async (req, res) => {
     try {
         // Get disabled, deleted, or banned users to exclude their products
-        const inactiveUsers = await User.find({ 
+        const inactiveUsers = await User.find({
             $or: [
                 { enabled: false },
                 { isDeleted: true },
@@ -359,14 +385,14 @@ const storeProductPhotos = async (photos, product) => {
         try {
             const photoName = `${product._id}_${i}${path.extname(photos[i].name)}`;
             const photoPath = path.join(__dirname, `../../public/products/${photoName}`);
-            
+
             // Ensure the public/products directory exists
             const dir = path.dirname(photoPath);
             await fs.promises.mkdir(dir, { recursive: true });
 
             // Write the photo file
             await fs.promises.writeFile(photoPath, await fs.promises.readFile(photos[i].path));
-            
+
             // Add the relative path and type to the product photos array
             product.photos.push({ path: `/products/${photoName}`, type: photos[i].type });
         } catch (error) {
@@ -385,6 +411,17 @@ exports.updateProduct = async (req, res) => {
     try {
         let product = req.product;
 
+        const previousProductPhotoPaths =
+            Array.isArray(product.photos)
+                ? product.photos
+                    .map(photo =>
+                        typeof photo === 'string'
+                            ? photo
+                            : photo && photo.path
+                    )
+                    .filter(Boolean)
+                : [];
+
         // Omit 'photos' from the incoming fields to avoid overwriting them directly
         const fieldsToUpdate = _.omit(req.fields, ['photos']);
         product = _.extend(product, fieldsToUpdate);  // Extend the product with new fields
@@ -398,6 +435,43 @@ exports.updateProduct = async (req, res) => {
         // Save the updated product
         await product.save();
 
+        if (req.files && req.files.photos) {
+            const currentProductPhotoPaths =
+                new Set(
+                    Array.isArray(product.photos)
+                        ? product.photos
+                            .map(photo =>
+                                typeof photo === 'string'
+                                    ? photo
+                                    : photo && photo.path
+                            )
+                            .filter(Boolean)
+                        : []
+                );
+
+            const replacedProductPhotoPaths =
+                previousProductPhotoPaths.filter(
+                    oldPath =>
+                        !currentProductPhotoPaths.has(oldPath)
+                );
+
+            await Promise.all(
+                replacedProductPhotoPaths.map(
+                    async oldPath => {
+                        try {
+                            await removeManagedMedia(oldPath);
+                        } catch (error) {
+                            console.warn(
+                                'Failed to clean replaced product photo',
+                                oldPath,
+                                error
+                            );
+                        }
+                    }
+                )
+            );
+        }
+
         return Response.sendResponse(res, product, 'Product updated successfully');
     } catch (error) {
         console.error('Error updating product:', error);
@@ -407,20 +481,19 @@ exports.updateProduct = async (req, res) => {
 
 
 exports.deleteProduct = async (req, res) => {
-    try {
-        await Product.deleteOne({ _id: req.product._id });
-        return Response.sendResponse(res, null, 'Product removed');
-    } catch (err) {
-        console.log(err);
-        return Response.sendError(res, 400, 'Could not remove product');
-    }
+    // The legacy owner-delete path already hard-deleted the Product document.
+    // Route it through the complete destructive lifecycle so photos and
+    // moderation evidence are not orphaned.
+    return exports.destroyProduct(
+        req,
+        res
+    );
 };
-
 
 exports.soldProduct = async (req, res) => {
     try {
         const product = await Product.findOne({ _id: req.product._id });
-        
+
         if (!product) {
             return Response.sendError(res, 400, 'Product not found');
         }
@@ -429,7 +502,7 @@ exports.soldProduct = async (req, res) => {
 
         await product.save();
         return Response.sendResponse(res, true, 'Product is marked as sold');
-        
+
     } catch (err) {
         console.log(err);
         return Response.sendError(res, 400, 'Cannot mark this product as sold now, try again later');
@@ -438,27 +511,69 @@ exports.soldProduct = async (req, res) => {
 
 
 exports.destroyProduct = async (req, res) => {
-    const product = req.product;
-    const photoPaths = product.photos.map(photo => path.join(__dirname, `../../public${photo.path}`));
+    const product =
+        req.product;
 
     try {
-        await Product.deleteOne({ _id: product._id });
+        const photos =
+            Array.isArray(
+                product.photos
+            )
+                ? product.photos
+                : [];
 
-            // Remove the photos associated with the product
-            for (const photoPath of photoPaths) {
-                try {
-                    await fsp.access(photoPath);
-                    await fsp.unlink(photoPath);
-                } catch (e) {
-                    // ignore if file does not exist
-                }
-            }
+        await Promise.all(
+            photos
+                .map(
+                    photo =>
+                        (
+                            typeof photo ===
+                                'string'
+                                ? photo
+                                : (
+                                    photo &&
+                                    photo.path
+                                )
+                        )
+                )
+                .filter(Boolean)
+                .map(
+                    photoPath =>
+                        removeManagedMedia(
+                            photoPath
+                        )
+                )
+        );
 
-        return Response.sendResponse(res, null, 'Product removed');
-        
+        await resolveEntityReports({
+            entityId:
+                product._id,
+
+            entityModel:
+                'Product',
+
+            moderatorNote:
+                'Product removed'
+        });
+
+        await Product.deleteOne({
+            _id:
+                product._id
+        });
+
+        return Response.sendResponse(
+            res,
+            null,
+            'Product removed'
+        );
+
     } catch (err) {
         console.log(err);
-        return Response.sendError(res, 400, 'Could not remove product');
+
+        return Response.sendError(
+            res,
+            400,
+            'Could not remove product'
+        );
     }
 };
-

@@ -1,4 +1,5 @@
 'use strict';
+const { tokenVersionMatches } = require('../utils/tokenVersion');
 
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
@@ -65,6 +66,15 @@ function createSocketAuthMiddleware({
         .findById(userId)
         .select('-password -tokens -refreshToken')
         .lean();
+
+      if (
+        !tokenVersionMatches(
+          decoded && decoded.tokenVersion,
+          user && user.tokenVersion
+        )
+      ) {
+        return next(new Error(AUTHENTICATION_ERROR));
+      }
 
       if (!isSocketAccountEligible(user)) {
         return next(new Error(AUTHENTICATION_ERROR));

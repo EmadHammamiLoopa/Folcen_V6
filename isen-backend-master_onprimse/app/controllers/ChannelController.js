@@ -1,12 +1,14 @@
 const mongoose = require("mongoose")
 const Channel = require("../models/Channel")
 const Response = require("./Response")
+const { removeManagedMedia } = require('../utils/contentMediaLifecycle');
 const path = require('path')
 const fs = require('fs')
 const fsp = fs.promises
 const { extractDashParams, report, sendNotification } = require("../helpers")
 const _ = require('lodash')
 const Report = require("../models/Report")
+const { dismissEntityReports, resolveEntityReports } = require('../utils/reportModeration');
 const Post = require("../models/Post");
 const { destroyPost } = require("./PostController")
 const User = require("../models/User")
@@ -20,7 +22,7 @@ const mediaStore = require("../utils/mediaStore")
 const storeChannelPhoto = async (req, channel) => {
     try {
         let photo = req.files.photo || req.files.image || req.files.upload;
-        
+
         if (Array.isArray(photo)) {
             photo = photo[0];
         }
@@ -30,10 +32,10 @@ const storeChannelPhoto = async (req, channel) => {
             const photoName = `${channel._id}.png`;
             const photoPath = path.join(__dirname, `./../../public/channels/${photoName}`);
             const dir = path.dirname(photoPath);
-            
+
             await fsp.mkdir(dir, { recursive: true });
             await fsp.copyFile(tempPath, photoPath);
-            
+
             if (!channel.photo || typeof channel.photo !== 'object') {
                 channel.photo = {};
             }
@@ -57,7 +59,7 @@ const storeChannelPhoto = async (req, channel) => {
             const dir = path.dirname(photoPath);
             await fsp.mkdir(dir, { recursive: true });
             await fsp.writeFile(photoPath, buffer);
-            
+
             if (!channel.photo || typeof channel.photo !== 'object') {
                 channel.photo = {};
             }
@@ -112,12 +114,36 @@ exports.reportChannel = async (req, res) => {
 
 exports.clearChannelReports = async (req, res) => {
     try {
-        await Report.deleteMany({
-            "entity._id": req.channel._id,
-            "entity.name": "channel"
-        });
+        const result =
+            await dismissEntityReports({
+                entityId:
+                    req.channel._id,
+                entityModel:
+                    'Channel'
+            });
 
-        return Response.sendResponse(res, null, "reports cleaned");
+        await Channel.updateOne(
+            {
+                _id:
+                    req.channel._id
+            },
+            {
+                $set: {
+                    reports: []
+                }
+            }
+        );
+
+        return Response.sendResponse(
+            res,
+            {
+                dismissedReports:
+                    result.dismissedReports,
+                retentionDate:
+                    result.retentionDate
+            },
+            'Reports cleared from active moderation queue'
+        );
     } catch (err) {
         console.log(err);
         return Response.sendError(res, 400, 'Failed to clear reports');
@@ -156,7 +182,14 @@ exports.showChannel = async (req, res) => {
     try {
         const channel = await Channel.findOne({ _id: req.channel._id })
             .populate({ path: 'user', select: 'firstName lastName email mainAvatar avatarStyle avatarSeed avatarOverrides role' })
-            .populate({ path: 'reports', model: 'Report' });
+            .populate({
+                path: 'reports',
+                model: 'Report',
+                populate: {
+                    path: 'reporter',
+                    select: 'firstName lastName email'
+                }
+            });
 
         if (!channel) {
             return Response.sendError(res, 404, 'Channel not found');
@@ -187,14 +220,15 @@ exports.showChannel = async (req, res) => {
         return Response.sendError(res, 500, 'Failed to retrieve channel');
     }
 };
+
 exports.showChannelEditDash = async (req, res) => {
     try {
         const channel = await Channel.findById(req.channel._id);
         if (!channel) return Response.sendError(res, 404, 'Channel not found');
-        
+
         const channelData = channel.toObject();
         channelData.id = channel._id;
-        
+
         return Response.sendResponse(res, channelData);
     } catch (err) {
         console.error("Error in showChannelEditDash:", err);
@@ -417,7 +451,7 @@ exports.followedChannels = async (req, res) => {
     try {
         // Default query params to safe values to avoid creating a '^undefined' regex
         const { search = '', page = 0, category = '' } = req.query || {};
-        
+
         // Ensure the request contains valid user data
         if (!req.authUser) {
             return Response.sendError(res, 400, 'User not authenticated');
@@ -442,7 +476,7 @@ exports.followedChannels = async (req, res) => {
 
         // Ensure static channels for the user's current city exist
         const created = await createStaticChannelsForCity(user.city, user.country, user);
-        
+
         // Save user once if any changes were made to followedChannels
         if (unfollowed || created) {
             await user.save();
@@ -492,7 +526,7 @@ exports.followedChannels = async (req, res) => {
 
 const createStaticChannelsForCity = async (city, country, user) => {
     const systemUserId = new mongoose.Types.ObjectId('66c7ba8cb077a84040bd9ee6');
-    
+
     const staticChannels = [
         {
             name: `${city} Local News`,
@@ -522,7 +556,7 @@ const createStaticChannelsForCity = async (city, country, user) => {
                 type: 'webp'
             }
         },
-        
+
         {
             name: `${city} Lost & Found`,
             description: `Find or report lost items in ${city}. Help reunite belongings with their owners.`,
@@ -537,7 +571,7 @@ const createStaticChannelsForCity = async (city, country, user) => {
                 type: 'webp'
             }
         },
-        
+
         {
             name: `${city} Neighborhood Watch`,
             description: `Stay safe in ${city}. Share security tips, updates, and alerts with your neighbors.`,
@@ -587,8 +621,8 @@ const createStaticChannelsForCity = async (city, country, user) => {
             interests: [], // User will select their interests or hobbies as tags
             hintAboutMe: '' // A free-text field where users can write something about themselves
         }
-        
-        
+
+
 
     ];
 
@@ -814,7 +848,7 @@ exports.updateChannel = async (req, res) => {
         if (req.files.photo || req.files.image || req.files.upload) {
             await storeChannelPhoto(req, channel)
         }
-        
+
         channel.global = fields.global ? (fields.global == 'undefined' ? false : true) : false;
         await channel.save();
         return Response.sendResponse(res, channel, 'the channel has been updated successfully')
@@ -836,19 +870,48 @@ exports.disableChannel = async (req, res) => {
     }
 };
 
-exports.deleteChannel = async(req, res) => {
+exports.deleteChannel = async (req, res) => {
     try {
-        const channel = req.channel
-        // Prevent deletion of static channels (system-managed)
-        if (channel.static || ['static', 'static_events', 'static_dating'].includes(channel.type)) {
-            return Response.sendError(res, 400, 'Static channels cannot be deleted');
+        const channel = req.channel;
+
+        // Prevent deletion of static channels (system-managed).
+        if (
+            channel.static ||
+            [
+                'static',
+                'static_events',
+                'static_dating'
+            ].includes(channel.type)
+        ) {
+            return Response.sendError(
+                res,
+                400,
+                'Static channels cannot be deleted'
+            );
         }
-        exports.destroyChannel(res, channel._id, (res) => Response.sendResponse(res, null, 'channel removed'))
+
+        return await exports.destroyChannel(
+            res,
+            channel._id,
+            response =>
+                Response.sendResponse(
+                    response,
+                    null,
+                    'channel removed'
+                )
+        );
     } catch (error) {
         console.log(error);
-        return Response.sendError(res, 500, 'Failed to delete channel');
+
+        if (!res.headersSent) {
+            return Response.sendError(
+                res,
+                500,
+                'Failed to delete channel'
+            );
+        }
     }
-}
+};
 
 exports.followChannel = async (req, res) => {
     try {
@@ -874,7 +937,7 @@ exports.followChannel = async (req, res) => {
                 $addToSet: { followedChannels: channel._id },
                 ...(isStaticChannel ? { $pull: { unfollowedStaticChannels: channel._id } } : {})
             });
-            
+
             sendNotification({
                 en: channel.name
             }, {
@@ -930,15 +993,89 @@ exports.getCityChannels = async (req, res) => {
 
 exports.destroyChannel = async (res, channelId, callback) => {
     try {
-        await Channel.deleteMany({ _id: channelId });
-        await Report.deleteMany({ "entity.id": channelId, "entity.name": 'channel' });
+        const channel =
+            await Channel.findById(
+                channelId
+            )
+                .select(
+                    'photo.path'
+                )
+                .lean();
 
-        const posts = await Post.find({ channel: channelId });
-        posts.forEach(post => destroyPost(res, post._id, null));
+        const posts =
+            await Post.find({
+                channel:
+                    channelId
+            })
+                .select(
+                    '_id'
+                )
+                .lean();
 
-        if (callback) return callback(res);
+        // A channel deletion is not complete until every child post and its
+        // comments/media/report lifecycle has completed.
+        await Promise.all(
+            posts.map(
+                post =>
+                    destroyPost(
+                        res,
+                        post._id,
+                        null,
+                        {
+                            suppressResponse:
+                                true
+                        }
+                    )
+            )
+        );
+
+        if (
+            channel &&
+            channel.photo &&
+            channel.photo.path
+        ) {
+            await removeManagedMedia(
+                channel.photo.path
+            );
+        }
+
+        await resolveEntityReports({
+            entityId:
+                channelId,
+
+            entityModel:
+                'Channel',
+
+            moderatorNote:
+                'Channel removed'
+        });
+
+        await Channel.deleteOne({
+            _id:
+                channelId
+        });
+
+        if (callback) {
+            return callback(
+                res
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            null,
+            'Channel and related content removed'
+        );
+
     } catch (err) {
         console.log(err);
-        return Response.sendError(res, 500, 'Failed to delete channel');
+
+        if (!res.headersSent) {
+            return Response.sendError(
+                res,
+                500,
+                'Failed to delete channel'
+            );
+        }
     }
 };

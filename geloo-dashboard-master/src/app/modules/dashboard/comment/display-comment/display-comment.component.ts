@@ -89,8 +89,8 @@ export class DisplayCommentComponent implements OnInit {
 
   clearReports() {
     Swal.fire({
-      title: 'Clear all reports?',
-      text: 'This will remove all report history for this comment.',
+      title: 'Dismiss reports?',
+      text: 'Open and under-review reports will be dismissed. Moderation history will be retained according to the retention policy.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, clear them'
@@ -98,10 +98,10 @@ export class DisplayCommentComponent implements OnInit {
       if (result.isConfirmed) {
         this.dataService.sendPostRequest(`comment/${this.itemId(this.comment)}/clearReports`, {}).subscribe(
           () => {
-            Swal.fire('Cleared!', 'Reports have been cleared.', 'success');
+            Swal.fire('Dismissed!', 'Reports have been dismissed.', 'success');
             this.fetchComment(this.itemId(this.comment));
           },
-          err => Swal.fire('Error', 'Could not clear reports', 'error')
+          err => Swal.fire('Error', 'Could not dismiss reports', 'error')
         );
       }
     });

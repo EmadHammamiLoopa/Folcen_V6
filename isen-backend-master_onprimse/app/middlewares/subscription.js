@@ -2,6 +2,7 @@ const Response = require("../controllers/Response")
 const Subscription = require("../models/Subscription")
 const User = require("../models/User")
 const mongoose = require('mongoose');
+const { hasFreePlanEntitlement } = require('../utils/subscriptionPolicy');
 
 exports.subscriptionById = async (req, res, next, subscriptionId) => {
     try {
@@ -9,16 +10,16 @@ exports.subscriptionById = async (req, res, next, subscriptionId) => {
       if (!subscriptionId || subscriptionId === 'null' || subscriptionId === 'undefined') {
         return Response.sendError(res, 400, 'Invalid Subscription ID');
       }
-  
+
       if (!mongoose.Types.ObjectId.isValid(subscriptionId)) {
         return Response.sendError(res, 400, 'Invalid Subscription ID format');
       }
-  
+
       const subscription = await Subscription.findById(subscriptionId);
       if (!subscription) {
         return Response.sendError(res, 404, 'Subscription not found');
       }
-  
+
       req.subscription = subscription; // Attach subscription to request
       next();
     } catch (err) {
@@ -30,21 +31,72 @@ exports.subscriptionById = async (req, res, next, subscriptionId) => {
 
 
 exports.userSubscribed = async (user) => {
-    if (user.subscription && user.subscription._id) {
-        if (new Date(user.subscription.expireDate).getTime() > new Date().getTime()) {
+    if (
+        !user ||
+        !user._id
+    ) {
+        return false;
+    }
+
+    if (
+        user.subscription &&
+        user.subscription._id
+    ) {
+        const expireDate =
+            new Date(
+                user.subscription.expireDate
+            );
+
+        if (
+            !Number.isNaN(
+                expireDate.getTime()
+            ) &&
+            expireDate.getTime() >
+                Date.now()
+        ) {
             return true;
         }
 
         try {
-            // Use await to handle promises and remove callback
-            const result = await User.updateOne(
-                { _id: user._id }, 
-                { $set: { subscription: null } }
+            await User.updateOne(
+                {
+                    _id:
+                        user._id
+                },
+                {
+                    $set: {
+                        subscription:
+                            null
+                    }
+                }
             );
-            console.log('Update result:', result);
+
+            user.subscription =
+                null;
+
         } catch (err) {
-            console.error('Error updating user subscription:', err);
+            console.error(
+                'Error cleaning expired user subscription:',
+                err
+            );
         }
     }
+
+    try {
+        if (
+            await hasFreePlanEntitlement(
+                user
+            )
+        ) {
+            return true;
+        }
+
+    } catch (err) {
+        console.error(
+            'Error evaluating FREE_PLAN entitlement:',
+            err
+        );
+    }
+
     return false;
 };

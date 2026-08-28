@@ -7,11 +7,13 @@ const Follow = require("../models/Follow");
 const Post = require("../models/Post");
 const Activity = require('../models/Activity');
 const Report = require("../models/Report");
+const { resolveEntityReports } = require('../utils/reportModeration');
 const User = require("../models/User");
 const Product = require("../models/Product");
 const Job = require("../models/Job");
 const Service = require("../models/Service");
 const Response = require("./Response");
+const { removeManagedMedia } = require('../utils/contentMediaLifecycle');
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
 const logger = require('../utils/logger');
 const mediaStore = require('../utils/mediaStore');
@@ -165,8 +167,8 @@ exports.allPosts = async (req, res) => {
                             if: { $eq: ['$anonymName', null] },
                             then: {
                                 $concat: [
-                                    { $ifNull: ['$userDetails.firstName', ''] }, 
-                                    ' ', 
+                                    { $ifNull: ['$userDetails.firstName', ''] },
+                                    ' ',
                                     { $ifNull: ['$userDetails.lastName', ''] }
                                 ]
                             },
@@ -246,12 +248,12 @@ exports.channelPosts = async (req, res) => {
         .exec();
 
     if (!posts) return Response.sendError(res, 500, 'Server error, please try again later');
-    
+
     const count = await Post.find({
         channel: channel._id,
         ...dashParams.filter
     }).countDocuments();
-    
+
     return Response.sendResponse(res, {
         docs: posts,
         totalPages: Math.ceil(count / dashParams.limit)
@@ -407,7 +409,7 @@ exports.getFeed = async (req, res) => {
         // 4. Fetch Posts
         // build a per-follow OR clause so we only include posts from followed users made after they were followed
         const feedCriteria = [];
-        
+
         // Following or Friends
         followedEntries.forEach(fe => {
             if (fe.since) {
@@ -701,13 +703,13 @@ exports.showPost = async (req, res) => {
 
         // Check if author blocked requester or vice versa
         const authorId = author ? author._id.toString() : null;
-        
+
         if (authorId) {
             const isBlockedByAuthor = await User.findOne({
                 _id: authorId,
                 blockedUsers: requesterId
             });
-            
+
             const isBlockedByMe = req.authUser.blockedUsers && req.authUser.blockedUsers.some(id => id.toString() === authorId);
 
             if (isBlockedByAuthor || isBlockedByMe) {
@@ -746,6 +748,21 @@ exports.showPost = async (req, res) => {
 
         const postWithVotes = withVotesInfo(post, req.auth._id, post._id);
 
+        // A media expiry is an access boundary, not only a feed filter.
+        // Never return an expired public media URL while the scheduled
+        // physical cleanup is waiting for its next sweep.
+        if (
+            postWithVotes &&
+            postWithVotes.media &&
+            postWithVotes.media.url &&
+            postWithVotes.media.expiryDate &&
+            new Date(postWithVotes.media.expiryDate).getTime() <= Date.now()
+        ) {
+            postWithVotes.media = {
+                expiryDate: postWithVotes.media.expiryDate
+            };
+        }
+
         console.log("showPost response", postWithVotes);
         return Response.sendResponse(res, postWithVotes);
 
@@ -763,7 +780,14 @@ exports.showDashPost = async (req, res) => {
     try {
         // Fetch the post by its ID
         const post = await Post.findById(req.post._id)
-            .populate({ path: 'reports', model: 'Report' })
+            .populate({
+                path: 'reports',
+                model: 'Report',
+                populate: {
+                    path: 'reporter',
+                    select: 'firstName lastName email'
+                }
+            })
             .populate({ path: 'user', select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides' })
             .populate({ path: 'channel', select: 'name' })
             .exec();
@@ -860,7 +884,7 @@ exports.storePost = async (req, res) => {
             if (req.body.hintAboutMe) {
                 post.hintAboutMe = req.body.hintAboutMe;
             }
-            
+
             // If media is uploaded, attach it to the post
             if (req.file) {
                 const mediaUrl = publicUploadUrl(req.file);
@@ -888,9 +912,9 @@ exports.storePost = async (req, res) => {
             console.log('Saved Post:', savedPost);
 
             // Populate the user details immediately after saving
-            const populatedPost = await Post.populate(savedPost, { 
-                path: 'user', 
-                select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides' 
+            const populatedPost = await Post.populate(savedPost, {
+                path: 'user',
+                select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides'
             });
             console.log('Populated Post:', populatedPost);
 
@@ -1092,10 +1116,10 @@ exports.storePost = async (req, res) => {
                     }
 
                     // 🔥 REAL-TIME: Emit targeted feed activity
-                    try { 
+                    try {
                         // Use the same refined recipients list as notifications
                         realtime.emitFeedPost(feedRecipients, savedPost);
-                        
+
                         // Emit activity to followers
                         const activityPayload = { ...activity.toObject(), type: activity.type };
                         const { emitToUsers } = require('../helpers');
@@ -1152,7 +1176,7 @@ exports.getPosts = async (req, res) => {
                 { deletedAt: { $ne: null } }
             ]
         }).select('_id').lean();
-        
+
         // Normalize ObjectIds to strings
         const allExcludedIds = excludedUsersRaw.map(u => String(u._id));
         const friendIds = (req.authUser.friends || []).map(id => String(id));
@@ -1170,7 +1194,7 @@ exports.getPosts = async (req, res) => {
         };
 
         // 2. High-Throughput Fetch (Database Access)
-        // Removed heavy 'comments' populate for feed performance. 
+        // Removed heavy 'comments' populate for feed performance.
         // Feed only needs counts (handled below via projection/processing).
         let posts = await Post.find(visibilityQuery)
             .select('-reports -__v') // Explicit projection: exclude unwanted heavy fields
@@ -1251,11 +1275,11 @@ exports.getPosts = async (req, res) => {
             pw.excerpt = ex;
             // Keep full text for frontend, send excerpt separately
             // Frontend can decide whether to show excerpt or full text
-            
+
             // Count only comments that the mobile comments screen can render.
             pw.commentCount = visibleCommentCountByPost.get(String(post._id)) || 0;
             delete pw.comments; // Remove the full array to keep payload lean
-            
+
             return pw;
         });
 
@@ -1335,7 +1359,7 @@ exports.voteOnPost = async (req, res) => {
                         if (channel) {
                             // Normalize ObjectIds to strings
                             channel = normalizeLeanDoc(channel);
-                            
+
                             sendNotification(
                                 { en: channel.name },
                                 { en: (post.anonyme ? 'Anonym' : req.authUser.firstName + ' ' + req.authUser.lastName) + ' has voted on your post' },
@@ -1365,67 +1389,217 @@ exports.voteOnPost = async (req, res) => {
     }
 };
 
-exports.deletePost = (req, res) => {
+exports.deletePost = async (req, res) => {
     try {
-        const post = req.post
-        this.destroyPost(res, post._id, (res) => Response.sendResponse(res, null, 'post removed'))
-        
+        const post =
+            req.post;
+
+        return await exports.destroyPost(
+            res,
+            post._id,
+            response =>
+                Response.sendResponse(
+                    response,
+                    null,
+                    'post removed'
+                )
+        );
+
     } catch (error) {
         console.log(error);
-    }
-}
 
-exports.destroyPost = async (res, postId, callback) => {
-    try {
-        // Collect related comment IDs once for bulk cleanup.
-        const comments = await Comment.find({ post: postId })
-            .select('_id')
-            .lean();
-        const commentIds = comments.map(comment => comment._id);
-        
-        // Delete the post
-        await Post.deleteOne({ _id: postId });
-        
-        // Delete related reports for the post
-        await Report.deleteMany({ "entity.id": postId, "entity.name": 'post' });
-
-        // Remove post activity plus any legacy/current comment activity
-        // in one bulk operation.
-        const activityCleanup = [
-            { targetType: 'post', targetId: postId }
-        ];
-
-        if (commentIds.length > 0) {
-            activityCleanup.push(
-                { 'meta.commentId': { $in: commentIds } },
-                { targetType: 'comment', targetId: { $in: commentIds } }
+        if (!res.headersSent) {
+            return Response.sendError(
+                res,
+                500,
+                'Error deleting post'
             );
         }
+    }
+};
 
-        await Activity.deleteMany({ $or: activityCleanup });
+exports.destroyPost = async (
+    res,
+    postId,
+    callback,
+    options = {}
+) => {
+    const suppressResponse =
+        options &&
+        options.suppressResponse === true;
 
-        // Delete comment reports and comments in bulk instead of issuing
-        // several delete queries per comment.
-        if (commentIds.length > 0) {
-            await Report.deleteMany({
-                "entity.id": { $in: commentIds },
-                "entity.name": 'comment'
+    try {
+        const post =
+            await Post.findById(
+                postId
+            )
+                .select(
+                    'media.url'
+                )
+                .lean();
+
+        const comments =
+            await Comment.find({
+                post:
+                    postId
+            })
+                .select(
+                    '_id media.url'
+                )
+                .lean();
+
+        const commentIds =
+            comments.map(
+                comment =>
+                    comment._id
+            );
+
+        const mediaPaths =
+            [
+                (
+                    post &&
+                    post.media &&
+                    post.media.url
+                ),
+                ...comments.map(
+                    comment =>
+                        (
+                            comment.media &&
+                            comment.media.url
+                        )
+                )
+            ]
+                .filter(Boolean);
+
+        // Strict media cleanup first. If a durable copy cannot be removed,
+        // do not claim that destructive deletion completed.
+        await Promise.all(
+            [
+                ...new Set(
+                    mediaPaths
+                )
+            ].map(
+                mediaPath =>
+                    removeManagedMedia(
+                        mediaPath
+                    )
+            )
+        );
+
+        await resolveEntityReports({
+            entityId:
+                postId,
+
+            entityModel:
+                'Post',
+
+            moderatorNote:
+                'Post removed'
+        });
+
+        if (
+            commentIds.length > 0
+        ) {
+            await resolveEntityReports({
+                entityIds:
+                    commentIds,
+
+                entityModel:
+                    'Comment',
+
+                moderatorNote:
+                    'Comment removed with parent post'
             });
         }
 
-        await Comment.deleteMany({ post: postId });
+        const activityCleanup =
+            [
+                {
+                    targetType:
+                        'post',
 
-        // If a callback is provided, call it after everything is deleted
-        if (callback) {
-            return callback(res);
+                    targetId:
+                        postId
+                }
+            ];
+
+        if (
+            commentIds.length > 0
+        ) {
+            activityCleanup.push(
+                {
+                    'meta.commentId': {
+                        $in:
+                            commentIds
+                    }
+                },
+                {
+                    targetType:
+                        'comment',
+
+                    targetId: {
+                        $in:
+                            commentIds
+                    }
+                }
+            );
         }
 
-        return Response.sendResponse(res, null, 'Post and related data deleted successfully');
+        await Activity.deleteMany({
+            $or:
+                activityCleanup
+        });
+
+        await Comment.deleteMany({
+            post:
+                postId
+        });
+
+        await Post.deleteOne({
+            _id:
+                postId
+        });
+
+        if (callback) {
+            return callback(
+                res
+            );
+        }
+
+        if (
+            suppressResponse
+        ) {
+            return {
+                postId,
+                deletedComments:
+                    commentIds.length
+            };
+        }
+
+        return Response.sendResponse(
+            res,
+            null,
+            'Post and related data deleted successfully'
+        );
 
     } catch (err) {
-        console.error('Error deleting post and related data:', err);
+        console.error(
+            'Error deleting post and related data:',
+            err
+        );
+
+        if (
+            suppressResponse
+        ) {
+            throw err;
+        }
+
         if (!res.headersSent) {
-            return Response.sendError(res, 500, 'Error deleting post');
+            return Response.sendError(
+                res,
+                500,
+                'Error deleting post'
+            );
         }
     }
 };

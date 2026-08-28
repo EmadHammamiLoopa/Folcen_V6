@@ -22,6 +22,11 @@ const Product = require("../models/Product");
 const Job = require("../models/Job");
 const Service = require("../models/Service");
 const { createReport } = require('../utils/eventLogger');
+const tokenBlacklist = require('../utils/tokenBlacklist');
+const {
+    isAdminRole,
+    wouldRemoveLastActiveSuperAdmin
+} = require('../utils/adminLifecycle');
 
 exports.allReports = async (req, res) => {
     try {
@@ -111,179 +116,363 @@ exports.allReports = async (req, res) => {
     }
 };
 exports.takeActionOnReport = async (req, res) => {
-    console.log("Processing action:", req.body.action, "for report ID:", req.params.reportId);
+    console.log(
+        'Processing action:',
+        req.body.action,
+        'for report ID:',
+        req.params.reportId
+    );
 
     const { reportId } = req.params;
-    const { action, notes, banDuration } = req.body;
+    const {
+        action,
+        notes,
+        banDuration
+    } = req.body || {};
+
+    const actor =
+        req.authUser || req.auth;
 
     try {
-        let report = await Report.findById(reportId);
-        if (!report) return Response.sendError(res, 404, 'Report not found');
+        const report =
+            await Report.findById(reportId);
 
-        // Perform the action
+        if (!report) {
+            return Response.sendError(
+                res,
+                404,
+                'Report not found'
+            );
+        }
+
+        // Account erasure is a legal/data-subject workflow, not a
+        // moderation shortcut. It must go through GDPR Centre so the
+        // Article 17 exception assessment, purge ordering and retained
+        // evidence minimization are applied.
+        if (action === 'deleteUser') {
+            return Response.sendError(
+                res,
+                409,
+                'Account erasure cannot be performed from report moderation. Use the GDPR Erasure Centre.'
+            );
+        }
+
         switch (action) {
             case 'ignore':
             case 'dismiss':
-                report.status = "dismissed";
-                report.resolutionAction = "No Action";
-                report.moderatorNotes = notes || 'No additional notes';
+                report.status = 'dismissed';
+                report.resolutionAction = 'No Action';
+                report.moderatorNotes =
+                    notes || 'No additional notes';
                 break;
 
             case 'resolve':
-                report.status = "resolved";
-                report.resolutionAction = "Resolved";
-                report.moderatorNotes = notes || 'Resolved by moderator';
+                report.status = 'resolved';
+                report.resolutionAction = 'Resolved';
+                report.moderatorNotes =
+                    notes || 'Resolved by moderator';
                 break;
 
-            case 'removeContent':
-                if (report.entity && report.entityModel) {
+            case 'removeContent': {
+                if (
+                    report.entity &&
+                    report.entityModel
+                ) {
                     try {
                         if (report.entityModel === 'Photo') {
-                            // For Photo reports, the entity is the User
-                            const user = await User.findById(report.entity);
-                            if (!user) {
-                                return Response.sendError(res, 404, 'User not found');
-                            }
-                            
-                            // If it's a photo report, we might want to remove the specific photoUrl from user's gallery
-                            // For now, we'll just mark the report as resolved and maybe the moderator can manually remove it
-                            // or we can implement a helper to remove the avatar.
-                            console.log(`Moderator requested removal of photo: ${report.photoUrl} for user: ${report.entity}`);
-                        } else {
-                            const model = mongoose.model(report.entityModel);
+                            // Photo removal requires a specific media lifecycle
+                            // operation; do not claim deletion when we only
+                            // have an owner reference.
+                            return Response.sendError(
+                                res,
+                                409,
+                                'Photo removal requires the dedicated user/media moderation action'
+                            );
+                        }
 
-                            // Check if the content exists before deletion
-                            const contentExists = await model.findById(report.entity);
-                            if (!contentExists) {
-                                console.warn(`Content with ID ${report.entity} not found. Marking report as resolved.`);
-                                report.status = "resolved";
-                                report.resolutionAction = "Content Removed";
-                                await report.save();
-                                return Response.sendResponse(res, { message: 'Report resolved: Content was already removed' });
-                            }
+                        const model =
+                            mongoose.model(
+                                report.entityModel
+                            );
 
-                            // Delete the content
-                            const deleted = await model.findByIdAndDelete(report.entity);
-                            if (!deleted) {
-                                console.error(`Failed to delete content: ${report.entity}`);
-                                return Response.sendError(res, 400, 'Failed to delete content');
-                            }
+                        const contentExists =
+                            await model.findById(
+                                report.entity
+                            );
 
-                            console.log(`Deleted content: ${report.entity}`);
+                        if (!contentExists) {
+                            report.status = 'resolved';
+                            report.resolutionAction =
+                                'Content Already Removed';
+                            report.moderatorNotes =
+                                notes ||
+                                'Content was already absent';
+                            break;
+                        }
+
+                        const deleted =
+                            await model.findByIdAndDelete(
+                                report.entity
+                            );
+
+                        if (!deleted) {
+                            return Response.sendError(
+                                res,
+                                400,
+                                'Failed to delete content'
+                            );
                         }
                     } catch (error) {
-                        console.error("Error deleting content:", error);
-                        return Response.sendError(res, 500, 'Server error deleting content');
+                        console.error(
+                            'Error deleting content:',
+                            error
+                        );
+
+                        return Response.sendError(
+                            res,
+                            500,
+                            'Server error deleting content'
+                        );
                     }
                 }
 
-                report.status = "resolved";
-                report.resolutionAction = "Content Removed";
-                report.moderatorNotes = notes || 'Content removed by moderator';
+                report.status = 'resolved';
+                report.resolutionAction =
+                    'Content Removed';
+                report.moderatorNotes =
+                    notes ||
+                    'Content removed by moderator';
                 break;
+            }
 
             case 'banUser':
             case 'ban_1h':
             case 'ban_24h':
             case 'ban_7d':
-            case 'ban_permanent':
-            case 'deleteUser':
+            case 'ban_permanent': {
                 let banUntil = null;
+                let ttlSeconds = null;
                 const now = new Date();
-                
+
                 if (action === 'ban_1h') {
-                    banUntil = new Date(now.getTime() + 60 * 60 * 1000);
+                    ttlSeconds = 60 * 60;
                 } else if (action === 'ban_24h') {
-                    banUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    ttlSeconds = 24 * 60 * 60;
                 } else if (action === 'ban_7d') {
-                    banUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                } else if (action === 'banUser' && banDuration && !isNaN(banDuration)) {
-                    banUntil = new Date(now.getTime() + parseInt(banDuration) * 24 * 60 * 60 * 1000);
+                    ttlSeconds = 7 * 24 * 60 * 60;
+                } else if (
+                    action === 'banUser' &&
+                    banDuration !== undefined &&
+                    banDuration !== null &&
+                    String(banDuration).trim() !== ''
+                ) {
+                    const days =
+                        Number(banDuration);
+
+                    if (
+                        !Number.isFinite(days) ||
+                        days <= 0
+                    ) {
+                        return Response.sendError(
+                            res,
+                            400,
+                            'Ban duration must be a positive number of days'
+                        );
+                    }
+
+                    ttlSeconds =
+                        Math.max(
+                            1,
+                            Math.ceil(
+                                days *
+                                24 *
+                                60 *
+                                60
+                            )
+                        );
                 }
-                // ban_permanent and deleteUser leave banUntil as null
+
+                if (ttlSeconds !== null) {
+                    banUntil =
+                        new Date(
+                            now.getTime() +
+                            ttlSeconds * 1000
+                        );
+                }
 
                 let targetUserId = null;
-                if (report.entityModel === 'User') {
-                    targetUserId = report.entity;
+
+                if (
+                    report.entityModel === 'User' ||
+                    report.entityModel === 'Photo'
+                ) {
+                    targetUserId =
+                        report.entity;
                 } else {
-                    // Try to find the author of the reported entity
                     try {
-                        const model = mongoose.model(report.entityModel);
-                        const entity = await model.findById(report.entity);
+                        const model =
+                            mongoose.model(
+                                report.entityModel
+                            );
+
+                        const entity =
+                            await model.findById(
+                                report.entity
+                            );
+
                         if (entity) {
-                            // Check common fields for user reference
-                            targetUserId = entity.user || entity.author || entity.owner || entity.creator || entity.userId;
+                            targetUserId =
+                                entity.user ||
+                                entity.author ||
+                                entity.owner ||
+                                entity.creator ||
+                                entity.userId;
                         }
                     } catch (e) {
-                        console.error("Error finding author for ban:", e);
+                        console.error(
+                            'Error finding author for ban:',
+                            e
+                        );
                     }
                 }
 
-                if (targetUserId) {
-                    if (action === 'deleteUser') {
-                        const { purgeUser } = require('../helpers');
-                        await purgeUser(targetUserId);
-                        report.resolutionAction = "User Deleted (GDPR)";
+                if (!targetUserId) {
+                    return Response.sendError(
+                        res,
+                        400,
+                        'Could not identify user to ban'
+                    );
+                }
 
-                        // Record Audit Log
-                        const { recordAudit } = require('../utils/audit');
-                        await recordAudit({
-                            actorId: req.authUser._id,
-                            actorRole: req.authUser.role,
-                            action: 'DELETE',
-                            targetUserId: targetUserId,
-                            details: { reason: notes || 'Moderation action: deleteUser', type: 'HARD_DELETE_MODERATION' },
-                            ip: req.ip,
-                            userAgent: req.get('User-Agent')
-                        });
-                    } else {
-                        const user = await User.findByIdAndUpdate(targetUserId, { 
-                            banned: true, 
-                            banUntil: banUntil,
-                            bannedReason: notes || 'Banned via report action'
-                        });
-                        if (!user) {
-                            return Response.sendError(res, 400, 'Failed to ban user');
+                const targetUser =
+                    await User.findById(
+                        targetUserId
+                    );
+
+                if (!targetUser) {
+                    return Response.sendError(
+                        res,
+                        404,
+                        'Target user not found'
+                    );
+                }
+
+                if (
+                    isAdminRole(targetUser.role) &&
+                    (!actor || actor.role !== 'SUPER ADMIN')
+                ) {
+                    return Response.sendError(
+                        res,
+                        403,
+                        'Only SUPER ADMIN can ban another administrator'
+                    );
+                }
+
+                if (
+                    targetUser.role === 'SUPER ADMIN' &&
+                    await wouldRemoveLastActiveSuperAdmin(
+                        targetUser,
+                        {
+                            banned: true,
+                            banUntil
                         }
-                        report.resolutionAction = "User Banned";
-
-                        // Record Audit Log
-                        const { recordAudit } = require('../utils/audit');
-                        await recordAudit({
-                            actorId: req.authUser._id,
-                            actorRole: req.authUser.role,
-                            action: 'UPDATE',
-                            targetUserId: targetUserId,
-                            details: { reason: notes || 'Moderation action: ban', banUntil, action },
-                            ip: req.ip,
-                            userAgent: req.get('User-Agent')
-                        });
-                    }
-                } else {
-                    return Response.sendError(res, 400, 'Could not identify user to ban');
+                    )
+                ) {
+                    return Response.sendError(
+                        res,
+                        409,
+                        'Cannot ban the final active SUPER ADMIN'
+                    );
                 }
 
-                report.status = "resolved";
-                report.moderatorNotes = notes || (action === 'deleteUser' ? 'User account deleted per GDPR request/moderation' : (banUntil ? `User banned until ${banUntil}` : 'User banned permanently'));
+                targetUser.banned = true;
+                targetUser.banUntil = banUntil;
+                targetUser.bannedReason =
+                    notes ||
+                    'Banned via report moderation';
+
+                await targetUser.save();
+
+                try {
+                    await tokenBlacklist.revokeUser(
+                        String(targetUser._id),
+                        ttlSeconds
+                    );
+                } catch (e) {
+                    console.warn(
+                        'Failed to revoke report-banned user',
+                        e
+                    );
+                }
+
+                try {
+                    const { recordAudit } =
+                        require('../utils/audit');
+
+                    await recordAudit({
+                        actorId:
+                            actor && actor._id,
+                        actorRole:
+                            actor && actor.role,
+                        action:
+                            'ADMIN_ACCOUNT_BAN_CHANGE',
+                        targetUserId:
+                            targetUser._id,
+                        details: {
+                            source: 'REPORT_MODERATION',
+                            reportId:
+                                report._id,
+                            banUntil,
+                            moderationAction:
+                                action,
+                            reason:
+                                notes ||
+                                'Banned via report moderation'
+                        },
+                        ip:
+                            req.ip,
+                        userAgent:
+                            req.get('User-Agent')
+                    });
+                } catch (e) {
+                    console.warn(
+                        'Failed to audit report moderation ban',
+                        e
+                    );
+                }
+
+                report.status = 'resolved';
+                report.resolutionAction =
+                    'User Banned';
+                report.moderatorNotes =
+                    notes ||
+                    (
+                        banUntil
+                            ? `User banned until ${banUntil.toISOString()}`
+                            : 'User banned permanently'
+                    );
                 break;
+            }
 
             default:
-                return Response.sendError(res, 400, 'Invalid action');
+                return Response.sendError(
+                    res,
+                    400,
+                    'Invalid action'
+                );
         }
 
         /*
          * GDPR storage-limitation lifecycle:
-         * retention starts when the moderation case closes, not when
-         * the report was originally created.
-         *
-         * Report.js enforces the same invariant as defence-in-depth.
+         * retention starts when the moderation case closes.
          */
         if (
             report.status === 'resolved' ||
             report.status === 'dismissed'
         ) {
             if (!report.resolvedAt) {
-                report.resolvedAt = new Date();
+                report.resolvedAt =
+                    new Date();
             }
 
             if (!report.retentionDate) {
@@ -300,20 +489,29 @@ exports.takeActionOnReport = async (req, res) => {
         }
 
         await report.save();
-        console.log("Updated report:", report);
 
-        return Response.sendResponse(res, {
-            message: 'Action taken successfully',
-            report
-        });
+        return Response.sendResponse(
+            res,
+            {
+                message:
+                    'Action taken successfully',
+                report
+            }
+        );
 
     } catch (error) {
-        console.error('Error taking action on report:', error);
-        return Response.sendError(res, 500, 'Server error');
+        console.error(
+            'Error taking action on report:',
+            error
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Server error'
+        );
     }
 };
-
-
 
 
 exports.showReport = async (req, res) => {

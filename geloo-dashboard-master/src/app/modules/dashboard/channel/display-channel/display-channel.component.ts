@@ -63,7 +63,7 @@ export class DisplayChannelComponent implements OnInit {
     if (v && typeof v === 'object') {
       if (v.$oid) return String(v.$oid);
       if (v.toHexString && typeof v.toHexString === 'function') return v.toHexString();
-      
+
       // Handle Buffer-like objects from Mongoose/BSON
       const buf = v.buffer || v.data || v;
       if (buf && (typeof buf === 'object' || Array.isArray(buf))) {
@@ -72,7 +72,7 @@ export class DisplayChannelComponent implements OnInit {
           return keys.map(k => Number(buf[k]).toString(16).padStart(2, '0')).join('');
         }
       }
-      
+
       if (v._id) return this.itemId(v._id);
       if (v.id) return this.itemId(v.id);
     }
@@ -109,7 +109,7 @@ export class DisplayChannelComponent implements OnInit {
   }
 
   clearReports() {
-    if (confirm('Are you sure you want to clear all reports for this channel?')) {
+    if (confirm('Dismiss all open and under-review reports for this channel? Moderation history will be retained.')) {
       const id = this.itemId(this.channel);
       this.dataService.sendPostRequest(`channel/${id}/clearReports`, {}).subscribe(() => {
         this.loadChannel(id);

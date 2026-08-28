@@ -13,12 +13,29 @@ exports.requireLegalAcceptance = (requirements) => {
                 return next();
             }
 
-            // Bypass for admins (often seeded or system users)
-            if (req.auth && (req.auth.role === 'ADMIN' || req.auth.role === 'SUPER ADMIN' || req.auth.role === 'SUPER_ADMIN')) {
+            // Bypass for active platform administrators. When a live
+            // database-backed actor is available it is authoritative over
+            // stale JWT role claims.
+            const actor =
+                req.authUser ||
+                req.auth;
+
+            if (
+                actor &&
+                actor.enabled !== false &&
+                actor.isDeleted !== true &&
+                (
+                    actor.role === 'ADMIN' ||
+                    actor.role === 'SUPER ADMIN' ||
+                    actor.role === 'SUPER_ADMIN'
+                )
+            ) {
                 return next();
             }
 
-            const userId = req.auth && req.auth._id;
+            const userId =
+                actor &&
+                actor._id;
             if (!userId) return Response.sendError(res, 401, 'Unauthorized');
 
             // Explicit feature-specific legal acceptance must be tied to the

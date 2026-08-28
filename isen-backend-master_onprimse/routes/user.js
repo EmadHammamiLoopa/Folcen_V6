@@ -641,8 +641,8 @@ router.get('/:userId', [requireSignin, isAuth], showUser);
 
 // Analytics Aliases (Dashboard compatibility)
 const AdminController = require('../app/controllers/AdminController');
-router.get('/analytics', [requireSignin, isAdmin], AdminController.getAnalytics);
-router.get('/retention', [requireSignin, isAdmin], AdminController.getRetention); // Fixed: use getRetention instead of getAnalytics alias
+router.get('/analytics', [requireSignin, withAuthUser, isAdmin], AdminController.getAnalytics);
+router.get('/retention', [requireSignin, withAuthUser, isAdmin], AdminController.getRetention); // Fixed: use getRetention instead of getAnalytics alias
 
 router.post('/:userId/report', [requireSignin], reportUser);
 router.post('/:userId/ban', [requireSignin, withAuthUser, isAdmin], banUser);

@@ -4,8 +4,10 @@ const Channel = require("../models/Channel")
 const Post = require("../models/Post")
 const Comment = require("../models/Comment")
 const Report = require("../models/Report")
+const { dismissEntityReports, resolveEntityReports } = require('../utils/reportModeration');
 const Activity = require('../models/Activity');
 const Response = require("./Response")
+const { removeManagedMedia } = require('../utils/contentMediaLifecycle');
 const { generateAnonymName, withVotesInfo } = require(".././nameGenerator")
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
@@ -95,14 +97,25 @@ exports.showComment = async (req, res) => {
             }
         }
 
-        // Check if media is attached and format URL if present
-        if (comment.media && comment.media.url) {
-            responseData.mediaUrl = `http://127.0.0.1:3300/${comment.media.url.replace(/\\/g, '/')}`; // Set mediaUrl field with formatted URL
-            responseData.mediaExpiryDate = comment.media.expiryDate; // Set mediaExpiryDate field with expiry date
+        // Expiry is an access boundary. Suppress the URL immediately
+        // even if the physical cleanup sweep has not run yet.
+        const mediaIsActive =
+            comment.media &&
+            comment.media.url &&
+            (
+                !comment.media.expiryDate ||
+                new Date(comment.media.expiryDate).getTime() > Date.now()
+            );
+
+        if (mediaIsActive) {
+            responseData.mediaUrl = `http://127.0.0.1:3300/${comment.media.url.replace(/\\/g, '/')}`;
+            responseData.mediaExpiryDate = comment.media.expiryDate;
         } else {
-            // No media attached
             responseData.mediaUrl = null;
-            responseData.mediaExpiryDate = null;
+            responseData.mediaExpiryDate =
+                comment.media && comment.media.expiryDate
+                    ? comment.media.expiryDate
+                    : null;
         }
 
         // Remove the original media field (optional)
@@ -123,7 +136,7 @@ exports.showDashComment = async (req, res) => {
             .populate('post', 'title text')
             .populate({
                 path: 'reports',
-                populate: { path: 'userId', select: 'firstName lastName email' }
+                populate: { path: 'reporter', select: 'firstName lastName email' }
             });
 
         if (!comment) {
@@ -141,10 +154,10 @@ exports.showCommentEditDash = async (req, res) => {
     try {
         const comment = await Comment.findById(req.comment._id).lean();
         if (!comment) return Response.sendError(res, 404, 'Comment not found');
-        
+
         // Ensure ID is present for the form
         comment.id = comment._id.toString();
-        
+
         return Response.sendResponse(res, comment);
     } catch (err) {
         console.error('Error in showCommentEditDash:', err);
@@ -189,7 +202,7 @@ exports.postComments = async (req, res) => {
     try {
         const post = req.post;
         const dashParams = extractDashParams(req, ['text']);
-        
+
         const comments = await Comment.aggregate()
             .match({ post: post._id, ...dashParams.filter })
             .project({
@@ -682,7 +695,7 @@ exports.getComments = async (req, res) => {
         }
 
         // Get disabled, deleted, or banned users to hide their comments
-        const disabledUsers = await User.find({ 
+        const disabledUsers = await User.find({
             $or: [
                 { enabled: false },
                 { isDeleted: true },
@@ -693,7 +706,7 @@ exports.getComments = async (req, res) => {
         const disabledUserIds = disabledUsers.map(u => u._id);
 
         // Find comments for the post with pagination and population
-        const comments = await Comment.find({ 
+        const comments = await Comment.find({
             post: post._id,
             user: { $nin: disabledUserIds },
             deletedAt: null,
@@ -710,7 +723,7 @@ exports.getComments = async (req, res) => {
         }
 
         // Count the total number of comments (excluding disabled users)
-        const count = await Comment.countDocuments({ 
+        const count = await Comment.countDocuments({
             post: post._id,
             user: { $nin: disabledUserIds },
             deletedAt: null,
@@ -744,44 +757,145 @@ exports.getComments = async (req, res) => {
 };
 
 
-exports.deleteComment = (req, res) => {
+exports.deleteComment = async (req, res) => {
     try {
-        const comment = req.comment
-        this.destroyComment(res, comment._id, (res) => Response.sendResponse(res, null, 'comment removed'))
+        const comment =
+            req.comment;
+
+        return await exports.destroyComment(
+            res,
+            comment._id,
+            response =>
+                Response.sendResponse(
+                    response,
+                    null,
+                    'comment removed'
+                )
+        );
+
     } catch (error) {
         console.log(error);
+
+        if (!res.headersSent) {
+            return Response.sendError(
+                res,
+                500,
+                'Server error'
+            );
+        }
     }
-}
+};
 
 exports.destroyComment = async (res, commentId, callback) => {
     try {
-        // Delete the comment
-        await Comment.deleteOne({ _id: commentId });
+        const comment =
+            await Comment.findById(
+                commentId
+            )
+                .select(
+                    'media.url'
+                )
+                .lean();
 
-        // Remove any associated reports for the comment
-        await Report.deleteMany({ 'entity.id': commentId, 'entity.name': 'comment' });
+        if (
+            comment &&
+            comment.media &&
+            comment.media.url
+        ) {
+            await removeManagedMedia(
+                comment.media.url
+            );
+        }
 
-        // Remove the Archive/Activity entry created for this comment.
+        await resolveEntityReports({
+            entityId:
+                commentId,
+
+            entityModel:
+                'Comment',
+
+            moderatorNote:
+                'Comment removed'
+        });
+
         await Activity.deleteMany({
             $or: [
-                { 'meta.commentId': commentId },
-                { targetType: 'comment', targetId: commentId }
+                {
+                    'meta.commentId':
+                        commentId
+                },
+                {
+                    targetType:
+                        'comment',
+
+                    targetId:
+                        commentId
+                }
             ]
         });
 
-        // If a callback exists, call it
-        if (callback) return callback(res);
+        await Comment.deleteOne({
+            _id:
+                commentId
+        });
+
+        if (callback) {
+            return callback(
+                res
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            null,
+            'Comment removed'
+        );
+
     } catch (err) {
         console.log(err);
-        return Response.sendError(res, 500, 'Server error');
+
+        if (!res.headersSent) {
+            return Response.sendError(
+                res,
+                500,
+                'Server error'
+            );
+        }
     }
 };
 
 exports.clearCommentReports = async (req, res) => {
     try {
-        const commentId = req.comment._id;
-        await Report.deleteMany({ 'entity.id': commentId, 'entity.name': 'comment' });
-        return Response.sendResponse(res, null, 'reports cleaned');
+        const result =
+            await dismissEntityReports({
+                entityId:
+                    req.comment._id,
+                entityModel:
+                    'Comment'
+            });
+
+        await Comment.updateOne(
+            {
+                _id:
+                    req.comment._id
+            },
+            {
+                $set: {
+                    reports: []
+                }
+            }
+        );
+
+        return Response.sendResponse(
+            res,
+            {
+                dismissedReports:
+                    result.dismissedReports,
+                retentionDate:
+                    result.retentionDate
+            },
+            'Reports cleared from active moderation queue'
+        );
     } catch (err) {
         console.log(err);
         return Response.sendError(res, 400, 'Failed to clear reports');

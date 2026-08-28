@@ -5,66 +5,39 @@ const Response = require("./Response")
 const _ = require('lodash')
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const User = require("../models/User");
+const mongoose = require('mongoose');
+const SubscriptionPaymentReceipt = require("../models/SubscriptionPaymentReceipt");
+const {
+    getEffectivePlanForUser
+} = require("../utils/subscriptionPolicy");
 
 // New method to get the effective plan for the current user
 exports.getEffectivePlan = async (req, res) => {
     try {
-        const userId = req.authUser._id;
-        const userRole = req.authUser.role;
-        const userCountry = req.authUser.country;
-        const userCity = req.authUser.city;
+        const plan =
+            await getEffectivePlanForUser(
+                req.authUser
+            );
 
-        // 1. Get global subscription
-        let plan = await Subscription.findOne({ userId: { $exists: false } }).lean();
-        if (!plan) {
-            // Fallback if no global plan exists
-            plan = { dayPrice: 0, weekPrice: 0, monthPrice: 0, yearPrice: 0, currency: 'USD', offers: [] };
-        }
+        return Response.sendResponse(
+            res,
+            plan
+        );
 
-        // 2. Find applicable rules
-        const rules = await PlanRule.find({
-            isActive: true,
-            $or: [
-                { targetUsers: userId },
-                { targetRoles: userRole },
-                { targetCountries: userCountry },
-                { targetCities: userCity }
-            ],
-            $or: [
-                { expiresAt: { $exists: false } },
-                { expiresAt: null },
-                { expiresAt: { $gt: new Date() } }
-            ]
-        }).sort({ priority: -1 });
-
-        // 3. Apply rules
-        plan.isFree = false;
-        for (const rule of rules) {
-            if (rule.type === 'FREE_PLAN') {
-                plan.dayPrice = 0;
-                plan.weekPrice = 0;
-                plan.monthPrice = 0;
-                plan.yearPrice = 0;
-                plan.isFree = true;
-                break; // FREE_PLAN is usually the ultimate override
-            } else if (rule.type === 'PRICE_OVERRIDE') {
-                if (rule.config.dayPrice !== undefined) plan.dayPrice = rule.config.dayPrice;
-                if (rule.config.weekPrice !== undefined) plan.weekPrice = rule.config.weekPrice;
-                if (rule.config.monthPrice !== undefined) plan.monthPrice = rule.config.monthPrice;
-                if (rule.config.yearPrice !== undefined) plan.yearPrice = rule.config.yearPrice;
-                if (rule.config.currency) plan.currency = rule.config.currency;
-                if (rule.config.offers && rule.config.offers.length > 0) plan.offers = rule.config.offers;
-            }
-        }
-
-        return Response.sendResponse(res, plan);
     } catch (error) {
-        console.error('Error getting effective plan:', error);
-        return Response.sendError(res, 500, 'Server error');
+        console.error(
+            'Error getting effective plan:',
+            error
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Server error'
+        );
     }
 };
 
-// Dashboard CRUD for Plan Rules
 exports.listPlanRules = async (req, res) => {
     try {
         const rules = await PlanRule.find().sort({ priority: -1 });
@@ -82,7 +55,7 @@ exports.listPlanRules = async (req, res) => {
 exports.createPlanRule = async (req, res) => {
     try {
         const data = req.fields || req.body;
-        
+
         // Parse JSON strings from FormData if necessary
         ['targetUsers', 'targetRoles', 'targetCountries', 'targetCities'].forEach(field => {
             if (typeof data[field] === 'string') {
@@ -227,7 +200,7 @@ exports.manageOffers = async (req, res) => {
     try {
         const { offers } = req.body;
         let subscription = await Subscription.findOne({ _id: req.params.subscriptionId });
-        
+
         if (!subscription) {
             return Response.sendError(res, 404, 'Subscription not found');
         }
@@ -435,68 +408,762 @@ exports.destroySubscription = async (req, res) => {
 };
 
 
-exports.clientSecret = async(req, res) => {
-    console.log("Ssssssssssss")
-    const subscription = req.subscription
-    const duration = req.body.duration
-    const { amount } = subExpireDateAndAmount(subscription, duration)
-    const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100),
-        currency: subscription.currency,
-        metadata: {integration_check: 'accept_a_payment'},
-    });
-    Response.sendResponse(res, {
-        client_secret: paymentIntent.client_secret
-    })
-}
+exports.clientSecret = async (req, res) => {
+    try {
+        const subscription =
+            req.subscription;
 
-const subExpireDateAndAmount = (subscription, duration) => {
+        const duration =
+            normalizeSubscriptionDuration(
+                req.body &&
+                req.body.duration
+            );
 
-    const expireDate = new Date()
-    let amount;
+        const effectivePlan =
+            await getEffectivePlanForUser(
+                req.authUser,
+                subscription
+            );
 
-    if(duration == 'day'){
-        amount = subscription.dayPrice
-        expireDate.setDate(expireDate.getDate() + 1)
+        const {
+            amount
+        } =
+            subExpireDateAndAmount(
+                effectivePlan,
+                duration
+            );
+
+        const amountCents =
+            Math.round(
+                Number(
+                    amount
+                ) *
+                100
+            );
+
+        if (
+            !Number.isSafeInteger(
+                amountCents
+            ) ||
+            amountCents <=
+                0
+        ) {
+            return Response.sendError(
+                res,
+                400,
+                effectivePlan.isFree
+                    ? 'No payment is required for this user'
+                    : 'Subscription amount must be greater than zero'
+            );
+        }
+
+        const currency =
+            String(
+                effectivePlan.currency ||
+                subscription.currency ||
+                ''
+            )
+                .trim()
+                .toLowerCase();
+
+        if (
+            !/^[a-z]{3,4}$/.test(
+                currency
+            )
+        ) {
+            return Response.sendError(
+                res,
+                400,
+                'Invalid subscription currency'
+            );
+        }
+
+        const paymentIntent =
+            await stripe.paymentIntents.create({
+                amount:
+                    amountCents,
+
+                currency,
+
+                metadata: {
+                    integration_check:
+                        'accept_a_payment',
+
+                    folcenUserId:
+                        String(
+                            req.authUser._id
+                        ),
+
+                    folcenSubscriptionId:
+                        String(
+                            subscription._id
+                        ),
+
+                    folcenDuration:
+                        duration,
+
+                    folcenAmountCents:
+                        String(
+                            amountCents
+                        ),
+
+                    folcenCurrency:
+                        currency
+                }
+            });
+
+        return Response.sendResponse(
+            res,
+            {
+                client_secret:
+                    paymentIntent.client_secret,
+
+                payment_intent_id:
+                    paymentIntent.id
+            }
+        );
+
+    } catch (error) {
+        console.error(
+            'Error creating subscription PaymentIntent:',
+            error
+        );
+
+        return Response.sendError(
+            res,
+            error &&
+            error.statusCode ===
+                400
+                ? 400
+                : 500,
+            error &&
+            error.statusCode ===
+                400
+                ? error.message
+                : 'Failed to create payment intent'
+        );
     }
-    if(duration == 'week'){
-        amount = subscription.weekPrice
-        expireDate.setDate(expireDate.getDate() + 7)
+};
 
+const VALID_SUBSCRIPTION_DURATIONS =
+    new Set([
+        'day',
+        'week',
+        'month',
+        'year'
+    ]);
+
+const normalizeSubscriptionDuration = (value) => {
+    const duration =
+        String(
+            value || ''
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        !VALID_SUBSCRIPTION_DURATIONS.has(
+            duration
+        )
+    ) {
+        const error =
+            new Error(
+                'Invalid subscription duration'
+            );
+
+        error.statusCode =
+            400;
+
+        throw error;
     }
-    if(duration == 'month'){
-        amount = subscription.monthPrice
-        expireDate.setMonth(expireDate.getMonth() + 1)
+
+    return duration;
+};
+
+const addSubscriptionDuration = (
+    baseDate,
+    duration
+) => {
+    const normalized =
+        normalizeSubscriptionDuration(
+            duration
+        );
+
+    const expireDate =
+        new Date(
+            baseDate
+        );
+
+    if (
+        Number.isNaN(
+            expireDate.getTime()
+        )
+    ) {
+        const error =
+            new Error(
+                'Invalid subscription base date'
+            );
+
+        error.statusCode =
+            400;
+
+        throw error;
     }
-    if(duration == 'year'){
-        amount = subscription.yearPrice
-        expireDate.setFullYear(expireDate.getFullYear() + 1)
+
+    if (
+        normalized ===
+        'day'
+    ) {
+        expireDate.setDate(
+            expireDate.getDate() +
+            1
+        );
+    }
+
+    if (
+        normalized ===
+        'week'
+    ) {
+        expireDate.setDate(
+            expireDate.getDate() +
+            7
+        );
+    }
+
+    if (
+        normalized ===
+        'month'
+    ) {
+        expireDate.setMonth(
+            expireDate.getMonth() +
+            1
+        );
+    }
+
+    if (
+        normalized ===
+        'year'
+    ) {
+        expireDate.setFullYear(
+            expireDate.getFullYear() +
+            1
+        );
+    }
+
+    return expireDate;
+};
+
+const subExpireDateAndAmount = (
+    subscription,
+    duration
+) => {
+    const normalized =
+        normalizeSubscriptionDuration(
+            duration
+        );
+
+    const priceField = {
+        day:
+            'dayPrice',
+
+        week:
+            'weekPrice',
+
+        month:
+            'monthPrice',
+
+        year:
+            'yearPrice'
+    }[normalized];
+
+    const amount =
+        Number(
+            subscription &&
+            subscription[
+                priceField
+            ]
+        );
+
+    if (
+        !Number.isFinite(
+            amount
+        ) ||
+        amount <
+            0
+    ) {
+        const error =
+            new Error(
+                'Invalid subscription price'
+            );
+
+        error.statusCode =
+            400;
+
+        throw error;
     }
 
     return {
         amount,
-        expireDate
+
+        expireDate:
+            addSubscriptionDuration(
+                new Date(),
+                normalized
+            )
+    };
+};
+
+const paymentClaimWindowMs = () => {
+    const configured =
+        Number(
+            process.env.SUBSCRIPTION_PAYMENT_CLAIM_HOURS ||
+            24
+        );
+
+    const hours =
+        Number.isFinite(
+            configured
+        ) &&
+        configured >
+            0
+            ? configured
+            : 24;
+
+    return hours *
+        60 *
+        60 *
+        1000;
+};
+
+const paymentReceiptLifetimeMs = () => {
+    const claimWindow =
+        paymentClaimWindowMs();
+
+    const configured =
+        Number(
+            process.env.SUBSCRIPTION_PAYMENT_RECEIPT_HOURS ||
+            48
+        );
+
+    const configuredMs =
+        (
+            Number.isFinite(
+                configured
+            ) &&
+            configured >
+                0
+                ? configured
+                : 48
+        ) *
+        60 *
+        60 *
+        1000;
+
+    return Math.max(
+        configuredMs,
+        claimWindow +
+        60 *
+        60 *
+        1000
+    );
+};
+
+const paymentReceiptMatches = (
+    receipt,
+    {
+        userId,
+        subscriptionId,
+        duration
     }
-}
+) => (
+    receipt &&
+    String(
+        receipt.userId
+    ) ===
+        String(
+            userId
+        ) &&
+    String(
+        receipt.subscriptionId
+    ) ===
+        String(
+            subscriptionId
+        ) &&
+    receipt.duration ===
+        duration
+);
 
 exports.subscribe = async (req, res) => {
+    const subscription =
+        req.subscription;
+
+    const authUser =
+        req.authUser;
+
+    let receipt =
+        null;
+
+    let entitlementSaved =
+        false;
+
     try {
-        const subscription = req.subscription
-        const duration = req.body.duration
-        const authUser = req.authUser
-        const { expireDate } = subExpireDateAndAmount(subscription, duration)
-        
-        authUser.subscription = {
-            _id: subscription._id,
-            expireDate
+        const duration =
+            normalizeSubscriptionDuration(
+                req.body &&
+                req.body.duration
+            );
+
+        const paymentIntentId =
+            String(
+                (
+                    req.body &&
+                    req.body.paymentIntentId
+                ) ||
+                ''
+            )
+                .trim();
+
+        if (
+            !paymentIntentId.startsWith(
+                'pi_'
+            )
+        ) {
+            return Response.sendError(
+                res,
+                400,
+                'Valid paymentIntentId is required'
+            );
         }
-        const user = await authUser.save();
-        return Response.sendResponse(res, user.publicInfo(), 'Payment Successful');
+
+        const paymentIntent =
+            await stripe.paymentIntents.retrieve(
+                paymentIntentId
+            );
+
+        if (
+            !paymentIntent ||
+            paymentIntent.status !==
+                'succeeded'
+        ) {
+            return Response.sendError(
+                res,
+                402,
+                'Payment has not completed successfully'
+            );
+        }
+
+        const metadata =
+            paymentIntent.metadata ||
+            {};
+
+        const userId =
+            String(
+                authUser._id
+            );
+
+        const subscriptionId =
+            String(
+                subscription._id
+            );
+
+        if (
+            metadata.folcenUserId !==
+                userId ||
+            metadata.folcenSubscriptionId !==
+                subscriptionId ||
+            metadata.folcenDuration !==
+                duration
+        ) {
+            return Response.sendError(
+                res,
+                403,
+                'Payment intent does not match this subscription request'
+            );
+        }
+
+        const expectedAmountCents =
+            Number(
+                metadata.folcenAmountCents
+            );
+
+        const expectedCurrency =
+            String(
+                metadata.folcenCurrency ||
+                ''
+            )
+                .trim()
+                .toLowerCase();
+
+        if (
+            !Number.isSafeInteger(
+                expectedAmountCents
+            ) ||
+            expectedAmountCents <=
+                0 ||
+            Number(
+                paymentIntent.amount
+            ) !==
+                expectedAmountCents ||
+            Number(
+                paymentIntent.amount_received ||
+                0
+            ) <
+                expectedAmountCents ||
+            String(
+                paymentIntent.currency ||
+                ''
+            )
+                .trim()
+                .toLowerCase() !==
+                expectedCurrency
+        ) {
+            return Response.sendError(
+                res,
+                402,
+                'Payment amount or currency does not match the subscription'
+            );
+        }
+
+        const createdMs =
+            Number(
+                paymentIntent.created
+            ) *
+            1000;
+
+        const nowMs =
+            Date.now();
+
+        if (
+            !Number.isFinite(
+                createdMs
+            ) ||
+            createdMs >
+                nowMs +
+                5 *
+                60 *
+                1000 ||
+            nowMs -
+                createdMs >
+                paymentClaimWindowMs()
+        ) {
+            return Response.sendError(
+                res,
+                409,
+                'Payment intent is outside the subscription claim window'
+            );
+        }
+
+        const existingReceipt =
+            await SubscriptionPaymentReceipt.findById(
+                paymentIntentId
+            )
+                .lean();
+
+        if (
+            existingReceipt
+        ) {
+            if (
+                paymentReceiptMatches(
+                    existingReceipt,
+                    {
+                        userId:
+                            authUser._id,
+
+                        subscriptionId:
+                            subscription._id,
+
+                        duration
+                    }
+                ) &&
+                existingReceipt.status ===
+                    'granted'
+            ) {
+                return Response.sendResponse(
+                    res,
+                    authUser.publicInfo(),
+                    'Payment already applied'
+                );
+            }
+
+            return Response.sendError(
+                res,
+                409,
+                'Payment intent has already been claimed'
+            );
+        }
+
+        try {
+            receipt =
+                await SubscriptionPaymentReceipt.create({
+                    _id:
+                        paymentIntentId,
+
+                    userId:
+                        authUser._id,
+
+                    subscriptionId:
+                        subscription._id,
+
+                    duration,
+
+                    amountCents:
+                        expectedAmountCents,
+
+                    currency:
+                        expectedCurrency,
+
+                    status:
+                        'claimed',
+
+                    deleteAfter:
+                        new Date(
+                            nowMs +
+                            paymentReceiptLifetimeMs()
+                        )
+                });
+
+        } catch (error) {
+            if (
+                error &&
+                error.code ===
+                    11000
+            ) {
+                const racedReceipt =
+                    await SubscriptionPaymentReceipt.findById(
+                        paymentIntentId
+                    )
+                        .lean();
+
+                if (
+                    paymentReceiptMatches(
+                        racedReceipt,
+                        {
+                            userId:
+                                authUser._id,
+
+                            subscriptionId:
+                                subscription._id,
+
+                            duration
+                        }
+                    ) &&
+                    racedReceipt &&
+                    racedReceipt.status ===
+                        'granted'
+                ) {
+                    return Response.sendResponse(
+                        res,
+                        authUser.publicInfo(),
+                        'Payment already applied'
+                    );
+                }
+
+                return Response.sendError(
+                    res,
+                    409,
+                    'Payment intent has already been claimed'
+                );
+            }
+
+            throw error;
+        }
+
+        const {
+            expireDate
+        } =
+            subExpireDateAndAmount(
+                subscription,
+                duration
+            );
+
+        authUser.subscription = {
+            _id:
+                subscription._id,
+
+            expireDate
+        };
+
+        await authUser.save();
+
+        entitlementSaved =
+            true;
+
+        try {
+            await SubscriptionPaymentReceipt.updateOne(
+                {
+                    _id:
+                        paymentIntentId
+                },
+                {
+                    $set: {
+                        status:
+                            'granted',
+
+                        grantedAt:
+                            new Date(),
+
+                        entitlementExpireDate:
+                            expireDate
+                    }
+                }
+            );
+
+        } catch (receiptError) {
+            // The claimed receipt still blocks replay even when this
+            // bookkeeping update fails after entitlement persistence.
+            console.error(
+                'Subscription receipt finalization failed:',
+                receiptError
+            );
+        }
+
+        return Response.sendResponse(
+            res,
+            authUser.publicInfo(),
+            'Payment Successful'
+        );
+
     } catch (err) {
-        console.error('Error in subscribe:', err);
-        return Response.sendError(res, 500, 'Failed to subscribe');
+        console.error(
+            'Error in verified subscribe:',
+            err
+        );
+
+        if (
+            receipt &&
+            !entitlementSaved
+        ) {
+            try {
+                await SubscriptionPaymentReceipt.deleteOne({
+                    _id:
+                        receipt._id,
+
+                    status:
+                        'claimed'
+                });
+            } catch (cleanupError) {
+                console.error(
+                    'Failed to release unsuccessful payment claim:',
+                    cleanupError
+                );
+            }
+        }
+
+        return Response.sendError(
+            res,
+            err &&
+            err.statusCode ===
+                400
+                ? 400
+                : 500,
+            err &&
+            err.statusCode ===
+                400
+                ? err.message
+                : 'Failed to subscribe'
+        );
     }
-}
+};
 
 exports.payAndSubscribe = async (req, res) => {
     const subscription = req.subscription
@@ -526,32 +1193,196 @@ exports.payAndSubscribe = async (req, res) => {
 
 exports.giveFreeSubscription = async (req, res) => {
     try {
-        const { userId, days, planId } = req.body;
-        const user = await User.findById(userId);
-        if (!user) return Response.sendError(res, 404, 'User not found');
+        const {
+            userId,
+            days,
+            planId
+        } =
+            req.body ||
+            {};
 
-        const now = new Date();
-        const currentExpire = (user.subscription && user.subscription.expireDate) ? new Date(user.subscription.expireDate) : now;
-        const baseDate = currentExpire > now ? currentExpire : now;
-        
-        const newExpire = new Date(baseDate);
-        newExpire.setDate(newExpire.getDate() + parseInt(days));
+        const normalizedDays =
+            Number(
+                days
+            );
 
-        user.subscription = {
-            _id: planId || (user.subscription ? user.subscription._id : null),
-            expireDate: newExpire
-        };
-
-        // If no planId and no existing plan, try to find a global plan
-        if (!user.subscription._id) {
-            const globalPlan = await Subscription.findOne({ userId: { $exists: false } });
-            if (globalPlan) user.subscription._id = globalPlan._id;
+        if (
+            !Number.isSafeInteger(
+                normalizedDays
+            ) ||
+            normalizedDays <=
+                0
+        ) {
+            return Response.sendError(
+                res,
+                400,
+                'days must be a positive integer'
+            );
         }
 
+        if (
+            !userId ||
+            !mongoose.Types.ObjectId.isValid(
+                userId
+            )
+        ) {
+            return Response.sendError(
+                res,
+                400,
+                'Invalid userId'
+            );
+        }
+
+        const user =
+            await User.findById(
+                userId
+            );
+
+        if (
+            !user
+        ) {
+            return Response.sendError(
+                res,
+                404,
+                'User not found'
+            );
+        }
+
+        let selectedPlan =
+            null;
+
+        if (
+            planId
+        ) {
+            if (
+                !mongoose.Types.ObjectId.isValid(
+                    planId
+                )
+            ) {
+                return Response.sendError(
+                    res,
+                    400,
+                    'Invalid planId'
+                );
+            }
+
+            selectedPlan =
+                await Subscription.findById(
+                    planId
+                );
+
+            if (
+                !selectedPlan
+            ) {
+                return Response.sendError(
+                    res,
+                    404,
+                    'Subscription plan not found'
+                );
+            }
+        }
+
+        if (
+            !selectedPlan &&
+            user.subscription &&
+            user.subscription._id
+        ) {
+            selectedPlan =
+                await Subscription.findById(
+                    user.subscription._id
+                );
+        }
+
+        if (
+            !selectedPlan
+        ) {
+            selectedPlan =
+                await Subscription.findOne({
+                    $or: [
+                        {
+                            userId: {
+                                $exists:
+                                    false
+                            }
+                        },
+                        {
+                            userId:
+                                null
+                        }
+                    ]
+                });
+        }
+
+        if (
+            !selectedPlan
+        ) {
+            return Response.sendError(
+                res,
+                409,
+                'No subscription plan is available'
+            );
+        }
+
+        const now =
+            new Date();
+
+        const currentExpire =
+            (
+                user.subscription &&
+                user.subscription.expireDate
+            )
+                ? new Date(
+                    user.subscription.expireDate
+                )
+                : now;
+
+        const baseDate =
+            (
+                !Number.isNaN(
+                    currentExpire.getTime()
+                ) &&
+                currentExpire >
+                    now
+            )
+                ? currentExpire
+                : now;
+
+        const newExpire =
+            new Date(
+                baseDate
+            );
+
+        newExpire.setDate(
+            newExpire.getDate() +
+            normalizedDays
+        );
+
+        user.subscription = {
+            _id:
+                selectedPlan._id,
+
+            expireDate:
+                newExpire
+        };
+
         await user.save();
-        return Response.sendResponse(res, user.subscription, `Gave ${days} days of free subscription`);
+
+        return Response.sendResponse(
+            res,
+            user.subscription,
+            `Gave ${normalizedDays} days of free subscription`
+        );
+
     } catch (err) {
-        console.error('Error in giveFreeSubscription:', err);
-        return Response.sendError(res, 500, 'Server error');
+        console.error(
+            'Error in giveFreeSubscription:',
+            err
+        );
+
+        return Response.sendError(
+            res,
+            500,
+            'Server error'
+        );
     }
 };

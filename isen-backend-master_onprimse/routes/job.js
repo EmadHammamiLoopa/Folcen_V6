@@ -9,18 +9,18 @@ const { requireLegalAcceptance } = require('../app/middlewares/legal');
 const router = express.Router()
 
 
-router.get('/all', [requireSignin, isAdmin], allJobs)
-router.get('/dash/:jobId', [requireSignin, isAdmin], showJobDash)
-router.delete('/dash/:jobId', [requireSignin, isAdmin], destroyJob)
+router.get('/all', [requireSignin, withAuthUser, isAdmin], allJobs)
+router.get('/dash/:jobId', [requireSignin, withAuthUser, isAdmin], showJobDash)
+router.delete('/dash/:jobId', [requireSignin, withAuthUser, isAdmin], destroyJob)
 
 router.get('/posted', [requireSignin], postedJobs)
 router.get('/available', [requireSignin, withAuthUser], availableJobs)
 router.get('/storePermession', [requireSignin, withAuthUser, jobStorePermission], (req, res) => Response.sendResponse(res, true))
 router.post('/', [
-    form, 
-    requireSignin, 
-    withAuthUser, 
-    jobStorePermission, 
+    form,
+    requireSignin,
+    withAuthUser,
+    jobStorePermission,
     storeJobValidator,
     requireLegalAcceptance([
         { type: 'terms_and_conditions', versionEnvVar: 'TERMS_VERSION' },
@@ -28,15 +28,15 @@ router.post('/', [
         { type: 'jobs_disclaimer', versionEnvVar: 'JOBS_DISCLAIMER_VERSION' }
     ])
 ], storeJob)
-// router.post('/disable/:jobId', [requireSignin, jobOwner], disableJob)
+// router.post('/disable/:jobId', [requireSignin, withAuthUser, jobOwner], disableJob)
 
-router.post('/:jobId/status', [requireSignin, isAdmin], toggleJobStatus)
+router.post('/:jobId/status', [requireSignin, withAuthUser, isAdmin], toggleJobStatus)
 
-router.post('/:jobId/clearReports', [requireSignin, isAdmin], clearJobReports)
+router.post('/:jobId/clearReports', [requireSignin, withAuthUser, isAdmin], clearJobReports)
 router.post('/:jobId/report', [requireSignin], reportJob)
 router.get('/:jobId',[requireSignin], showJob)
-router.put('/:jobId', [form, requireSignin, jobOwner, updateJobValidator], updateJob)
-router.delete('/:jobId', [requireSignin, jobOwner], deleteJob)
+router.put('/:jobId', [form, requireSignin, withAuthUser, jobOwner, updateJobValidator], updateJob)
+router.delete('/:jobId', [requireSignin, withAuthUser, jobOwner], deleteJob)
 
 router.param('jobId', jobById)
 

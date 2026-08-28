@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { environment } from '../../../../../environments/environment';
-import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { DataService } from './../../../../services/data.service';
+import { GdprService } from './../../../../services/gdpr.service';
 import { User } from './../../../../models/User';
 import { AvatarUrlUtil } from './../../../../utils/avatar-url-util';
 import Swal from 'sweetalert2';
@@ -33,7 +33,11 @@ export class DisplayUserComponent implements OnInit {
   tab: string = 'profile';
   today: Date = new Date();
 
-  constructor(private http: HttpClient, private route: ActivatedRoute, private dataService: DataService) { }
+  constructor(
+    private route: ActivatedRoute,
+    private dataService: DataService,
+    private gdprService: GdprService
+  ) { }
 
   ngOnInit(): void {
     this.currentUser = new User().initialize(JSON.parse(localStorage.getItem('user')));
@@ -499,45 +503,172 @@ technical environment described.
   }
 
   extractUserData(userId: string) {
-    if (!userId || userId === 'undefined' || userId === 'null') {
-      alert("Cannot extract data: Invalid User ID");
+    if (
+      !userId ||
+      userId === 'undefined' ||
+      userId === 'null'
+    ) {
+      alert(
+        'Cannot extract data: Invalid User ID'
+      );
       return;
     }
-    const format = prompt("Enter format: 'json' or 'csv'", "json")?.toLowerCase();
-    if (!format || (format !== 'json' && format !== 'csv')) {
-      alert("Invalid format! Please enter 'json' or 'csv'.");
+
+    const format =
+      prompt(
+        "Enter format: 'json' or 'csv'",
+        'json'
+      )?.toLowerCase();
+
+    if (
+      !format ||
+      (
+        format !== 'json' &&
+        format !== 'csv'
+      )
+    ) {
+      alert(
+        "Invalid format! Please enter 'json' or 'csv'."
+      );
       return;
     }
-    const token = window.localStorage.getItem('token');
-    const apiUrl = `${environment.apiUrl}/user/extract/${userId}?format=${format}&token=${token}`;
-    if (format === 'json') {
-      this.http.get(apiUrl).subscribe((data: any) => {
-        const w = window.open('', '_blank');
-        if (!w) { alert('Popup blocked. Please allow popups.'); return; }
-        w.document.write('<pre>' + JSON.stringify(data, null, 2) + '</pre>');
-        w.document.close();
-      }, err => alert('Failed to extract data'));
-    } else {
-      window.open(apiUrl, '_blank');
-    }
+
+    // Authorization remains in the Authorization header. Never place the
+    // bearer token in a query string / browser history / proxy log.
+    this.dataService
+      .sendGetBlobRequest(
+        `user/extract/${userId}`,
+        { format }
+      )
+      .subscribe({
+        next: (blob: Blob) => {
+          const url =
+            URL.createObjectURL(
+              blob
+            );
+
+          const link =
+            document.createElement(
+              'a'
+            );
+
+          link.href =
+            url;
+
+          link.download =
+            `user-${userId}.${format}`;
+
+          link.style.display =
+            'none';
+
+          document.body.appendChild(
+            link
+          );
+
+          link.click();
+          link.remove();
+
+          setTimeout(
+            () =>
+              URL.revokeObjectURL(
+                url
+              ),
+            0
+          );
+        },
+
+        error: (err) => {
+          alert(
+            err?.message ||
+            'Failed to extract data'
+          );
+        }
+      });
   }
 
   extractJson(userId?: string) {
-    const id = userId || this.itemId(this.profile);
+    const id =
+      userId ||
+      this.itemId(
+        this.profile
+      );
+
     if (!id) return;
-    const apiUrl = `${environment.apiUrl}/gdpr/portability?userId=${id}`;
-    this.http.get(apiUrl, { headers: { Authorization: 'Bearer ' + window.localStorage.getItem('token') } }).subscribe((data: any) => {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `gdpr-export-${id}-${new Date().getTime()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      this.loadLegalData(id); // Refresh audit logs
-    }, err => alert('Failed to extract GDPR data'));
+
+    this.loading = true;
+
+    this.gdprService
+      .exportUserDataAll(id)
+      .subscribe({
+        next: (data: any) => {
+          this.loading = false;
+
+          if (
+            data &&
+            data.complete === false
+          ) {
+            alert(
+              'GDPR export was not marked complete by the server.'
+            );
+            return;
+          }
+
+          const blob =
+            new Blob(
+              [
+                JSON.stringify(
+                  data,
+                  null,
+                  2
+                )
+              ],
+              {
+                type:
+                  'application/json'
+              }
+            );
+
+          const url =
+            URL.createObjectURL(
+              blob
+            );
+
+          const link =
+            document.createElement(
+              'a'
+            );
+
+          link.href =
+            url;
+
+          link.download =
+            `gdpr-export-${id}-${Date.now()}.json`;
+
+          document.body.appendChild(
+            link
+          );
+
+          link.click();
+          link.remove();
+
+          URL.revokeObjectURL(
+            url
+          );
+
+          this.loadLegalData(
+            id
+          );
+        },
+
+        error: (err) => {
+          this.loading = false;
+
+          alert(
+            err?.message ||
+            'Failed to extract GDPR data'
+          );
+        }
+      });
   }
 
   gdprErase() {

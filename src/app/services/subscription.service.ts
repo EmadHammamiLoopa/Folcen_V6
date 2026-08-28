@@ -17,7 +17,7 @@ export class SubscriptionService extends DataService {
   getSubscriptionPrices(){
     return this.sendRequest({
       method: 'get',
-      url: '/prices'
+      url: '/effective'
     })
   }
 
