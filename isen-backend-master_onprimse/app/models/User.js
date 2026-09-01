@@ -9,14 +9,7 @@ try {
         console.warn('bcrypt native module failed to load; attempting bcryptjs fallback');
         bcrypt = require('bcryptjs');
     } catch (e2) {
-        console.warn('bcrypt and bcryptjs not available — using lightweight fallback for development only');
-        const crypto = require('crypto');
-        bcrypt = {
-            hashSync: (pwd) => 'devhash:' + crypto.createHash('sha256').update(pwd).digest('hex'),
-            hash: async (pwd) => 'devhash:' + crypto.createHash('sha256').update(pwd).digest('hex'),
-            compare: async (pwd, hash) => ('devhash:' + crypto.createHash('sha256').update(pwd).digest('hex')) === hash,
-            compareSync: (pwd, hash) => ('devhash:' + crypto.createHash('sha256').update(pwd).digest('hex')) === hash
-        };
+        throw new Error('Password hashing unavailable: failed to load both bcrypt and bcryptjs');
     }
 }
 
