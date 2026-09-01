@@ -1,7 +1,11 @@
 const { MongoClient } = require('mongodb');
 
 async function listAllDocumentsInCluster() {
-  const uri = "mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/?retryWrites=true&w=majority";
+if (!process.env.MONGODB_URL) {
+  throw new Error('MONGODB_URL is required');
+}
+
+  const uri = process.env.MONGODB_URL;
   const client = new MongoClient(uri);
 
   try {

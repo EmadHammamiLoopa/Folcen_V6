@@ -3,15 +3,14 @@ require("dotenv").config();
 
 const Peer = require("./app/models/Peer");
 
-const db =
-  process.env.MONGODB_URL ||
-  "mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0";
+if (!process.env.MONGODB_URL) {
+  throw new Error('MONGODB_URL is required');
+}
+
+const db = process.env.MONGODB_URL;
 
 mongoose
-  .connect(db, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(db)
   .then(async () => {
     console.log("✅ Connected to MongoDB");
 

@@ -4,10 +4,7 @@ const Subscription = require('./app/models/Subscription'); // Adjust the path to
 require('dotenv').config(); // Load environment variables from .env file
 
 // Connect to the MongoDB database
-mongoose.connect(process.env.MONGODB_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(process.env.MONGODB_URL);
 
 const resetAllSubscriptions = async () => {
   try {

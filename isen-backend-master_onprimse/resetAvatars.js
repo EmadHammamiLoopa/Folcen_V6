@@ -10,10 +10,7 @@ const defaultFemaleAvatarUrl = '/images/avatars/female.webp';
 const defaultOtherAvatarUrl = '/images/avatars/other.webp';
 
 // Connect to the MongoDB database
-mongoose.connect(process.env.MONGODB_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(process.env.MONGODB_URL);
 
 const cleanUpAvatars = async () => {
   try {

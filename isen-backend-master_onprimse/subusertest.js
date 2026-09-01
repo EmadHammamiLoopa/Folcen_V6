@@ -4,9 +4,11 @@ const Subscription = require("./app/models/Subscription");
 require("dotenv").config();
 
 // Use the MONGODB_URL from your environment variables or replace it with your MongoDB connection string directly
-const db =
-  process.env.MONGODB_URL ||
-  "mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0";
+if (!process.env.MONGODB_URL) {
+  throw new Error('MONGODB_URL is required');
+}
+
+const db = process.env.MONGODB_URL;
 
 // Helper to log subscription and user for debugging
 const logSubscriptionAndUser = async (userId, subscriptionId) => {
@@ -75,7 +77,7 @@ const subscribeUser = async () => {
 
 // Connect to MongoDB and run the subscription function
 mongoose
-  .connect(db, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(db)
   .then(() => {
     console.log("Connected to MongoDB");
     subscribeUser();

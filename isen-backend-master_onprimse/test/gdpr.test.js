@@ -43,7 +43,7 @@ describe('GDPR — purgeUser cascade', function () {
 
   before(async () => {
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
   });
 
   after(async () => { await mongoose.disconnect(); await mongod.stop(); });
@@ -98,7 +98,7 @@ describe('GDPR — consent gate for analytics', function () {
 
   before(async () => {
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
   });
 
   after(async () => { await mongoose.disconnect(); await mongod.stop(); });
@@ -162,7 +162,7 @@ describe('GDPR — consent update writes history', function () {
 
   before(async () => {
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
   });
 
   after(async () => { await mongoose.disconnect(); await mongod.stop(); });
@@ -349,7 +349,7 @@ describe('GDPR — consent record has immutable createdAt', function () {
 
   before(async () => {
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
   });
 
   after(async () => { await mongoose.disconnect(); await mongod.stop(); });
@@ -378,7 +378,7 @@ describe('GDPR — audit log browsing without userId filter', function () {
 
   before(async () => {
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
   });
 
   after(async () => { await mongoose.disconnect(); await mongod.stop(); });
@@ -405,7 +405,7 @@ describe('GDPR — recompute profiles only for consented users', function () {
 
   before(async () => {
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
   });
 
   after(async () => { await mongoose.disconnect(); await mongod.stop(); });

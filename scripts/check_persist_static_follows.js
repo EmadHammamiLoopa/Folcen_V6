@@ -73,7 +73,11 @@
       // As a next step, connect directly to MongoDB and list static channels in the user's city
       try {
         const mongoose = require('mongoose');
-        const mongoUri = process.env.MONGODB_URL || 'mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0';
+        const mongoUri = process.env.MONGODB_URL;
+        if (!mongoUri) {
+          console.error('MONGODB_URL is required for the direct database check');
+          process.exit(7);
+        }
         await mongoose.connect(mongoUri);
         console.log('Connected to MongoDB to inspect static channels');
 

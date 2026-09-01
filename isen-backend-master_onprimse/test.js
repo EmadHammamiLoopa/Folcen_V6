@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 
 // MongoDB connection
-mongoose.connect('mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
+if (!process.env.MONGODB_URL) {
+  throw new Error('MONGODB_URL is required');
+}
+
+mongoose.connect(process.env.MONGODB_URL)
 .then(() => {
     console.log('Connected to MongoDB successfully.');
     updateChannelType(); // Call the update function once connected

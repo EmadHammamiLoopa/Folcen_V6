@@ -3,7 +3,11 @@ const User = require("./app/models/User");
 require('dotenv').config(); // Load environment variables from .env file, if available
 
 // Use the MONGODB_URL from your environment variables or replace it with your MongoDB connection string directly
-const db = process.env.MONGODB_URL || 'mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0';
+if (!process.env.MONGODB_URL) {
+  throw new Error('MONGODB_URL is required');
+}
+
+const db = process.env.MONGODB_URL;
 
 // Function to update mainAvatar and avatar URLs for all users back to localhost
 const revertAvatarsForAllUsers = async () => {
@@ -53,7 +57,7 @@ const revertAvatarsForAllUsers = async () => {
 };
 
 // Connect to MongoDB and run the revert function
-mongoose.connect(db, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(db)
   .then(() => {
     console.log('Connected to MongoDB');
     revertAvatarsForAllUsers();

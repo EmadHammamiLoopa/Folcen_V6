@@ -6,10 +6,11 @@ const Message = require('./app/models/Message'); // Adjust the path to your Mess
 const User = require('./app/models/User'); // Adjust the path to your User model
 
 // Connect to the MongoDB database
-mongoose.connect('mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+if (!process.env.MONGODB_URL) {
+  throw new Error('MONGODB_URL is required');
+}
+
+mongoose.connect(process.env.MONGODB_URL);
 
 const resetMessagesAndUsers = async () => {
   try {

@@ -159,10 +159,7 @@ const resetAndCreateUsers = async () => {
 };
 
 // Connect to MongoDB and call resetAndCreateUsers function
-mongoose.connect(db, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => {
+mongoose.connect(db).then(() => {
   console.log('Connected to MongoDB');
   resetAndCreateUsers();
 }).catch(error => {

@@ -4,12 +4,16 @@
 const mongoose = require('mongoose');
 const path = require('path');
 
-const MONGO_URI = 'mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0';
+const MONGO_URI = process.env.MONGODB_URL;
+if (!MONGO_URI) {
+  console.error('MONGODB_URL is required');
+  process.exit(2);
+}
 
 async function run() {
   try {
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(MONGO_URI);
     console.log('Connected');
 
     const User = require(path.join(__dirname, '..', 'isen-backend-master_onprimse', 'app', 'models', 'User'));

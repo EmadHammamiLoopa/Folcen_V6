@@ -96,7 +96,7 @@ describe('Notification triggers (integration)', function () {
     };
 
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
   });
 
   after(async () => {

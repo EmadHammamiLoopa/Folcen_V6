@@ -6,8 +6,12 @@ const A = '66c7ba8cb077a84040bd9f01';
 const B = '66c7ba8cb077a84040bd9eed';
 
 async function main(){
-  const uri = process.env.MONGODB_URL || 'mongodb+srv://isenappnorway:S3WlOS8nf8EwWMmN@cluster0.gwb9wev.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0';
-  await mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+if (!process.env.MONGODB_URL) {
+  throw new Error('MONGODB_URL is required');
+}
+
+  const uri = process.env.MONGODB_URL;
+  await mongoose.connect(uri);
   console.log('Connected to DB');
   try{
     const ua = await User.findById(A);

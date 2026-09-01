@@ -85,10 +85,7 @@ const accounts = [
 async function seed() {
   console.log(`\nConnecting to: ${MONGO_URL.replace(/:([^@]+)@/, ':****@')}\n`);
 
-  await mongoose.connect(MONGO_URL, {
-    useNewUrlParser:    true,
-    useUnifiedTopology: true,
-  });
+  await mongoose.connect(MONGO_URL);
 
   // Load model AFTER connection so mongoose is ready
   const User = require('../app/models/User');

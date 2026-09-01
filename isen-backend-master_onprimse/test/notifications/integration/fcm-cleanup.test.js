@@ -54,7 +54,7 @@ describe('FCM invalid token cleanup (integration)', function () {
   before(async () => {
     // Boot DB
     mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongod.getUri());
 
     // We need the REAL fcmPushService — remove any mock that may have been
     // injected by triggers.test.js (which runs first in the suite).

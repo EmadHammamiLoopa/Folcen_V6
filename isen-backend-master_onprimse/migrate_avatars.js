@@ -4,10 +4,7 @@ require('dotenv').config();
 
 const MONGODB_URL = process.env.MONGODB_URL || 'mongodb://localhost:27017/isen';
 
-mongoose.connect(MONGODB_URL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(async () => {
+mongoose.connect(MONGODB_URL).then(async () => {
     console.log('Connected to MongoDB');
 
     const oldDefaults = [

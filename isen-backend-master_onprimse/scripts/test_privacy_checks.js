@@ -14,7 +14,7 @@ const User = require('../app/models/User');
 
 async function main(){
   const mongo = process.env.MONGODB_URL || process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/isen_test';
-  await mongoose.connect(mongo, { useNewUrlParser: true, useUnifiedTopology: true });
+  await mongoose.connect(mongo);
   console.log('Connected to', mongo);
 
   // Create a fake user
