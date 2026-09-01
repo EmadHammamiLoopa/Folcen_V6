@@ -7,10 +7,10 @@ const CallEvent = require('../models/CallEvent');
 const MessageEvent = require('../models/MessageEvent');
 const Report = require('../models/Report');
 const { recordAudit } = require('./audit');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 async function createCallRequest({ initiatedBy, participants = [], initialEvent = 'requested' }) {
-  const callId = `call_${uuidv4()}`;
+  const callId = `call_${randomUUID()}`;
   const evt = new CallEvent({ callId, initiatedBy, participants: participants.map(p => p), lifecycle: [{ event: initialEvent }] });
   await evt.save();
   // record audit linking the creation (append-only)
@@ -25,11 +25,7 @@ async function appendCallLifecycle(callId, { event, at = new Date(), durationSec
     evt.lifecycle.push({ event, at, durationSeconds });
     return await evt.save();
   } catch (err) {
-    console.error('[CallEvent] Failed to append lifecycle event:', {
-      callId,
-      event,
-      error: err.message
-    });
+    console.error('[CallEvent] Failed to append lifecycle event:', { event, error: err.message });
     return null;
   }
 }
@@ -100,7 +96,7 @@ async function createReport({ reporter, targetType, targetId, reasonCode, reason
           banUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h auto-ban
           bannedReason: 'Automatic ban due to multiple reports within 24 hours.'
         });
-        console.log(`[Auto-Ban] User ${targetUserId} banned due to ${reportCount} reports.`);
+        console.log(`[Auto-Ban] Account banned due to ${reportCount} reports.`);
       }
     }
   } catch (err) {

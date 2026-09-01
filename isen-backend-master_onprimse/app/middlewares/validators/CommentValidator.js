@@ -3,7 +3,6 @@ const Validator = require('validatorjs');
 
 exports.storeCommentValidator = (req, res, next) => {
     // Log to check if 'text' exists in req.body
-    console.log("Validating req.body:", req.body);
 
     const validation = new Validator(req.body, {
         'text': 'min:1|max:255|required' // Ensure the text is at least 1 character and required

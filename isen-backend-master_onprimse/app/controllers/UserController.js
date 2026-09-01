@@ -3,8 +3,7 @@ const User = require("../models/User")
 const mongoose = require('mongoose')
 
 const Response = require("./Response")
-const fs = require('fs')
-const fsp = fs.promises;
+const fsp = require('fs').promises;
 const path = require('path')
 const _ = require('lodash')
 const Request = require("../models/Request")
@@ -128,7 +127,7 @@ exports.removeAvatar = async (req, res) => {
 
         const avatarPath = path.join(__dirname, '..', '..', 'public', 'uploads', filename); // Adjusted to include 'uploads' directory
 
-        logger.info(`Requested path to delete: ${avatarPath}`);
+        logger.info('Avatar deletion requested');
 
         // Check if the avatar is a default avatar
         const isDefaultAvatar = [
@@ -145,15 +144,15 @@ exports.removeAvatar = async (req, res) => {
             // Ensure file exists (throws if not)
             await fsp.access(avatarPath);
         } catch (e) {
-            logger.info(`File not found or inaccessible: ${avatarPath}`);
+            logger.info('Avatar file not found or inaccessible');
             return res.status(404).send('Avatar file not found');
         }
 
         try {
-            logger.info(`File found: ${avatarPath}`);
+            logger.info('Avatar file located for deletion');
             await fsp.unlink(avatarPath);
         } catch (e) {
-            logger.info(`Failed to unlink avatar: ${avatarPath}`, e);
+            logger.warn('Failed to unlink avatar file');
             // continue to attempt cleanup of user record
         }
 
@@ -1464,9 +1463,9 @@ exports.uploadChatMedia = async (req, res) => {
 exports.showUserDash = async (req, res) => {
     try {
         const userId = normalizeId(req.params.userId);
-        logger.info(`[showUserDash] userId: ${userId}, original: ${req.params.userId}`);
+        logger.info('[showUserDash] request received');
         if (!mongoose.Types.ObjectId.isValid(userId)) {
-            logger.error(`[showUserDash] Invalid User ID: ${userId}`);
+            logger.error('[showUserDash] invalid user ID');
             return Response.sendError(res, 400, 'Invalid User ID');
         }
 
@@ -1578,17 +1577,14 @@ exports.updateUser = async (req, res) => {
         if (!user) return Response.sendError(res, 404, 'User not found');
 
         // Guarded debug logging: activate when env PROFILE_DEBUG_ID matches targetId or ?debug=1
-        const debugActive = (process.env.PROFILE_DEBUG_ID && String(process.env.PROFILE_DEBUG_ID) === String(targetId)) || (req.query && (req.query.debug === '1' || req.query.debug === 'true'));
+        const debugActive = Boolean(
+            process.env.PROFILE_DEBUG_ID &&
+            String(process.env.PROFILE_DEBUG_ID) === String(targetId)
+        );
         if (debugActive) {
             try {
                 const incoming = Object.keys(req.body || {}).map(k => ({ key: k, type: Array.isArray(req.body[k]) ? 'array' : typeof req.body[k], empty: req.body[k] === '' || req.body[k] === null || req.body[k] === undefined }));
-                logger.info('PROFILE_DEBUG: incoming payload keys/types for', String(targetId), incoming);
-                // append to debug file
-                try {
-                    const dbg = { at: new Date().toISOString(), userId: String(targetId), incoming };
-                    const logPath = path.join(process.cwd(), `profile-debug-${String(targetId)}.log`);
-                    fs.appendFileSync(logPath, JSON.stringify(dbg) + '\n');
-                } catch (e) { logger.warn('PROFILE_DEBUG: failed to write debug file', e); }
+                logger.info('PROFILE_DEBUG: incoming payload keys/types', incoming);
             } catch (e) { logger.warn('PROFILE_DEBUG: failed to stringify incoming payload', e); }
         }
 
@@ -1815,14 +1811,14 @@ exports.updateUser = async (req, res) => {
 
         // If debug was active for this update, record a post-save snapshot of changed fields (types only)
         try {
-            const debugActiveAfter = (process.env.PROFILE_DEBUG_ID && String(process.env.PROFILE_DEBUG_ID) === String(targetId)) || (req.query && (req.query.debug === '1' || req.query.debug === 'true'));
+            const debugActiveAfter = Boolean(
+                process.env.PROFILE_DEBUG_ID &&
+                String(process.env.PROFILE_DEBUG_ID) === String(targetId)
+            );
             if (debugActiveAfter) {
                 try {
                     const saved = changedFields.map(k => ({ key: k, type: Array.isArray(user[k]) ? 'array' : typeof user[k], empty: user[k] === '' || user[k] === null || user[k] === undefined }));
-                    logger.info('PROFILE_DEBUG: saved snapshot for', String(targetId), saved);
-                    const dbg2 = { at: new Date().toISOString(), userId: String(targetId), saved };
-                    const logPath2 = path.join(process.cwd(), `profile-debug-${String(targetId)}.log`);
-                    fs.appendFileSync(logPath2, JSON.stringify(dbg2) + '\n');
+                    logger.info('PROFILE_DEBUG: saved field types', saved);
                 } catch (e) { logger.warn('PROFILE_DEBUG: failed to write post-save debug file', e); }
             }
         } catch (e) { /* non-fatal */ }
@@ -1843,8 +1839,6 @@ exports.updateEmail = async (req, res) => {
         const { email, current_password } = req.body;
         const authUser = req.authUser;
 
-        logger.info('Attempting to update email for user:', authUser._id);
-        logger.info('New email to be set:', email);
 
         // Verify password before allowing email change
         const isPasswordValid = await authUser.authenticate(current_password);
@@ -1856,7 +1850,6 @@ exports.updateEmail = async (req, res) => {
         // Find if the email is already being used
         const user = await User.findOne({ email });
         if (user) {
-            logger.info('Email is already in use by another account:', email);
             return Response.sendError(res, 400, 'email already used in another account');
         }
 
@@ -1939,7 +1932,6 @@ exports.updatePassword = async (req, res) => {
             );
         }
 
-        logger.info('Comparing current password for user:', authUser._id);
         // Compare provided current password with the stored hashed password
         const isMatch = await authUser.authenticate(current_password);
 
@@ -1964,7 +1956,6 @@ exports.updatePassword = async (req, res) => {
         // tokenVersion is the durable credential-generation boundary.
         // Account-level revocation is reserved for lifecycle states such as disable/deletion.
 
-        logger.info('Password updated successfully for user:', authUser._id);
         return Response.sendResponse(res, authUser.publicInfo(), 'Password updated successfully');
     } catch (err) {
         logger.error('Error updating password:', err);
@@ -1980,8 +1971,8 @@ exports.storeAvatar = async (avatar, user) => {
         const avatarDir = path.join(process.cwd(), 'public/uploads');
         const avatarPath = path.join(avatarDir, avatarName);
 
-        logger.info(`Avatar directory: ${avatarDir}`);
-        logger.info(`Avatar path: ${avatarPath}`);
+        logger.info('Avatar storage directory resolved');
+        logger.info('Avatar storage path resolved');
 
         // Ensure the uploads directory exists
         try {
@@ -1992,7 +1983,7 @@ exports.storeAvatar = async (avatar, user) => {
         }
 
         // Write the new avatar file (async)
-        logger.info(`Writing new avatar file: ${avatarPath}`);
+        logger.info('Writing new avatar file');
         try {
             const data = await fsp.readFile(avatar.path);
             await fsp.writeFile(avatarPath, data);
@@ -2007,7 +1998,7 @@ exports.storeAvatar = async (avatar, user) => {
             const lastAvatarPath = path.join(__dirname, `./../../public${user.mainAvatar}`);
             try {
                 await fsp.access(lastAvatarPath);
-                logger.info(`Removing old avatar file: ${lastAvatarPath}`);
+                logger.info('Removing old avatar file');
                 await fsp.unlink(lastAvatarPath);
             } catch (e) {
                 // ignore if not exists
@@ -2035,7 +2026,7 @@ exports.storeAvatar = async (avatar, user) => {
         user.avatar.type = avatar.type;
 
         // Save the user object to the database
-        logger.info(`Saving user data with new avatar path: ${newAvatarPath}`);
+        logger.info('Saving user data with updated avatar reference');
         await user.save();
 
         // 🔥 REAL-TIME: Emit targeted profile update
@@ -3513,7 +3504,7 @@ exports.getFriends = async (req, res) => {
             return res.status(400).json({ error: 'Invalid page parameter' });
         }
 
-        logger.info('Authenticated user:', req.authUser);
+        logger.info('Authenticated user available');
 
         if (!req.authUser || !req.authUser._id) {
             logger.error('req.authUser is undefined or does not have _id');
@@ -3528,7 +3519,7 @@ exports.getFriends = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        logger.info('User document:', user);
+        logger.info('User document loaded');
 
         // If the user has no friends, return empty result immediately to avoid
         // querying with an empty $in array which will always return no documents.
@@ -3641,7 +3632,7 @@ exports.removeFriendship = async(req, res) => {
             )
         ]);
 
-        logger.info('removeFriendship: removed friendship and requests between', String(authUser._id), 'and', String(user._id));
+        logger.info('removeFriendship: friendship and requests removed');
 
         // 🔁 Notify both sides to refresh friends list
         emitFriendRequestsUpdated(authUser._id, user._id);
@@ -3750,12 +3741,12 @@ exports.updateRandomVisibility = async (req, res) => {
     try {
         const { visible } = req.body;
         const userId = req.authUser ? req.authUser._id : req.auth._id;
-        logger.info(`[UserController] updateRandomVisibility: visible=${visible}, userId=${userId}`);
+        logger.info('[UserController] privacy setting update requested');
 
         const user = await User.findByIdAndUpdate(userId, { $set: { randomVisible: visible } }, { new: true });
 
         if (!user) {
-            logger.warn(`[UserController] updateRandomVisibility: User not found for ID ${userId}`);
+            logger.warn('[UserController] privacy setting target not found');
             return Response.sendError(res, 404, 'User not found');
         }
 
@@ -3770,12 +3761,12 @@ exports.updateAgeVisibility = async (req, res) => {
     try {
         const { visible } = req.body;
         const userId = req.authUser ? req.authUser._id : req.auth._id;
-        logger.info(`[UserController] updateAgeVisibility: visible=${visible}, userId=${userId}`);
+        logger.info('[UserController] privacy setting update requested');
 
         const user = await User.findByIdAndUpdate(userId, { $set: { ageVisible: visible } }, { new: true });
 
         if (!user) {
-            logger.warn(`[UserController] updateAgeVisibility: User not found for ID ${userId}`);
+            logger.warn('[UserController] privacy setting target not found');
             return Response.sendError(res, 404, 'User not found');
         }
 
@@ -3791,7 +3782,7 @@ exports.updateNonFriendVideoRequests = async (req, res) => {
         const { allowed } = req.body;
         const userId = req.authUser ? req.authUser._id : req.auth._id;
         const value = !(allowed === false || allowed === 'false' || allowed === 0 || allowed === '0');
-        logger.info(`[UserController] updateNonFriendVideoRequests: allowed=${value}, userId=${userId}`);
+        logger.info('[UserController] privacy setting update requested');
 
         const user = await User.findByIdAndUpdate(
             userId,
@@ -3800,7 +3791,7 @@ exports.updateNonFriendVideoRequests = async (req, res) => {
         );
 
         if (!user) {
-            logger.warn(`[UserController] updateNonFriendVideoRequests: User not found for ID ${userId}`);
+            logger.warn('[UserController] privacy setting target not found');
             return Response.sendError(res, 404, 'User not found');
         }
 
@@ -3819,12 +3810,12 @@ exports.updatePrivacy = async (req, res) => {
     try {
         const { isPrivate } = req.body;
         const userId = req.authUser ? req.authUser._id : req.auth._id;
-        logger.info(`[UserController] updatePrivacy: isPrivate=${isPrivate}, userId=${userId}`);
+        logger.info('[UserController] privacy setting update requested');
 
         const user = await User.findByIdAndUpdate(userId, { $set: { isPrivate: isPrivate } }, { new: true });
 
         if (!user) {
-            logger.warn(`[UserController] updatePrivacy: User not found for ID ${userId}`);
+            logger.warn('[UserController] privacy setting target not found');
             return Response.sendError(res, 404, 'User not found');
         }
 
@@ -3839,12 +3830,12 @@ exports.updateGenderVisibility = async (req, res) => {
     try {
         const { visible } = req.body;
         const userId = req.authUser ? req.authUser._id : req.auth._id;
-        logger.info(`[UserController] updateGenderVisibility: visible=${visible}, userId=${userId}`);
+        logger.info('[UserController] privacy setting update requested');
 
         const user = await User.findByIdAndUpdate(userId, { $set: { genderVisible: visible } }, { new: true });
 
         if (!user) {
-            logger.warn(`[UserController] updateGenderVisibility: User not found for ID ${userId}`);
+            logger.warn('[UserController] privacy setting target not found');
             return Response.sendError(res, 404, 'User not found');
         }
 
@@ -3867,15 +3858,9 @@ exports.profileVisited = async(req, res) => {
             return res.status(401).json({ message: 'User not authenticated' });
         }
 
-        console.log('AuthUser before update:', authUser); // Log authUser before update
-        console.log('before Avatar URLs:', authUser.avatar);
-        console.log('before Main Avatar URL:', authUser.mainAvatar);
 
         authUser.visitProfile = true;
         await authUser.save();
-        console.log('AuthUser after update:', authUser); // Log updated authUser
-        console.log('after  Avatar URLs:', authUser.avatar);
-        console.log('after Main Avatar URL:', authUser.mainAvatar);
 
         // Add headers to prevent caching
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

@@ -88,7 +88,6 @@ exports.reportPost = async (req, res) => {
         const post = req.post;
 
         // Log the request body to verify `reportType`
-        console.log('Request body:', req.body);
 
         // Call the `report` function
         const reportInstance = await report(req, res, 'Post', post._id);
@@ -763,7 +762,7 @@ exports.showPost = async (req, res) => {
             };
         }
 
-        console.log("showPost response", postWithVotes);
+        console.log('showPost completed');
         return Response.sendResponse(res, postWithVotes);
 
     } catch (err) {
@@ -835,10 +834,6 @@ exports.storePost = async (req, res) => {
             }
 
             console.log('Multer processed request successfully');
-            console.log('Request Body:', req.body);  // Log the text and anonymity status
-            console.log('Uploaded File:', req.file);  // Log the file info if any
-            console.log('Request headers:', req.headers);
-            console.log('Content-Type:', req.get('content-type'));
 
             // Validate that text field is present
             if (!req.body.text || req.body.text.trim() === '') {
@@ -902,21 +897,21 @@ exports.storePost = async (req, res) => {
                     url: mediaUrl, // Stable public URL; DB fallback preserves new uploads across restarts.
                     expiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Set a 24-hour expiry for the media
                 };
-                console.log('Media attached to post:', post.media);
+                console.log('Post media attached');
             }
 
-            console.log('Saving Post:', post);
+            console.log('Saving post');
 
             // Save the post to the database
             const savedPost = await post.save();
-            console.log('Saved Post:', savedPost);
+            console.log('Post saved');
 
             // Populate the user details immediately after saving
             const populatedPost = await Post.populate(savedPost, {
                 path: 'user',
                 select: 'firstName lastName mainAvatar avatarStyle avatarSeed avatarVariant avatarOverrides'
             });
-            console.log('Populated Post:', populatedPost);
+            console.log('Post population completed');
 
             if (!populatedPost) {
                 return Response.sendError(res, 400, 'Error populating post data');
@@ -924,7 +919,7 @@ exports.storePost = async (req, res) => {
 
             // Add votes info to the post
             const processedPost = withVotesInfo(populatedPost, req.auth._id, savedPost._id);
-            console.log('Post with Votes Info:', processedPost);
+            console.log('Post vote metadata processed');
 
             // Send notifications and create Activity only for non-anonymous posts
             if (!populatedPost.anonyme) {

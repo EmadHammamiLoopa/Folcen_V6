@@ -22,7 +22,7 @@ exports.requestById = async (req, res, next, id) => {
 
 exports.requestSender = async (req, res, next) => {
     try {
-        console.log('[request.middleware] requestSender - auth:', req.auth && req.auth._id, 'param user:', req.params.userId, 'req.request:', !!req.request);
+        console.log('[request.middleware] requestSender prepared:', !!req.request);
         const request = req.request;
         if (!req.auth || !req.auth._id) return Response.sendError(res, 401, 'Unauthorized');
         if (request.from != req.auth._id)
@@ -40,7 +40,7 @@ exports.requestSender = async (req, res, next) => {
 
 exports.requestReceiver = async (req, res, next) => {
     try {
-        console.log('[request.middleware] requestReceiver - auth:', req.auth && req.auth._id, 'param user:', req.params.userId, 'req.request:', !!req.request);
+        console.log('[request.middleware] requestReceiver prepared:', !!req.request);
         const request = req.request;
         if (!req.auth || !req.auth._id) return Response.sendError(res, 401, 'Unauthorized');
         if (request.to != req.auth._id)

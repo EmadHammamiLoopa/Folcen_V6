@@ -10,6 +10,7 @@ const logger = {
    */
   redact(data) {
     if (!data || typeof data !== 'object') return data;
+    if (data instanceof Error) return { message: data.message };
     const sensitiveKeys = /token|password|jwt|secret|auth|cookie|ssn/i;
     const redacted = Array.isArray(data) ? [] : {};
     
@@ -34,7 +35,14 @@ const logger = {
   },
 
   error(message, error = null, meta = {}) {
-    const errorDetails = error instanceof Error ? { message: error.message, stack: error.stack } : error;
+    const errorDetails = error instanceof Error
+      ? {
+          message: error.message,
+          ...(process.env.DEBUG_ERROR_STACKS === '1'
+            ? { stack: error.stack }
+            : {})
+        }
+      : error;
     console.error(`[ERROR] ${message}`, JSON.stringify(this.redact({ ...meta, error: errorDetails })));
   },
 
@@ -43,12 +51,12 @@ const logger = {
    * Persists record to DB via audit utility
    */
   async audit(action, { actorId, targetUserId, details } = {}) {
-    this.info(`Audit Event: ${action}`, { actorId, targetUserId, details });
+    this.info(`Audit Event: ${action}`);
     try {
       await recordAudit({ actorId, action, targetUserId, details });
     } catch (err) {
       // Fallback if DB audit fails
-      this.error('Audit Persistence Failed', err, { action, actorId });
+      this.error('Audit Persistence Failed', err, { action });
     }
   }
 };

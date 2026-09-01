@@ -59,9 +59,9 @@ module.exports = (agenda) => {
                 user.deleteOne()
             ]);
 
-            console.log(`User ${user._id} and related data deleted.`);
+            console.log('User and related data deleted.');
         } catch (err) {
-            console.error(`Error deleting user ${user._id}:`, err);
+            console.error('Error deleting user:', err?.message || 'unknown error');
         }
     };
 

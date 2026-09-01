@@ -287,8 +287,8 @@ exports.availableProducts = async (req, res) => {
 
 exports.storeProduct = async (req, res) => {
     try {
-        console.log('Parsed fields:', req.fields);
-        console.log('Parsed files:', req.files);
+        console.log('Product form fields parsed');
+        console.log('Product file metadata parsed');
 
         const dimensions = req.fields.dimensions ? JSON.parse(req.fields.dimensions) : { length: '0', width: '0', height: '0' };
 
@@ -329,9 +329,9 @@ exports.storeProduct = async (req, res) => {
             return Response.sendError(res, 400, 'At least one photo is required');
         }
 
-        console.log('Product before saving:', product);
+        console.log('Product save requested');
         await product.save();
-        console.log('Product saved successfully:', product);
+        console.log('Product saved successfully');
         // Send notification to followers and friends (match jobs/services behavior)
         try {
             const notificationTitle = `${req.authUser.firstName} ${req.authUser.lastName}`;
@@ -401,7 +401,7 @@ const storeProductPhotos = async (photos, product) => {
         }
     }
 
-    console.log('Product photos stored:', product.photos);
+    console.log('Product photos stored:', Array.isArray(product.photos) ? product.photos.length : 0);
 };
 
 

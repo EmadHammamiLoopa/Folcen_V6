@@ -49,7 +49,6 @@ async function recordAcceptance({ user, documentType, documentVersion, acceptanc
   // Ensure acceptedAt is set explicitly to avoid N/A in dashboard
   const acceptedAt = new Date();
 
-  console.log(`DEBUG: recordAcceptance - User: ${user._id}, Doc: ${documentType}, Version: ${documentVersion}, IP: ${enrichedMeta.ip}`);
 
   const rec = await LegalAcceptance.create({
     userId: user._id,
@@ -60,7 +59,6 @@ async function recordAcceptance({ user, documentType, documentVersion, acceptanc
     meta: enrichedMeta
   });
 
-  console.log(`DEBUG: recordAcceptance - Created record ID: ${rec._id}`);
 
   // Audit the acceptance (append-only audit). Avoid logging PII or tokens.
   try {

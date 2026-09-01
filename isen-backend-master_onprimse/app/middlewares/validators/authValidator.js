@@ -4,7 +4,6 @@ const { isAtLeast18 } = require('../../utils/agePolicy')
 const { check, validationResult } = require('express-validator');
 
 exports.signupValidator = (req, res, next) => {
-    console.log('DEBUG: signupValidator req.body', JSON.stringify(req.body, null, 2));
     const validation = new Validator(req.body, {
         'firstName': 'required|alpha_dash|max:50|min:2',
         'lastName': 'required|alpha_dash|max:50|min:2',

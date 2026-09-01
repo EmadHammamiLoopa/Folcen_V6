@@ -476,7 +476,7 @@ io.on('connection', async (socket) => {
             // persist clearedAt for the user so new sessions honor the clear
             await User.findByIdAndUpdate(userId, { missedCallsClearedAt: new Date(clearedAt) });
           } catch (err) {
-            console.error('Failed to persist missedCallsClearedAt for', userId, err);
+            console.error('Failed to persist missedCallsClearedAt:', err?.message || 'unknown error');
           }
         }
       });

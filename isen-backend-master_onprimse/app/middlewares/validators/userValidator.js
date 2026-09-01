@@ -184,7 +184,6 @@ exports.updatePasswordValidator = (req, res, next) => {
 };
 
 exports.updateEmailValidator = (req, res, next) => {
-    console.log('Validating email for user:', req.body.email);
 
     try {
         const validation = new Validator(req.body, {

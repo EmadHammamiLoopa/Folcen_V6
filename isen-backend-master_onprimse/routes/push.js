@@ -35,7 +35,6 @@ router.post('/register', auth, async (req, res) => {
       },
       { upsert: true, setDefaultsOnInsert: true, new: true }
     );
-    console.log(`[push/register] userId=${userId} platform=${saved.platform} deviceId=${saved.deviceId || 'none'} tokenTail=${token.trim().slice(-8)}`);
 
     return res.json({ success: true, message: 'Push token registered' });
   } catch (err) {
@@ -56,7 +55,6 @@ router.post('/unregister', auth, async (req, res) => {
 
     // Only delete if the token belongs to the requesting user
     const result = await PushToken.deleteOne({ token: token.trim(), userId });
-    console.log(`[push/unregister] userId=${userId} removed=${result.deletedCount || 0} tokenTail=${token.trim().slice(-8)}`);
 
     return res.json({ success: true, message: 'Push token unregistered' });
   } catch (err) {

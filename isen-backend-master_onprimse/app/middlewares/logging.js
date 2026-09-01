@@ -21,7 +21,7 @@ function redactBody(body) {
 exports.redactRequestLog = (req, res, next) => {
   try {
     const userId = (req.auth && req.auth._id) || null;
-    console.log(`[INCOMING] ${req.method} ${req.originalUrl} user:${userId ? userId : 'anon'}`);
+    console.log(`[INCOMING] ${req.method}`);
   } catch (e) {}
   next();
 };

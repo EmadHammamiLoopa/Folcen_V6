@@ -69,8 +69,8 @@ exports.sendAdminMessage = async (req, res) => {
     const { text } = req.body;
     let { userIds } = req.body;
 
-    console.log('DEBUG AdminController.sendAdminMessage: body', { userIds, text });
-    console.log('DEBUG AdminController.sendAdminMessage: auth', req.auth);
+    console.log('AdminController.sendAdminMessage: request received');
+    console.log('AdminController.sendAdminMessage: authenticated request');
 
     // Support single string or array
     if (typeof userIds === 'string') {
@@ -78,11 +78,11 @@ exports.sendAdminMessage = async (req, res) => {
     }
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      console.warn('AdminController.sendAdminMessage: No users specified. Body:', JSON.stringify(req.body));
+      console.warn('AdminController.sendAdminMessage: No users specified');
       return Response.sendError(res, 400, 'No users specified');
     }
     if (!text) {
-      console.warn('AdminController.sendAdminMessage: Message text is required. Body:', JSON.stringify(req.body));
+      console.warn('AdminController.sendAdminMessage: Message text is required');
       return Response.sendError(res, 400, 'Message text is required');
     }
 
@@ -105,7 +105,7 @@ exports.sendAdminMessage = async (req, res) => {
           const decoded = Buffer.from(id, 'base64').toString('utf8');
           // If decoded looks like a hex ObjectId (24 chars) or a valid string, use it
           if (decoded && (decoded.length === 24 || decoded.length > 5)) {
-            console.log(`DEBUG AdminController: decoded ID ${id} -> ${decoded}`);
+            console.log('AdminController.sendAdminMessage: target identifier decoded');
             return decoded;
           }
         } catch (e) {}
@@ -119,7 +119,7 @@ exports.sendAdminMessage = async (req, res) => {
         userId = decodeId(userId);
 
         if (!userId || typeof userId !== 'string' || userId.length < 12) {
-          console.warn(`Skipping invalid userId: ${userId}`);
+          console.warn('Skipping invalid user identifier');
           continue;
         }
 
@@ -150,9 +150,9 @@ exports.sendAdminMessage = async (req, res) => {
           console.warn('AdminController.sendAdminMessage push notify failed:', pushErr?.message || pushErr);
         }
       } catch (saveErr) {
-        console.error(`Failed to save message for user ${userId}:`, saveErr.message || saveErr);
+        console.error('Failed to save admin message:', saveErr?.message || 'unknown error');
         if (saveErr.errors) {
-          console.error('Validation errors:', JSON.stringify(saveErr.errors));
+          console.error('AdminController.sendAdminMessage validation failed');
         }
       }
     }

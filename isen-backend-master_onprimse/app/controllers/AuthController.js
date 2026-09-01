@@ -83,7 +83,6 @@ const autoFollowStaticChannels = async (authUser) => {
 
 exports.signup = async (req, res) => {
     try {
-      if (process.env.DEBUG_AUTH === '1') console.log('DEBUG: AuthController.signup body', JSON.stringify(req.body, null, 2));
       // --- normalize payload ---
       const body = { ...req.body };
   
@@ -256,7 +255,6 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
             }
           ];
           await LegalAcceptance.insertMany(acceptances);
-          console.log(`✅ Legal acceptances recorded for user ${user._id}`);
         } catch (legalErr) {
           console.error('Failed to record legal acceptance:', legalErr);
           // Don't fail signup if this fails, but log it
@@ -448,7 +446,7 @@ exports.signin = async (req, res) => {
 
     } catch (error) {
         recordAuthEvent({ type: 'signin_failed', ipHash, reasonCode: 'internal_error' });
-        console.error('SignIn Error:', error && error.message ? error.message : error);
+        console.error('SignIn Error:', error?.message || 'unknown error');
         return Response.sendError(res, 500, 'Internal server error');
     }
 };
@@ -529,7 +527,6 @@ exports.signout = async (req, res) => {
 
 
 exports.firebaseLogin = async (req, res) => {
-    logger.info(`[firebaseLogin] Received request for: ${req.body.idToken ? req.body.idToken.substring(0, 10) + '...' : 'no-token'}`);
     try {
         const { idToken, profile } = req.body;
         if (!idToken) {
@@ -552,7 +549,6 @@ exports.firebaseLogin = async (req, res) => {
         }
 
         const { uid, email, email_verified } = decodedToken;
-        logger.info(`[firebaseLogin] Verified UID: ${uid}, Email: ${email}`);
         const profileInput = (profile && typeof profile === 'object') ? profile : {};
         const identities = decodedToken.firebase && decodedToken.firebase.identities ? decodedToken.firebase.identities : {};
         const googleIds = Array.isArray(identities['google.com']) ? identities['google.com'] : [];
@@ -879,12 +875,12 @@ exports.forgotPassword = async (req, res) => {
                 // Create a Firebase Auth entry so sendPasswordResetEmail works
                 try {
                     await admin.auth().createUser({ email: normalizedEmail, emailVerified: false });
-                    logger.info(`[forgotPassword] Created Firebase Auth record for legacy user: ${normalizedEmail}`);
+                    logger.info('[forgotPassword] Created Firebase Auth record for legacy user');
                 } catch (createErr) {
                     if (createErr.code === 'auth/email-already-exists') {
                         // Race condition: another request already created it between our get and create calls.
                         // This is fine — the account exists, continue.
-                        logger.info(`[forgotPassword] Firebase user already exists (race condition) for: ${normalizedEmail}`);
+                        logger.info('[forgotPassword] Firebase user already exists during legacy-user synchronization');
                     } else {
                         throw createErr;
                     }

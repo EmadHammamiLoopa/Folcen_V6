@@ -3,8 +3,6 @@ const User = require('../app/models/User');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬�
 const Request = require('../app/models/Request');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import Request model
 const Report = require('../app/models/Report');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import Report model
 const Post = require('../app/models/Post');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import Post model
-const fs = require('fs');  
-const fsp = fs.promises;
 const path = require('path');
 const { Parser } = require('json2csv');  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Import json2csv to handle CSV conversion
 const Comment = require("../app/models/Comment");
@@ -21,6 +19,7 @@ const AuthEvent = require('../app/models/AuthEvent');
 const CallEvent = require('../app/models/CallEvent');
 const Activity = require('../app/models/Activity');
 const AuditLog = require('../app/models/AuditLog');
+const { recordAudit } = require('../app/utils/audit');
 const MessageEvent = require('../app/models/MessageEvent');
 const peerStore = require('.././app/utils/peerStorage');
 const { notifyPeerNeeded, emitToUser, normalizeId } = require('../app/helpers');
@@ -337,9 +336,9 @@ const { enqueueImageProcessing } = require('../app/utils/queue');
 
 
 // Register routes
-console.log('DEBUG: updateEmail type:', typeof updateEmail);
-console.log('DEBUG: updateEmailValidator type:', typeof updateEmailValidator);
-console.log('DEBUG: withAuthUser type:', typeof withAuthUser);
+
+
+
 
 router.put('/email', [requireSignin, updateEmailValidator, withAuthUser], updateEmail);
 router.put('/password', [requireSignin, updatePasswordValidator, withAuthUser], updatePassword);
@@ -546,10 +545,10 @@ router.patch('/:userId/peer/heartbeat', [requireSignin, withAuthUser, isAuth], a
 
 router.post('/:userId/upload', [requireSignin, withAuthUser, chatUpload.single('upload')], (req, res, next) => {
   console.log('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Reached /:userId/upload route');
-  console.log('Request params userId:', req.params.userId);
-  console.log('Authenticated user from middleware:', req.auth);
-  console.log('Uploaded file info:', req.file);
-  console.log('Saved Chat Path:', req.savedChatPath);
+
+
+
+
 
   // You can keep your original controller logic here
   uploadChatMedia(req, res, next);
@@ -652,7 +651,6 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
     try {
         const userId = req.params.userId;
         const mongoose = require('mongoose');
-        console.log(`ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Extracting data for user: ${userId}`);
 
         // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Helper to clean and decode data
         const deepClean = (obj) => {
@@ -711,11 +709,9 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
         // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Fetch user details
         const userRaw = await User.findById(userId).lean();
         if (!userRaw) {
-            console.log(`ÃƒÂ¢Ã‚ÂÃ…â€™ User ${userId} not found.`);
             return res.status(404).json({ error: 'User not found' });
         }
         const user = deepClean(userRaw);
-        console.log(`ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ User found: ${user.firstName} ${user.lastName} (${user.email})`);
 
         // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Fetch related data
         const [
@@ -812,23 +808,27 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
             audit_logs_count: auditLogs.length
         };
 
-        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ensure logs directory exists
-        const logsDir = path.join(__dirname, '../logs');
-        try { await fsp.mkdir(logsDir, { recursive: true }); } catch (e) {}
+        const requestedFormat = (req.query.format || '').toLowerCase();
+        const exportFormat = requestedFormat === 'json' ? 'json' : 'csv';
+        const actor = req.authUser;
 
         // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Log extraction for GDPR compliance
         const adminId = req.auth ? req.auth._id : (req.user ? req.user.id : 'unknown');
         const logMessage = `${new Date().toISOString()} - Admin ${adminId} extracted data for user ${userId}\n`;
         try {
-            await fsp.appendFile(path.join(logsDir, 'extraction.log'), logMessage);
-            console.log(`ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â GDPR Log Updated: ${logMessage.trim()}`);
-        } catch (e) {
-            console.error('Failed to append GDPR log:', e);
+            await recordAudit({
+                actorId: actor && actor._id,
+                actorRole: actor && actor.role,
+                action: 'EXPORT',
+                targetUserId: userId,
+                details: { format: exportFormat },
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
+            });
+        } catch (auditErr) {
+            console.warn('Failed to record data export audit event');
         }
-
-        const requestedFormat = (req.query.format || '').toLowerCase();
         if (requestedFormat === 'json') {
-            console.log('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Returning JSON extract for user', userId);
             return res.status(200).json({
                 success: true,
                 ...allData,

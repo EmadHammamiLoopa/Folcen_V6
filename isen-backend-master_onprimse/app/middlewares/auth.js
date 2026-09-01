@@ -186,7 +186,7 @@ exports.requireSignin = (req, res, next) => {
             if (await rejectIfTokenVersionStale(req, res)) return;
 
             if (process.env.DEBUG_AUTH === '1') {
-                try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+                try { logger.info('Authenticated token decoded'); } catch (e) {}
             }
             return next();
         })();
@@ -292,7 +292,7 @@ exports.requireSignin = (req, res, next) => {
         if (await rejectIfTokenVersionStale(req, res)) return;
 
         if (process.env.DEBUG_AUTH === '1') {
-            try { logger.info('Decoded token present for user id:', req.auth && req.auth._id); } catch (e) {}
+            try { logger.info('Authenticated token decoded'); } catch (e) {}
         }
         return next();
     });
@@ -324,9 +324,7 @@ exports.isAdmin = (req, res, next) => {
         actor.enabled === false ||
         actor.isDeleted === true
     ) {
-        logger.warn(
-            `isAdmin check failed for user ${req.auth?._id}. Role: ${actor?.role}`
-        );
+        logger.warn('isAdmin authorization check failed');
         return Response.sendError(res, 403, 'Access forbidden');
     }
 
@@ -400,7 +398,7 @@ exports.withAuthUser = async (req, res, next) => {
         user = normalizeLeanDoc(user);
 
         if (process.env.DEBUG_AUTH === '1') {
-            logger.info('withAuthUser: User loaded id/email:', user._id, user.email);
+            logger.info('withAuthUser: authenticated user loaded');
         }
         // Attach to `req.authUser` always. Only attach to `req.user` if not already set
         // (to avoid overwriting param-loaded target users).
@@ -507,7 +505,7 @@ exports.withAuthUser = async (req, res, next) => {
 
 exports.requireEmailVerified = (req, res, next) => {
     if (req.authUser && !req.authUser.emailVerified) {
-        logger.warn(`requireEmailVerified: User ${req.authUser._id} attempted to access ${req.originalUrl} without verification`);
+        logger.warn('requireEmailVerified: unverified account attempted access');
         return Response.sendError(res, 403, 'Please verify your email to access this feature.');
     }
     next();

@@ -117,7 +117,6 @@ router.get('/acceptances', requireSignin, withAuthUser, isAdmin, rateLimit({ win
 				}
 			};
 		});
-		logger.info('DEBUG: GDPR acceptances for user', qUserId, JSON.stringify(safe, null, 2));
 
 		// Audit the admin/dashboard retrieval (do not include PII in audit meta)
 		try { await recordAudit({ actorId: req.auth && req.auth._id, actorRole: req.auth && req.auth.role, action: 'DASHBOARD_VIEW_ACCEPTANCES', targetUserId: qUserId, details: { reason: 'Admin viewed legal acceptance history', count: safe.length } }); } catch (e) {}

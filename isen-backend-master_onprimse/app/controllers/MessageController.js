@@ -214,7 +214,7 @@ exports.storeMessage = async (req, res) => {
             }
         }
 
-        logger.error('storeMessage error:', error);
+        logger.error('storeMessage error:', error?.message || 'unknown error');
         return Response.sendError(res, 500, 'Message could not be saved. Please try again.');
     }
 };
@@ -432,7 +432,7 @@ exports.getUsersMessages = async (req, res) => {
 
     return Response.sendResponse(res, { users: usersWithMessages, more });
   } catch (err) {
-    logger.error('Error fetching users messages:', err);
+    logger.error('Error fetching users messages:', err?.message || 'unknown error');
     return Response.sendError(res, 500, 'Internal server error');
   }
 };
@@ -477,13 +477,13 @@ exports.deleteMessage = async (req, res) => {
                 // best-effort here and must not turn a successful delete into a
                 // misleading 500 response. Any stale lease is also bounded by
                 // request-time recovery in the reservation service.
-                logger.warn('deleteMessage opener lease reconciliation failed:', leaseErr);
+                logger.warn('deleteMessage opener lease reconciliation failed:', leaseErr?.message || 'unknown error');
             }
         }
 
         return Response.sendResponse(res, { success: true, message: 'Message deleted successfully' });
     } catch (error) {
-        logger.error('Error deleting message:', error);
+        logger.error('Error deleting message:', error?.message || 'unknown error');
         return Response.sendError(res, 500, 'Failed to delete message');
     }
 };
@@ -498,7 +498,7 @@ exports.sendMessagePermission = async (req, res) => {
 
         return Response.sendResponse(res, check.allowed, check.allowed ? 'Allowed' : check.reason);
     } catch (error) {
-        logger.error('sendMessagePermission error:', error);
+        logger.error('sendMessagePermission error:', error?.message || 'unknown error');
         return Response.sendError(res, 500, 'Server error');
     }
 };

@@ -43,7 +43,7 @@ function createSocketAuthMiddleware({
       if (error && error.name === 'TokenExpiredError') {
         logger.warn('❌ Authentication failed: token expired at', error.expiredAt);
       } else {
-        logger.error('❌ Invalid token', error && error.message ? error.message : error);
+        logger.error('❌ Invalid token', error?.message || 'unknown error');
       }
       return next(new Error(AUTHENTICATION_ERROR));
     }
