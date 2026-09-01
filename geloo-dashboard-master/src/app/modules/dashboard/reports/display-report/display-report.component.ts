@@ -3,9 +3,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { DataService } from 'src/app/services/data.service';
 
 @Component({
-  selector: 'app-display-report',
-  templateUrl: './display-report.component.html',
-  styleUrls: ['./display-report.component.scss']
+    selector: 'app-display-report',
+    templateUrl: './display-report.component.html',
+    styleUrls: ['./display-report.component.scss'],
+    standalone: false
 })
 export class DisplayReportComponent implements OnInit {
   report: any = {};

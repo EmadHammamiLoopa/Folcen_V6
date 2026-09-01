@@ -104,9 +104,8 @@
           [datasets]="growthChartData"
           [labels]="growthChartLabels"
           [options]="chartOptions"
-          [colors]="lineChartColors"
           [legend]="true"
-          [chartType]="'line'">
+          [type]="'line'">
         </canvas>
       </div>
     </div>
@@ -118,9 +117,8 @@
           [datasets]="engagementChartData"
           [labels]="engagementChartLabels"
           [options]="chartOptions"
-          [colors]="lineChartColors"
           [legend]="true"
-          [chartType]="'line'">
+          [type]="'line'">
         </canvas>
       </div>
     </div>
@@ -132,10 +130,9 @@
       <h3 class="text-lg font-semibold text-gray-800 mb-6">User Status</h3>
       <div class="h-64 flex items-center justify-center">
         <canvas baseChart
-          [data]="statusChartData"
+          [datasets]="statusChartData"
           [labels]="statusChartLabels"
-          [chartType]="'pie'"
-          [colors]="pieChartColors"
+          [type]="'pie'"
           [options]="{ responsive: true, maintainAspectRatio: false }">
         </canvas>
       </div>

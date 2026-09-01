@@ -5,9 +5,10 @@ import { NotificationService } from '../../../../services/notification.service';
 type Step = 'input' | 'confirm' | 'done';
 
 @Component({
-  selector: 'app-erase-user',
-  templateUrl: './erase-user.component.html',
-  styleUrls: ['./erase-user.component.scss']
+    selector: 'app-erase-user',
+    templateUrl: './erase-user.component.html',
+    styleUrls: ['./erase-user.component.scss'],
+    standalone: false
 })
 export class EraseUserComponent {
   userId = '';

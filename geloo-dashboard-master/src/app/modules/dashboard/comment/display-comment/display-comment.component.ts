@@ -5,9 +5,10 @@ import { environment } from 'src/environments/environment';
 import Swal from 'sweetalert2';
 
 @Component({
-  selector: 'app-display-comment',
-  templateUrl: './display-comment.component.html',
-  styleUrls: ['./display-comment.component.scss']
+    selector: 'app-display-comment',
+    templateUrl: './display-comment.component.html',
+    styleUrls: ['./display-comment.component.scss'],
+    standalone: false
 })
 export class DisplayCommentComponent implements OnInit {
   comment: any;

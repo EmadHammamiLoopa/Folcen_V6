@@ -2,9 +2,10 @@ import { JsonService } from './../../../../services/json.service';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'app-channel-form',
-  templateUrl: './channel-form.component.html',
-  styleUrls: ['./channel-form.component.scss']
+    selector: 'app-channel-form',
+    templateUrl: './channel-form.component.html',
+    styleUrls: ['./channel-form.component.scss'],
+    standalone: false
 })
 export class ChannelFormComponent implements OnInit {
 

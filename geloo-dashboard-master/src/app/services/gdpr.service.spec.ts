@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { GdprService } from './gdpr.service';
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 
 const BASE = 'http://127.0.0.1:3300/api/v1';
 
@@ -10,9 +11,9 @@ describe('GdprService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [GdprService],
-    });
+    imports: [],
+    providers: [GdprService, provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
+});
     service = TestBed.inject(GdprService);
     http = TestBed.inject(HttpTestingController);
   });

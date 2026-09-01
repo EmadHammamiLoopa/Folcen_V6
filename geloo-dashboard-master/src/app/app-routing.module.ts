@@ -1,7 +1,7 @@
 import { GuestGuard } from './guards/guest.guard';
 import { AppComponent } from './app.component';
 import { NgModule } from '@angular/core';
-import { RouterModule, Routes, CanActivate } from '@angular/router';
+import { RouterModule, Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 
 const routes: Routes = [

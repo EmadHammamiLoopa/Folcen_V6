@@ -5,9 +5,10 @@ import { environment } from '../../../../../environments/environment';
 import Swal from 'sweetalert2';
 
 @Component({
-  selector: 'app-display-job',
-  templateUrl: './display-job.component.html',
-  styleUrls: ['./display-job.component.scss']
+    selector: 'app-display-job',
+    templateUrl: './display-job.component.html',
+    styleUrls: ['./display-job.component.scss'],
+    standalone: false
 })
 export class DisplayJobComponent implements OnInit {
   jobId: string;

@@ -5,9 +5,10 @@ import { environment } from 'src/environments/environment';
 import Swal from 'sweetalert2';
 
 @Component({
-  selector: 'app-subscription-display',
-  templateUrl: './subscription-display.component.html',
-  styleUrls: ['./subscription-display.component.scss']
+    selector: 'app-subscription-display',
+    templateUrl: './subscription-display.component.html',
+    styleUrls: ['./subscription-display.component.scss'],
+    standalone: false
 })
 export class SubscriptionDisplayComponent implements OnInit {
   subscription: any;

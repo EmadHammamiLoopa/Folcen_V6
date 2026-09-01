@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'app-plan-rule-list',
-  templateUrl: './plan-rule-list.component.html',
-  styleUrls: ['./plan-rule-list.component.scss']
+    selector: 'app-plan-rule-list',
+    templateUrl: './plan-rule-list.component.html',
+    styleUrls: ['./plan-rule-list.component.scss'],
+    standalone: false
 })
 export class PlanRuleListComponent implements OnInit {
 

@@ -3,9 +3,10 @@ import { Header } from 'src/app/models/Header';
 import { User } from 'src/app/models/User';
 
 @Component({
-  selector: 'app-list',
-  templateUrl: './list.component.html',
-  styleUrls: ['./list.component.scss']
+    selector: 'app-list',
+    templateUrl: './list.component.html',
+    styleUrls: ['./list.component.scss'],
+    standalone: false
 })
 export class ListComponent implements OnInit {
   headers: { title: string; name: string; type: string; values?: string[] }[] = [

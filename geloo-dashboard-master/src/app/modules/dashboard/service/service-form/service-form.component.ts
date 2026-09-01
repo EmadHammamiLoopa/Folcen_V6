@@ -2,9 +2,10 @@ import { JsonService } from './../../../../services/json.service';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'app-service-form',
-  templateUrl: './service-form.component.html',
-  styleUrls: ['./service-form.component.scss']
+    selector: 'app-service-form',
+    templateUrl: './service-form.component.html',
+    styleUrls: ['./service-form.component.scss'],
+    standalone: false
 })
 export class ServiceFormComponent implements OnInit {
 

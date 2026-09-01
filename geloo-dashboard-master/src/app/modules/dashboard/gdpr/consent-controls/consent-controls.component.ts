@@ -3,9 +3,10 @@ import { GdprService } from '../../../../services/gdpr.service';
 import { NotificationService } from '../../../../services/notification.service';
 
 @Component({
-  selector: 'app-consent-controls',
-  templateUrl: './consent-controls.component.html',
-  styleUrls: ['./consent-controls.component.scss']
+    selector: 'app-consent-controls',
+    templateUrl: './consent-controls.component.html',
+    styleUrls: ['./consent-controls.component.scss'],
+    standalone: false
 })
 export class ConsentControlsComponent {
   userId = '';

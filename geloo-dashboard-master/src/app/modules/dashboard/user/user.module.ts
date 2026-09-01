@@ -10,7 +10,7 @@ import { ListComponent } from './list/list.component';
 import { UserFormComponent } from './user-form/user-form.component';
 import { DisplayUserComponent } from './display-user/display-user.component';
 import { AnalyticsComponent } from './analytics/analytics.component';
-import { ChartsModule } from 'ng2-charts';
+import { NgChartsModule } from 'ng2-charts';
 
 
 @NgModule({
@@ -25,7 +25,7 @@ import { ChartsModule } from 'ng2-charts';
     ShareModule,
     CommonModule,
     UserRoutingModule,
-    ChartsModule
+    NgChartsModule
   ]
 })
 export class UserModule { }

@@ -1,7 +1,7 @@
 import { SuperAdminGuard } from './../../guards/super-admin.guard';
 import { DashboardComponent } from './dashboard.component';
 import { NgModule } from '@angular/core';
-import { RouterModule, Routes, CanActivate } from '@angular/router';
+import { RouterModule, Routes } from '@angular/router';
 
 const routes: Routes = [
   {

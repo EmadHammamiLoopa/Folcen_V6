@@ -5,7 +5,7 @@ import { ListComponent } from './list/list.component';
 import { AnalyticsComponent } from './analytics/analytics.component';
 import { UserComponent } from './user.component';
 import { NgModule } from '@angular/core';
-import { RouterModule, Routes, CanActivate } from '@angular/router';
+import { RouterModule, Routes } from '@angular/router';
 
 const routes: Routes = [
   {

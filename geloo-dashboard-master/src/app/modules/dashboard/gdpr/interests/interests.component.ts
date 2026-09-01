@@ -12,9 +12,10 @@ interface EvidenceEvent { eventType: string; category?: string; channelId?: stri
 interface ExplainResult { consentStatus: string; userId?: string; computedAt?: string; topCategories?: { category: string; score: number }[]; evidence?: EvidenceEvent[]; }
 
 @Component({
-  selector: 'app-interests',
-  templateUrl: './interests.component.html',
-  styleUrls: ['./interests.component.scss']
+    selector: 'app-interests',
+    templateUrl: './interests.component.html',
+    styleUrls: ['./interests.component.scss'],
+    standalone: false
 })
 export class InterestsComponent implements OnInit, OnDestroy {
   // ── Aggregate view ──

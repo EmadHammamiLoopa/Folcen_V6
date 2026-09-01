@@ -8,9 +8,10 @@ import { AvatarUrlUtil } from './../../../../utils/avatar-url-util';
 import Swal from 'sweetalert2';
 
 @Component({
-  selector: 'app-display-user',
-  templateUrl: './display-user.component.html',
-  styleUrls: ['./display-user.component.scss']
+    selector: 'app-display-user',
+    templateUrl: './display-user.component.html',
+    styleUrls: ['./display-user.component.scss'],
+    standalone: false
 })
 export class DisplayUserComponent implements OnInit {
 

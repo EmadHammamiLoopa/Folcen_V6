@@ -3,9 +3,10 @@ import { GdprService } from '../../../../services/gdpr.service';
 import { NotificationService } from '../../../../services/notification.service';
 
 @Component({
-  selector: 'app-dsar',
-  templateUrl: './dsar.component.html',
-  styleUrls: ['./dsar.component.scss']
+    selector: 'app-dsar',
+    templateUrl: './dsar.component.html',
+    styleUrls: ['./dsar.component.scss'],
+    standalone: false
 })
 export class DsarComponent {
   userId = '';

@@ -2,9 +2,10 @@ import { JsonService } from './../../../../services/json.service';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'app-plan-rule-form',
-  templateUrl: './plan-rule-form.component.html',
-  styleUrls: ['./plan-rule-form.component.scss']
+    selector: 'app-plan-rule-form',
+    templateUrl: './plan-rule-form.component.html',
+    styleUrls: ['./plan-rule-form.component.scss'],
+    standalone: false
 })
 export class PlanRuleFormComponent implements OnInit {
 

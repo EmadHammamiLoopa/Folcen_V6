@@ -4,9 +4,10 @@ import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { GdprService } from '../../../../services/gdpr.service';
 
 @Component({
-  selector: 'app-audit-log',
-  templateUrl: './audit-log.component.html',
-  styleUrls: ['./audit-log.component.scss']
+    selector: 'app-audit-log',
+    templateUrl: './audit-log.component.html',
+    styleUrls: ['./audit-log.component.scss'],
+    standalone: false
 })
 export class AuditLogComponent implements OnInit, OnDestroy {
   logs: any[] = [];

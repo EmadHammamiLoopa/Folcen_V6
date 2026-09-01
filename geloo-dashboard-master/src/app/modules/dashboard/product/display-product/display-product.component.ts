@@ -5,9 +5,10 @@ import { environment } from '../../../../../environments/environment';
 import Swal from 'sweetalert2';
 
 @Component({
-  selector: 'app-display-product',
-  templateUrl: './display-product.component.html',
-  styleUrls: ['./display-product.component.scss']
+    selector: 'app-display-product',
+    templateUrl: './display-product.component.html',
+    styleUrls: ['./display-product.component.scss'],
+    standalone: false
 })
 export class DisplayProductComponent implements OnInit {
   productId: string;

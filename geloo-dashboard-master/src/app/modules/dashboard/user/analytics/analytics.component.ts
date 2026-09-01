@@ -1,12 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { DataService } from './../../../../services/data.service';
-import { ChartDataSets, ChartOptions, ChartType } from 'chart.js';
-import { Color, Label } from 'ng2-charts';
+import { ChartDataset, ChartOptions } from 'chart.js';
 
 @Component({
-  selector: 'app-analytics',
-  templateUrl: './analytics.component.html',
-  styleUrls: ['./analytics.component.scss']
+    selector: 'app-analytics',
+    templateUrl: './analytics.component.html',
+    styleUrls: ['./analytics.component.scss'],
+    standalone: false
 })
 export class AnalyticsComponent implements OnInit {
 
@@ -16,16 +16,46 @@ export class AnalyticsComponent implements OnInit {
   retention: any = {};
 
   // Growth Chart
-  growthChartData: ChartDataSets[] = [{ data: [], label: 'New Users' }];
-  growthChartLabels: Label[] = [];
+  growthChartData: ChartDataset<'line', number[]>[] = [
+    {
+      data: [],
+      label: 'New Users',
+      backgroundColor: 'rgba(79, 70, 229, 0.2)',
+      borderColor: 'rgba(79, 70, 229, 1)',
+      pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+      pointBorderColor: '#fff',
+      pointHoverBackgroundColor: '#fff',
+      pointHoverBorderColor: 'rgba(79, 70, 229, 0.8)'
+    }
+  ];
+  growthChartLabels: string[] = [];
 
   // Engagement Chart
-  engagementChartData: ChartDataSets[] = [{ data: [], label: 'Active Users' }];
-  engagementChartLabels: Label[] = [];
+  engagementChartData: ChartDataset<'line', number[]>[] = [
+    {
+      data: [],
+      label: 'Active Users',
+      backgroundColor: 'rgba(79, 70, 229, 0.2)',
+      borderColor: 'rgba(79, 70, 229, 1)',
+      pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+      pointBorderColor: '#fff',
+      pointHoverBackgroundColor: '#fff',
+      pointHoverBorderColor: 'rgba(79, 70, 229, 0.8)'
+    }
+  ];
+  engagementChartLabels: string[] = [];
 
   // Status Chart
-  statusChartData: number[] = [];
-  statusChartLabels: Label[] = ['Enabled', 'Disabled'];
+  statusChartData: ChartDataset<'pie', number[]>[] = [
+    {
+      data: [],
+      backgroundColor: [
+        'rgba(34, 197, 94, 0.8)',
+        'rgba(239, 68, 68, 0.8)'
+      ]
+    }
+  ];
+  statusChartLabels: string[] = ['Enabled', 'Disabled'];
 
   // Feature Usage
   features: any = {};
@@ -38,30 +68,15 @@ export class AnalyticsComponent implements OnInit {
     target: 'all'
   };
 
-  chartOptions: ChartOptions = {
+  chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-      yAxes: [{ ticks: { beginAtZero: true } }]
+      y: {
+        beginAtZero: true
+      }
     }
   };
-
-  lineChartColors: Color[] = [
-    {
-      backgroundColor: 'rgba(79, 70, 229, 0.2)',
-      borderColor: 'rgba(79, 70, 229, 1)',
-      pointBackgroundColor: 'rgba(79, 70, 229, 1)',
-      pointBorderColor: '#fff',
-      pointHoverBackgroundColor: '#fff',
-      pointHoverBorderColor: 'rgba(79, 70, 229, 0.8)'
-    }
-  ];
-
-  pieChartColors = [
-    {
-      backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)'],
-    },
-  ];
 
   constructor(private dataService: DataService) { }
 
@@ -121,16 +136,31 @@ export class AnalyticsComponent implements OnInit {
 
         // Growth Chart
         this.growthChartLabels = data.charts.growth.map(i => i._id);
-        this.growthChartData[0].data = data.charts.growth.map(i => i.count);
+        this.growthChartData = [
+          {
+            ...this.growthChartData[0],
+            data: data.charts.growth.map(i => i.count)
+          }
+        ];
 
         // Engagement Chart
         this.engagementChartLabels = data.charts.engagement.map(i => i._id);
-        this.engagementChartData[0].data = data.charts.engagement.map(i => i.count);
+        this.engagementChartData = [
+          {
+            ...this.engagementChartData[0],
+            data: data.charts.engagement.map(i => i.count)
+          }
+        ];
 
         // Status Chart
         const enabled = data.charts.status.find(s => s._id === true)?.count || 0;
         const disabled = data.charts.status.find(s => s._id === false)?.count || 0;
-        this.statusChartData = [enabled, disabled];
+        this.statusChartData = [
+          {
+            ...this.statusChartData[0],
+            data: [enabled, disabled]
+          }
+        ];
 
         this.loading = false;
       },

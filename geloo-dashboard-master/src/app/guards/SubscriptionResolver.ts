@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
-import { Resolve, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+import { ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { Observable } from 'rxjs';
 import { SubscriptionService } from '../modules/dashboard/subscription/subscription.service';  // Import your subscription service
 
 @Injectable({
   providedIn: 'root'
 })
-export class SubscriptionResolver implements Resolve<any> {
+export class SubscriptionResolver  {
 
   constructor(private subscriptionService: SubscriptionService) {}
 

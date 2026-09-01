@@ -2,9 +2,10 @@ import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 
 @Component({
-  selector: 'app-gdpr-centre',
-  templateUrl: './gdpr-centre.component.html',
-  styleUrls: ['./gdpr-centre.component.scss']
+    selector: 'app-gdpr-centre',
+    templateUrl: './gdpr-centre.component.html',
+    styleUrls: ['./gdpr-centre.component.scss'],
+    standalone: false
 })
 export class GdprCentreComponent {
 

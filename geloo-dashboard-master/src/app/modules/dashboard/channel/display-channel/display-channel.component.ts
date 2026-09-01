@@ -4,9 +4,10 @@ import { DataService } from 'src/app/services/data.service';
 import { environment } from 'src/environments/environment';
 
 @Component({
-  selector: 'app-display-channel',
-  templateUrl: './display-channel.component.html',
-  styleUrls: ['./display-channel.component.scss']
+    selector: 'app-display-channel',
+    templateUrl: './display-channel.component.html',
+    styleUrls: ['./display-channel.component.scss'],
+    standalone: false
 })
 export class DisplayChannelComponent implements OnInit {
   channel: any = {};

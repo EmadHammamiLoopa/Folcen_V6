@@ -4,9 +4,10 @@ import { Component, OnInit, ViewChild } from '@angular/core';
 import { TableComponent } from '../../../table/table.component';
 
 @Component({
-  selector: 'app-list',
-  templateUrl: './list.component.html',
-  styleUrls: ['./list.component.scss']
+    selector: 'app-list',
+    templateUrl: './list.component.html',
+    styleUrls: ['./list.component.scss'],
+    standalone: false
 })
 export class ListComponent implements OnInit {
 

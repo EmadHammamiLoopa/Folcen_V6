@@ -8,9 +8,10 @@ import { Component, Input, OnInit, Output, EventEmitter } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
-  selector: 'app-display',
-  templateUrl: './display.component.html',
-  styleUrls: ['./display.component.scss']
+    selector: 'app-display',
+    templateUrl: './display.component.html',
+    styleUrls: ['./display.component.scss'],
+    standalone: false
 })
 
 export class DisplayComponent implements OnInit {
