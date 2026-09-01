@@ -248,7 +248,7 @@ exports.recomputeInterestProfiles = async () => {
       );
       updated++;
     } catch (e) {
-      console.error('[InterestAnalytics] Failed to recompute for user', userId, e.message);
+      console.error('[InterestAnalytics] Failed to recompute profile:', e?.message || 'unknown error');
     }
   }
   return updated;

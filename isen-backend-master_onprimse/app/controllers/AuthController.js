@@ -507,7 +507,7 @@ exports.signout = async (req, res) => {
                                     console.log(`🔌 Disconnected socket ${socketId} for user ${userId} on signout`);
                                 }
                             } catch (e) {
-                                console.warn('Failed to disconnect socket', socketId, e);
+                                console.warn('Failed to disconnect socket:', e?.message || 'unknown error');
                             }
                         });
                     }

@@ -213,7 +213,7 @@ peerServer.on("connection", (client) => {
   const userId = client.getId().split('-')[0]; // Extract userId from PeerJS ID
 // Push peerId + refresh ttl (expiresAt = now + 5 min)
   peerStore.set(userId, client.getId());
-  console.log(`📝 Stored peerId: ${client.getId()} for userId: ${userId}`);
+  console.log('Peer connection mapping stored');
 });
 
 
@@ -458,7 +458,7 @@ io.on('connection', async (socket) => {
   console.log('⚡ New WebSocket connection:', socket.id);
 
   const userId = socket.userId;
-  console.log(`✅ User ${userId} connected with socket ID ${socket.id}`);
+  console.log('Authenticated WebSocket user connected');
 
   // Register this connection
   userConnected(userId, socket.id);
@@ -500,19 +500,19 @@ io.on('connection', async (socket) => {
     try { await peerStore.set(u, peerId); } catch (e) { console.error('peerStore.set failed', e); }
 
     io.to(socket.id).emit('online-confirmed', { peerId });
-    console.log(`✅ Presence updated for ${u}, peerId: ${peerId}`);
+    console.log('Socket presence updated');
   });
 
   // 📢 Debug all events
   if (DEBUG_SOCKET_EVENTS) socket.onAny((event, ...args) => {
-    console.log(`📢 WebSocket Event Received: ${event}`, args);
+    console.log(`WebSocket event received: ${event}`);
   });
 
   // Heartbeat mechanism
   let isAlive = true;
   const heartbeatInterval = setInterval(() => {
     if (!isAlive) {
-      console.log(`💔 No heartbeat from ${socket.id}, terminating`);
+      console.log('WebSocket heartbeat missed; terminating socket');
       socket.disconnect(true);
       return;
     }
@@ -528,14 +528,14 @@ io.on('connection', async (socket) => {
   socket.on('disconnect', async () => {
     clearInterval(heartbeatInterval);
 
-    console.log(`❌ Disconnected: User ${userId}, Socket ID: ${socket.id}`);
+    console.log('WebSocket disconnected');
 
     const wentOffline = userDisconnected(socket.id);
 
     if (wentOffline) {
       try {
         await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
-        console.log(`💤 User ${userId} marked as offline.`);
+        console.log('Disconnected account marked offline');
         io.emit('user-status-changed', { userId, online: false });
       } catch (err) {
         console.error('❌ Error during user disconnect cleanup:', err);

@@ -2171,7 +2171,7 @@ exports.deleteAccount = async(req, res) => {
                         if (sock && typeof sock.disconnect === 'function') {
                             sock.disconnect(true);
                         }
-                    } catch (e) { logger.warn('Error forcing socket logout for', sid, e); }
+                    } catch (e) { logger.warn('Error forcing socket logout', { error: e?.message || 'unknown error' }); }
                 }
             }
         } catch (e) { logger.warn('Failed to notify sockets on account delete', e); }

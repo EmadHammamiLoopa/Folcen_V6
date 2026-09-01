@@ -40,7 +40,7 @@ module.exports = (io, socket) => {
   /* ───────── disconnect / connect-user ───────── */
 
   socket.on("disconnect", async function () {
-    console.log(`❌ Disconnected: User ${socket.userId || "Unknown"}, Socket ID: ${socket.id}`);
+    console.log('Chat socket disconnected');
   
     if (socket.userId && connectedUsers.has(socket.userId)) {
       const bucket = connectedUsers.get(socket.userId);
@@ -55,7 +55,7 @@ module.exports = (io, socket) => {
           await User.findByIdAndUpdate(socket.userId, {
             lastSeen: new Date(), // ✅ only update lastSeen
           });
-          console.log(`💤 Marked user ${socket.userId} as offline`);
+          console.log('Disconnected chat account marked offline');
           io.emit("user-status-changed", { userId: socket.userId, online: false });
         } catch (err) {
           console.error("❌ Failed to update DB offline status:", err);
@@ -239,7 +239,7 @@ socket.on("video-call-request", async (data, ack) => {
         payload: { aps: { sound: "default" } }
       }
     }).then(result => {
-      console.log(`[chat] video request push to ${receiverId}:`, result);
+      console.log('[chat] video request push completed', { successCount: result?.successCount || 0, failureCount: result?.failureCount || 0, removedInvalid: result?.removedInvalid || 0 });
     }).catch(err => console.warn("[chat] video request push failed:", err.message));
 
     if (ack) ack({ success: true, messageId: saved._id });
@@ -524,10 +524,7 @@ socket.on("video-call-cancelled", async (data, ack) => {
           }
         }
       }).then(result => {
-        console.log(
-          `[chat] ${notificationType} push to ${pushTarget}:`,
-          result
-        );
+        console.log('[chat] video permission push completed', { type: notificationType, successCount: result?.successCount || 0, failureCount: result?.failureCount || 0, removedInvalid: result?.removedInvalid || 0 });
       }).catch(err => {
         console.warn(
           `[chat] ${notificationType} push failed:`,
@@ -591,7 +588,7 @@ socket.on("connect-user", async (user_id) => {
   }
 
   const userId = authUser;
-  console.log(`✅ Authenticated socket confirmed for user: ${userId}, Socket ID: ${socket.id}`);
+  console.log('Authenticated chat socket confirmed');
 
   if (!connectedUsers.has(userId)) connectedUsers.set(userId, new Set());
   connectedUsers.get(userId).add(socket.id);
@@ -627,23 +624,23 @@ socket.on("connect-user", async (user_id) => {
       msg.to   = msg.to   || msg._to;
       msg.text = msg.text || msg._text;
 
-      console.log(`📢 WebSocket Event Received: send-message from socket.userId=${senderId}`);
+      console.log('send-message event received');
 
       // Validate required fields
       if (!msg.to || (typeof msg.text !== "string" && typeof msg.image !== "string")) {
-        console.error("❌ Invalid message format! Must include text or image.", msg);
+        console.error("Invalid message format: text or image required");
         try { socket.emit('send-message-error', { tempId, reason: 'invalid_format' }); } catch (_) {}
         return;
       }
 
       // Validate ObjectId for recipient
       if (!mongoose.Types.ObjectId.isValid(msg.to)) {
-        console.error("❌ Invalid recipient ID in message", msg.to);
+        console.error("Invalid recipient ID in message");
         try { socket.emit('send-message-error', { tempId, reason: 'invalid_recipient_id', to: msg.to }); } catch (_) {}
         return;
       }
 
-      console.log(`📩 Message attempt from ${senderId} to ${msg.to}`);
+      console.log('Message send attempt received');
 
       // Ensure users exist
       const [sender, receiver] = await Promise.all([
@@ -661,7 +658,7 @@ socket.on("connect-user", async (user_id) => {
       const isBlockedBySender = sender.blockedUsers && sender.blockedUsers.some(id => id.toString() === msg.to.toString());
 
       if (isBlockedByReceiver || isBlockedBySender) {
-        console.warn(`Message blocked: ${senderId} and ${msg.to} have a block relationship`);
+        console.warn('Message blocked by relationship policy');
         try { socket.emit('send-message-error', { tempId, reason: 'blocked' }); } catch (_) {}
         return;
       }
@@ -713,7 +710,7 @@ socket.on("connect-user", async (user_id) => {
         }
         socket._msgCount += 1;
         if (socket._msgCount > maxPerWindow) {
-          console.warn(`Rate limit exceeded for ${senderId}`);
+          console.warn('Message rate limit exceeded');
           if (openingReservationToken && openingReservationTarget) {
             try {
               await helpers.releaseChatOpeningReservation(
@@ -780,7 +777,7 @@ socket.on("connect-user", async (user_id) => {
       const message = new Message(messageData);
       const savedMessage = await message.save();
       messagePersisted = true;
-      console.log("✅ Message saved:", savedMessage._id);
+      console.log('Message persisted');
 
       if (openingReservationToken) {
         try {
@@ -828,7 +825,7 @@ socket.on("connect-user", async (user_id) => {
       const delivered = await emitToUser(msg.to, "new-message", safePayload);
 
       if (delivered) {
-        console.log(`📤 Delivered to receiver (${msg.to}) on ${getUserSockets(msg.to).length} socket(s)`);
+        console.log(`Message delivered on ${getUserSockets(msg.to).length} receiver socket(s)`);
         try {
           await recordMessageEvent({
             messageId: savedMessage._id,
@@ -840,7 +837,7 @@ socket.on("connect-user", async (user_id) => {
           console.warn('Failed to record message delivered event', e);
         }
       } else {
-        console.warn(`⚠️ User ${msg.to} has no active socket - message remains persisted`);
+        console.warn('Recipient has no active socket; message remains persisted');
       }
 
       // Socket connectivity is not equivalent to foreground visibility.
@@ -866,10 +863,7 @@ socket.on("connect-user", async (user_id) => {
           senderId
         )
           .then(result => {
-            console.log(
-              `[chat] message push to ${msg.to}:`,
-              result
-            );
+            console.log('[chat] message push completed', { successCount: result?.successCount || 0, failureCount: result?.failureCount || 0, removedInvalid: result?.removedInvalid || 0 });
           })
           .catch(err => {
             console.warn(

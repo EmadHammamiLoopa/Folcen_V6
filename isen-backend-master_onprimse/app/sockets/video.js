@@ -721,7 +721,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       const at   = Number(payload.at) || Date.now();
       if (!from || !to) return; // invalid
       if (reason !== 'timeout' && reason !== 'missed') {
-        console.log('[sockets][video] ignored non-timeout missed event', { from, to, reason, callId: payload.callId });
+        console.log('[sockets][video] ignored non-timeout missed event', { reason });
         return;
       }
 
@@ -824,15 +824,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       clearTimeout(previousTimer);
     }
 
-    console.log(
-      '[video] socket disconnect grace started',
-      {
-        callId,
-        userId: me,
-        state: state.state,
-        graceMs: DISCONNECT_GRACE_MS
-      }
-    );
+    console.log('[video] socket disconnect grace started', { state: state.state, graceMs: DISCONNECT_GRACE_MS });
 
     const timer = setTimeout(() => {
       disconnectGraceTimers.delete(graceKey);
@@ -842,10 +834,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
         .filter(sid => String(sid) !== String(socket.id));
 
       if (liveSockets.length) {
-        console.log(
-          '[video] disconnect recovered during grace period',
-          { callId, userId: me }
-        );
+        console.log('[video] disconnect recovered during grace period');
         return;
       }
 
@@ -896,15 +885,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
           ? 'cancel'
           : 'disconnect';
 
-      console.log(
-        '[video] disconnect grace expired; ending call',
-        {
-          callId: currentCallId,
-          userId: me,
-          state: currentState.state,
-          reason
-        }
-      );
+      console.log('[video] disconnect grace expired; ending call', { state: currentState.state, reason });
 
       /*
        * If the CALLER really disappeared while ringing, the callee

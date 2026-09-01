@@ -17,7 +17,7 @@ function userConnected(userId, socketId) {
   }
   connectedUsers.get(userId).add(socketId);
   socketUserMap.set(socketId, userId);
-  console.log(`✅ User ${userId} connected. Active sockets: ${connectedUsers.get(userId).size}`);
+  console.log(`Socket connected. Active sockets for account: ${connectedUsers.get(userId).size}`);
 
   // Mark presence in Redis/in-memory
   try { presence.setUserOnline(userId).catch(() => {}); } catch (e) {}
@@ -29,24 +29,24 @@ function userConnected(userId, socketId) {
 function userDisconnected(socketId) {
     const userId = socketUserMap.get(socketId);
     if (!userId) return false;
-  
+
     socketUserMap.delete(socketId);
-  
+
     const userSockets = connectedUsers.get(userId);
     if (userSockets) {
       userSockets.delete(socketId);
       if (userSockets.size === 0) {
         connectedUsers.delete(userId);
-          console.log(`❌ User ${userId} is now offline`);
+          console.log('Account socket set is now offline');
           try { presence.setUserOffline(userId).catch(() => {}); } catch(e) {}
           return true; // went offline
       } else {
-        console.log(`⚡ User ${userId} still has ${userSockets.size} active sockets`);
+        console.log(`Account still has ${userSockets.size} active sockets`);
       }
     }
     return false; // still online somewhere
   }
-  
+
 
 /**
  * Check if a user is online

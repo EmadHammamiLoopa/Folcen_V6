@@ -151,7 +151,7 @@ async function emitToUser(userId, event, payload = {}, options = {}) {
         event,
         payload
       });
-      console.log(`[STASHED] User ${userId} offline. Event ${event} saved to Outbox.`);
+      console.log(`[STASHED] Offline event saved to Outbox: ${event}`);
     } catch (err) {
       console.error('Failed to stash offline event:', err.message);
     }
@@ -166,7 +166,7 @@ async function replayOfflineEvents(userId, socket) {
     const EventOutbox = require('./models/EventOutbox');
     const events = await EventOutbox.find({ userId: String(userId) }).sort({ createdAt: 1 });
     if (events.length > 0) {
-      console.log(`[REPLAY] Replaying ${events.length} events for user ${userId} on socket ${socket.id}`);
+      console.log(`[REPLAY] Replaying ${events.length} queued event(s)`);
       for (const evt of events) {
         socket.emit(evt.event, evt.payload);
       }
@@ -174,7 +174,7 @@ async function replayOfflineEvents(userId, socket) {
       await EventOutbox.deleteMany({ userId: String(userId) });
     }
   } catch (err) {
-    console.warn(`[REPLAY] Replay failed for user ${userId}:`, err.message);
+    console.warn('[REPLAY] Replay failed:', err.message);
   }
 }
 
@@ -508,7 +508,7 @@ async function getUserStatistics(userId) {
       pendingFriendRequests: pendingFriends
     };
   } catch (e) {
-    console.error(`Error computing stats for ${userId}:`, e.message);
+    console.error('Error computing user stats:', e.message);
     return null;
   }
 }
@@ -1769,9 +1769,7 @@ function notifyPeerNeeded(calleeId, callerId = null, options = {}) {
       }
     }
   }).then(result => {
-    console.log(
-      `[callPush] callId=${payload.callId} calleeId=${calleeId} callerId=${callerId || ''} sockets=${sockets.length} success=${result?.successCount || 0} failure=${result?.failureCount || 0} removed=${result?.removedInvalid || 0}`
-    );
+    console.log(`[callPush] completed sockets=${sockets.length} success=${result?.successCount || 0} failure=${result?.failureCount || 0} removed=${result?.removedInvalid || 0}`);
   }).catch(err => {
     console.error('[callPush] failed:', err?.message || 'unknown error');
   });

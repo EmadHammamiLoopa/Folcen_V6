@@ -695,7 +695,7 @@ const createStaticChannelsForCity = async (city, country, user) => {
 };
 
 const unfollowOldCityStaticChannels = async (req, user) => {
-    console.log(`Checking for static channels to unfollow for user: ${user._id} in city: ${user.city}`);
+    console.log('Checking static channel follow state after city change');
 
     // Find all static, static_events, and static_dating channels the user follows
     const filter = {
@@ -725,7 +725,7 @@ const unfollowOldCityStaticChannels = async (req, user) => {
     } else {
         console.log('Listing all static channels the user is following:');
         allStaticChannels.forEach(channel => {
-            console.log(`Channel: ${channel.name}, City: ${channel.city}, Type: ${channel.type}, User City: ${user.city}`);
+            console.log('Evaluating followed static channel');
         });
     }
 
@@ -733,16 +733,16 @@ const unfollowOldCityStaticChannels = async (req, user) => {
     // Unfollow static channels if the city doesn't match the user's city
     for (const channel of allStaticChannels) {
         if (channel.city !== user.city) {
-            console.log(`Unfollowing static channel: ${channel.name} as the city does not match`);
+            console.log('Unfollowing static channel due to city mismatch');
 
             // Remove the user from the channel's followers
             const followerIndex = channel.followers.indexOf(user._id);
             if (followerIndex !== -1) {
                 channel.followers.splice(followerIndex, 1);
                 await channel.save();
-                console.log(`User ${user._id} removed from followers of channel ${channel.name}`);
+                console.log('Follower removed from channel');
             } else {
-                console.log(`User ${user._id} not found in followers of channel ${channel.name}`);
+                console.log('Follower not found in channel');
             }
 
             // Remove the channel from the user's followedChannels array
@@ -750,9 +750,9 @@ const unfollowOldCityStaticChannels = async (req, user) => {
             if (channelIndex !== -1) {
                 user.followedChannels.splice(channelIndex, 1);
                 userModified = true;
-                console.log(`Channel ${channel.name} removed from user's followedChannels`);
+                console.log('Static channel removed from followedChannels');
             } else {
-                console.log(`Channel ${channel.name} not found in user's followedChannels`);
+                console.log('Static channel not present in followedChannels');
             }
         }
     }

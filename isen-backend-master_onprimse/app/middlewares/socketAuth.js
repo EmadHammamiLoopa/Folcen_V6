@@ -82,7 +82,7 @@ function createSocketAuthMiddleware({
 
       socket.authUser = user;
       socket.userId = String(user._id);
-      logger.log(`✅ WebSocket authenticated for userId: ${socket.userId}`);
+      logger.log('WebSocket authentication succeeded');
       return next();
     } catch (error) {
       logger.error('WebSocket authentication lookup failed', error);
