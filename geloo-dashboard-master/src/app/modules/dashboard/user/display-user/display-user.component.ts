@@ -146,7 +146,7 @@ export class DisplayUserComponent implements OnInit {
       content += `
         <div class="prose prose-sm max-w-none text-left text-gray-600 leading-relaxed">
           <h3 class="font-black text-gray-800 mb-2">TERMS OF SERVICE</h3>
-          <p>By using Folcen, you agree to be bound by these Terms of Service. This includes general terms of use, user privacy, and GDPR compliance.</p>
+          <p>By using Folcen, you agree to be bound by these Terms of Service. This includes general terms of use, privacy, and data-protection obligations.</p>
           <p>Every new user is entitled to specific usage limits and privileges, including friend requests, video calls, and posts.</p>
           <div class="mt-4 p-3 bg-amber-50 border-l-4 border-amber-400 text-amber-700 text-xs italic rounded-r-lg">
             Note: This is a summary of the terms accepted by the user at the time of registration.
@@ -220,7 +220,7 @@ export class DisplayUserComponent implements OnInit {
     const dateStr = this.getRobustDate(acc);
     const meta = acc.meta || {};
     const text = `
-LEGAL ACCEPTANCE RECORD (GDPR COMPLIANT)
+LEGAL ACCEPTANCE RECORD
 ---------------------------------------
 Document: ${acc.documentType.toUpperCase()}
 Version: ${acc.documentVersion}
@@ -678,12 +678,12 @@ technical environment described.
     const reason = prompt('Please provide a reason for this GDPR erasure request:');
     if (reason === null) return; // Cancelled
 
-    if (confirm('GDPR ERASURE: This will PERMANENTLY DELETE the user and all their data (files, posts, etc.) immediately. This action is irreversible. Are you sure?')) {
+    if (confirm('GDPR ERASURE: This will permanently erase the user\'s ordinary account data and is irreversible. Limited records may be retained temporarily where a documented retention exception applies. Are you sure?')) {
       this.loading = true;
       this.dataService.sendPostRequest('gdpr/erase', { userId: id, reason }).subscribe(
         (resp: any) => {
           this.loading = false;
-          alert('User permanently erased and data purged.');
+          alert('User erasure completed. Ordinary account data was purged subject to configured retention exceptions.');
           window.history.back();
         },
         err => {

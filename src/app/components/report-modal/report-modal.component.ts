@@ -113,7 +113,7 @@ import { TermsOfServiceComponent } from '../../pages/terms-of-service/terms-of-s
 
         <div class="gdpr-footer">
           <ion-icon name="lock-closed-outline"></ion-icon>
-          <span>GDPR Compliant • Data retained for 1 year</span>
+          <span>Privacy-aware reporting • Moderation records follow the retention policy</span>
         </div>
       </div>
     </ion-content>

@@ -68,7 +68,7 @@ export class EraseUserComponent {
         this.result = res.data || res;
         this.step = 'done';
         this.loading = false;
-        this.notify.showSuccess('User erased permanently', 'Erasure Complete');
+        this.notify.showSuccess('User erasure completed', 'Erasure Complete');
       },
       error: (e: any) => {
         this.error = e?.message || 'Erasure failed';
