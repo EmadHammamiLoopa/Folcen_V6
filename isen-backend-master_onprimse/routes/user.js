@@ -376,7 +376,6 @@ router.post('/', [requireSignin, withAuthUser, isSuperAdmin, form, userStoreVali
 
   try {
     await peerStore.set(userId, peerId);                // <-- upsert + ttl refresh
-    console.log(`ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦  stored peerId for ${userId}: ${peerId}`);
 
     return res.json({
       success : true,
@@ -510,7 +509,6 @@ router.delete('/:userId/peer', [requireSignin, withAuthUser, isAuth], async (req
         }
 
         await peerStore.delete(userId);
-        console.log(`ÃƒÂ¢Ã‚ÂÃ…â€™ Removed peerId for userId: ${userId}`);
         return res.json({
             success: true,
             message: "Peer ID removed successfully.",

@@ -219,7 +219,7 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
         // Also send a push notification
         helpers.sendNotification(String(user._id), "Welcome to Folcen 👋", senderName, String(senderId)).catch(() => {});
         
-        console.log(`✅ Welcome message sent to user ${user._id} from ${senderName} (${senderId})`);
+        console.log('Welcome message sent');
       } catch (welcomeErr) {
         console.error('Failed to send welcome message:', welcomeErr);
       }
@@ -504,7 +504,7 @@ exports.signout = async (req, res) => {
                                 const sock = io.sockets && io.sockets.sockets && io.sockets.sockets.get(socketId);
                                 if (sock && typeof sock.disconnect === 'function') {
                                     sock.disconnect(true);
-                                    console.log(`🔌 Disconnected socket ${socketId} for user ${userId} on signout`);
+                                    console.log('Socket disconnected on signout');
                                 }
                             } catch (e) {
                                 console.warn('Failed to disconnect socket:', e?.message || 'unknown error');
@@ -806,9 +806,7 @@ Enjoy exploring Folcen — and thank you for being part of it!`;
                             );
                     }
 
-                    logger.info(
-                        `[firebaseLogin] MongoDB password hash synced for user: ${user._id}`
-                    );
+                    logger.info('[firebaseLogin] MongoDB password hash synchronized');
                 }
             }
             await user.save();

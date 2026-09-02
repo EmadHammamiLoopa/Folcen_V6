@@ -390,7 +390,7 @@ exports.withAuthUser = async (req, res, next) => {
         }
 
         if (!user) {
-            logger.info('withAuthUser error: User not found in DB for ID:', userId);
+            logger.info('withAuthUser: authenticated user not found');
             return Response.sendError(res, 404, 'User not found');
         }
 

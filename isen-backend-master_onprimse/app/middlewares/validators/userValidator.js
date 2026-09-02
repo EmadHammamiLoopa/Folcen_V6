@@ -196,7 +196,6 @@ exports.updateEmailValidator = (req, res, next) => {
             return Response.sendError(res, 400, validation.errors.all());
         }
 
-        console.log('Email validation passed, calling next()');
         next();
     } catch (err) {
         console.error('Error in updateEmailValidator:', err);

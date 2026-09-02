@@ -837,11 +837,7 @@ exports.storePost = async (req, res) => {
 
             // Validate that text field is present
             if (!req.body.text || req.body.text.trim() === '') {
-                logger.warn('Post creation failed: text field is missing or empty', {
-                    body: req.body,
-                    hasFile: !!req.file,
-                    contentType: req.get('content-type')
-                });
+                logger.warn('Post creation failed: text field is missing or empty');
                 return Response.sendError(res, 400, 'Post text is required. Please make sure you are sending the "text" field in your FormData.');
             }
 

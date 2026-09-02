@@ -72,7 +72,6 @@ exports.reportUser = async (req, res) => {
     try {
         const userId = normalizeId(req.params.userId); // Get the user ID from the request parameters
 
-        logger.info('Request body:', req.body); // Debugging log
 
         // Find the user being reported
         const reportedUser = await User.findById(userId);
@@ -1712,7 +1711,6 @@ exports.updateUser = async (req, res) => {
 
             // Debug log to help diagnose malformed client payloads (remove or gate in production)
             try {
-                logger.info('Debug: raw languages payload:', req.body.languages);
                 const normalizedLangs = normalizeLanguages(req.body.languages);
                 // Validate language names: allow letters (including common Latin accents), digits, spaces,
                 // dashes, apostrophes, periods and parentheses — avoid `\p{L}` for older Node regex engines
@@ -1863,7 +1861,6 @@ exports.updateEmail = async (req, res) => {
             return Response.sendError(res, 400, 'failed');
         }
 
-        logger.info('Email updated successfully for user:', updatedUser._id);
         return Response.sendResponse(res, updatedUser.publicInfo(), 'email changed');
     } catch (err) {
         logger.error('Unexpected error in updateEmail:', err);
@@ -1936,11 +1933,9 @@ exports.updatePassword = async (req, res) => {
         const isMatch = await authUser.authenticate(current_password);
 
         if (!isMatch) {
-            logger.info('Password comparison result: Password does not match');
             return Response.sendError(res, 400, 'Current password is incorrect');
         }
 
-        logger.info('Password comparison result: Password matches');
 
         // Update to the new password
         if (!validatePassword(password)) {
@@ -3515,7 +3510,7 @@ exports.getFriends = async (req, res) => {
 
         const user = await User.findById(userId);
         if (!user) {
-            logger.error('User not found:', userId);
+            logger.error('User not found');
             return res.status(404).json({ error: 'User not found' });
         }
 
@@ -3524,7 +3519,7 @@ exports.getFriends = async (req, res) => {
         // If the user has no friends, return empty result immediately to avoid
         // querying with an empty $in array which will always return no documents.
         if (!user.friends || user.friends.length === 0) {
-            logger.warn('User has no friends, returning empty list for:', userId);
+            logger.warn('User has no friends; returning empty list');
             return res.status(200).json({ friends: [], more: false });
         }
 
@@ -3555,7 +3550,7 @@ exports.getFriends = async (req, res) => {
         .exec();
 
         if (!friends || friends.length === 0) {
-            logger.warn('No friends found for user:', userId);
+            logger.warn('No friends found');
             return res.status(200).json({ friends: [], more: false });
         }
 

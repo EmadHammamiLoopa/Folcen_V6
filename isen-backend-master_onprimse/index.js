@@ -462,7 +462,7 @@ const { connectedUsers, socketUserMap } = require('./app/utils/socketManager');
 app.set('connectedUsers', connectedUsers);
 
 io.on('connection', async (socket) => {
-  console.log('⚡ New WebSocket connection:', socket.id);
+  console.log('New WebSocket connection');
 
   const userId = socket.userId;
   console.log('Authenticated WebSocket user connected');
@@ -487,7 +487,7 @@ io.on('connection', async (socket) => {
           }
         }
       });
-      console.log('✅ attachMissedCallHandlers loaded and bound for socket', socket.id);
+      console.log('Missed-call handlers attached');
     }
   } catch (e) {
     // helper not present or failed to load — ignore silently

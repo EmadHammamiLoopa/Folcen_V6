@@ -642,11 +642,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
     }
 
     if (!eligibility?.allowed) {
-      console.warn('[video] rejected unauthorized call start', {
-        caller,
-        callee,
-        code: eligibility?.code || 'authorization_failed'
-      });
+      console.warn('[video] rejected unauthorized call start');
       return;
     }
 
@@ -1047,14 +1043,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
         };
       });
 
-      console.log(
-        '[sockets][video] missed-calls:list',
-        {
-          userId: String(me),
-          budget,
-          returned: calls.length
-        }
-      );
+      console.log('[sockets][video] missed-calls:list', { budget, returned: calls.length });
 
       return ack?.({
         success: true,
@@ -1080,7 +1069,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       const { userId, clearedAt } = payload;
       // Only allow emitter to clear their own missed calls
       if (!emitter || String(emitter) !== String(userId)) {
-        console.warn('Unauthorized missed-calls-cleared attempt', { emitter, userId });
+        console.warn('Unauthorized missed-calls-cleared attempt');
         return;
       }
 
@@ -1099,7 +1088,7 @@ module.exports = (io, socket) => {   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬
       const emitter = socket.userId;
       const { ownerUserId, removedUserId, at } = payload;
       if (!emitter || String(emitter) !== String(ownerUserId)) {
-        console.warn('Unauthorized missed-call-removed attempt', { emitter, ownerUserId });
+        console.warn('Unauthorized missed-call-removed attempt');
         return;
       }
 
