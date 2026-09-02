@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema({
   body:      { type: String, default: '' },
   data:      { type: mongoose.Schema.Types.Mixed, default: {} },
   read:      { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now, index: true }
+  createdAt: { type: Date, default: Date.now }
 });
 
 notificationSchema.index({ recipient: 1, createdAt: -1 });

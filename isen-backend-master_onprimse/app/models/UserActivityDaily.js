@@ -4,7 +4,7 @@ const DAU_TTL_SECONDS = Number(process.env.USER_ACTIVITY_DAILY_RETENTION_DAYS ||
 
 const UserActivityDailySchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  date: { type: Date, required: true, index: true },
+  date: { type: Date, required: true },
   createdAt: { type: Date, default: Date.now }
 }, { collection: 'user_activity_daily' });
 
