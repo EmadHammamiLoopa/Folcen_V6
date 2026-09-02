@@ -1,5 +1,5 @@
 const { tokenVersionMatches } = require('../utils/tokenVersion');
-const expressJWT = require('express-jwt');
+const { expressjwt: expressJWT } = require('express-jwt');
 const Response = require('../controllers/Response');
 const { adminCheck, normalizeLeanDoc } = require('../helpers');
 const User = require('../models/User');
@@ -215,7 +215,7 @@ exports.requireSignin = (req, res, next) => {
     expressJWT({
         secret: process.env.JWT_SECRET || 'fallback_secret_for_dev_only',
         algorithms: ['HS256'],
-        userProperty: 'auth',
+        requestProperty: 'auth',
         credentialsRequired: true,
         getToken: (req) => {
             // Only allow Authorization: Bearer by default (strict per-request JWT)
