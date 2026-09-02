@@ -33,7 +33,10 @@ function makeAdminMock(sendResponse) {
     admin: {
       apps: [{ name: '[DEFAULT]' }],   // makes admin.apps.length > 0
       messaging: () => ({
-        sendEachForMulticast: async () => sendResponse,
+        sendEachForMulticast: async (message) =>
+          typeof sendResponse === 'function'
+            ? sendResponse(message)
+            : sendResponse,
       }),
     },
   };
@@ -211,14 +214,20 @@ describe('FCM invalid token cleanup (integration)', function () {
         { userId: String(IDS.bob), token: badToken,  platform: 'android', deviceId: 'dev-2' },
       ]);
 
-      useAdminMock({
+      useAdminMock((message) => ({
         successCount: 1,
         failureCount: 1,
-        responses: [
-          { success: true },
-          { success: false, error: { code: 'messaging/registration-token-not-registered' } },
-        ],
-      });
+        responses: message.tokens.map(token =>
+          token === badToken
+            ? {
+                success: false,
+                error: {
+                  code: 'messaging/registration-token-not-registered',
+                },
+              }
+            : { success: true }
+        ),
+      }));
 
       const result = await sendPushToUser(String(IDS.bob), {
         title: 'Batch test',

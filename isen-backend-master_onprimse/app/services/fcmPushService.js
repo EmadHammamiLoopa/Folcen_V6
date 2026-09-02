@@ -48,14 +48,12 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
   // Fetch all FCM tokens for this user
   const tokenDocs = await PushToken.find({ userId: String(userId) }).lean();
   if (!tokenDocs.length) {
-    console.warn(
-      `[fcmPushService] no tokens for userId=${userId} type=${data.type || data.event || data.category || 'notification'}`
-    );
+    console.warn(`[fcmPushService] no registered push tokens type=${data.type || data.event || data.category || 'notification'}`);
     return { successCount: 0, failureCount: 0, removedInvalid: 0 };
   }
 
   const tokens = tokenDocs.map(d => d.token);
-  console.log(`[fcmPushService] preparing push userId=${userId} tokens=${tokens.length} type=${data.type || data.event || data.category || 'notification'}`);
+  console.log(`[fcmPushService] preparing push tokens=${tokens.length} type=${data.type || data.event || data.category || 'notification'}`);
 
   const safeTitle = cleanPushText(title, 'Notification');
   const safeBody = cleanPushText(body, '');
@@ -167,7 +165,7 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     response.responses.forEach((res, idx) => {
       if (!res.success) {
         const code = res.error && res.error.code;
-        console.warn(`[fcmPushService] tokenTail=${String(tokens[idx]).slice(-8)} failed code=${code || 'unknown'} message=${res.error?.message || ''}`);
+        console.warn(`[fcmPushService] push failed code=${code || 'unknown'}`);
         if (
           code === 'messaging/registration-token-not-registered' ||
           code === 'messaging/invalid-registration-token'
@@ -180,11 +178,11 @@ async function sendPushToUser(userId, { title, body, data = {}, android = null, 
     if (invalidTokens.length) {
       await PushToken.deleteMany({ token: { $in: invalidTokens } });
       removedInvalid = invalidTokens.length;
-      console.log(`[fcmPushService] Removed ${removedInvalid} invalid token(s) for user ${userId}`);
+      console.log(`[fcmPushService] removed ${removedInvalid} invalid token(s)`);
     }
 
     console.log(
-      `[fcmPushService] userId=${userId} success=${successCount} failure=${failureCount} removed=${removedInvalid}`
+      `[fcmPushService] success=${successCount} failure=${failureCount} removed=${removedInvalid}`
     );
   } catch (err) {
     console.error('[fcmPushService] Error sending multicast push:', err.message);
