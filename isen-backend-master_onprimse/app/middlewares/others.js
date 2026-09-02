@@ -1,4 +1,3 @@
-const iplocate = require('node-iplocate')
 const Response = require('../controllers/Response')
 const User = require('../models/User')
 
