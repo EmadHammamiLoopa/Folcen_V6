@@ -37,7 +37,7 @@ class PeerStore {
   async delete(userId) {
     try {
       await Peer.deleteOne({ userId });
-      console.log(`❌ DB: Deleted peerId for userId ${userId}`);
+      console.log('Peer record deleted from DB');
     } catch (err) {
       console.error('❌ Failed to delete peerId from DB:', err);
     }

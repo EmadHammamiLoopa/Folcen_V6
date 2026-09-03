@@ -1,6 +1,5 @@
 const Response = require("./controllers/Response");
 const Report = require("./models/Report");
-const request = require('request');
 
 function simpleHash(str) {
     let hash = 0;

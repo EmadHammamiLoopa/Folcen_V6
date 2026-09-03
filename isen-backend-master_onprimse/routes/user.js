@@ -810,9 +810,8 @@ router.get('/extract/:userId', [requireSignin, withAuthUser, requireLatestTermsP
         const exportFormat = requestedFormat === 'json' ? 'json' : 'csv';
         const actor = req.authUser;
 
-        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Log extraction for GDPR compliance
-        const adminId = req.auth ? req.auth._id : (req.user ? req.user.id : 'unknown');
-        const logMessage = `${new Date().toISOString()} - Admin ${adminId} extracted data for user ${userId}\n`;
+        // Persist export accountability in the structured audit store.
+        // Audit failure remains non-blocking to preserve existing export behaviour.
         try {
             await recordAudit({
                 actorId: actor && actor._id,

@@ -24,11 +24,19 @@ if (!email) {
   process.exit(1);
 }
 
-const admin   = require('firebase-admin');
+const {
+  initializeApp,
+  cert,
+  getApps,
+} = require('firebase-admin/app');
+
+const {
+  getAuth,
+} = require('firebase-admin/auth');
 const mongoose = require('mongoose');
 
 // ── Firebase Admin ────────────────────────────────────────────────────────────
-if (admin.apps.length === 0) {
+if (getApps().length === 0) {
   const {
     FIREBASE_PROJECT_ID: projectId,
     FIREBASE_CLIENT_EMAIL: clientEmail,
@@ -38,9 +46,9 @@ if (admin.apps.length === 0) {
 
   let credential;
   if (saPath) {
-    credential = admin.credential.cert(require(saPath));
+    credential = cert(require(saPath));
   } else if (projectId && clientEmail && rawKey) {
-    credential = admin.credential.cert({
+    credential = cert({
       projectId,
       clientEmail,
       privateKey: rawKey.replace(/\\n/g, '\n'),
@@ -49,7 +57,7 @@ if (admin.apps.length === 0) {
     console.error('[Firebase] Missing credentials. Set FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY.');
     process.exit(1);
   }
-  admin.initializeApp({ credential });
+  initializeApp({ credential });
 }
 
 // ── MongoDB User model (minimal) ──────────────────────────────────────────────
@@ -68,8 +76,9 @@ async function main() {
 
   // 1. Firebase
   try {
-    const fbUser = await admin.auth().getUserByEmail(email);
-    await admin.auth().deleteUser(fbUser.uid);
+    const auth = getAuth();
+    const fbUser = await auth.getUserByEmail(email);
+    await auth.deleteUser(fbUser.uid);
     console.log(`✅  Firebase: deleted (uid=${fbUser.uid})`);
   } catch (e) {
     if (e.code === 'auth/user-not-found') {
