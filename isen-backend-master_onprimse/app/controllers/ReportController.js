@@ -488,6 +488,9 @@ exports.takeActionOnReport = async (req, res) => {
             }
         }
 
+        report.markModified('status');
+        report.markModified('resolutionAction');
+        report.markModified('moderatorNotes');
         await report.save();
 
         return Response.sendResponse(
