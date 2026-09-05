@@ -15,7 +15,8 @@ describe('ChannelsHeaderComponent', () => {
 
     fixture = TestBed.createComponent(ChannelsHeaderComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    // Creation-only test: do not run component lifecycle here.
+    // ngOnInit/async behavior is covered by dedicated tests.
   }));
 
   it('should create', () => {

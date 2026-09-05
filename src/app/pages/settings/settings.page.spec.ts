@@ -1,24 +1,28 @@
-import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
-import { IonicModule } from '@ionic/angular';
-
 import { SettingsPage } from './settings.page';
 
 describe('SettingsPage', () => {
-  let component: SettingsPage;
-  let fixture: ComponentFixture<SettingsPage>;
-
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
-      declarations: [ SettingsPage ],
-      imports: [IonicModule.forRoot()]
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(SettingsPage);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-  }));
-
   it('should create', () => {
+    const component = new SettingsPage(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
     expect(component).toBeTruthy();
+    expect(component.pageLoading).toBeFalse();
+    expect(component.loading).toBeFalse();
+    expect(component.isUpdating).toBeFalse();
+    expect(component.blockedUsers).toEqual([]);
   });
 });

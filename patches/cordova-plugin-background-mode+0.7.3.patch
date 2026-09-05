@@ -1,8 +1,8 @@
 diff --git a/node_modules/cordova-plugin-background-mode/src/android/ForegroundService.java b/node_modules/cordova-plugin-background-mode/src/android/ForegroundService.java
-index 806c956..eb19e18 100644
+index 806c956..bee3a9f 100644
 --- a/node_modules/cordova-plugin-background-mode/src/android/ForegroundService.java
 +++ b/node_modules/cordova-plugin-background-mode/src/android/ForegroundService.java
-@@ -128,7 +128,14 @@ public class ForegroundService extends Service {
+@@ -129,7 +129,12 @@ public class ForegroundService extends Service {
          boolean isSilent    = settings.optBoolean("silent", false);
  
          if (!isSilent) {
@@ -16,7 +16,11 @@ index 806c956..eb19e18 100644
          }
  
          PowerManager pm = (PowerManager)getSystemService(POWER_SERVICE);
-@@ -222,7 +229,7 @@ public class ForegroundService extends Service {
+@@ -222,7 +227,7 @@ public class ForegroundService extends Service {
+             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+             PendingIntent contentIntent = PendingIntent.getActivity(
+                     context, NOTIFICATION_ID, intent,
+-                    PendingIntent.FLAG_UPDATE_CURRENT);
 +                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
  
  

@@ -1,24 +1,35 @@
-import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
-import { IonicModule } from '@ionic/angular';
+import { FormBuilder } from '@angular/forms';
 
 import { SignupComponent } from './signup.component';
 
 describe('SignupComponent', () => {
-  let component: SignupComponent;
-  let fixture: ComponentFixture<SignupComponent>;
-
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
-      declarations: [ SignupComponent ],
-      imports: [IonicModule.forRoot()]
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(SignupComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-  }));
-
   it('should create', () => {
+    const component = new SignupComponent(
+      {} as any,
+      {} as any,
+      {} as any,
+      new FormBuilder(),
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    component.initializeForm();
+
     expect(component).toBeTruthy();
+    expect(component.form).toBeTruthy();
+    expect(component.form.get('email')).toBeTruthy();
+    expect(component.form.get('password')).toBeTruthy();
+    expect(component.form.get('acceptedTerms')).toBeTruthy();
   });
 });

@@ -10,7 +10,10 @@ describe('AvatarCustomizeModalComponent (unit)', () => {
   beforeEach(() => {
     modalCtrl = { dismiss: jasmine.createSpy('dismiss') };
     userService = { updateProfile: jasmine.createSpy('updateProfile').and.returnValue(of({ user: { _id: 'u1' } })) };
-    toastService = { presentToast: jasmine.createSpy('presentToast') };
+    toastService = {
+      presentSuccessToastr: jasmine.createSpy('presentSuccessToastr'),
+      presentErrorToastr: jasmine.createSpy('presentErrorToastr')
+    };
 
     comp = new AvatarCustomizeModalComponent(modalCtrl, userService, toastService);
   });
@@ -50,7 +53,7 @@ describe('AvatarCustomizeModalComponent (unit)', () => {
     expect(userService.updateProfile).toHaveBeenCalled();
     // simulate async response
     userService.updateProfile().subscribe(() => {
-      expect(toastService.presentToast).toHaveBeenCalledWith('Avatar updated successfully');
+      expect(toastService.presentSuccessToastr).toHaveBeenCalledWith('Avatar updated successfully');
       expect(modalCtrl.dismiss).toHaveBeenCalled();
       done();
     });
