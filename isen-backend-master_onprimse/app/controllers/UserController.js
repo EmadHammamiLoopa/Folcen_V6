@@ -1050,6 +1050,34 @@ exports.storeUser = async (req, res) => {
             'User created successfully'
         );
     } catch (err) {
+        const duplicateEmail =
+            err &&
+            err.code === 11000 &&
+            (
+                (
+                    err.keyPattern &&
+                    Object.prototype.hasOwnProperty.call(
+                        err.keyPattern,
+                        'email'
+                    )
+                ) ||
+                (
+                    err.keyValue &&
+                    Object.prototype.hasOwnProperty.call(
+                        err.keyValue,
+                        'email'
+                    )
+                )
+            );
+
+        if (duplicateEmail) {
+            return Response.sendError(
+                res,
+                400,
+                'email already used in another account'
+            );
+        }
+
         logger.error('Error in storeUser:', err);
         return Response.sendError(
             res,
